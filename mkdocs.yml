@@ -82,7 +82,7 @@ nav:
                 - 'api/simulator/instrument_config.md'
                 - 'api/simulator/image_model.md'
         - cryojax.distributions:
-            - 'api/inference/gaussian.md'
+            - 'api/distributions/gaussian.md'
         - cryojax.dataset:
             - 'api/dataset/relion.md'
         - cryojax.io:

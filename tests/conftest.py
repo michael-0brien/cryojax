@@ -10,8 +10,8 @@ from jaxtyping import install_import_hook
 with install_import_hook("cryojax", "typeguard.typechecked"):
     import cryojax.experimental as cxe
     import cryojax.simulator as cxs
-    from cryojax.image import operators as op, rfftn
     from cryojax.io import read_array_with_spacing_from_mrc
+    from cryojax.ndimage import operators as op, rfftn
 
 
 # jax.config.update("jax_numpy_dtype_promotion", "strict")
