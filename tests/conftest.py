@@ -144,7 +144,7 @@ def pose():
 
 @pytest.fixture
 def specimen(potential, pose):
-    return cxs.SingleStructureEnsemble(potential, pose)
+    return cxs.Structure(potential, pose)
 
 
 @pytest.fixture
@@ -155,27 +155,26 @@ def solvent():
 
 
 @pytest.fixture
-def theory(specimen, projection_method, transfer_theory, solvent):
-    return cxs.WeakPhaseScatteringTheory(
-        specimen, projection_method, transfer_theory, solvent
+def theory(projection_method, transfer_theory, solvent):
+    return cxs.WeakPhaseScatteringTheory(projection_method, transfer_theory, solvent)
+
+
+@pytest.fixture
+def theory_with_solvent(projection_method, transfer_theory, solvent):
+    return cxs.WeakPhaseScatteringTheory(projection_method, transfer_theory, solvent)
+
+
+@pytest.fixture
+def noiseless_model(specimen, config, theory):
+    return cxs.IntensityImageModel(
+        structure=specimen, instrument_config=config, scattering_theory=theory
     )
 
 
 @pytest.fixture
-def theory_with_solvent(specimen, projection_method, transfer_theory, solvent):
-    return cxs.WeakPhaseScatteringTheory(
-        specimen, projection_method, transfer_theory, solvent
-    )
-
-
-@pytest.fixture
-def noiseless_model(config, theory):
-    return cxs.IntensityImageModel(instrument_config=config, scattering_theory=theory)
-
-
-@pytest.fixture
-def noisy_model(config, theory_with_solvent, detector):
+def noisy_model(specimen, config, theory_with_solvent, detector):
     return cxs.ElectronCountsImageModel(
+        structure=specimen,
         instrument_config=config,
         scattering_theory=theory_with_solvent,
         detector=detector,

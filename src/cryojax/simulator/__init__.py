@@ -8,9 +8,11 @@ from ._detector import (
 )
 from ._image_model import (
     AbstractImageModel as AbstractImageModel,
+    AbstractPhysicalImageModel as AbstractPhysicalImageModel,
     ContrastImageModel as ContrastImageModel,
     ElectronCountsImageModel as ElectronCountsImageModel,
     IntensityImageModel as IntensityImageModel,
+    LinearImageModel as LinearImageModel,
 )
 from ._instrument_config import InstrumentConfig as InstrumentConfig
 from ._pose import (
@@ -46,12 +48,11 @@ from ._scattering_theory import (
     apply_interaction_constant as apply_interaction_constant,
 )
 from ._solvent import AbstractSolvent as AbstractSolvent
-from ._structural_ensemble import (
-    AbstractConformationalVariable as AbstractConformationalVariable,
+from ._structure import (
+    AbstractBiologicalStructure as AbstractBiologicalStructure,
     AbstractStructuralEnsemble as AbstractStructuralEnsemble,
-    DiscreteConformationalVariable as DiscreteConformationalVariable,
     DiscreteStructuralEnsemble as DiscreteStructuralEnsemble,
-    SingleStructureEnsemble as SingleStructureEnsemble,
+    Structure as Structure,
 )
 from ._transfer_theory import (
     AberratedAstigmaticCTF as AberratedAstigmaticCTF,

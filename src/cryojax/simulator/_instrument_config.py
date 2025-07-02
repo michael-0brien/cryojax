@@ -26,7 +26,7 @@ class InstrumentConfig(eqx.Module, strict=True):
     shape: tuple[int, int] = eqx.field(static=True)
     pixel_size: Float[Array, ""]
     voltage_in_kilovolts: Float[Array, ""]
-    electrons_per_angstrom_squared: Float[Array, ""]
+    electrons_per_angstrom_squared: Optional[Float[Array, ""]]
 
     padded_shape: tuple[int, int] = eqx.field(static=True)
     pad_mode: Union[str, Callable]
@@ -36,7 +36,7 @@ class InstrumentConfig(eqx.Module, strict=True):
         shape: tuple[int, int],
         pixel_size: float | Float[Array, ""],
         voltage_in_kilovolts: float | Float[Array, ""],
-        electrons_per_angstrom_squared: float | Float[Array, ""] = 100.0,
+        electrons_per_angstrom_squared: Optional[float | Float[Array, ""]] = None,
         padded_shape: Optional[tuple[int, int]] = None,
         *,
         pad_scale: float = 1.0,
@@ -68,9 +68,12 @@ class InstrumentConfig(eqx.Module, strict=True):
         self.voltage_in_kilovolts = error_if_not_positive(
             jnp.asarray(voltage_in_kilovolts)
         )
-        self.electrons_per_angstrom_squared = error_if_not_positive(
-            jnp.asarray(electrons_per_angstrom_squared)
-        )
+        if electrons_per_angstrom_squared is None:
+            self.electrons_per_angstrom_squared = error_if_not_positive(
+                jnp.asarray(electrons_per_angstrom_squared)
+            )
+        else:
+            self.electrons_per_angstrom_squared = None
         self.pad_mode = pad_mode
         # Set shape after padding
         if padded_shape is None:
