@@ -168,6 +168,10 @@ class LinearImageModel(AbstractImageModel, strict=True):
     structure: AbstractBiologicalStructure
     potential_integrator: AbstractPotentialIntegrator
     transfer_theory: ContrastTransferTheory
+    instrument_config: InstrumentConfig
+
+    filter: Optional[FilterLike]
+    mask: Optional[MaskLike]
 
     def __init__(
         self,
