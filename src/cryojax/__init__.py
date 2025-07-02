@@ -1,7 +1,7 @@
 from . import (
     constants as constants,
     coordinates as coordinates,
-    data as data,
+    dataset as dataset,
     distributions as distributions,
     experimental as experimental,
     internal as internal,

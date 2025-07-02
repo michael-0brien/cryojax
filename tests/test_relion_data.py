@@ -18,12 +18,12 @@ import pytest
 from jaxtyping import TypeCheckError
 
 import cryojax.simulator as cxs
-from cryojax.data import (
+from cryojax.dataset import (
     RelionParticleParameterFile,
     RelionParticleStackDataset,
     simulate_particle_stack,
 )
-from cryojax.data._particle_data.relion import (
+from cryojax.dataset._particle_data.relion import (
     _validate_starfile_data,
 )
 from cryojax.io import read_array_from_mrc
