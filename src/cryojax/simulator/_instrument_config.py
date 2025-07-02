@@ -69,11 +69,11 @@ class InstrumentConfig(eqx.Module, strict=True):
             jnp.asarray(voltage_in_kilovolts)
         )
         if electrons_per_angstrom_squared is None:
+            self.electrons_per_angstrom_squared = None
+        else:
             self.electrons_per_angstrom_squared = error_if_not_positive(
                 jnp.asarray(electrons_per_angstrom_squared)
             )
-        else:
-            self.electrons_per_angstrom_squared = None
         self.pad_mode = pad_mode
         # Set shape after padding
         if padded_shape is None:
