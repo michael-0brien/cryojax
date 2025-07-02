@@ -9,7 +9,7 @@ from ...ndimage import ifftn, irfftn
 from .._instrument_config import InstrumentConfig
 from .._potential_integrator import AbstractPotentialIntegrator
 from .._solvent import AbstractSolvent
-from .._structural_ensemble import AbstractStructuralEnsemble
+from .._structure import AbstractBiologicalStructure
 from .._transfer_theory import WaveTransferTheory
 from .base_scattering_theory import AbstractWaveScatteringTheory
 from .common_functions import apply_amplitude_contrast_ratio, apply_interaction_constant
@@ -27,7 +27,6 @@ class HighEnergyScatteringTheory(AbstractWaveScatteringTheory, strict=True):
       Optics, Volume 4: Advanced Wave Optics. Academic Press, 2022.*
     """
 
-    structural_ensemble: AbstractStructuralEnsemble
     potential_integrator: AbstractPotentialIntegrator
     transfer_theory: WaveTransferTheory
     solvent: Optional[AbstractSolvent]
@@ -35,7 +34,6 @@ class HighEnergyScatteringTheory(AbstractWaveScatteringTheory, strict=True):
 
     def __init__(
         self,
-        structural_ensemble: AbstractStructuralEnsemble,
         potential_integrator: AbstractPotentialIntegrator,
         transfer_theory: WaveTransferTheory,
         solvent: Optional[AbstractSolvent] = None,
@@ -43,13 +41,11 @@ class HighEnergyScatteringTheory(AbstractWaveScatteringTheory, strict=True):
     ):
         """**Arguments:**
 
-        - `structural_ensemble`: The structural ensemble of scattering potentials.
         - `potential_integrator`: The method for integrating the scattering potential.
         - `transfer_theory`: The wave transfer theory.
         - `solvent`: The model for the solvent.
         - `amplitude_contrast_ratio`: The amplitude contrast ratio.
         """
-        self.structural_ensemble = structural_ensemble
         self.potential_integrator = potential_integrator
         self.transfer_theory = transfer_theory
         self.solvent = solvent
@@ -58,15 +54,14 @@ class HighEnergyScatteringTheory(AbstractWaveScatteringTheory, strict=True):
     @override
     def compute_wavefunction_at_exit_plane(
         self,
+        structure: AbstractBiologicalStructure,
         instrument_config: InstrumentConfig,
         rng_key: Optional[PRNGKeyArray] = None,
     ) -> Complex[
         Array, "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim}"
     ]:
         # Compute the integrated potential in the exit plane
-        potential = self.structural_ensemble.get_potential_in_transformed_frame(
-            apply_translation=False
-        )
+        potential = structure.get_potential_in_transformed_frame(apply_translation=False)
         fourier_integrated_potential = (
             self.potential_integrator.compute_integrated_potential(
                 potential, instrument_config, outputs_real_space=False

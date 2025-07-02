@@ -6,27 +6,47 @@ from abc import abstractmethod
 from typing import Optional
 from typing_extensions import override
 
+import equinox as eqx
 import jax
-from equinox import AbstractVar, Module
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
 from ..ndimage import irfftn, rfftn
 from ..ndimage.transforms import FilterLike, MaskLike
 from ._detector import AbstractDetector
 from ._instrument_config import InstrumentConfig
+from ._potential_integrator import AbstractPotentialIntegrator
 from ._scattering_theory import AbstractScatteringTheory
+from ._structure import AbstractBiologicalStructure
+from ._transfer_theory import ContrastTransferTheory
 
 
-class AbstractImageModel(Module, strict=True):
+ImageArray = (
+    Float[Array, "{self.instrument_config.y_dim} {self.instrument_config.x_dim}"]
+    | Complex[Array, "{self.instrument_config.y_dim} {self.instrument_config.x_dim//2+1}"]
+)
+PaddedImageArray = (
+    Float[
+        Array,
+        "{self.instrument_config.padded_y_dim} " "{self.instrument_config.padded_x_dim}",
+    ]
+    | Complex[
+        Array,
+        "{self.instrument_config.padded_y_dim} "
+        "{self.instrument_config.padded_x_dim//2+1}",
+    ]
+)
+
+
+class AbstractImageModel(eqx.Module, strict=True):
     """Base class for an image formation model.
 
     Call an `AbstractImageModel`'s `render` routine.
     """
 
-    instrument_config: AbstractVar[InstrumentConfig]
-    scattering_theory: AbstractVar[AbstractScatteringTheory]
-    filter: AbstractVar[Optional[FilterLike]]
-    mask: AbstractVar[Optional[MaskLike]]
+    structure: eqx.AbstractVar[AbstractBiologicalStructure]
+    instrument_config: eqx.AbstractVar[InstrumentConfig]
+    filter: eqx.AbstractVar[Optional[FilterLike]]
+    mask: eqx.AbstractVar[Optional[MaskLike]]
 
     @abstractmethod
     def render(
@@ -37,22 +57,7 @@ class AbstractImageModel(Module, strict=True):
         outputs_real_space: bool = True,
         applies_mask: bool = True,
         applies_filter: bool = True,
-    ) -> (
-        Float[Array, "{self.instrument_config.y_dim} {self.instrument_config.x_dim}"]
-        | Float[
-            Array,
-            "{self.instrument_config.padded_y_dim} "
-            "{self.instrument_config.padded_x_dim}",
-        ]
-        | Complex[
-            Array, "{self.instrument_config.y_dim} {self.instrument_config.x_dim//2+1}"
-        ]
-        | Complex[
-            Array,
-            "{self.instrument_config.padded_y_dim} "
-            "{self.instrument_config.padded_x_dim//2+1}",
-        ]
-    ):
+    ) -> ImageArray | PaddedImageArray:
         """Render an image without any stochasticity.
 
         **Arguments:**
@@ -86,13 +91,7 @@ class AbstractImageModel(Module, strict=True):
         outputs_real_space: bool = True,
         applies_mask: bool = True,
         applies_filter: bool = True,
-    ) -> (
-        Float[Array, "{self.instrument_config.y_dim} {self.instrument_config.x_dim}"]
-        | Complex[
-            Array,
-            "{self.instrument_config.y_dim} {self.instrument_config.x_dim//2+1}",
-        ]
-    ):
+    ) -> ImageArray:
         """Return an image postprocessed with filters, cropping, and masking
         in either real or fourier space.
         """
@@ -149,22 +148,7 @@ class AbstractImageModel(Module, strict=True):
         outputs_real_space: bool = True,
         applies_mask: bool = True,
         applies_filter: bool = True,
-    ) -> (
-        Float[Array, "{self.instrument_config.y_dim} {self.instrument_config.x_dim}"]
-        | Float[
-            Array,
-            "{self.instrument_config.padded_y_dim} "
-            "{self.instrument_config.padded_x_dim}",
-        ]
-        | Complex[
-            Array, "{self.instrument_config.y_dim} {self.instrument_config.x_dim//2+1}"
-        ]
-        | Complex[
-            Array,
-            "{self.instrument_config.padded_y_dim} "
-            "{self.instrument_config.padded_x_dim//2+1}",
-        ]
-    ):
+    ) -> PaddedImageArray | ImageArray:
         instrument_config = self.instrument_config
         if removes_padding:
             return self.postprocess(
@@ -181,7 +165,79 @@ class AbstractImageModel(Module, strict=True):
             )
 
 
-class ContrastImageModel(AbstractImageModel, strict=True):
+class LinearImageModel(AbstractImageModel, strict=True):
+    structure: AbstractBiologicalStructure
+    potential_integrator: AbstractPotentialIntegrator
+    transfer_theory: ContrastTransferTheory
+
+    def __init__(
+        self,
+        structure: AbstractBiologicalStructure,
+        potential_integrator: AbstractPotentialIntegrator,
+        transfer_theory: ContrastTransferTheory,
+        instrument_config: InstrumentConfig,
+        *,
+        filter: Optional[FilterLike] = None,
+        mask: Optional[MaskLike] = None,
+    ):
+        self.instrument_config = instrument_config
+        self.potential_integrator = potential_integrator
+        self.structure = structure
+        self.transfer_theory = transfer_theory
+        self.filter = filter
+        self.mask = mask
+
+    @override
+    def render(
+        self,
+        rng_key: Optional[PRNGKeyArray] = None,
+        *,
+        removes_padding: bool = True,
+        outputs_real_space: bool = True,
+        applies_mask: bool = True,
+        applies_filter: bool = True,
+    ) -> ImageArray | PaddedImageArray:
+        # Get potential in the lab frame
+        potential = self.structure.get_potential_in_transformed_frame(
+            apply_translation=False
+        )
+        # Compute the projection image
+        fourier_projection = self.potential_integrator.compute_integrated_potential(
+            potential, self.instrument_config, outputs_real_space=False
+        )
+        # Compute the image
+        image = self.transfer_theory.propagate_object_to_detector_plane(  # noqa: E501
+            fourier_projection,
+            self.instrument_config,
+            is_projection_approximation=self.potential_integrator.is_projection_approximation,
+            defocus_offset=self.structure.pose.offset_z_in_angstroms,
+        )
+        # Now for the in-plane translation
+        translation_operator = self.structure.pose.compute_translation_operator(
+            self.instrument_config.padded_frequency_grid_in_angstroms
+        )
+        image = self.structure.pose.translate_image(
+            image, translation_operator, self.instrument_config.padded_shape
+        )
+
+        return self._maybe_postprocess(
+            image,
+            removes_padding=removes_padding,
+            outputs_real_space=outputs_real_space,
+            applies_mask=applies_mask,
+            applies_filter=applies_filter,
+        )
+
+
+class AbstractPhysicalImageModel(AbstractImageModel, strict=True):
+    """An image formation model that simulates physical
+    quantities. This uses the `AbstractScatteringTheory` class.
+    """
+
+    scattering_theory: eqx.AbstractVar[AbstractScatteringTheory]
+
+
+class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
     """An image formation model that returns the image contrast from a linear
     scattering theory.
 
@@ -223,26 +279,11 @@ class ContrastImageModel(AbstractImageModel, strict=True):
         outputs_real_space: bool = True,
         applies_mask: bool = True,
         applies_filter: bool = True,
-    ) -> (
-        Float[Array, "{self.instrument_config.y_dim} {self.instrument_config.x_dim}"]
-        | Float[
-            Array,
-            "{self.instrument_config.padded_y_dim} "
-            "{self.instrument_config.padded_x_dim}",
-        ]
-        | Complex[
-            Array, "{self.instrument_config.y_dim} {self.instrument_config.x_dim//2+1}"
-        ]
-        | Complex[
-            Array,
-            "{self.instrument_config.padded_y_dim} "
-            "{self.instrument_config.padded_x_dim//2+1}",
-        ]
-    ):
+    ) -> ImageArray | PaddedImageArray:
         # Compute the squared wavefunction
         fourier_contrast_at_detector_plane = (
             self.scattering_theory.compute_contrast_spectrum_at_detector_plane(
-                self.instrument_config, rng_key
+                self.structure, self.instrument_config, rng_key
             )
         )
 
@@ -255,7 +296,7 @@ class ContrastImageModel(AbstractImageModel, strict=True):
         )
 
 
-class IntensityImageModel(AbstractImageModel, strict=True):
+class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
     """An image formation model that returns an intensity distribution---or in other
     words a squared wavefunction.
 
@@ -296,27 +337,11 @@ class IntensityImageModel(AbstractImageModel, strict=True):
         outputs_real_space: bool = True,
         applies_mask: bool = True,
         applies_filter: bool = True,
-    ) -> (
-        Float[Array, "{self.instrument_config.y_dim} {self.instrument_config.x_dim}"]
-        | Float[
-            Array,
-            "{self.instrument_config.padded_y_dim} "
-            "{self.instrument_config.padded_x_dim}",
-        ]
-        | Complex[
-            Array,
-            "{self.instrument_config.y_dim} {self.instrument_config.x_dim//2+1}",
-        ]
-        | Complex[
-            Array,
-            "{self.instrument_config.padded_y_dim} "
-            "{self.instrument_config.padded_x_dim//2+1}",
-        ]
-    ):
+    ) -> ImageArray | PaddedImageArray:
         theory = self.scattering_theory
         fourier_squared_wavefunction_at_detector_plane = (
             theory.compute_intensity_spectrum_at_detector_plane(
-                self.instrument_config, rng_key
+                self.structure, self.instrument_config, rng_key
             )
         )
 
@@ -329,7 +354,7 @@ class IntensityImageModel(AbstractImageModel, strict=True):
         )
 
 
-class ElectronCountsImageModel(AbstractImageModel, strict=True):
+class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
     """An image formation model that returns electron counts, given a
     model for the detector.
 
@@ -374,28 +399,13 @@ class ElectronCountsImageModel(AbstractImageModel, strict=True):
         outputs_real_space: bool = True,
         applies_mask: bool = True,
         applies_filter: bool = True,
-    ) -> (
-        Float[Array, "{self.instrument_config.y_dim} {self.instrument_config.x_dim}"]
-        | Float[
-            Array,
-            "{self.instrument_config.padded_y_dim} "
-            "{self.instrument_config.padded_x_dim}",
-        ]
-        | Complex[
-            Array, "{self.instrument_config.y_dim} {self.instrument_config.x_dim//2+1}"
-        ]
-        | Complex[
-            Array,
-            "{self.instrument_config.padded_y_dim} "
-            "{self.instrument_config.padded_x_dim//2+1}",
-        ]
-    ):
+    ) -> ImageArray | PaddedImageArray:
         if rng_key is None:
             # Compute the squared wavefunction
             theory = self.scattering_theory
             fourier_squared_wavefunction_at_detector_plane = (
                 theory.compute_intensity_spectrum_at_detector_plane(
-                    self.instrument_config
+                    self.structure, self.instrument_config
                 )
             )
             # ... now measure the expected electron events at the detector
@@ -418,7 +428,7 @@ class ElectronCountsImageModel(AbstractImageModel, strict=True):
             theory = self.scattering_theory
             fourier_squared_wavefunction_at_detector_plane = (
                 theory.compute_intensity_spectrum_at_detector_plane(
-                    self.instrument_config, keys[0]
+                    self.structure, self.instrument_config, keys[0]
                 )
             )
             # ... now measure the detector readout
