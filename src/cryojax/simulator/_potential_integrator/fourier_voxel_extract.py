@@ -8,7 +8,7 @@ from typing_extensions import override
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
-from ...image import (
+from ...ndimage import (
     convert_fftn_to_rfftn,
     fftn,
     ifftn,

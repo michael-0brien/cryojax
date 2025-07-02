@@ -14,7 +14,7 @@ import numpy as np
 from equinox import AbstractVar, Module
 from jaxtyping import Array, Complex, Float
 
-from ..image import enforce_self_conjugate_rfftn_components
+from ..ndimage import enforce_self_conjugate_rfftn_components
 from ..rotations import SO3, convert_quaternion_to_euler_angles
 
 

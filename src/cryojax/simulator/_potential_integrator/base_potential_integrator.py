@@ -9,7 +9,7 @@ import jax.numpy as jnp
 from equinox import AbstractClassVar, AbstractVar, Module, error_if
 from jaxtyping import Array, Complex, Float
 
-from ...image import maybe_rescale_pixel_size
+from ...ndimage import maybe_rescale_pixel_size
 from .._instrument_config import InstrumentConfig
 from .._potential_representation import AbstractVoxelPotential
 

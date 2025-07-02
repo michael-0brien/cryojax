@@ -12,12 +12,12 @@ from jaxtyping import Array, Float, Inexact
 
 from ..constants import convert_keV_to_angstroms
 from ..coordinates import make_coordinate_grid, make_frequency_grid
-from ..image import (
+from ..internal import error_if_not_positive
+from ..ndimage import (
     crop_to_shape,
     pad_to_shape,
     resize_with_crop_or_pad,
 )
-from ..internal import error_if_not_positive
 
 
 class InstrumentConfig(eqx.Module, strict=True):

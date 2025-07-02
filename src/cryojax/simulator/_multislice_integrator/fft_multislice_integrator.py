@@ -7,7 +7,7 @@ from equinox import error_if
 from jaxtyping import Array, Complex, Float
 
 from ...coordinates import make_frequency_grid
-from ...image import fftn, ifftn, map_coordinates
+from ...ndimage import fftn, ifftn, map_coordinates
 from .._instrument_config import InstrumentConfig
 from .._potential_representation import AbstractAtomicPotential, RealVoxelGridPotential
 from .._scattering_theory import (

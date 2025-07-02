@@ -11,14 +11,14 @@ import jax.random as jr
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
 from ..constants import PARKHURST2024_POWER_CONSTANTS
-from ..image import ifftn, irfftn
-from ..image.operators import (
+from ..internal import error_if_negative
+from ..ndimage import ifftn, irfftn
+from ..ndimage.operators import (
     AbstractFourierOperator,
     FourierGaussian,
     FourierGaussianWithRadialOffset,
     FourierOperatorLike,
 )
-from ..internal import error_if_negative
 from ._instrument_config import InstrumentConfig
 
 

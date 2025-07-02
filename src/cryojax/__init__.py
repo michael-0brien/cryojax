@@ -4,10 +4,10 @@ from . import (
     data as data,
     distributions as distributions,
     experimental as experimental,
-    image as image,
     internal as internal,
     io as io,
     jax_util as jax_util,
+    ndimage as ndimage,
     rotations as rotations,
     simulator as simulator,
 )

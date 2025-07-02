@@ -26,8 +26,8 @@ from cryojax.data import (
 from cryojax.data._particle_data.relion import (
     _validate_starfile_data,
 )
-from cryojax.image import operators as op
 from cryojax.io import read_array_from_mrc
+from cryojax.ndimage import operators as op
 from cryojax.rotations import SO3
 
 

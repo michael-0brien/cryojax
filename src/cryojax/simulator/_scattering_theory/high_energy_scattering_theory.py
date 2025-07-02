@@ -4,8 +4,8 @@ from typing_extensions import override
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
-from ...image import ifftn, irfftn
 from ...internal import error_if_not_fractional
+from ...ndimage import ifftn, irfftn
 from .._instrument_config import InstrumentConfig
 from .._potential_integrator import AbstractPotentialIntegrator
 from .._solvent import AbstractSolvent

@@ -11,10 +11,10 @@ import jax.random as jr
 from equinox import AbstractVar, field
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
-from ..image import rfftn
-from ..image.operators import Constant, FourierOperatorLike
-from ..image.transforms import AbstractBooleanMask
 from ..internal import NDArrayLike, error_if_not_positive
+from ..ndimage import rfftn
+from ..ndimage.operators import Constant, FourierOperatorLike
+from ..ndimage.transforms import AbstractBooleanMask
 from ..simulator import AbstractImageModel
 from ._base_distribution import AbstractDistribution
 
