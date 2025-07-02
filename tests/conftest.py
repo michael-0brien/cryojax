@@ -91,7 +91,13 @@ def voltage_in_kilovolts():
 
 @pytest.fixture
 def config(pixel_size, voltage_in_kilovolts):
-    return cxs.InstrumentConfig((65, 66), pixel_size, voltage_in_kilovolts, pad_scale=1.1)
+    return cxs.InstrumentConfig(
+        (65, 66),
+        pixel_size,
+        voltage_in_kilovolts,
+        electrons_per_angstrom_squared=50.0,
+        pad_scale=1.1,
+    )
 
 
 @pytest.fixture

@@ -15,7 +15,6 @@ from .common_functions import apply_interaction_constant
 class WeakPhaseScatteringTheory(AbstractWeakPhaseScatteringTheory, strict=True):
     """Base linear image formation theory."""
 
-    structure: AbstractBiologicalStructure
     potential_integrator: AbstractPotentialIntegrator
     transfer_theory: ContrastTransferTheory
     solvent: Optional[AbstractSolvent] = None

@@ -52,7 +52,6 @@ class Structure(AbstractBiologicalStructure, strict=True):
         """
         self.potential = potential
         self.pose = pose or EulerAnglePose()
-        self.conformation = None
 
     @override
     def get_potential_in_body_frame(self) -> AbstractPotentialRepresentation:
