@@ -44,20 +44,24 @@ class AbstractImageModel(eqx.Module, strict=True):
 
     structure: eqx.AbstractVar[AbstractBiologicalStructure]
     instrument_config: eqx.AbstractVar[InstrumentConfig]
-    filter: eqx.AbstractVar[Optional[FilterLike]]
-    mask: eqx.AbstractVar[Optional[MaskLike]]
 
     @abstractmethod
+    def compute_fourier_image(
+        self, rng_key: Optional[PRNGKeyArray] = None
+    ) -> ImageArray | PaddedImageArray:
+        """Render an image without postprocessing."""
+        raise NotImplementedError
+
     def render(
         self,
         rng_key: Optional[PRNGKeyArray] = None,
         *,
         removes_padding: bool = True,
         outputs_real_space: bool = True,
-        applies_mask: bool = True,
-        applies_filter: bool = True,
+        mask: Optional[MaskLike] = None,
+        filter: Optional[FilterLike] = None,
     ) -> ImageArray | PaddedImageArray:
-        """Render an image without any stochasticity.
+        """Render an image.
 
         **Arguments:**
 
@@ -72,59 +76,64 @@ class AbstractImageModel(eqx.Module, strict=True):
             the booleans `applies_mask` and `applies_filter`.
         - `outputs_real_space`:
             If `True`, return the image in real space.
-        - `applies_mask`:
-            If `True`, apply mask stored in `AbstractImageModel.mask`.
-        - `applies_filter`:
-            If `True`, apply filter stored in `AbstractImageModel.filter`.
+        - `mask`:
+            Optionally apply a mask to the image.
+        - `filter`:
+            Optionally apply a filter to the image.
         """
-        raise NotImplementedError
+        fourier_image = self.compute_fourier_image(rng_key)
+
+        return self._maybe_postprocess(
+            fourier_image,
+            removes_padding=removes_padding,
+            outputs_real_space=outputs_real_space,
+            mask=mask,
+            filter=filter,
+        )
 
     def postprocess(
         self,
         image: PaddedFourierImageArray,
         *,
         outputs_real_space: bool = True,
-        applies_mask: bool = True,
-        applies_filter: bool = True,
+        mask: Optional[MaskLike] = None,
+        filter: Optional[FilterLike] = None,
     ) -> ImageArray:
         """Return an image postprocessed with filters, cropping, and masking
         in either real or fourier space.
         """
         instrument_config = self.instrument_config
-        if (
-            self.mask is None
-            and instrument_config.padded_shape == instrument_config.shape
-        ):
+        if mask is None and instrument_config.padded_shape == instrument_config.shape:
             # ... if there are no masks and we don't need to crop,
             # minimize moving back and forth between real and fourier space
-            if self.filter is not None:
-                image = self.filter(image) if applies_filter else image
+            if filter is not None:
+                image = filter(image)
             return (
                 irfftn(image, s=instrument_config.shape) if outputs_real_space else image
             )
         else:
             # ... otherwise, apply filter, crop, and mask, again trying to
             # minimize moving back and forth between real and fourier space
-            is_filter_applied = True if self.filter is None else False
+            is_filter_applied = True if filter is None else False
             if (
-                self.filter is not None
-                and self.filter.array.shape
+                filter is not None
+                and filter.array.shape
                 == instrument_config.padded_frequency_grid_in_pixels.shape[0:2]
             ):
                 # ... apply the filter here if it is the same size as the padded
                 # coordinates
                 is_filter_applied = True
-                image = self.filter(image) if applies_filter else image
+                image = filter(image)
             image = irfftn(image, s=instrument_config.padded_shape)
             image = instrument_config.crop_to_shape(image)
-            if self.mask is not None:
-                image = self.mask(image) if applies_mask else image
-            if is_filter_applied or self.filter is None:
+            if mask is not None:
+                image = mask(image)
+            if is_filter_applied or filter is None:
                 return image if outputs_real_space else rfftn(image)
             else:
                 # ... otherwise, apply the filter here and return. assume
                 # the filter is the same size as the non-padded coordinates
-                image = self.filter(rfftn(image)) if applies_filter else rfftn(image)
+                image = filter(rfftn(image))
                 return (
                     irfftn(image, s=instrument_config.shape)
                     if outputs_real_space
@@ -152,16 +161,13 @@ class AbstractImageModel(eqx.Module, strict=True):
         *,
         removes_padding: bool = True,
         outputs_real_space: bool = True,
-        applies_mask: bool = True,
-        applies_filter: bool = True,
+        mask: Optional[MaskLike] = None,
+        filter: Optional[FilterLike] = None,
     ) -> PaddedImageArray | ImageArray:
         instrument_config = self.instrument_config
         if removes_padding:
             return self.postprocess(
-                image,
-                outputs_real_space=outputs_real_space,
-                applies_mask=applies_mask,
-                applies_filter=applies_filter,
+                image, outputs_real_space=outputs_real_space, mask=mask, filter=filter
             )
         else:
             return (
@@ -179,35 +185,21 @@ class LinearImageModel(AbstractImageModel, strict=True):
     transfer_theory: ContrastTransferTheory
     instrument_config: InstrumentConfig
 
-    filter: Optional[FilterLike]
-    mask: Optional[MaskLike]
-
     def __init__(
         self,
         structure: AbstractBiologicalStructure,
         potential_integrator: AbstractPotentialIntegrator,
         transfer_theory: ContrastTransferTheory,
         instrument_config: InstrumentConfig,
-        *,
-        filter: Optional[FilterLike] = None,
-        mask: Optional[MaskLike] = None,
     ):
         self.instrument_config = instrument_config
         self.potential_integrator = potential_integrator
         self.structure = structure
         self.transfer_theory = transfer_theory
-        self.filter = filter
-        self.mask = mask
 
     @override
-    def render(
-        self,
-        rng_key: Optional[PRNGKeyArray] = None,
-        *,
-        removes_padding: bool = True,
-        outputs_real_space: bool = True,
-        applies_mask: bool = True,
-        applies_filter: bool = True,
+    def compute_fourier_image(
+        self, rng_key: Optional[PRNGKeyArray] = None
     ) -> ImageArray | PaddedImageArray:
         # Get potential in the lab frame
         potential = self.structure.get_potential_in_transformed_frame(
@@ -227,10 +219,4 @@ class LinearImageModel(AbstractImageModel, strict=True):
         # Now for the in-plane translation
         fourier_image = self._apply_translation(fourier_image)
 
-        return self._maybe_postprocess(
-            fourier_image,
-            removes_padding=removes_padding,
-            outputs_real_space=outputs_real_space,
-            applies_mask=applies_mask,
-            applies_filter=applies_filter,
-        )
+        return fourier_image

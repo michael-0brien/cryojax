@@ -9,7 +9,6 @@ import equinox as eqx
 import jax
 from jaxtyping import PRNGKeyArray
 
-from ...ndimage.transforms import FilterLike, MaskLike
 from .._detector import AbstractDetector
 from .._instrument_config import InstrumentConfig
 from .._scattering_theory import AbstractScatteringTheory
@@ -34,17 +33,11 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
     instrument_config: InstrumentConfig
     scattering_theory: AbstractScatteringTheory
 
-    filter: Optional[FilterLike]
-    mask: Optional[MaskLike]
-
     def __init__(
         self,
         structure: AbstractBiologicalStructure,
         instrument_config: InstrumentConfig,
         scattering_theory: AbstractScatteringTheory,
-        *,
-        filter: Optional[FilterLike] = None,
-        mask: Optional[MaskLike] = None,
     ):
         """**Arguments:**
 
@@ -55,24 +48,14 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
             and the wavelength.
         - `scattering_theory`:
             The scattering theory.
-        - `filter: `A filter to apply to the image.
-        - `mask`: A mask to apply to the image.
         """
         self.structure = structure
         self.instrument_config = instrument_config
         self.scattering_theory = scattering_theory
-        self.filter = filter
-        self.mask = mask
 
     @override
-    def render(
-        self,
-        rng_key: Optional[PRNGKeyArray] = None,
-        *,
-        removes_padding: bool = True,
-        outputs_real_space: bool = True,
-        applies_mask: bool = True,
-        applies_filter: bool = True,
+    def compute_fourier_image(
+        self, rng_key: Optional[PRNGKeyArray] = None
     ) -> ImageArray | PaddedImageArray:
         # Get the potential
         potential = self.structure.get_potential_in_transformed_frame()
@@ -90,13 +73,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
             contrast_spectrum_at_detector_plane
         )
 
-        return self._maybe_postprocess(
-            contrast_spectrum_at_detector_plane,
-            removes_padding=removes_padding,
-            outputs_real_space=outputs_real_space,
-            applies_mask=applies_mask,
-            applies_filter=applies_filter,
-        )
+        return contrast_spectrum_at_detector_plane
 
 
 class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
@@ -116,17 +93,11 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
     instrument_config: InstrumentConfig
     scattering_theory: AbstractScatteringTheory
 
-    filter: Optional[FilterLike]
-    mask: Optional[MaskLike]
-
     def __init__(
         self,
         structure: AbstractBiologicalStructure,
         instrument_config: InstrumentConfig,
         scattering_theory: AbstractScatteringTheory,
-        *,
-        filter: Optional[FilterLike] = None,
-        mask: Optional[MaskLike] = None,
     ):
         """**Arguments:**
 
@@ -137,24 +108,14 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
             and the wavelength.
         - `scattering_theory`:
             The scattering theory.
-        - `filter: `A filter to apply to the image.
-        - `mask`: A mask to apply to the image.
         """
         self.structure = structure
         self.instrument_config = instrument_config
         self.scattering_theory = scattering_theory
-        self.filter = filter
-        self.mask = mask
 
     @override
-    def render(
-        self,
-        rng_key: Optional[PRNGKeyArray] = None,
-        *,
-        removes_padding: bool = True,
-        outputs_real_space: bool = True,
-        applies_mask: bool = True,
-        applies_filter: bool = True,
+    def compute_fourier_image(
+        self, rng_key: Optional[PRNGKeyArray] = None
     ) -> ImageArray | PaddedImageArray:
         potential = self.structure.get_potential_in_transformed_frame()
         scattering_theory = self.scattering_theory
@@ -170,13 +131,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
             fourier_intensity_at_detector_plane
         )
 
-        return self._maybe_postprocess(
-            fourier_intensity_at_detector_plane,
-            removes_padding=removes_padding,
-            outputs_real_space=outputs_real_space,
-            applies_mask=applies_mask,
-            applies_filter=applies_filter,
-        )
+        return fourier_intensity_at_detector_plane
 
 
 class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
@@ -189,18 +144,12 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
     scattering_theory: AbstractScatteringTheory
     detector: AbstractDetector
 
-    filter: Optional[FilterLike]
-    mask: Optional[MaskLike]
-
     def __init__(
         self,
         structure: AbstractBiologicalStructure,
         instrument_config: InstrumentConfig,
         scattering_theory: AbstractScatteringTheory,
         detector: AbstractDetector,
-        *,
-        filter: Optional[FilterLike] = None,
-        mask: Optional[MaskLike] = None,
     ):
         """**Arguments:**
 
@@ -211,25 +160,15 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
             and the wavelength.
         - `scattering_theory`:
             The scattering theory.
-        - `filter: `A filter to apply to the image.
-        - `mask`: A mask to apply to the image.
         """
         self.structure = structure
         self.instrument_config = instrument_config
         self.scattering_theory = scattering_theory
         self.detector = detector
-        self.filter = filter
-        self.mask = mask
 
     @override
-    def render(
-        self,
-        rng_key: Optional[PRNGKeyArray] = None,
-        *,
-        removes_padding: bool = True,
-        outputs_real_space: bool = True,
-        applies_mask: bool = True,
-        applies_filter: bool = True,
+    def compute_fourier_image(
+        self, rng_key: Optional[PRNGKeyArray] = None
     ) -> ImageArray | PaddedImageArray:
         potential = self.structure.get_potential_in_transformed_frame()
         if rng_key is None:
@@ -252,13 +191,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
                 )
             )
 
-            return self._maybe_postprocess(
-                fourier_expected_electron_events,
-                removes_padding=removes_padding,
-                outputs_real_space=outputs_real_space,
-                applies_mask=applies_mask,
-                applies_filter=applies_filter,
-            )
+            return fourier_expected_electron_events
         else:
             keys = jax.random.split(rng_key)
             # Compute the squared wavefunction
@@ -281,10 +214,4 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
                 self.instrument_config,
             )
 
-            return self._maybe_postprocess(
-                fourier_detector_readout,
-                removes_padding=removes_padding,
-                outputs_real_space=outputs_real_space,
-                applies_mask=applies_mask,
-                applies_filter=applies_filter,
-            )
+            return fourier_detector_readout
