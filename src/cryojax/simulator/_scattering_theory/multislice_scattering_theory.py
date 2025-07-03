@@ -35,7 +35,7 @@ class MultisliceScatteringTheory(AbstractWaveScatteringTheory, strict=True):
         self.amplitude_contrast_ratio = error_if_not_fractional(amplitude_contrast_ratio)
 
     @override
-    def compute_wavefunction_at_exit_plane(
+    def compute_wavefunction(
         self,
         potential: AbstractPotentialRepresentation,
         instrument_config: InstrumentConfig,
@@ -44,10 +44,8 @@ class MultisliceScatteringTheory(AbstractWaveScatteringTheory, strict=True):
         Array, "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim}"
     ]:
         # Compute the wavefunction in the exit plane
-        wavefunction_at_exit_plane = (
-            self.multislice_integrator.compute_wavefunction_at_exit_plane(
-                potential, instrument_config, self.amplitude_contrast_ratio
-            )
+        wavefunction = self.multislice_integrator(
+            potential, instrument_config, self.amplitude_contrast_ratio
         )
 
-        return wavefunction_at_exit_plane
+        return wavefunction

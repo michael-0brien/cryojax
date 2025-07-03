@@ -62,7 +62,7 @@ class FourierSliceExtraction(AbstractVoxelPotentialIntegrator, strict=True):
         self.fill_value = fill_value
 
     @override
-    def compute_integrated_potential(
+    def integrate(
         self,
         potential: FourierVoxelGridPotential | FourierVoxelSplinePotential,
         instrument_config: InstrumentConfig,
@@ -97,12 +97,14 @@ class FourierSliceExtraction(AbstractVoxelPotentialIntegrator, strict=True):
             )
         # Compute the fourier projection
         if isinstance(potential, FourierVoxelSplinePotential):
-            fourier_projection = self.extract_fourier_slice_from_spline_coefficients(
-                potential.spline_coefficients,
-                frequency_slice,
+            fourier_in_plane_potential = (
+                self.extract_fourier_slice_from_spline_coefficients(
+                    potential.spline_coefficients,
+                    frequency_slice,
+                )
             )
         elif isinstance(potential, FourierVoxelGridPotential):
-            fourier_projection = self.extract_fourier_slice_from_grid_points(
+            fourier_in_plane_potential = self.extract_fourier_slice_from_grid_points(
                 potential.fourier_voxel_grid,
                 frequency_slice,
             )
@@ -114,18 +116,18 @@ class FourierSliceExtraction(AbstractVoxelPotentialIntegrator, strict=True):
 
         # Resize the image to match the InstrumentConfig.padded_shape
         if instrument_config.padded_shape != (N, N):
-            fourier_projection = rfftn(
+            fourier_in_plane_potential = rfftn(
                 instrument_config.crop_or_pad_to_padded_shape(
-                    irfftn(fourier_projection, s=(N, N))
+                    irfftn(fourier_in_plane_potential, s=(N, N))
                 )
             )
-        fourier_projection = self._convert_raw_image_to_integrated_potential(
-            fourier_projection, potential, instrument_config, input_is_rfft=True
+        fourier_in_plane_potential = self._convert_raw_image_to_integrated_potential(
+            fourier_in_plane_potential, potential, instrument_config, input_is_rfft=True
         )
         return (
-            irfftn(fourier_projection, s=instrument_config.padded_shape)
+            irfftn(fourier_in_plane_potential, s=instrument_config.padded_shape)
             if outputs_real_space
-            else fourier_projection
+            else fourier_in_plane_potential
         )
 
     def extract_fourier_slice_from_spline_coefficients(
@@ -239,7 +241,7 @@ class EwaldSphereExtraction(AbstractVoxelPotentialIntegrator, strict=True):
         self.fill_value = fill_value
 
     @override
-    def compute_integrated_potential(
+    def integrate(
         self,
         potential: FourierVoxelGridPotential | FourierVoxelSplinePotential,
         instrument_config: InstrumentConfig,

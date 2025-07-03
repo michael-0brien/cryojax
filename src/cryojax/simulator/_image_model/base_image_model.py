@@ -206,11 +206,11 @@ class LinearImageModel(AbstractImageModel, strict=True):
             apply_translation=False
         )
         # Compute the projection image
-        fourier_projection = self.potential_integrator.compute_integrated_potential(
+        fourier_projection = self.potential_integrator.integrate(
             potential, self.instrument_config, outputs_real_space=False
         )
         # Compute the image
-        fourier_image = self.transfer_theory.propagate_object_to_detector_plane(  # noqa: E501
+        fourier_image = self.transfer_theory.propagate_object(  # noqa: E501
             fourier_projection,
             self.instrument_config,
             is_projection_approximation=self.potential_integrator.is_projection_approximation,

@@ -47,7 +47,7 @@ from ._scattering_theory import (
     apply_amplitude_contrast_ratio as apply_amplitude_contrast_ratio,
     apply_interaction_constant as apply_interaction_constant,
 )
-from ._solvent import AbstractSolvent as AbstractSolvent
+from ._solvent import AbstractRandomSolvent as AbstractRandomSolvent
 from ._structure import (
     AbstractBiologicalStructure as AbstractBiologicalStructure,
     AbstractStructuralEnsemble as AbstractStructuralEnsemble,

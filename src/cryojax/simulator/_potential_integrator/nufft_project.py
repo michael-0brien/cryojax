@@ -66,7 +66,7 @@ class NufftProjection(
         return _project_with_nufft(weights, coordinate_list_in_angstroms, shape, self.eps)
 
     @override
-    def compute_integrated_potential(
+    def integrate(
         self,
         potential: RealVoxelGridPotential | RealVoxelCloudPotential,
         instrument_config: InstrumentConfig,
@@ -95,13 +95,13 @@ class NufftProjection(
         """
         if isinstance(potential, RealVoxelGridPotential):
             shape = potential.shape
-            fourier_projection = self.project_voxel_cloud_with_nufft(
+            fourier_in_plane_potential = self.project_voxel_cloud_with_nufft(
                 potential.real_voxel_grid.ravel(),
                 potential.coordinate_grid_in_pixels.reshape((math.prod(shape), 3)),
                 instrument_config.padded_shape,
             )
         elif isinstance(potential, RealVoxelCloudPotential):
-            fourier_projection = self.project_voxel_cloud_with_nufft(
+            fourier_in_plane_potential = self.project_voxel_cloud_with_nufft(
                 potential.voxel_weights,
                 potential.coordinate_list_in_pixels,
                 instrument_config.padded_shape,
@@ -111,13 +111,13 @@ class NufftProjection(
                 "Supported types for `potential` are `RealVoxelGridPotential` and "
                 "`RealVoxelCloudPotential`."
             )
-        fourier_projection = self._convert_raw_image_to_integrated_potential(
-            fourier_projection, potential, instrument_config, input_is_rfft=True
+        fourier_in_plane_potential = self._convert_raw_image_to_integrated_potential(
+            fourier_in_plane_potential, potential, instrument_config, input_is_rfft=True
         )
         return (
-            irfftn(fourier_projection, s=instrument_config.padded_shape)
+            irfftn(fourier_in_plane_potential, s=instrument_config.padded_shape)
             if outputs_real_space
-            else fourier_projection
+            else fourier_in_plane_potential
         )
 
 

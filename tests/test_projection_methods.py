@@ -198,12 +198,10 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
 @eqx.filter_jit
 def compute_projection(
     potential: cxs.AbstractPotentialRepresentation,
-    method: cxs.AbstractPotentialIntegrator,
+    integrator: cxs.AbstractPotentialIntegrator,
     config: cxs.InstrumentConfig,
 ) -> Array:
-    fourier_projection = method.compute_integrated_potential(
-        potential, config, outputs_real_space=False
-    )
+    fourier_projection = integrator.integrate(potential, config, outputs_real_space=False)
     return crop_to_shape(
         irfftn(
             fourier_projection,
@@ -216,12 +214,12 @@ def compute_projection(
 @eqx.filter_jit
 def compute_projection_at_pose(
     potential: cxs.AbstractPotentialRepresentation,
-    method: cxs.AbstractPotentialIntegrator,
+    integrator: cxs.AbstractPotentialIntegrator,
     pose: cxs.AbstractPose,
     config: cxs.InstrumentConfig,
 ) -> Array:
     rotated_potential = potential.rotate_to_pose(pose)
-    fourier_projection = method.compute_integrated_potential(
+    fourier_projection = integrator.integrate(
         rotated_potential, config, outputs_real_space=False
     )
     translation_operator = pose.compute_translation_operator(

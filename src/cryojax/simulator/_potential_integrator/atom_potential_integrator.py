@@ -76,7 +76,7 @@ class GaussianMixtureProjection(
             )
 
     @override
-    def compute_integrated_potential(
+    def integrate(
         self,
         potential: GaussianMixtureAtomicPotential | PengAtomicPotential,
         instrument_config: InstrumentConfig,
@@ -133,7 +133,7 @@ class GaussianMixtureProjection(
                 "`GaussianMixtureAtomicPotential`."
             )
         # Compute the projection
-        projection = _compute_projected_potential_from_atoms(
+        in_plane_potential = _compute_projected_potential_from_atoms(
             upsampled_shape,
             upsampled_pixel_size,
             potential.atom_positions,
@@ -148,28 +148,40 @@ class GaussianMixtureProjection(
             n_pixels, upsampled_n_pixels = math.prod(shape), math.prod(upsampled_shape)
             if self.shape is None:
                 return downsample_to_shape_with_fourier_cropping(
-                    projection * (n_pixels / upsampled_n_pixels),
+                    in_plane_potential * (n_pixels / upsampled_n_pixels),
                     downsampled_shape=shape,
                     outputs_real_space=outputs_real_space,
                 )
             else:
-                projection = downsample_to_shape_with_fourier_cropping(
-                    projection * (n_pixels / upsampled_n_pixels),
+                in_plane_potential = downsample_to_shape_with_fourier_cropping(
+                    in_plane_potential * (n_pixels / upsampled_n_pixels),
                     downsampled_shape=shape,
                     outputs_real_space=True,
                 )
-                projection = resize_with_crop_or_pad(
-                    projection, instrument_config.padded_shape
+                in_plane_potential = resize_with_crop_or_pad(
+                    in_plane_potential, instrument_config.padded_shape
                 )
-                return projection if outputs_real_space else rfftn(projection)
+                return (
+                    in_plane_potential
+                    if outputs_real_space
+                    else rfftn(in_plane_potential)
+                )
         else:
             if self.shape is None:
-                return projection if outputs_real_space else rfftn(projection)
-            else:
-                projection = resize_with_crop_or_pad(
-                    projection, instrument_config.padded_shape
+                return (
+                    in_plane_potential
+                    if outputs_real_space
+                    else rfftn(in_plane_potential)
                 )
-                return projection if outputs_real_space else rfftn(projection)
+            else:
+                in_plane_potential = resize_with_crop_or_pad(
+                    in_plane_potential, instrument_config.padded_shape
+                )
+                return (
+                    in_plane_potential
+                    if outputs_real_space
+                    else rfftn(in_plane_potential)
+                )
 
 
 def _compute_projected_potential_from_atoms(

@@ -26,7 +26,7 @@ class AbstractPotentialIntegrator(Module, Generic[PotentialT], strict=True):
     is_projection_approximation: AbstractClassVar[bool]
 
     @abstractmethod
-    def compute_integrated_potential(
+    def integrate(
         self,
         potential: PotentialT,
         instrument_config: InstrumentConfig,
@@ -55,7 +55,7 @@ class AbstractVoxelPotentialIntegrator(
 
     def _convert_raw_image_to_integrated_potential(
         self,
-        fourier_integrated_potential_without_postprocess,
+        fourier_in_plane_potential_without_postprocess,
         potential,
         instrument_config,
         input_is_rfft,
@@ -64,8 +64,8 @@ class AbstractVoxelPotentialIntegrator(
         `instrument_config.pixel_size` and the `instrument_config.padded_shape.`
         """
         if self.pixel_size_rescaling_method is None:
-            fourier_integrated_potential = error_if(
-                potential.voxel_size * fourier_integrated_potential_without_postprocess,
+            fourier_in_plane_potential = error_if(
+                potential.voxel_size * fourier_in_plane_potential_without_postprocess,
                 ~jnp.isclose(potential.voxel_size, instrument_config.pixel_size),
                 f"Tried to use {type(self).__name__} with `{type(potential).__name__}."
                 "voxel_size != InstrumentConfig.pixel_size`. If this is true, then "
@@ -73,14 +73,14 @@ class AbstractVoxelPotentialIntegrator(
                 f"`None`. Try setting `{type(self).__name__}.pixel_size_rescaling_method "
                 "= 'bicubic'`.",
             )
-            return fourier_integrated_potential
+            return fourier_in_plane_potential
         else:
-            fourier_integrated_potential = maybe_rescale_pixel_size(
-                potential.voxel_size * fourier_integrated_potential_without_postprocess,
+            fourier_in_plane_potential = maybe_rescale_pixel_size(
+                potential.voxel_size * fourier_in_plane_potential_without_postprocess,
                 potential.voxel_size,
                 instrument_config.pixel_size,
                 input_is_real=False,
                 input_is_rfft=input_is_rfft,
                 shape_in_real_space=instrument_config.padded_shape,
             )
-            return fourier_integrated_potential
+            return fourier_in_plane_potential

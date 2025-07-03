@@ -14,7 +14,7 @@ class AbstractMultisliceIntegrator(Module, Generic[PotentialT], strict=True):
     """Base class for a multi-slice integration scheme."""
 
     @abstractmethod
-    def compute_wavefunction_at_exit_plane(
+    def integrate(
         self,
         potential: PotentialT,
         instrument_config: InstrumentConfig,

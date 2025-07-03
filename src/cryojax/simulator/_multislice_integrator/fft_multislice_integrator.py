@@ -56,7 +56,7 @@ class FFTMultisliceIntegrator(
         self.options_for_rasterization = options_for_rasterization
 
     @override
-    def compute_wavefunction_at_exit_plane(
+    def integrate(
         self,
         potential: AbstractAtomicPotential | RealVoxelGridPotential,
         instrument_config: InstrumentConfig,

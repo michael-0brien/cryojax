@@ -69,14 +69,14 @@ class SolventMixturePower(AbstractFourierOperator, strict=True):
         return mixture_function(frequency_grid_in_angstroms)
 
 
-class AbstractSolvent(eqx.Module, strict=True):
+class AbstractRandomSolvent(eqx.Module, strict=True):
     """Base class for a model of the solvent in cryo-EM."""
 
     thickness_in_angstroms: eqx.AbstractVar[Float[Array, ""]]
     potential_scale: eqx.AbstractVar[float]
 
     @abstractmethod
-    def sample_solvent_integrated_potential(
+    def sample_solvent_in_plane_potential(
         self,
         rng_key: PRNGKeyArray,
         instrument_config: InstrumentConfig,
@@ -100,10 +100,10 @@ class AbstractSolvent(eqx.Module, strict=True):
         at the exit plane."""
         raise NotImplementedError
 
-    def compute_integrated_potential_with_solvent(
+    def compute_in_plane_potential(
         self,
         rng_key: PRNGKeyArray,
-        fourier_integrated_potential_of_specimen: (
+        fourier_in_plane_potential: (
             Complex[
                 Array,
                 "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim//2+1}",
@@ -134,34 +134,29 @@ class AbstractSolvent(eqx.Module, strict=True):
         # Sample the realization of the phase due to the ice.
         # TODO: this function will also handle masking from a model for the
         # solvent shell.
-        fourier_integrated_potential_of_solvent = (
-            self.sample_solvent_integrated_potential(
-                rng_key,
-                instrument_config,
-                outputs_rfft=input_is_rfft,
-                outputs_real_space=False,
-            )
+        fourier_in_plane_potential_of_solvent = self.sample_solvent_in_plane_potential(
+            rng_key,
+            instrument_config,
+            outputs_rfft=input_is_rfft,
+            outputs_real_space=False,
         )
-        fourier_integrated_potential = (
-            fourier_integrated_potential_of_solvent
-            + fourier_integrated_potential_of_specimen
+        fourier_in_plane_potential = (
+            fourier_in_plane_potential_of_solvent + fourier_in_plane_potential
         )
 
         if outputs_real_space:
             if input_is_rfft:
                 return irfftn(
-                    fourier_integrated_potential,
+                    fourier_in_plane_potential,
                     s=instrument_config.padded_shape,
                 )
             else:
-                return ifftn(
-                    fourier_integrated_potential, s=instrument_config.padded_shape
-                )
+                return ifftn(fourier_in_plane_potential, s=instrument_config.padded_shape)
         else:
-            return fourier_integrated_potential
+            return fourier_in_plane_potential
 
 
-class GRFSolvent(AbstractSolvent, strict=True):
+class GRFSolvent(AbstractRandomSolvent, strict=True):
     r"""Solvent modeled as a gaussian random field (GRF)."""
 
     thickness_in_angstroms: Float[Array, ""]
@@ -202,7 +197,7 @@ class GRFSolvent(AbstractSolvent, strict=True):
         )
 
     @override
-    def sample_solvent_integrated_potential(
+    def sample_solvent_in_plane_potential(
         self,
         rng_key: PRNGKeyArray,
         instrument_config: InstrumentConfig,
@@ -222,8 +217,8 @@ class GRFSolvent(AbstractSolvent, strict=True):
             "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim}",
         ]
     ):
-        """Sample a realization of the ice integrated potential as a gaussian
-        random field.
+        """Sample a realization of the ice integrated potential
+        as a gaussian random field.
         """
         n_pixels = instrument_config.padded_n_pixels
         if outputs_real_space:
@@ -250,13 +245,13 @@ class GRFSolvent(AbstractSolvent, strict=True):
             dtype=complex,
         ).at[0, 0].set(0.0)
         # Apply dimensionful scalings to get the potential
-        fourier_integrated_potential_of_solvent = (
+        fourier_in_plane_potential_of_solvent = (
             self.potential_scale * self.thickness_in_angstroms
         ) * solvent_grf
         if outputs_real_space:
             return irfftn(
-                fourier_integrated_potential_of_solvent,
+                fourier_in_plane_potential_of_solvent,
                 s=instrument_config.padded_shape,
             )
         else:
-            return fourier_integrated_potential_of_solvent
+            return fourier_in_plane_potential_of_solvent

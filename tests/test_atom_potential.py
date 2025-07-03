@@ -51,7 +51,7 @@ def test_atom_potential_integrator_shape(sample_pdb_path, shape):
         voltage_in_kilovolts=300.0,
     )
     # ... compute the integrated volumetric_potential
-    fourier_integrated_potential = potential_integrator.compute_integrated_potential(
+    fourier_integrated_potential = potential_integrator(
         atom_potential, instrument_config, outputs_real_space=False
     )
 
@@ -99,12 +99,8 @@ def test_downsampled_gmm_potential_agreement(sample_pdb_path):
         voltage_in_kilovolts=300.0,
     )
     # ... compute the integrated volumetric_potential
-    image_from_hires = integrator_int_hires.compute_integrated_potential(
-        atom_potential, instrument_config
-    )
-    image_lowres = integrator_int_lowres.compute_integrated_potential(
-        atom_potential, instrument_config
-    )
+    image_from_hires = integrator_int_hires(atom_potential, instrument_config)
+    image_lowres = integrator_int_lowres(atom_potential, instrument_config)
 
     assert image_from_hires.shape == image_lowres.shape
 
@@ -146,12 +142,8 @@ def test_peng_vs_gmm_agreement(sample_pdb_path):
 
     # Compute projections
     integrator = GaussianMixtureProjection(upsampling_factor=1)
-    projection_gmm = integrator.compute_integrated_potential(
-        gmm_potential, instrument_config
-    )
-    projection_peng = integrator.compute_integrated_potential(
-        atom_potential, instrument_config
-    )
+    projection_gmm = integrator(gmm_potential, instrument_config)
+    projection_peng = integrator(atom_potential, instrument_config)
 
     np.testing.assert_allclose(projection_gmm, projection_peng)
 
@@ -186,9 +178,7 @@ class TestBuildRealSpaceVoxelsFromAtoms:
         # Build the potential integrators
         integrator = GaussianMixtureProjection()
         # Compute projections
-        projection = integrator.compute_integrated_potential(
-            atomic_potential, instrument_config
-        )
+        projection = integrator(atomic_potential, instrument_config)
         projection = irfftn(projection)
 
         # Find the maximum
@@ -223,9 +213,7 @@ class TestBuildRealSpaceVoxelsFromAtoms:
         # Build the potential integrators
         integrator = GaussianMixtureProjection()
         # Compute projections
-        projection = integrator.compute_integrated_potential(
-            atomic_potential, instrument_config
-        )
+        projection = integrator(atomic_potential, instrument_config)
         projection = irfftn(projection)
 
         integral = jnp.sum(projection) * voxel_size**2

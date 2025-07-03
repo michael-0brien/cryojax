@@ -19,7 +19,7 @@ class AbstractScatteringTheory(eqx.Module, strict=True):
     """Base class for a scattering theory."""
 
     @abstractmethod
-    def compute_contrast_spectrum_at_detector_plane(
+    def compute_contrast_spectrum(
         self,
         potential: AbstractPotentialRepresentation,
         instrument_config: InstrumentConfig,
@@ -31,7 +31,7 @@ class AbstractScatteringTheory(eqx.Module, strict=True):
         raise NotImplementedError
 
     @abstractmethod
-    def compute_intensity_spectrum_at_detector_plane(
+    def compute_intensity_spectrum(
         self,
         potential: AbstractPotentialRepresentation,
         instrument_config: InstrumentConfig,
@@ -50,7 +50,7 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
     amplitude_contrast_ratio: eqx.AbstractVar[Float[Array, ""]]
 
     @abstractmethod
-    def compute_wavefunction_at_exit_plane(
+    def compute_wavefunction(
         self,
         potential: AbstractPotentialRepresentation,
         instrument_config: InstrumentConfig,
@@ -61,7 +61,7 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
         raise NotImplementedError
 
     @override
-    def compute_intensity_spectrum_at_detector_plane(
+    def compute_intensity_spectrum(
         self,
         potential: AbstractPotentialRepresentation,
         instrument_config: InstrumentConfig,
@@ -71,29 +71,23 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
         Array, "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim//2+1}"
     ]:
         # ... compute the exit wave
-        fourier_wavefunction_at_exit_plane = fftn(
-            self.compute_wavefunction_at_exit_plane(potential, instrument_config, rng_key)
+        fourier_wavefunction = fftn(
+            self.compute_wavefunction(potential, instrument_config, rng_key)
         )
         # ... propagate to the detector plane
-        fourier_wavefunction_at_detector_plane = (
-            self.transfer_theory.propagate_wavefunction_to_detector_plane(
-                fourier_wavefunction_at_exit_plane,
-                instrument_config,
-                defocus_offset=defocus_offset,
-            )
+        fourier_wavefunction = self.transfer_theory.propagate_wavefunction(
+            fourier_wavefunction,
+            instrument_config,
+            defocus_offset=defocus_offset,
         )
-        wavefunction_at_detector_plane = ifftn(fourier_wavefunction_at_detector_plane)
+        wavefunction = ifftn(fourier_wavefunction)
         # ... get the squared wavefunction and return to fourier space
-        intensity_spectrum_at_detector_plane = rfftn(
-            (
-                wavefunction_at_detector_plane * jnp.conj(wavefunction_at_detector_plane)
-            ).real
-        )
+        intensity_spectrum = rfftn((wavefunction * jnp.conj(wavefunction)).real)
 
-        return intensity_spectrum_at_detector_plane
+        return intensity_spectrum
 
     @override
-    def compute_contrast_spectrum_at_detector_plane(
+    def compute_contrast_spectrum(
         self,
         potential: AbstractPotentialRepresentation,
         instrument_config: InstrumentConfig,
@@ -104,30 +98,25 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
     ]:
         """Compute the contrast at the detector plane, given the squared wavefunction."""
         # ... compute the exit wave
-        fourier_wavefunction_at_exit_plane = fftn(
-            self.compute_wavefunction_at_exit_plane(potential, instrument_config, rng_key)
+        fourier_wavefunction = fftn(
+            self.compute_wavefunction(potential, instrument_config, rng_key)
         )
         # ... propagate to the detector plane
-        fourier_wavefunction_at_detector_plane = (
-            self.transfer_theory.propagate_wavefunction_to_detector_plane(
-                fourier_wavefunction_at_exit_plane,
-                instrument_config,
-                defocus_offset=defocus_offset,
-            )
+        fourier_wavefunction = self.transfer_theory.propagate_wavefunction(
+            fourier_wavefunction,
+            instrument_config,
+            defocus_offset=defocus_offset,
         )
-        wavefunction_at_detector_plane = ifftn(fourier_wavefunction_at_detector_plane)
+        wavefunction = ifftn(fourier_wavefunction)
         # ... get the squared wavefunction
-        squared_wavefunction_at_detector_plane = (
-            wavefunction_at_detector_plane * jnp.conj(wavefunction_at_detector_plane)
-        ).real
+        squared_wavefunction = (wavefunction * jnp.conj(wavefunction)).real
         # ... compute the contrast directly from the squared wavefunction
         # as C = -1 + psi^2 / 1 + psi^2
-        contrast_spectrum_at_detector_plane = rfftn(
-            (-1 + squared_wavefunction_at_detector_plane)
-            / (1 + squared_wavefunction_at_detector_plane)
+        contrast_spectrum = rfftn(
+            (-1 + squared_wavefunction) / (1 + squared_wavefunction)
         )
 
-        return contrast_spectrum_at_detector_plane
+        return contrast_spectrum
 
 
 class AbstractWeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
@@ -138,7 +127,7 @@ class AbstractWeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
     transfer_theory: eqx.AbstractVar[ContrastTransferTheory]
 
     @abstractmethod
-    def compute_object_spectrum_at_exit_plane(
+    def compute_object_spectrum(
         self,
         potential: AbstractPotentialRepresentation,
         instrument_config: InstrumentConfig,
@@ -149,7 +138,7 @@ class AbstractWeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
         raise NotImplementedError
 
     @override
-    def compute_intensity_spectrum_at_detector_plane(
+    def compute_intensity_spectrum(
         self,
         potential: AbstractPotentialRepresentation,
         instrument_config: InstrumentConfig,
@@ -164,12 +153,8 @@ class AbstractWeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
         N1, N2 = instrument_config.padded_shape
         # ... compute the squared wavefunction directly from the image contrast
         # as |psi|^2 = 1 + 2C.
-        contrast_spectrum_at_detector_plane = (
-            self.compute_contrast_spectrum_at_detector_plane(
-                potential, instrument_config, rng_key, defocus_offset=defocus_offset
-            )
+        contrast_spectrum = self.compute_contrast_spectrum(
+            potential, instrument_config, rng_key, defocus_offset=defocus_offset
         )
-        intensity_spectrum_at_detector_plane = (
-            (2 * contrast_spectrum_at_detector_plane).at[0, 0].add(1.0 * N1 * N2)
-        )
-        return intensity_spectrum_at_detector_plane
+        intensity_spectrum = (2 * contrast_spectrum).at[0, 0].add(1.0 * N1 * N2)
+        return intensity_spectrum

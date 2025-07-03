@@ -60,20 +60,16 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
         # Get the potential
         potential = self.structure.get_potential_in_transformed_frame()
         # Compute the squared wavefunction
-        contrast_spectrum_at_detector_plane = (
-            self.scattering_theory.compute_contrast_spectrum_at_detector_plane(
-                potential,
-                self.instrument_config,
-                rng_key,
-                defocus_offset=self.structure.pose.offset_z_in_angstroms,
-            )
+        contrast_spectrum = self.scattering_theory.compute_contrast_spectrum(
+            potential,
+            self.instrument_config,
+            rng_key,
+            defocus_offset=self.structure.pose.offset_z_in_angstroms,
         )
         # Apply the translation
-        contrast_spectrum_at_detector_plane = self._apply_translation(
-            contrast_spectrum_at_detector_plane
-        )
+        contrast_spectrum = self._apply_translation(contrast_spectrum)
 
-        return contrast_spectrum_at_detector_plane
+        return contrast_spectrum
 
 
 class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
@@ -119,19 +115,15 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
     ) -> ImageArray | PaddedImageArray:
         potential = self.structure.get_potential_in_transformed_frame()
         scattering_theory = self.scattering_theory
-        fourier_intensity_at_detector_plane = (
-            scattering_theory.compute_intensity_spectrum_at_detector_plane(
-                potential,
-                self.instrument_config,
-                rng_key,
-                defocus_offset=self.structure.pose.offset_z_in_angstroms,
-            )
+        fourier_intensity = scattering_theory.compute_intensity_spectrum(
+            potential,
+            self.instrument_config,
+            rng_key,
+            defocus_offset=self.structure.pose.offset_z_in_angstroms,
         )
-        fourier_intensity_at_detector_plane = self._apply_translation(
-            fourier_intensity_at_detector_plane
-        )
+        fourier_intensity = self._apply_translation(fourier_intensity)
 
-        return fourier_intensity_at_detector_plane
+        return fourier_intensity
 
 
 class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
@@ -174,20 +166,16 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
         if rng_key is None:
             # Compute the squared wavefunction
             scattering_theory = self.scattering_theory
-            fourier_intensity_at_detector_plane = (
-                scattering_theory.compute_intensity_spectrum_at_detector_plane(
-                    potential,
-                    self.instrument_config,
-                    defocus_offset=self.structure.pose.offset_z_in_angstroms,
-                )
+            fourier_intensity = scattering_theory.compute_intensity_spectrum(
+                potential,
+                self.instrument_config,
+                defocus_offset=self.structure.pose.offset_z_in_angstroms,
             )
-            fourier_intensity_at_detector_plane = self._apply_translation(
-                fourier_intensity_at_detector_plane
-            )
+            fourier_intensity = self._apply_translation(fourier_intensity)
             # ... now measure the expected electron events at the detector
             fourier_expected_electron_events = (
                 self.detector.compute_expected_electron_events(
-                    fourier_intensity_at_detector_plane, self.instrument_config
+                    fourier_intensity, self.instrument_config
                 )
             )
 
@@ -196,21 +184,17 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
             keys = jax.random.split(rng_key)
             # Compute the squared wavefunction
             scattering_theory = self.scattering_theory
-            fourier_intensity_at_detector_plane = (
-                scattering_theory.compute_intensity_spectrum_at_detector_plane(
-                    potential,
-                    self.instrument_config,
-                    keys[0],
-                    defocus_offset=self.structure.pose.offset_z_in_angstroms,
-                )
+            fourier_intensity = scattering_theory.compute_intensity_spectrum(
+                potential,
+                self.instrument_config,
+                keys[0],
+                defocus_offset=self.structure.pose.offset_z_in_angstroms,
             )
-            fourier_intensity_at_detector_plane = self._apply_translation(
-                fourier_intensity_at_detector_plane
-            )
+            fourier_intensity = self._apply_translation(fourier_intensity)
             # ... now measure the detector readout
             fourier_detector_readout = self.detector.compute_detector_readout(
                 keys[1],
-                fourier_intensity_at_detector_plane,
+                fourier_intensity,
                 self.instrument_config,
             )
 
