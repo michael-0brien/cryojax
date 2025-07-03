@@ -56,7 +56,7 @@ class InstrumentConfig(eqx.Module, strict=True):
         *,
         pad_scale: float = 1.0,
         pad_mode: str | Callable = "constant",
-        init_settings: dict = dict(eager=False, only_rfft=True),
+        init_settings: dict[str, Any] = dict(eager=False, only_rfft=True),
     ):
         """**Arguments:**
 
