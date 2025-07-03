@@ -170,12 +170,6 @@ class AbstractDetector(Module, strict=True):
         N_pix = np.prod(instrument_config.padded_shape)
         frequency_grid = instrument_config.padded_frequency_grid_in_pixels
         # Compute the time-integrated electron flux in pixels
-        if instrument_config.electrons_per_angstrom_squared is None:
-            raise ValueError(
-                "Found that the "
-                "`InstrumentConfig.electrons_per_angstrom_squared` was "
-                "`None`, but this must be set for usage with an `AbstractDetector`."
-            )
         electrons_per_pixel = (
             instrument_config.electrons_per_angstrom_squared
             * instrument_config.pixel_size**2

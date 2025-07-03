@@ -1,10 +1,8 @@
-"""
-The image configuration and utility manager.
-"""
+"""The image configuration and utility manager."""
 
 import math
 from functools import cached_property
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Optional
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -20,27 +18,45 @@ from ..ndimage import (
 )
 
 
+class GridWrapper(eqx.Module, strict=True):
+    coordinate_grid: Float[Array, "y_dim x_dim 2"]
+    frequency_grid: Float[Array, "y_dim x_dim//2+1 2"]
+    full_frequency_grid: Optional[Float[Array, "y_dim x_dim 2"]]
+
+    def __init__(self, shape: tuple[int, int], only_rfft: bool = True):
+        self.coordinate_grid = make_coordinate_grid(shape)
+        self.frequency_grid = make_frequency_grid(shape, outputs_rfftfreqs=True)
+        if only_rfft:
+            self.full_frequency_grid = None
+        else:
+            self.full_frequency_grid = make_frequency_grid(shape, outputs_rfftfreqs=False)
+
+
 class InstrumentConfig(eqx.Module, strict=True):
     """Configuration and utilities for an electron microscopy image."""
 
     shape: tuple[int, int] = eqx.field(static=True)
     pixel_size: Float[Array, ""]
     voltage_in_kilovolts: Float[Array, ""]
-    electrons_per_angstrom_squared: Optional[Float[Array, ""]]
+    electrons_per_angstrom_squared: float | Float[Array, ""]
 
     padded_shape: tuple[int, int] = eqx.field(static=True)
-    pad_mode: Union[str, Callable]
+    pad_mode: str | Callable
+
+    grid_wrapper: Optional[GridWrapper]
+    padded_grid_wrapper: Optional[GridWrapper]
 
     def __init__(
         self,
         shape: tuple[int, int],
         pixel_size: float | Float[Array, ""],
         voltage_in_kilovolts: float | Float[Array, ""],
-        electrons_per_angstrom_squared: Optional[float | Float[Array, ""]] = None,
+        electrons_per_angstrom_squared: float | Float[Array, ""] = 100.0,
         padded_shape: Optional[tuple[int, int]] = None,
         *,
         pad_scale: float = 1.0,
-        pad_mode: Union[str, Callable] = "constant",
+        pad_mode: str | Callable = "constant",
+        init_settings: dict = dict(eager=False, only_rfft=True),
     ):
         """**Arguments:**
 
@@ -62,24 +78,36 @@ class InstrumentConfig(eqx.Module, strict=True):
         - `pad_mode`:
             The method of image padding. By default, `"constant"`.
             For all options, see `jax.numpy.pad`.
+        - `init_settings`:
+            A dict of settings that determine behavior of coordinate
+            grids on initialization. This has the following keys
+            - `eager`: bool
+                If `True`, compute grids upon initialization.
+            - `only_rfft`: bool
+                If `True`, only compute a grid for use with FFTs of
+                real input.
+
         """
         self.shape = shape
         self.pixel_size = error_if_not_positive(jnp.asarray(pixel_size))
         self.voltage_in_kilovolts = error_if_not_positive(
             jnp.asarray(voltage_in_kilovolts)
         )
-        if electrons_per_angstrom_squared is None:
-            self.electrons_per_angstrom_squared = None
-        else:
-            self.electrons_per_angstrom_squared = error_if_not_positive(
-                jnp.asarray(electrons_per_angstrom_squared)
-            )
+        self.electrons_per_angstrom_squared = electrons_per_angstrom_squared
         self.pad_mode = pad_mode
         # Set shape after padding
         if padded_shape is None:
-            self.padded_shape = (int(pad_scale * shape[0]), int(pad_scale * shape[1]))
+            padded_shape = (int(pad_scale * shape[0]), int(pad_scale * shape[1]))
+        self.padded_shape = padded_shape
+        # Optionally make grids on initialization
+        if init_settings["eager"]:
+            self.padded_grid_wrapper = GridWrapper(
+                padded_shape, only_rfft=init_settings["only_rfft"]
+            )
+            self.grid_wrapper = GridWrapper(shape, only_rfft=init_settings["only_rfft"])
         else:
-            self.padded_shape = padded_shape
+            self.padded_grid_wrapper = None
+            self.grid_wrapper = None
 
     def __check_init__(self):
         if self.padded_shape[0] < self.shape[0] or self.padded_shape[1] < self.shape[1]:
@@ -107,7 +135,10 @@ class InstrumentConfig(eqx.Module, strict=True):
         self,
     ) -> Float[Array, "{self.y_dim} {self.x_dim} 2"]:
         """A spatial coordinate system for the `shape`."""
-        return make_coordinate_grid(shape=self.shape)
+        if self.grid_wrapper is None:
+            return make_coordinate_grid(self.shape)
+        else:
+            return self.grid_wrapper.coordinate_grid
 
     @cached_property
     def coordinate_grid_in_angstroms(
@@ -123,7 +154,10 @@ class InstrumentConfig(eqx.Module, strict=True):
         """A spatial frequency coordinate system for the `shape`,
         with hermitian symmetry.
         """
-        return make_frequency_grid(shape=self.shape)
+        if self.grid_wrapper is None:
+            return make_frequency_grid(self.shape, outputs_rfftfreqs=True)
+        else:
+            return self.grid_wrapper.frequency_grid
 
     @cached_property
     def frequency_grid_in_angstroms(
@@ -141,7 +175,10 @@ class InstrumentConfig(eqx.Module, strict=True):
         """A spatial frequency coordinate system for the `shape`,
         without hermitian symmetry.
         """
-        return make_frequency_grid(shape=self.shape, outputs_rfftfreqs=False)
+        if self.grid_wrapper is None or self.grid_wrapper.full_frequency_grid is None:
+            return make_frequency_grid(shape=self.shape, outputs_rfftfreqs=False)
+        else:
+            return self.grid_wrapper.full_frequency_grid
 
     @cached_property
     def full_frequency_grid_in_angstroms(
@@ -157,7 +194,10 @@ class InstrumentConfig(eqx.Module, strict=True):
         self,
     ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim} 2"]:
         """A spatial coordinate system for the `padded_shape`."""
-        return make_coordinate_grid(shape=self.padded_shape)
+        if self.padded_grid_wrapper is None:
+            return make_coordinate_grid(shape=self.padded_shape)
+        else:
+            return self.padded_grid_wrapper.coordinate_grid
 
     @cached_property
     def padded_coordinate_grid_in_angstroms(
@@ -175,7 +215,10 @@ class InstrumentConfig(eqx.Module, strict=True):
         """A spatial frequency coordinate system for the `padded_shape`,
         with hermitian symmetry.
         """
-        return make_frequency_grid(shape=self.padded_shape)
+        if self.padded_grid_wrapper is None:
+            return make_frequency_grid(shape=self.padded_shape, outputs_rfftfreqs=True)
+        else:
+            return self.padded_grid_wrapper.frequency_grid
 
     @cached_property
     def padded_frequency_grid_in_angstroms(
@@ -193,7 +236,13 @@ class InstrumentConfig(eqx.Module, strict=True):
         """A spatial frequency coordinate system for the `padded_shape`,
         without hermitian symmetry.
         """
-        return make_frequency_grid(shape=self.padded_shape, outputs_rfftfreqs=False)
+        if (
+            self.padded_grid_wrapper is None
+            or self.padded_grid_wrapper.full_frequency_grid is None
+        ):
+            return make_frequency_grid(shape=self.padded_shape, outputs_rfftfreqs=False)
+        else:
+            return self.padded_grid_wrapper.full_frequency_grid
 
     @cached_property
     def padded_full_frequency_grid_in_angstroms(
