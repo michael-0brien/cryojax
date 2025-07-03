@@ -181,19 +181,19 @@ class LinearImageModel(AbstractImageModel, strict=True):
     """An simple image model in linear image formation theory."""
 
     structure: AbstractBiologicalStructure
-    potential_integrator: AbstractPotentialIntegrator
+    integrator: AbstractPotentialIntegrator
     transfer_theory: ContrastTransferTheory
     instrument_config: InstrumentConfig
 
     def __init__(
         self,
         structure: AbstractBiologicalStructure,
-        potential_integrator: AbstractPotentialIntegrator,
+        integrator: AbstractPotentialIntegrator,
         transfer_theory: ContrastTransferTheory,
         instrument_config: InstrumentConfig,
     ):
         self.instrument_config = instrument_config
-        self.potential_integrator = potential_integrator
+        self.integrator = integrator
         self.structure = structure
         self.transfer_theory = transfer_theory
 
@@ -206,14 +206,14 @@ class LinearImageModel(AbstractImageModel, strict=True):
             apply_translation=False
         )
         # Compute the projection image
-        fourier_projection = self.potential_integrator.integrate(
+        fourier_projection = self.integrator.integrate(
             potential, self.instrument_config, outputs_real_space=False
         )
         # Compute the image
         fourier_image = self.transfer_theory.propagate_object(  # noqa: E501
             fourier_projection,
             self.instrument_config,
-            is_projection_approximation=self.potential_integrator.is_projection_approximation,
+            is_projection_approximation=self.integrator.is_projection_approximation,
             defocus_offset=self.structure.pose.offset_z_in_angstroms,
         )
         # Now for the in-plane translation

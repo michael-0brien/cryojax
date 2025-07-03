@@ -25,7 +25,7 @@ config.update("jax_enable_x64", True)
 
 
 @pytest.mark.parametrize("shape", ((64, 64), (63, 63), (63, 64), (64, 63)))
-def test_atom_potential_integrator_shape(sample_pdb_path, shape):
+def test_atom_integrator_shape(sample_pdb_path, shape):
     atom_positions, atom_identities, b_factors = read_atoms_from_pdb(
         sample_pdb_path,
         center=True,
@@ -43,7 +43,7 @@ def test_atom_potential_integrator_shape(sample_pdb_path, shape):
     )
     pixel_size = 0.5
 
-    potential_integrator = GaussianMixtureProjection(upsampling_factor=2)
+    integrator = GaussianMixtureProjection(upsampling_factor=2)
     # # ... and the configuration of the imaging instrument
     instrument_config = InstrumentConfig(
         shape=shape,
@@ -51,7 +51,7 @@ def test_atom_potential_integrator_shape(sample_pdb_path, shape):
         voltage_in_kilovolts=300.0,
     )
     # ... compute the integrated volumetric_potential
-    fourier_integrated_potential = potential_integrator(
+    fourier_integrated_potential = integrator.integrate(
         atom_potential, instrument_config, outputs_real_space=False
     )
 
@@ -99,8 +99,8 @@ def test_downsampled_gmm_potential_agreement(sample_pdb_path):
         voltage_in_kilovolts=300.0,
     )
     # ... compute the integrated volumetric_potential
-    image_from_hires = integrator_int_hires(atom_potential, instrument_config)
-    image_lowres = integrator_int_lowres(atom_potential, instrument_config)
+    image_from_hires = integrator_int_hires.integrate(atom_potential, instrument_config)
+    image_lowres = integrator_int_lowres.integrate(atom_potential, instrument_config)
 
     assert image_from_hires.shape == image_lowres.shape
 
@@ -142,8 +142,8 @@ def test_peng_vs_gmm_agreement(sample_pdb_path):
 
     # Compute projections
     integrator = GaussianMixtureProjection(upsampling_factor=1)
-    projection_gmm = integrator(gmm_potential, instrument_config)
-    projection_peng = integrator(atom_potential, instrument_config)
+    projection_gmm = integrator.integrate(gmm_potential, instrument_config)
+    projection_peng = integrator.integrate(atom_potential, instrument_config)
 
     np.testing.assert_allclose(projection_gmm, projection_peng)
 
@@ -178,7 +178,7 @@ class TestBuildRealSpaceVoxelsFromAtoms:
         # Build the potential integrators
         integrator = GaussianMixtureProjection()
         # Compute projections
-        projection = integrator(atomic_potential, instrument_config)
+        projection = integrator.integrate(atomic_potential, instrument_config)
         projection = irfftn(projection)
 
         # Find the maximum
@@ -213,7 +213,7 @@ class TestBuildRealSpaceVoxelsFromAtoms:
         # Build the potential integrators
         integrator = GaussianMixtureProjection()
         # Compute projections
-        projection = integrator(atomic_potential, instrument_config)
+        projection = integrator.integrate(atomic_potential, instrument_config)
         projection = irfftn(projection)
 
         integral = jnp.sum(projection) * voxel_size**2

@@ -27,26 +27,26 @@ class HighEnergyScatteringTheory(AbstractWaveScatteringTheory, strict=True):
       Optics, Volume 4: Advanced Wave Optics. Academic Press, 2022.*
     """
 
-    potential_integrator: AbstractPotentialIntegrator
+    integrator: AbstractPotentialIntegrator
     transfer_theory: WaveTransferTheory
     solvent: Optional[AbstractRandomSolvent]
     amplitude_contrast_ratio: Float[Array, ""]
 
     def __init__(
         self,
-        potential_integrator: AbstractPotentialIntegrator,
+        integrator: AbstractPotentialIntegrator,
         transfer_theory: WaveTransferTheory,
         solvent: Optional[AbstractRandomSolvent] = None,
         amplitude_contrast_ratio: float | Float[Array, ""] = 0.1,
     ):
         """**Arguments:**
 
-        - `potential_integrator`: The method for integrating the scattering potential.
+        - `integrator`: The method for integrating the scattering potential.
         - `transfer_theory`: The wave transfer theory.
         - `solvent`: The model for the solvent.
         - `amplitude_contrast_ratio`: The amplitude contrast ratio.
         """
-        self.potential_integrator = potential_integrator
+        self.integrator = integrator
         self.transfer_theory = transfer_theory
         self.solvent = solvent
         self.amplitude_contrast_ratio = error_if_not_fractional(amplitude_contrast_ratio)
@@ -61,12 +61,12 @@ class HighEnergyScatteringTheory(AbstractWaveScatteringTheory, strict=True):
         Array, "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim}"
     ]:
         # Compute the integrated potential in the exit plane
-        fourier_in_plane_potential = self.potential_integrator.integrate(
+        fourier_in_plane_potential = self.integrator.integrate(
             potential, instrument_config, outputs_real_space=False
         )
         # The integrated potential may not be from an rfft; this depends on
         # if it is a projection approx
-        is_projection_approx = self.potential_integrator.is_projection_approximation
+        is_projection_approx = self.integrator.is_projection_approximation
         if rng_key is not None:
             # Get the potential of the specimen plus the ice
             if self.solvent is not None:

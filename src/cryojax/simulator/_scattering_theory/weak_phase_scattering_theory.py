@@ -15,23 +15,23 @@ from .common_functions import apply_interaction_constant
 class WeakPhaseScatteringTheory(AbstractWeakPhaseScatteringTheory, strict=True):
     """Base linear image formation theory."""
 
-    potential_integrator: AbstractPotentialIntegrator
+    integrator: AbstractPotentialIntegrator
     transfer_theory: ContrastTransferTheory
     solvent: Optional[AbstractRandomSolvent] = None
 
     def __init__(
         self,
-        potential_integrator: AbstractPotentialIntegrator,
+        integrator: AbstractPotentialIntegrator,
         transfer_theory: ContrastTransferTheory,
         solvent: Optional[AbstractRandomSolvent] = None,
     ):
         """**Arguments:**
 
-        - `potential_integrator`: The method for integrating the scattering potential.
+        - `integrator`: The method for integrating the scattering potential.
         - `transfer_theory`: The contrast transfer theory.
         - `solvent`: The model for the solvent.
         """
-        self.potential_integrator = potential_integrator
+        self.integrator = integrator
         self.transfer_theory = transfer_theory
         self.solvent = solvent
 
@@ -45,7 +45,7 @@ class WeakPhaseScatteringTheory(AbstractWeakPhaseScatteringTheory, strict=True):
         Array, "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim//2+1}"
     ]:
         # Compute the integrated potential
-        fourier_in_plane_potential = self.potential_integrator(
+        fourier_in_plane_potential = self.integrator.integrate(
             potential, instrument_config, outputs_real_space=False
         )
 
@@ -56,7 +56,7 @@ class WeakPhaseScatteringTheory(AbstractWeakPhaseScatteringTheory, strict=True):
                     rng_key,
                     fourier_in_plane_potential,
                     instrument_config,
-                    input_is_rfft=self.potential_integrator.is_projection_approximation,
+                    input_is_rfft=self.integrator.is_projection_approximation,
                 )
 
         object_spectrum = apply_interaction_constant(
@@ -81,7 +81,7 @@ class WeakPhaseScatteringTheory(AbstractWeakPhaseScatteringTheory, strict=True):
         contrast_spectrum = self.transfer_theory.propagate_object(  # noqa: E501
             object_spectrum,
             instrument_config,
-            is_projection_approximation=self.potential_integrator.is_projection_approximation,
+            is_projection_approximation=self.integrator.is_projection_approximation,
             defocus_offset=defocus_offset,
         )
 

@@ -14,23 +14,23 @@ from .base_scattering_theory import AbstractWaveScatteringTheory
 class MultisliceScatteringTheory(AbstractWaveScatteringTheory, strict=True):
     """A scattering theory using the multislice method."""
 
-    multislice_integrator: AbstractMultisliceIntegrator
+    integrator: AbstractMultisliceIntegrator
     transfer_theory: WaveTransferTheory
     amplitude_contrast_ratio: Float[Array, ""]
 
     def __init__(
         self,
-        multislice_integrator: AbstractMultisliceIntegrator,
+        integrator: AbstractMultisliceIntegrator,
         transfer_theory: WaveTransferTheory,
         amplitude_contrast_ratio: float | Float[Array, ""] = 0.1,
     ):
         """**Arguments:**
 
-        - `multislice_integrator`: The multislice method.
+        - `integrator`: The multislice method.
         - `transfer_theory`: The wave transfer theory.
         - `amplitude_contrast_ratio`: The amplitude contrast ratio.
         """
-        self.multislice_integrator = multislice_integrator
+        self.integrator = integrator
         self.transfer_theory = transfer_theory
         self.amplitude_contrast_ratio = error_if_not_fractional(amplitude_contrast_ratio)
 
@@ -44,7 +44,7 @@ class MultisliceScatteringTheory(AbstractWaveScatteringTheory, strict=True):
         Array, "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim}"
     ]:
         # Compute the wavefunction in the exit plane
-        wavefunction = self.multislice_integrator(
+        wavefunction = self.integrator.integrate(
             potential, instrument_config, self.amplitude_contrast_ratio
         )
 
