@@ -17,21 +17,23 @@ from .._structure import AbstractBiologicalStructure
 from .._transfer_theory import ContrastTransferTheory
 
 
-ImageArray = (
-    Float[Array, "{self.instrument_config.y_dim} {self.instrument_config.x_dim}"]
-    | Complex[Array, "{self.instrument_config.y_dim} {self.instrument_config.x_dim//2+1}"]
-)
-PaddedImageArray = (
-    Float[
-        Array,
-        "{self.instrument_config.padded_y_dim} " "{self.instrument_config.padded_x_dim}",
-    ]
-    | Complex[
-        Array,
-        "{self.instrument_config.padded_y_dim} "
-        "{self.instrument_config.padded_x_dim//2+1}",
-    ]
-)
+RealImageArray = Float[
+    Array, "{self.instrument_config.y_dim} {self.instrument_config.x_dim}"
+]
+FourierImageArray = Complex[
+    Array, "{self.instrument_config.y_dim} {self.instrument_config.x_dim//2+1}"
+]
+PaddedRealImageArray = Float[
+    Array,
+    "{self.instrument_config.padded_y_dim} " "{self.instrument_config.padded_x_dim}",
+]
+PaddedFourierImageArray = Complex[
+    Array,
+    "{self.instrument_config.padded_y_dim} " "{self.instrument_config.padded_x_dim//2+1}",
+]
+
+ImageArray = RealImageArray | FourierImageArray
+PaddedImageArray = PaddedRealImageArray | PaddedFourierImageArray
 
 
 class AbstractImageModel(eqx.Module, strict=True):
@@ -79,11 +81,7 @@ class AbstractImageModel(eqx.Module, strict=True):
 
     def postprocess(
         self,
-        image: Complex[
-            Array,
-            "{self.instrument_config.padded_y_dim} "
-            "{self.instrument_config.padded_x_dim//2+1}",
-        ],
+        image: PaddedFourierImageArray,
         *,
         outputs_real_space: bool = True,
         applies_mask: bool = True,
@@ -133,13 +131,24 @@ class AbstractImageModel(eqx.Module, strict=True):
                     else image
                 )
 
+    def _apply_translation(
+        self, fourier_image: PaddedFourierImageArray
+    ) -> PaddedFourierImageArray:
+        pose = self.structure.pose
+        phase_shifts = pose.compute_translation_operator(
+            self.instrument_config.padded_frequency_grid_in_angstroms
+        )
+        fourier_image = pose.translate_image(
+            fourier_image,
+            phase_shifts,
+            self.instrument_config.padded_shape,
+        )
+
+        return fourier_image
+
     def _maybe_postprocess(
         self,
-        image: Complex[
-            Array,
-            "{self.instrument_config.padded_y_dim} "
-            "{self.instrument_config.padded_x_dim//2+1}",
-        ],
+        image: PaddedFourierImageArray,
         *,
         removes_padding: bool = True,
         outputs_real_space: bool = True,
@@ -209,22 +218,17 @@ class LinearImageModel(AbstractImageModel, strict=True):
             potential, self.instrument_config, outputs_real_space=False
         )
         # Compute the image
-        image = self.transfer_theory.propagate_object_to_detector_plane(  # noqa: E501
+        fourier_image = self.transfer_theory.propagate_object_to_detector_plane(  # noqa: E501
             fourier_projection,
             self.instrument_config,
             is_projection_approximation=self.potential_integrator.is_projection_approximation,
             defocus_offset=self.structure.pose.offset_z_in_angstroms,
         )
         # Now for the in-plane translation
-        translation_operator = self.structure.pose.compute_translation_operator(
-            self.instrument_config.padded_frequency_grid_in_angstroms
-        )
-        image = self.structure.pose.translate_image(
-            image, translation_operator, self.instrument_config.padded_shape
-        )
+        fourier_image = self._apply_translation(fourier_image)
 
         return self._maybe_postprocess(
-            image,
+            fourier_image,
             removes_padding=removes_padding,
             outputs_real_space=outputs_real_space,
             applies_mask=applies_mask,

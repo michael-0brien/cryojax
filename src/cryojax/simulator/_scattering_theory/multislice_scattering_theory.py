@@ -6,7 +6,7 @@ from jaxtyping import Array, Complex, Float, PRNGKeyArray
 from ...internal import error_if_not_fractional
 from .._instrument_config import InstrumentConfig
 from .._multislice_integrator import AbstractMultisliceIntegrator
-from .._structure import AbstractBiologicalStructure
+from .._potential_representation import AbstractPotentialRepresentation
 from .._transfer_theory import WaveTransferTheory
 from .base_scattering_theory import AbstractWaveScatteringTheory
 
@@ -37,14 +37,12 @@ class MultisliceScatteringTheory(AbstractWaveScatteringTheory, strict=True):
     @override
     def compute_wavefunction_at_exit_plane(
         self,
-        structure: AbstractBiologicalStructure,
+        potential: AbstractPotentialRepresentation,
         instrument_config: InstrumentConfig,
         rng_key: Optional[PRNGKeyArray] = None,
     ) -> Complex[
         Array, "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim}"
     ]:
-        # Get potential in the lab frame
-        potential = structure.get_potential_in_transformed_frame(apply_translation=False)
         # Compute the wavefunction in the exit plane
         wavefunction_at_exit_plane = (
             self.multislice_integrator.compute_wavefunction_at_exit_plane(

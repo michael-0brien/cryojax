@@ -8,7 +8,7 @@ from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
 from ...ndimage import fftn, ifftn, rfftn
 from .._instrument_config import InstrumentConfig
-from .._structure import AbstractBiologicalStructure
+from .._potential_representation import AbstractPotentialRepresentation
 from .._transfer_theory import (
     ContrastTransferTheory,
     WaveTransferTheory,
@@ -21,9 +21,10 @@ class AbstractScatteringTheory(eqx.Module, strict=True):
     @abstractmethod
     def compute_contrast_spectrum_at_detector_plane(
         self,
-        structure: AbstractBiologicalStructure,
+        potential: AbstractPotentialRepresentation,
         instrument_config: InstrumentConfig,
         rng_key: Optional[PRNGKeyArray] = None,
+        defocus_offset: Optional[float | Float[Array, ""]] = None,
     ) -> Complex[
         Array, "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim//2+1}"
     ]:
@@ -32,9 +33,10 @@ class AbstractScatteringTheory(eqx.Module, strict=True):
     @abstractmethod
     def compute_intensity_spectrum_at_detector_plane(
         self,
-        structure: AbstractBiologicalStructure,
+        potential: AbstractPotentialRepresentation,
         instrument_config: InstrumentConfig,
         rng_key: Optional[PRNGKeyArray] = None,
+        defocus_offset: Optional[float | Float[Array, ""]] = None,
     ) -> Complex[
         Array, "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim//2+1}"
     ]:
@@ -50,7 +52,7 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
     @abstractmethod
     def compute_wavefunction_at_exit_plane(
         self,
-        structure: AbstractBiologicalStructure,
+        potential: AbstractPotentialRepresentation,
         instrument_config: InstrumentConfig,
         rng_key: Optional[PRNGKeyArray] = None,
     ) -> Complex[
@@ -61,21 +63,23 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
     @override
     def compute_intensity_spectrum_at_detector_plane(
         self,
-        structure: AbstractBiologicalStructure,
+        potential: AbstractPotentialRepresentation,
         instrument_config: InstrumentConfig,
         rng_key: Optional[PRNGKeyArray] = None,
+        defocus_offset: Optional[float | Float[Array, ""]] = None,
     ) -> Complex[
         Array, "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim//2+1}"
     ]:
         # ... compute the exit wave
         fourier_wavefunction_at_exit_plane = fftn(
-            self.compute_wavefunction_at_exit_plane(structure, instrument_config, rng_key)
+            self.compute_wavefunction_at_exit_plane(potential, instrument_config, rng_key)
         )
         # ... propagate to the detector plane
         fourier_wavefunction_at_detector_plane = (
             self.transfer_theory.propagate_wavefunction_to_detector_plane(
                 fourier_wavefunction_at_exit_plane,
                 instrument_config,
+                defocus_offset=defocus_offset,
             )
         )
         wavefunction_at_detector_plane = ifftn(fourier_wavefunction_at_detector_plane)
@@ -85,39 +89,30 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
                 wavefunction_at_detector_plane * jnp.conj(wavefunction_at_detector_plane)
             ).real
         )
-        # ... apply translation
-        pose = structure.pose
-        phase_shifts = pose.compute_translation_operator(
-            instrument_config.padded_frequency_grid_in_angstroms
-        )
-        intensity_spectrum_at_detector_plane = pose.translate_image(
-            intensity_spectrum_at_detector_plane,
-            phase_shifts,
-            instrument_config.padded_shape,
-        )
 
         return intensity_spectrum_at_detector_plane
 
     @override
     def compute_contrast_spectrum_at_detector_plane(
         self,
-        structure: AbstractBiologicalStructure,
+        potential: AbstractPotentialRepresentation,
         instrument_config: InstrumentConfig,
         rng_key: Optional[PRNGKeyArray] = None,
+        defocus_offset: Optional[float | Float[Array, ""]] = None,
     ) -> Complex[
         Array, "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim//2+1}"
     ]:
         """Compute the contrast at the detector plane, given the squared wavefunction."""
         # ... compute the exit wave
         fourier_wavefunction_at_exit_plane = fftn(
-            self.compute_wavefunction_at_exit_plane(structure, instrument_config, rng_key)
+            self.compute_wavefunction_at_exit_plane(potential, instrument_config, rng_key)
         )
         # ... propagate to the detector plane
         fourier_wavefunction_at_detector_plane = (
             self.transfer_theory.propagate_wavefunction_to_detector_plane(
                 fourier_wavefunction_at_exit_plane,
                 instrument_config,
-                defocus_offset=structure.pose.offset_z_in_angstroms,
+                defocus_offset=defocus_offset,
             )
         )
         wavefunction_at_detector_plane = ifftn(fourier_wavefunction_at_detector_plane)
@@ -130,16 +125,6 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
         contrast_spectrum_at_detector_plane = rfftn(
             (-1 + squared_wavefunction_at_detector_plane)
             / (1 + squared_wavefunction_at_detector_plane)
-        )
-        # ... apply translation
-        pose = structure.pose
-        phase_shifts = pose.compute_translation_operator(
-            instrument_config.padded_frequency_grid_in_angstroms
-        )
-        contrast_spectrum_at_detector_plane = pose.translate_image(
-            contrast_spectrum_at_detector_plane,
-            phase_shifts,
-            instrument_config.padded_shape,
         )
 
         return contrast_spectrum_at_detector_plane
@@ -155,7 +140,7 @@ class AbstractWeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
     @abstractmethod
     def compute_object_spectrum_at_exit_plane(
         self,
-        structure: AbstractBiologicalStructure,
+        potential: AbstractPotentialRepresentation,
         instrument_config: InstrumentConfig,
         rng_key: Optional[PRNGKeyArray] = None,
     ) -> Complex[
@@ -166,9 +151,10 @@ class AbstractWeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
     @override
     def compute_intensity_spectrum_at_detector_plane(
         self,
-        structure: AbstractBiologicalStructure,
+        potential: AbstractPotentialRepresentation,
         instrument_config: InstrumentConfig,
         rng_key: Optional[PRNGKeyArray] = None,
+        defocus_offset: Optional[float | Float[Array, ""]] = None,
     ) -> Complex[
         Array, "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim//2+1}"
     ]:
@@ -180,7 +166,7 @@ class AbstractWeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
         # as |psi|^2 = 1 + 2C.
         contrast_spectrum_at_detector_plane = (
             self.compute_contrast_spectrum_at_detector_plane(
-                structure, instrument_config, rng_key
+                potential, instrument_config, rng_key, defocus_offset=defocus_offset
             )
         )
         intensity_spectrum_at_detector_plane = (

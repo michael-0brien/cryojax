@@ -8,8 +8,8 @@ from ...internal import error_if_not_fractional
 from ...ndimage import ifftn, irfftn
 from .._instrument_config import InstrumentConfig
 from .._potential_integrator import AbstractPotentialIntegrator
+from .._potential_representation import AbstractPotentialRepresentation
 from .._solvent import AbstractSolvent
-from .._structure import AbstractBiologicalStructure
 from .._transfer_theory import WaveTransferTheory
 from .base_scattering_theory import AbstractWaveScatteringTheory
 from .common_functions import apply_amplitude_contrast_ratio, apply_interaction_constant
@@ -54,14 +54,13 @@ class HighEnergyScatteringTheory(AbstractWaveScatteringTheory, strict=True):
     @override
     def compute_wavefunction_at_exit_plane(
         self,
-        structure: AbstractBiologicalStructure,
+        potential: AbstractPotentialRepresentation,
         instrument_config: InstrumentConfig,
         rng_key: Optional[PRNGKeyArray] = None,
     ) -> Complex[
         Array, "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim}"
     ]:
         # Compute the integrated potential in the exit plane
-        potential = structure.get_potential_in_transformed_frame(apply_translation=False)
         fourier_integrated_potential = (
             self.potential_integrator.compute_integrated_potential(
                 potential, instrument_config, outputs_real_space=False
