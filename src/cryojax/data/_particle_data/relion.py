@@ -299,9 +299,12 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
             if isinstance(particle_data_at_index, pd.Series):
                 particle_data_at_index = particle_data_at_index.to_frame().T
             # ... no overlapping keys with loaded pytrees
-            temp = particle_data_at_index.drop(
-                RELION_DEFAULT_PARTICLE_ENTRIES, axis="columns", errors="ignore"
-            )
+            redundant_entry_labels, _ = list(zip(*RELION_DEFAULT_PARTICLE_ENTRIES))
+            columns = particle_data_at_index.columns
+            remove_columns = [
+                column for column in columns if column in redundant_entry_labels
+            ]
+            temp = particle_data_at_index.drop(remove_columns, axis="columns")
             metadata = temp.to_dict()
         else:
             metadata = {}
