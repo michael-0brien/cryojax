@@ -42,7 +42,7 @@ def test_fourier_vs_real_normalize(noisy_model):
             input_is_rfft=True,
             shape_in_real_space=im1.shape,  # type: ignore
         ),
-        s=noisy_model.instrument_config.shape,
+        s=noisy_model.config.shape,
     )  # type: ignore
     for im in [im1, im2]:
         np.testing.assert_allclose(jnp.std(im), jnp.asarray(1.0), rtol=1e-3)

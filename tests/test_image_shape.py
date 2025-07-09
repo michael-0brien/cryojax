@@ -16,8 +16,8 @@ def test_real_shape(model, request):
     model = request.getfixturevalue(model)
     image = model.render()
     padded_image = model.render(removes_padding=False)
-    assert image.shape == model.instrument_config.shape
-    assert padded_image.shape == model.instrument_config.padded_shape
+    assert image.shape == model.config.shape
+    assert padded_image.shape == model.config.padded_shape
 
 
 @pytest.mark.parametrize("model", ["noisy_model"])
@@ -26,11 +26,8 @@ def test_fourier_shape(model, request):
     model = request.getfixturevalue(model)
     image = model.render(outputs_real_space=False)
     padded_image = model.render(removes_padding=False, outputs_real_space=False)
-    assert image.shape == model.instrument_config.frequency_grid_in_pixels.shape[0:2]
-    assert (
-        padded_image.shape
-        == model.instrument_config.padded_frequency_grid_in_pixels.shape[0:2]
-    )
+    assert image.shape == model.config.frequency_grid_in_pixels.shape[0:2]
+    assert padded_image.shape == model.config.padded_frequency_grid_in_pixels.shape[0:2]
 
 
 @pytest.mark.parametrize("shape", [(65, 65), (65, 64), (64, 65)])

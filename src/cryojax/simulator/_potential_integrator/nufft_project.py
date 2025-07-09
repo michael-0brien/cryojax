@@ -10,7 +10,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
 from ...ndimage import convert_fftn_to_rfftn, irfftn
-from .._instrument_config import InstrumentConfig
+from .._config import AbstractConfig
 from .._potential_representation import RealVoxelCloudPotential, RealVoxelGridPotential
 from .base_potential_integrator import AbstractVoxelPotentialIntegrator
 
@@ -32,7 +32,7 @@ class NufftProjection(
         """**Arguments:**
 
         - `pixel_size_rescaling_method`: Method for interpolating the final image to
-                                    the `InstrumentConfig` pixel size. See
+                                    the `AbstractConfig` pixel size. See
                                     `cryojax.image.rescale_pixel_size` for documentation.
         - `eps`: See [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft)
                  for documentation.
@@ -69,42 +69,40 @@ class NufftProjection(
     def integrate(
         self,
         potential: RealVoxelGridPotential | RealVoxelCloudPotential,
-        instrument_config: InstrumentConfig,
+        config: AbstractConfig,
         outputs_real_space: bool = False,
     ) -> (
         Complex[
             Array,
-            "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim//2+1}",
+            "{config.padded_y_dim} {config.padded_x_dim//2+1}",
         ]
-        | Float[
-            Array, "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim}"
-        ]
+        | Float[Array, "{config.padded_y_dim} {config.padded_x_dim}"]
     ):
-        """Compute the integrated scattering potential at the `InstrumentConfig` settings
+        """Compute the integrated scattering potential at the `AbstractConfig` settings
         of a voxel-based representation in real-space, using non-uniform FFTs.
 
         **Arguments:**
 
         - `potential`: The scattering potential representation.
-        - `instrument_config`: The configuration of the resulting image.
+        - `config`: The configuration of the resulting image.
 
         **Returns:**
 
         The projection integral of the `potential` in fourier space, at the
-        `instrument_config.padded_shape` and the `instrument_config.pixel_size`.
+        `config.padded_shape` and the `config.pixel_size`.
         """
         if isinstance(potential, RealVoxelGridPotential):
             shape = potential.shape
             fourier_in_plane_potential = self.project_voxel_cloud_with_nufft(
                 potential.real_voxel_grid.ravel(),
                 potential.coordinate_grid_in_pixels.reshape((math.prod(shape), 3)),
-                instrument_config.padded_shape,
+                config.padded_shape,
             )
         elif isinstance(potential, RealVoxelCloudPotential):
             fourier_in_plane_potential = self.project_voxel_cloud_with_nufft(
                 potential.voxel_weights,
                 potential.coordinate_list_in_pixels,
-                instrument_config.padded_shape,
+                config.padded_shape,
             )
         else:
             raise ValueError(
@@ -112,10 +110,10 @@ class NufftProjection(
                 "`RealVoxelCloudPotential`."
             )
         fourier_in_plane_potential = self._convert_raw_image_to_integrated_potential(
-            fourier_in_plane_potential, potential, instrument_config, input_is_rfft=True
+            fourier_in_plane_potential, potential, config, input_is_rfft=True
         )
         return (
-            irfftn(fourier_in_plane_potential, s=instrument_config.padded_shape)
+            irfftn(fourier_in_plane_potential, s=config.padded_shape)
             if outputs_real_space
             else fourier_in_plane_potential
         )

@@ -1,3 +1,8 @@
+from ._config import (
+    AbstractConfig as AbstractConfig,
+    DoseConfig as DoseConfig,
+    InstrumentConfig as InstrumentConfig,
+)
 from ._detector import (
     AbstractDetector as AbstractDetector,
     AbstractDQE as AbstractDQE,
@@ -14,7 +19,6 @@ from ._image_model import (
     IntensityImageModel as IntensityImageModel,
     LinearImageModel as LinearImageModel,
 )
-from ._instrument_config import InstrumentConfig as InstrumentConfig
 from ._pose import (
     AbstractPose as AbstractPose,
     AxisAnglePose as AxisAnglePose,

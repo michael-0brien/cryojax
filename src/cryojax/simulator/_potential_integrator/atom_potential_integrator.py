@@ -14,7 +14,7 @@ from ...ndimage import (
     resize_with_crop_or_pad,
     rfftn,
 )
-from .._instrument_config import InstrumentConfig
+from .._config import AbstractConfig
 from .._potential_representation import (
     GaussianMixtureAtomicPotential,
     PengAtomicPotential,
@@ -50,8 +50,8 @@ class GaussianMixtureProjection(
             This can be useful for reducing aliasing artifacts in the images.
         - `shape`:
             The shape of the plane on which projections are computed before padding or
-            cropping to the `InstrumentConfig.padded_shape`. This argument is particularly
-            useful if the `InstrumentConfig.padded_shape` is much larger than the protein.
+            cropping to the `AbstractConfig.padded_shape`. This argument is particularly
+            useful if the `AbstractConfig.padded_shape` is much larger than the protein.
         - `use_error_functions`:
             If `True`, use error functions to evaluate the projected potential at
             a pixel to be the average value within the pixel using gaussian
@@ -79,16 +79,14 @@ class GaussianMixtureProjection(
     def integrate(
         self,
         potential: GaussianMixtureAtomicPotential | PengAtomicPotential,
-        instrument_config: InstrumentConfig,
+        config: AbstractConfig,
         outputs_real_space: bool = False,
     ) -> (
         Complex[
             Array,
-            "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim//2+1}",
+            "{config.padded_y_dim} {config.padded_x_dim//2+1}",
         ]
-        | Float[
-            Array, "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim}"
-        ]
+        | Float[Array, "{config.padded_y_dim} {config.padded_x_dim}"]
     ):
         """Compute a projection from the atomic potential and transform it to Fourier
         space.
@@ -96,15 +94,15 @@ class GaussianMixtureProjection(
         **Arguments:**
 
         - `potential`: The atomic potential to project.
-        - `instrument_config`: The configuration of the imaging instrument.
+        - `config`: The configuration of the imaging instrument.
 
         **Returns:**
 
-        The integrated potential in real or fourier space at the `InstrumentConfig.padded_shape`.
+        The integrated potential in real or fourier space at the `AbstractConfig.padded_shape`.
         """  # noqa: E501
         # Grab the image configuration
-        shape = instrument_config.padded_shape if self.shape is None else self.shape
-        pixel_size = instrument_config.pixel_size
+        shape = config.padded_shape if self.shape is None else self.shape
+        pixel_size = config.pixel_size
         if self.upsampling_factor is not None:
             u = self.upsampling_factor
             upsampled_pixel_size, upsampled_shape = (
@@ -159,7 +157,7 @@ class GaussianMixtureProjection(
                     outputs_real_space=True,
                 )
                 in_plane_potential = resize_with_crop_or_pad(
-                    in_plane_potential, instrument_config.padded_shape
+                    in_plane_potential, config.padded_shape
                 )
                 return (
                     in_plane_potential
@@ -175,7 +173,7 @@ class GaussianMixtureProjection(
                 )
             else:
                 in_plane_potential = resize_with_crop_or_pad(
-                    in_plane_potential, instrument_config.padded_shape
+                    in_plane_potential, config.padded_shape
                 )
                 return (
                     in_plane_potential

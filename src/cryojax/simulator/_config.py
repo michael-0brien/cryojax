@@ -32,82 +32,18 @@ class GridWrapper(eqx.Module, strict=True):
             self.full_frequency_grid = make_frequency_grid(shape, outputs_rfftfreqs=False)
 
 
-class InstrumentConfig(eqx.Module, strict=True):
+class AbstractConfig(eqx.Module, strict=True):
     """Configuration and utilities for an electron microscopy image."""
 
-    shape: tuple[int, int] = eqx.field(static=True)
-    pixel_size: Float[Array, ""]
-    voltage_in_kilovolts: Float[Array, ""]
-    electrons_per_angstrom_squared: float | Float[Array, ""]
+    shape: eqx.AbstractVar[tuple[int, int]]
+    pixel_size: eqx.AbstractVar[Float[Array, ""]]
+    voltage_in_kilovolts: eqx.AbstractVar[Float[Array, ""]]
 
-    padded_shape: tuple[int, int] = eqx.field(static=True)
-    pad_mode: str | Callable
+    padded_shape: eqx.AbstractVar[tuple[int, int]]
+    pad_mode: eqx.AbstractVar[str | Callable]
 
-    grid_wrapper: Optional[GridWrapper]
-    padded_grid_wrapper: Optional[GridWrapper]
-
-    def __init__(
-        self,
-        shape: tuple[int, int],
-        pixel_size: float | Float[Array, ""],
-        voltage_in_kilovolts: float | Float[Array, ""],
-        electrons_per_angstrom_squared: float | Float[Array, ""] = 100.0,
-        padded_shape: Optional[tuple[int, int]] = None,
-        *,
-        pad_scale: float = 1.0,
-        pad_mode: str | Callable = "constant",
-        init_settings: dict[str, Any] = dict(eager=False, only_rfft=True),
-    ):
-        """**Arguments:**
-
-        - `shape`:
-            Shape of the imaging plane in pixels.
-        - `pixel_size`:
-            The pixel size of the image in angstroms.
-        - `voltage_in_kilovolts`:
-            The incident energy of the electron beam.
-        - `electrons_per_angstrom_squared`:
-            The integrated dose rate of the electron beam.
-        - `padded_shape`:
-            The shape of the image after padding. If this argument is
-            not given, it can be set by the `pad_scale` argument.
-        - `pad_scale`: A scale factor at which to pad the image. This is
-                       optionally used to set `padded_shape` and must be
-                       greater than `1`. If `padded_shape` is set, this
-                       argument is ignored.
-        - `pad_mode`:
-            The method of image padding. By default, `"constant"`.
-            For all options, see `jax.numpy.pad`.
-        - `init_settings`:
-            A dict of settings that determine behavior of coordinate
-            grids on initialization. This has the following keys
-            - `eager`: bool
-                If `True`, compute grids upon initialization.
-            - `only_rfft`: bool
-                If `True`, only compute a grid for use with FFTs of
-                real input.
-
-        """
-        self.shape = shape
-        self.pixel_size = error_if_not_positive(jnp.asarray(pixel_size))
-        self.voltage_in_kilovolts = error_if_not_positive(
-            jnp.asarray(voltage_in_kilovolts)
-        )
-        self.electrons_per_angstrom_squared = electrons_per_angstrom_squared
-        self.pad_mode = pad_mode
-        # Set shape after padding
-        if padded_shape is None:
-            padded_shape = (int(pad_scale * shape[0]), int(pad_scale * shape[1]))
-        self.padded_shape = padded_shape
-        # Optionally make grids on initialization
-        if init_settings["eager"]:
-            self.padded_grid_wrapper = GridWrapper(
-                padded_shape, only_rfft=init_settings["only_rfft"]
-            )
-            self.grid_wrapper = GridWrapper(shape, only_rfft=init_settings["only_rfft"])
-        else:
-            self.padded_grid_wrapper = None
-            self.grid_wrapper = None
+    grid_wrapper: eqx.AbstractVar[Optional[GridWrapper]]
+    padded_grid_wrapper: eqx.AbstractVar[Optional[GridWrapper]]
 
     def __check_init__(self):
         if self.padded_shape[0] < self.shape[0] or self.padded_shape[1] < self.shape[1]:
@@ -302,6 +238,169 @@ class InstrumentConfig(eqx.Module, strict=True):
     def padded_n_pixels(self) -> int:
         """Convenience property for `math.prod(padded_shape)`"""
         return math.prod(self.padded_shape)
+
+
+class InstrumentConfig(AbstractConfig, strict=True):
+    """Configuration and utilities for a basic electron microscopy
+    image."""
+
+    shape: tuple[int, int] = eqx.field(static=True)
+    pixel_size: Float[Array, ""]
+    voltage_in_kilovolts: Float[Array, ""]
+
+    padded_shape: tuple[int, int] = eqx.field(static=True)
+    pad_mode: str | Callable = eqx.field(static=True)
+
+    grid_wrapper: Optional[GridWrapper]
+    padded_grid_wrapper: Optional[GridWrapper]
+
+    def __init__(
+        self,
+        shape: tuple[int, int],
+        pixel_size: float | Float[Array, ""],
+        voltage_in_kilovolts: float | Float[Array, ""],
+        padded_shape: Optional[tuple[int, int]] = None,
+        *,
+        pad_scale: float = 1.0,
+        pad_mode: str | Callable = "constant",
+        init_settings: dict[str, Any] = dict(eager=False, only_rfft=True),
+    ):
+        """**Arguments:**
+
+        - `shape`:
+            Shape of the imaging plane in pixels.
+        - `pixel_size`:
+            The pixel size of the image in angstroms.
+        - `voltage_in_kilovolts`:
+            The incident energy of the electron beam.
+        - `electrons_per_angstrom_squared`:
+            The integrated dose rate of the electron beam.
+        - `padded_shape`:
+            The shape of the image after padding. If this argument is
+            not given, it can be set by the `pad_scale` argument.
+        - `pad_scale`: A scale factor at which to pad the image. This is
+                       optionally used to set `padded_shape` and must be
+                       greater than `1`. If `padded_shape` is set, this
+                       argument is ignored.
+        - `pad_mode`:
+            The method of image padding. By default, `"constant"`.
+            For all options, see `jax.numpy.pad`.
+        - `init_settings`:
+            A dict of settings that determine behavior of coordinate
+            grids on initialization. This has the following keys
+            - `eager`: bool
+                If `True`, compute grids upon initialization.
+            - `only_rfft`: bool
+                If `True`, only compute a grid for use with FFTs of
+                real input.
+
+        """
+        # Set parameters
+        self.pixel_size = error_if_not_positive(jnp.asarray(pixel_size, dtype=float))
+        self.voltage_in_kilovolts = error_if_not_positive(
+            jnp.asarray(voltage_in_kilovolts, dtype=float)
+        )
+        # Set shape
+        self.shape = shape
+        # ... after padding
+        if padded_shape is None:
+            padded_shape = (int(pad_scale * shape[0]), int(pad_scale * shape[1]))
+        self.padded_shape = padded_shape
+        # Now, settings
+        self.pad_mode = pad_mode
+        # ... optionally make grids on initialization
+        if init_settings["eager"]:
+            self.padded_grid_wrapper = GridWrapper(
+                padded_shape, only_rfft=init_settings["only_rfft"]
+            )
+            self.grid_wrapper = GridWrapper(shape, only_rfft=init_settings["only_rfft"])
+        else:
+            self.padded_grid_wrapper = None
+            self.grid_wrapper = None
+
+
+class DoseConfig(AbstractConfig, strict=True):
+    """Configuration and utilities for an electron microscopy image,
+    including the electron dose."""
+
+    shape: tuple[int, int] = eqx.field(static=True)
+    pixel_size: Float[Array, ""]
+    voltage_in_kilovolts: Float[Array, ""]
+    electrons_per_angstrom_squared: Float[Array, ""]
+
+    padded_shape: tuple[int, int] = eqx.field(static=True)
+    pad_mode: str | Callable = eqx.field(static=True)
+
+    grid_wrapper: Optional[GridWrapper]
+    padded_grid_wrapper: Optional[GridWrapper]
+
+    def __init__(
+        self,
+        shape: tuple[int, int],
+        pixel_size: float | Float[Array, ""],
+        voltage_in_kilovolts: float | Float[Array, ""],
+        electrons_per_angstrom_squared: float | Float[Array, ""],
+        padded_shape: Optional[tuple[int, int]] = None,
+        *,
+        pad_scale: float = 1.0,
+        pad_mode: str | Callable = "constant",
+        init_settings: dict[str, Any] = dict(eager=False, only_rfft=True),
+    ):
+        """**Arguments:**
+
+        - `shape`:
+            Shape of the imaging plane in pixels.
+        - `pixel_size`:
+            The pixel size of the image in angstroms.
+        - `voltage_in_kilovolts`:
+            The incident energy of the electron beam.
+        - `electrons_per_angstrom_squared`:
+            The integrated dose rate of the electron beam.
+        - `padded_shape`:
+            The shape of the image after padding. If this argument is
+            not given, it can be set by the `pad_scale` argument.
+        - `pad_scale`: A scale factor at which to pad the image. This is
+                       optionally used to set `padded_shape` and must be
+                       greater than `1`. If `padded_shape` is set, this
+                       argument is ignored.
+        - `pad_mode`:
+            The method of image padding. By default, `"constant"`.
+            For all options, see `jax.numpy.pad`.
+        - `init_settings`:
+            A dict of settings that determine behavior of coordinate
+            grids on initialization. This has the following keys
+            - `eager`: bool
+                If `True`, compute grids upon initialization.
+            - `only_rfft`: bool
+                If `True`, only compute a grid for use with FFTs of
+                real input.
+
+        """
+        # Set parameters
+        self.pixel_size = error_if_not_positive(jnp.asarray(pixel_size, dtype=float))
+        self.voltage_in_kilovolts = error_if_not_positive(
+            jnp.asarray(voltage_in_kilovolts, dtype=float)
+        )
+        self.electrons_per_angstrom_squared = jnp.asarray(
+            electrons_per_angstrom_squared, dtype=float
+        )
+        # Set shape
+        self.shape = shape
+        # ... after padding
+        if padded_shape is None:
+            padded_shape = (int(pad_scale * shape[0]), int(pad_scale * shape[1]))
+        self.padded_shape = padded_shape
+        # Now, settings
+        self.pad_mode = pad_mode
+        # ... optionally make grids on initialization
+        if init_settings["eager"]:
+            self.padded_grid_wrapper = GridWrapper(
+                padded_shape, only_rfft=init_settings["only_rfft"]
+            )
+            self.grid_wrapper = GridWrapper(shape, only_rfft=init_settings["only_rfft"])
+        else:
+            self.padded_grid_wrapper = None
+            self.grid_wrapper = None
 
 
 def _safe_multiply_by_constant(

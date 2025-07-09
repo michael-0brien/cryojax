@@ -17,7 +17,7 @@ from ...ndimage import (
     map_coordinates_with_cubic_spline,
     rfftn,
 )
-from .._instrument_config import InstrumentConfig
+from .._config import AbstractConfig
 from .._potential_representation import (
     FourierVoxelGridPotential,
     FourierVoxelSplinePotential,
@@ -48,7 +48,7 @@ class FourierSliceExtraction(AbstractVoxelPotentialIntegrator, strict=True):
         """**Arguments:**
 
         - `pixel_size_rescaling_method`:
-            Method for rescaling the final image to the `InstrumentConfig`
+            Method for rescaling the final image to the `AbstractConfig`
             pixel size. See `cryojax.image.rescale_pixel_size` for documentation.
         - `out_of_bounds_mode`:
             Specify how to handle out of bounds indexing. See
@@ -65,29 +65,27 @@ class FourierSliceExtraction(AbstractVoxelPotentialIntegrator, strict=True):
     def integrate(
         self,
         potential: FourierVoxelGridPotential | FourierVoxelSplinePotential,
-        instrument_config: InstrumentConfig,
+        config: AbstractConfig,
         outputs_real_space: bool = False,
     ) -> (
         Complex[
             Array,
-            "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim//2+1}",
+            "{config.padded_y_dim} {config.padded_x_dim//2+1}",
         ]
-        | Float[
-            Array, "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim}"
-        ]
+        | Float[Array, "{config.padded_y_dim} {config.padded_x_dim}"]
     ):
-        """Compute the integrated scattering potential at the `InstrumentConfig` settings
+        """Compute the integrated scattering potential at the `AbstractConfig` settings
         of a voxel-based representation in fourier-space, using fourier slice extraction.
 
         **Arguments:**
 
         - `potential`: The scattering potential representation.
-        - `instrument_config`: The configuration of the resulting image.
+        - `config`: The configuration of the resulting image.
 
         **Returns:**
 
         The extracted fourier voxels of the `potential`, at the
-        `instrument_config.padded_shape` and the `instrument_config.pixel_size`.
+        `config.padded_shape` and the `config.pixel_size`.
         """
         frequency_slice = potential.frequency_slice_in_pixels
         N = frequency_slice.shape[1]
@@ -114,18 +112,18 @@ class FourierSliceExtraction(AbstractVoxelPotentialIntegrator, strict=True):
                 "`FourierVoxelSplinePotential`."
             )
 
-        # Resize the image to match the InstrumentConfig.padded_shape
-        if instrument_config.padded_shape != (N, N):
+        # Resize the image to match the AbstractConfig.padded_shape
+        if config.padded_shape != (N, N):
             fourier_in_plane_potential = rfftn(
-                instrument_config.crop_or_pad_to_padded_shape(
+                config.crop_or_pad_to_padded_shape(
                     irfftn(fourier_in_plane_potential, s=(N, N))
                 )
             )
         fourier_in_plane_potential = self._convert_raw_image_to_integrated_potential(
-            fourier_in_plane_potential, potential, instrument_config, input_is_rfft=True
+            fourier_in_plane_potential, potential, config, input_is_rfft=True
         )
         return (
-            irfftn(fourier_in_plane_potential, s=instrument_config.padded_shape)
+            irfftn(fourier_in_plane_potential, s=config.padded_shape)
             if outputs_real_space
             else fourier_in_plane_potential
         )
@@ -227,7 +225,7 @@ class EwaldSphereExtraction(AbstractVoxelPotentialIntegrator, strict=True):
         """**Arguments:**
 
         - `pixel_size_rescaling_method`:
-            Method for rescaling the final image to the `InstrumentConfig`
+            Method for rescaling the final image to the `AbstractConfig`
             pixel size. See `cryojax.image.rescale_pixel_size` for documentation.
         - `out_of_bounds_mode`:
             Specify how to handle out of bounds indexing. See
@@ -244,28 +242,24 @@ class EwaldSphereExtraction(AbstractVoxelPotentialIntegrator, strict=True):
     def integrate(
         self,
         potential: FourierVoxelGridPotential | FourierVoxelSplinePotential,
-        instrument_config: InstrumentConfig,
+        config: AbstractConfig,
         outputs_real_space: bool = False,
     ) -> (
-        Complex[
-            Array, "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim}"
-        ]
-        | Float[
-            Array, "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim}"
-        ]
+        Complex[Array, "{config.padded_y_dim} {config.padded_x_dim}"]
+        | Float[Array, "{config.padded_y_dim} {config.padded_x_dim}"]
     ):
-        """Compute the integrated scattering potential at the `InstrumentConfig` settings
+        """Compute the integrated scattering potential at the `AbstractConfig` settings
         of a voxel-based representation in fourier-space, using fourier slice extraction.
 
         **Arguments:**
 
         - `potential`: The scattering potential representation.
-        - `instrument_config`: The configuration of the resulting image.
+        - `config`: The configuration of the resulting image.
 
         **Returns:**
 
         The extracted fourier voxels of the `potential`, at the
-        `instrument_config.padded_shape` and the `instrument_config.pixel_size`.
+        `config.padded_shape` and the `config.pixel_size`.
         """
         frequency_slice = potential.frequency_slice_in_pixels
         N = frequency_slice.shape[1]
@@ -279,14 +273,14 @@ class EwaldSphereExtraction(AbstractVoxelPotentialIntegrator, strict=True):
                 potential.spline_coefficients,
                 frequency_slice,
                 potential.voxel_size,
-                instrument_config.wavelength_in_angstroms,
+                config.wavelength_in_angstroms,
             )
         elif isinstance(potential, FourierVoxelGridPotential):
             ewald_sphere_surface = self.extract_ewald_sphere_from_grid_points(
                 potential.fourier_voxel_grid,
                 frequency_slice,
                 potential.voxel_size,
-                instrument_config.wavelength_in_angstroms,
+                config.wavelength_in_angstroms,
             )
         else:
             raise ValueError(
@@ -294,21 +288,19 @@ class EwaldSphereExtraction(AbstractVoxelPotentialIntegrator, strict=True):
                 "`FourierVoxelSplinePotential`."
             )
 
-        # Resize the image to match the InstrumentConfig.padded_shape
-        if instrument_config.padded_shape != (N, N):
+        # Resize the image to match the AbstractConfig.padded_shape
+        if config.padded_shape != (N, N):
             ewald_sphere_surface = fftn(
-                instrument_config.crop_or_pad_to_padded_shape(
-                    ifftn(ewald_sphere_surface, s=(N, N))
-                )
+                config.crop_or_pad_to_padded_shape(ifftn(ewald_sphere_surface, s=(N, N)))
             )
         ewald_sphere_surface = self._convert_raw_image_to_integrated_potential(
             ewald_sphere_surface,
             potential,
-            instrument_config,
+            config,
             input_is_rfft=False,
         )
         return (
-            irfftn(ewald_sphere_surface, s=instrument_config.padded_shape)
+            irfftn(ewald_sphere_surface, s=config.padded_shape)
             if outputs_real_space
             else ewald_sphere_surface
         )

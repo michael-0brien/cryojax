@@ -11,25 +11,21 @@ from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
 from ...ndimage import irfftn, rfftn
 from ...ndimage.transforms import FilterLike, MaskLike
-from .._instrument_config import InstrumentConfig
+from .._config import AbstractConfig
 from .._potential_integrator import AbstractPotentialIntegrator
 from .._structure import AbstractBiologicalStructure
 from .._transfer_theory import ContrastTransferTheory
 
 
-RealImageArray = Float[
-    Array, "{self.instrument_config.y_dim} {self.instrument_config.x_dim}"
-]
-FourierImageArray = Complex[
-    Array, "{self.instrument_config.y_dim} {self.instrument_config.x_dim//2+1}"
-]
+RealImageArray = Float[Array, "{self.config.y_dim} {self.config.x_dim}"]
+FourierImageArray = Complex[Array, "{self.config.y_dim} {self.config.x_dim//2+1}"]
 PaddedRealImageArray = Float[
     Array,
-    "{self.instrument_config.padded_y_dim} " "{self.instrument_config.padded_x_dim}",
+    "{self.config.padded_y_dim} " "{self.config.padded_x_dim}",
 ]
 PaddedFourierImageArray = Complex[
     Array,
-    "{self.instrument_config.padded_y_dim} " "{self.instrument_config.padded_x_dim//2+1}",
+    "{self.config.padded_y_dim} " "{self.config.padded_x_dim//2+1}",
 ]
 
 ImageArray = RealImageArray | FourierImageArray
@@ -43,7 +39,7 @@ class AbstractImageModel(eqx.Module, strict=True):
     """
 
     structure: eqx.AbstractVar[AbstractBiologicalStructure]
-    instrument_config: eqx.AbstractVar[InstrumentConfig]
+    config: eqx.AbstractVar[AbstractConfig]
 
     @abstractmethod
     def compute_fourier_image(
@@ -102,15 +98,13 @@ class AbstractImageModel(eqx.Module, strict=True):
         """Return an image postprocessed with filters, cropping, and masking
         in either real or fourier space.
         """
-        instrument_config = self.instrument_config
-        if mask is None and instrument_config.padded_shape == instrument_config.shape:
+        config = self.config
+        if mask is None and config.padded_shape == config.shape:
             # ... if there are no masks and we don't need to crop,
             # minimize moving back and forth between real and fourier space
             if filter is not None:
                 image = filter(image)
-            return (
-                irfftn(image, s=instrument_config.shape) if outputs_real_space else image
-            )
+            return irfftn(image, s=config.shape) if outputs_real_space else image
         else:
             # ... otherwise, apply filter, crop, and mask, again trying to
             # minimize moving back and forth between real and fourier space
@@ -118,14 +112,14 @@ class AbstractImageModel(eqx.Module, strict=True):
             if (
                 filter is not None
                 and filter.array.shape
-                == instrument_config.padded_frequency_grid_in_pixels.shape[0:2]
+                == config.padded_frequency_grid_in_pixels.shape[0:2]
             ):
                 # ... apply the filter here if it is the same size as the padded
                 # coordinates
                 is_filter_applied = True
                 image = filter(image)
-            image = irfftn(image, s=instrument_config.padded_shape)
-            image = instrument_config.crop_to_shape(image)
+            image = irfftn(image, s=config.padded_shape)
+            image = config.crop_to_shape(image)
             if mask is not None:
                 image = mask(image)
             if is_filter_applied or filter is None:
@@ -134,23 +128,19 @@ class AbstractImageModel(eqx.Module, strict=True):
                 # ... otherwise, apply the filter here and return. assume
                 # the filter is the same size as the non-padded coordinates
                 image = filter(rfftn(image))
-                return (
-                    irfftn(image, s=instrument_config.shape)
-                    if outputs_real_space
-                    else image
-                )
+                return irfftn(image, s=config.shape) if outputs_real_space else image
 
     def _apply_translation(
         self, fourier_image: PaddedFourierImageArray
     ) -> PaddedFourierImageArray:
         pose = self.structure.pose
         phase_shifts = pose.compute_translation_operator(
-            self.instrument_config.padded_frequency_grid_in_angstroms
+            self.config.padded_frequency_grid_in_angstroms
         )
         fourier_image = pose.translate_image(
             fourier_image,
             phase_shifts,
-            self.instrument_config.padded_shape,
+            self.config.padded_shape,
         )
 
         return fourier_image
@@ -164,17 +154,13 @@ class AbstractImageModel(eqx.Module, strict=True):
         mask: Optional[MaskLike] = None,
         filter: Optional[FilterLike] = None,
     ) -> PaddedImageArray | ImageArray:
-        instrument_config = self.instrument_config
+        config = self.config
         if removes_padding:
             return self.postprocess(
                 image, outputs_real_space=outputs_real_space, mask=mask, filter=filter
             )
         else:
-            return (
-                irfftn(image, s=instrument_config.padded_shape)
-                if outputs_real_space
-                else image
-            )
+            return irfftn(image, s=config.padded_shape) if outputs_real_space else image
 
 
 class LinearImageModel(AbstractImageModel, strict=True):
@@ -183,16 +169,16 @@ class LinearImageModel(AbstractImageModel, strict=True):
     structure: AbstractBiologicalStructure
     integrator: AbstractPotentialIntegrator
     transfer_theory: ContrastTransferTheory
-    instrument_config: InstrumentConfig
+    config: AbstractConfig
 
     def __init__(
         self,
         structure: AbstractBiologicalStructure,
         integrator: AbstractPotentialIntegrator,
         transfer_theory: ContrastTransferTheory,
-        instrument_config: InstrumentConfig,
+        config: AbstractConfig,
     ):
-        self.instrument_config = instrument_config
+        self.config = config
         self.integrator = integrator
         self.structure = structure
         self.transfer_theory = transfer_theory
@@ -207,12 +193,12 @@ class LinearImageModel(AbstractImageModel, strict=True):
         )
         # Compute the projection image
         fourier_projection = self.integrator.integrate(
-            potential, self.instrument_config, outputs_real_space=False
+            potential, self.config, outputs_real_space=False
         )
         # Compute the image
         fourier_image = self.transfer_theory.propagate_object(  # noqa: E501
             fourier_projection,
-            self.instrument_config,
+            self.config,
             is_projection_approximation=self.integrator.is_projection_approximation,
             defocus_offset=self.structure.pose.offset_z_in_angstroms,
         )

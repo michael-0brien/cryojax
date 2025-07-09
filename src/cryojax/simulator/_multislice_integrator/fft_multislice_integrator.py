@@ -8,7 +8,7 @@ from jaxtyping import Array, Complex, Float
 
 from ...coordinates import make_frequency_grid
 from ...ndimage import fftn, ifftn, map_coordinates
-from .._instrument_config import InstrumentConfig
+from .._config import AbstractConfig
 from .._potential_representation import AbstractAtomicPotential, RealVoxelGridPotential
 from .._scattering_theory import (
     apply_amplitude_contrast_ratio,
@@ -59,18 +59,16 @@ class FFTMultisliceIntegrator(
     def integrate(
         self,
         potential: AbstractAtomicPotential | RealVoxelGridPotential,
-        instrument_config: InstrumentConfig,
+        config: AbstractConfig,
         amplitude_contrast_ratio: Float[Array, ""] | float,
-    ) -> Complex[
-        Array, "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim}"
-    ]:
+    ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim}"]:
         """Compute the exit wave from an atomic potential using the multislice
         method.
 
         **Arguments:**
 
         - `potential`: The atomic potential to project.
-        - `instrument_config`: The configuration of the imaging instrument.
+        - `config`: The configuration of the imaging instrument.
 
         **Returns:**
 
@@ -79,10 +77,10 @@ class FFTMultisliceIntegrator(
         # Rasterize a voxel grid at the given settings
         if isinstance(potential, AbstractAtomicPotential):
             z_dim, y_dim, x_dim = (
-                min(instrument_config.padded_shape),
-                *instrument_config.padded_shape,
+                min(config.padded_shape),
+                *config.padded_shape,
             )
-            voxel_size = instrument_config.pixel_size
+            voxel_size = config.pixel_size
             potential_voxel_grid = potential.as_real_voxel_grid(
                 (z_dim, y_dim, x_dim), voxel_size, **self.options_for_rasterization
             )
@@ -124,7 +122,7 @@ class FFTMultisliceIntegrator(
         # the slice thickness (TODO: interpolate for different slice thicknesses?)
         compute_object_fn = lambda pot: apply_interaction_constant(
             apply_amplitude_contrast_ratio(voxel_size * pot, amplitude_contrast_ratio),
-            instrument_config.wavelength_in_angstroms,
+            config.wavelength_in_angstroms,
         )
         object_per_slice = jax.vmap(compute_object_fn)(potential_per_slice)
         # Compute the transmission function
@@ -132,7 +130,7 @@ class FFTMultisliceIntegrator(
         # Compute the fresnel propagator (TODO: check numerical factors)
         if isinstance(potential, AbstractAtomicPotential):
             radial_frequency_grid = jnp.sum(
-                instrument_config.padded_full_frequency_grid_in_angstroms**2,
+                config.padded_full_frequency_grid_in_angstroms**2,
                 axis=-1,
             )
         else:
@@ -144,7 +142,7 @@ class FFTMultisliceIntegrator(
         fresnel_propagator = jnp.exp(
             1.0j
             * jnp.pi
-            * instrument_config.wavelength_in_angstroms
+            * config.wavelength_in_angstroms
             * radial_frequency_grid
             * slice_thickness
         )
@@ -161,7 +159,7 @@ class FFTMultisliceIntegrator(
             exit_wave
             if isinstance(potential, AbstractAtomicPotential)
             else self._postprocess_exit_wave_for_voxel_potential(
-                exit_wave, potential, instrument_config
+                exit_wave, potential, config
             )
         )
 
@@ -169,23 +167,21 @@ class FFTMultisliceIntegrator(
         self,
         exit_wave: Complex[Array, "_ _"],
         potential,
-        instrument_config: InstrumentConfig,
-    ) -> Complex[
-        Array, "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim}"
-    ]:
+        config: AbstractConfig,
+    ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim}"]:
         # Check exit wave is at correct pixel size
         exit_wave = error_if(
             exit_wave,
-            ~jnp.isclose(potential.voxel_size, instrument_config.pixel_size),
+            ~jnp.isclose(potential.voxel_size, config.pixel_size),
             f"Tried to use {type(self).__name__} with `{type(potential).__name__}."
-            "voxel_size != InstrumentConfig.pixel_size`. If this is true, then "
+            "voxel_size != AbstractConfig.pixel_size`. If this is true, then "
             f"`{type(self).__name__}.pixel_rescaling_method` must not be set to "
             f"`None`. Try setting `{type(self).__name__}.pixel_rescaling_method = "
             "'bicubic'`.",
         )
-        # Resize the image to match the InstrumentConfig.padded_shape
-        if instrument_config.padded_shape != exit_wave.shape:
-            exit_wave = instrument_config.crop_or_pad_to_padded_shape(
+        # Resize the image to match the AbstractConfig.padded_shape
+        if config.padded_shape != exit_wave.shape:
+            exit_wave = config.crop_or_pad_to_padded_shape(
                 exit_wave, constant_values=1.0 + 0.0j
             )
 

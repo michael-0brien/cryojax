@@ -9,8 +9,8 @@ import equinox as eqx
 import jax
 from jaxtyping import PRNGKeyArray
 
+from .._config import AbstractConfig, DoseConfig
 from .._detector import AbstractDetector
-from .._instrument_config import InstrumentConfig
 from .._scattering_theory import AbstractScatteringTheory
 from .._structure import AbstractBiologicalStructure
 from .base_image_model import AbstractImageModel, ImageArray, PaddedImageArray
@@ -30,27 +30,27 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
     """
 
     structure: AbstractBiologicalStructure
-    instrument_config: InstrumentConfig
+    config: AbstractConfig
     scattering_theory: AbstractScatteringTheory
 
     def __init__(
         self,
         structure: AbstractBiologicalStructure,
-        instrument_config: InstrumentConfig,
+        config: AbstractConfig,
         scattering_theory: AbstractScatteringTheory,
     ):
         """**Arguments:**
 
         - `structure`:
             The biological structure.
-        - `instrument_config`:
+        - `config`:
             The configuration of the instrument, such as for the pixel size
             and the wavelength.
         - `scattering_theory`:
             The scattering theory.
         """
         self.structure = structure
-        self.instrument_config = instrument_config
+        self.config = config
         self.scattering_theory = scattering_theory
 
     @override
@@ -62,7 +62,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
         # Compute the squared wavefunction
         contrast_spectrum = self.scattering_theory.compute_contrast_spectrum(
             potential,
-            self.instrument_config,
+            self.config,
             rng_key,
             defocus_offset=self.structure.pose.offset_z_in_angstroms,
         )
@@ -78,7 +78,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
 
     **Attributes:**
 
-    - `instrument_config`: The configuration of the instrument, such as for the pixel size
+    - `config`: The configuration of the instrument, such as for the pixel size
                 and the wavelength.
     - `scattering_theory`: The scattering theory.
     - `filter: `A filter to apply to the image.
@@ -86,27 +86,27 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
     """
 
     structure: AbstractBiologicalStructure
-    instrument_config: InstrumentConfig
+    config: AbstractConfig
     scattering_theory: AbstractScatteringTheory
 
     def __init__(
         self,
         structure: AbstractBiologicalStructure,
-        instrument_config: InstrumentConfig,
+        config: AbstractConfig,
         scattering_theory: AbstractScatteringTheory,
     ):
         """**Arguments:**
 
         - `structure`:
             The biological structure.
-        - `instrument_config`:
+        - `config`:
             The configuration of the instrument, such as for the pixel size
             and the wavelength.
         - `scattering_theory`:
             The scattering theory.
         """
         self.structure = structure
-        self.instrument_config = instrument_config
+        self.config = config
         self.scattering_theory = scattering_theory
 
     @override
@@ -117,7 +117,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
         scattering_theory = self.scattering_theory
         fourier_intensity = scattering_theory.compute_intensity_spectrum(
             potential,
-            self.instrument_config,
+            self.config,
             rng_key,
             defocus_offset=self.structure.pose.offset_z_in_angstroms,
         )
@@ -132,14 +132,14 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
     """
 
     structure: AbstractBiologicalStructure
-    instrument_config: InstrumentConfig
+    config: DoseConfig
     scattering_theory: AbstractScatteringTheory
     detector: AbstractDetector
 
     def __init__(
         self,
         structure: AbstractBiologicalStructure,
-        instrument_config: InstrumentConfig,
+        config: DoseConfig,
         scattering_theory: AbstractScatteringTheory,
         detector: AbstractDetector,
     ):
@@ -147,14 +147,14 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
 
         - `structure`:
             The biological structure.
-        - `instrument_config`:
+        - `config`:
             The configuration of the instrument, such as for the pixel size
             and the wavelength.
         - `scattering_theory`:
             The scattering theory.
         """
         self.structure = structure
-        self.instrument_config = instrument_config
+        self.config = config
         self.scattering_theory = scattering_theory
         self.detector = detector
 
@@ -168,14 +168,14 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
             scattering_theory = self.scattering_theory
             fourier_intensity = scattering_theory.compute_intensity_spectrum(
                 potential,
-                self.instrument_config,
+                self.config,
                 defocus_offset=self.structure.pose.offset_z_in_angstroms,
             )
             fourier_intensity = self._apply_translation(fourier_intensity)
             # ... now measure the expected electron events at the detector
             fourier_expected_electron_events = (
                 self.detector.compute_expected_electron_events(
-                    fourier_intensity, self.instrument_config
+                    fourier_intensity, self.config
                 )
             )
 
@@ -186,7 +186,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
             scattering_theory = self.scattering_theory
             fourier_intensity = scattering_theory.compute_intensity_spectrum(
                 potential,
-                self.instrument_config,
+                self.config,
                 keys[0],
                 defocus_offset=self.structure.pose.offset_z_in_angstroms,
             )
@@ -195,7 +195,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
             fourier_detector_readout = self.detector.compute_detector_readout(
                 keys[1],
                 fourier_intensity,
-                self.instrument_config,
+                self.config,
             )
 
             return fourier_detector_readout

@@ -91,11 +91,11 @@ def voltage_in_kilovolts():
 
 @pytest.fixture
 def config(pixel_size, voltage_in_kilovolts):
-    return cxs.InstrumentConfig(
+    return cxs.DoseConfig(
         (65, 66),
         pixel_size,
         voltage_in_kilovolts,
-        electrons_per_angstrom_squared=50.0,
+        electrons_per_angstrom_squared=100.0,
         pad_scale=1.1,
     )
 
@@ -173,7 +173,7 @@ def theory_with_solvent(projection_method, transfer_theory, solvent):
 @pytest.fixture
 def noiseless_model(specimen, config, theory):
     return cxs.IntensityImageModel(
-        structure=specimen, instrument_config=config, scattering_theory=theory
+        structure=specimen, config=config, scattering_theory=theory
     )
 
 
@@ -181,7 +181,7 @@ def noiseless_model(specimen, config, theory):
 def noisy_model(specimen, config, theory_with_solvent, detector):
     return cxs.ElectronCountsImageModel(
         structure=specimen,
-        instrument_config=config,
+        config=config,
         scattering_theory=theory_with_solvent,
         detector=detector,
     )

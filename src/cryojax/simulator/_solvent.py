@@ -19,7 +19,7 @@ from ..ndimage.operators import (
     FourierGaussianWithRadialOffset,
     FourierOperatorLike,
 )
-from ._instrument_config import InstrumentConfig
+from ._config import AbstractConfig
 
 
 class SolventMixturePower(AbstractFourierOperator, strict=True):
@@ -79,21 +79,21 @@ class AbstractRandomSolvent(eqx.Module, strict=True):
     def sample_solvent_in_plane_potential(
         self,
         rng_key: PRNGKeyArray,
-        instrument_config: InstrumentConfig,
+        config: AbstractConfig,
         outputs_rfft: bool = True,
         outputs_real_space: bool = False,
     ) -> (
         Complex[
             Array,
-            "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim//2+1}",
+            "{config.padded_y_dim} {config.padded_x_dim//2+1}",
         ]
         | Complex[
             Array,
-            "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim}",
+            "{config.padded_y_dim} {config.padded_x_dim}",
         ]
         | Float[
             Array,
-            "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim}",
+            "{config.padded_y_dim} {config.padded_x_dim}",
         ]
     ):
         """Sample a stochastic realization of scattering potential due to the ice
@@ -106,28 +106,28 @@ class AbstractRandomSolvent(eqx.Module, strict=True):
         fourier_in_plane_potential: (
             Complex[
                 Array,
-                "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim//2+1}",
+                "{config.padded_y_dim} {config.padded_x_dim//2+1}",
             ]
             | Complex[
                 Array,
-                "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim}",
+                "{config.padded_y_dim} {config.padded_x_dim}",
             ]
         ),
-        instrument_config: InstrumentConfig,
+        config: AbstractConfig,
         input_is_rfft: bool = True,
         outputs_real_space: bool = False,
     ) -> (
         Complex[
             Array,
-            "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim//2+1}",
+            "{config.padded_y_dim} {config.padded_x_dim//2+1}",
         ]
         | Complex[
             Array,
-            "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim}",
+            "{config.padded_y_dim} {config.padded_x_dim}",
         ]
         | Float[
             Array,
-            "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim}",
+            "{config.padded_y_dim} {config.padded_x_dim}",
         ]
     ):
         """Compute the combined spectrum of the ice and the specimen."""
@@ -136,7 +136,7 @@ class AbstractRandomSolvent(eqx.Module, strict=True):
         # solvent shell.
         fourier_in_plane_potential_of_solvent = self.sample_solvent_in_plane_potential(
             rng_key,
-            instrument_config,
+            config,
             outputs_rfft=input_is_rfft,
             outputs_real_space=False,
         )
@@ -148,10 +148,10 @@ class AbstractRandomSolvent(eqx.Module, strict=True):
             if input_is_rfft:
                 return irfftn(
                     fourier_in_plane_potential,
-                    s=instrument_config.padded_shape,
+                    s=config.padded_shape,
                 )
             else:
-                return ifftn(fourier_in_plane_potential, s=instrument_config.padded_shape)
+                return ifftn(fourier_in_plane_potential, s=config.padded_shape)
         else:
             return fourier_in_plane_potential
 
@@ -200,39 +200,35 @@ class GRFSolvent(AbstractRandomSolvent, strict=True):
     def sample_solvent_in_plane_potential(
         self,
         rng_key: PRNGKeyArray,
-        instrument_config: InstrumentConfig,
+        config: AbstractConfig,
         outputs_rfft: bool = True,
         outputs_real_space: bool = False,
     ) -> (
         Complex[
             Array,
-            "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim//2+1}",
+            "{config.padded_y_dim} {config.padded_x_dim//2+1}",
         ]
         | Complex[
             Array,
-            "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim}",
+            "{config.padded_y_dim} {config.padded_x_dim}",
         ]
         | Float[
             Array,
-            "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim}",
+            "{config.padded_y_dim} {config.padded_x_dim}",
         ]
     ):
         """Sample a realization of the ice integrated potential
         as a gaussian random field.
         """
-        n_pixels = instrument_config.padded_n_pixels
+        n_pixels = config.padded_n_pixels
         if outputs_real_space:
-            frequency_grid_in_angstroms = (
-                instrument_config.padded_frequency_grid_in_angstroms
-            )
+            frequency_grid_in_angstroms = config.padded_frequency_grid_in_angstroms
         else:
             if outputs_rfft:
-                frequency_grid_in_angstroms = (
-                    instrument_config.padded_frequency_grid_in_angstroms
-                )
+                frequency_grid_in_angstroms = config.padded_frequency_grid_in_angstroms
             else:
                 frequency_grid_in_angstroms = (
-                    instrument_config.padded_full_frequency_grid_in_angstroms
+                    config.padded_full_frequency_grid_in_angstroms
                 )
         # Compute standard deviation, scaling up by the variance by the number
         # of pixels to make the realization independent pixel-independent in real-space.
@@ -251,7 +247,7 @@ class GRFSolvent(AbstractRandomSolvent, strict=True):
         if outputs_real_space:
             return irfftn(
                 fourier_in_plane_potential_of_solvent,
-                s=instrument_config.padded_shape,
+                s=config.padded_shape,
             )
         else:
             return fourier_in_plane_potential_of_solvent

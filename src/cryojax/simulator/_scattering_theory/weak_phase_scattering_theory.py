@@ -3,7 +3,7 @@ from typing_extensions import override
 
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
-from .._instrument_config import InstrumentConfig
+from .._config import AbstractConfig
 from .._potential_integrator import AbstractPotentialIntegrator
 from .._potential_representation import AbstractPotentialRepresentation
 from .._solvent import AbstractRandomSolvent
@@ -39,14 +39,12 @@ class WeakPhaseScatteringTheory(AbstractWeakPhaseScatteringTheory, strict=True):
     def compute_object_spectrum(
         self,
         potential: AbstractPotentialRepresentation,
-        instrument_config: InstrumentConfig,
+        config: AbstractConfig,
         rng_key: Optional[PRNGKeyArray] = None,
-    ) -> Complex[
-        Array, "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim//2+1}"
-    ]:
+    ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim//2+1}"]:
         # Compute the integrated potential
         fourier_in_plane_potential = self.integrator.integrate(
-            potential, instrument_config, outputs_real_space=False
+            potential, config, outputs_real_space=False
         )
 
         if rng_key is not None:
@@ -55,12 +53,12 @@ class WeakPhaseScatteringTheory(AbstractWeakPhaseScatteringTheory, strict=True):
                 fourier_in_plane_potential = self.solvent.compute_in_plane_potential(  # noqa: E501
                     rng_key,
                     fourier_in_plane_potential,
-                    instrument_config,
+                    config,
                     input_is_rfft=self.integrator.is_projection_approximation,
                 )
 
         object_spectrum = apply_interaction_constant(
-            fourier_in_plane_potential, instrument_config.wavelength_in_angstroms
+            fourier_in_plane_potential, config.wavelength_in_angstroms
         )
 
         return object_spectrum
@@ -69,18 +67,14 @@ class WeakPhaseScatteringTheory(AbstractWeakPhaseScatteringTheory, strict=True):
     def compute_contrast_spectrum(
         self,
         potential: AbstractPotentialRepresentation,
-        instrument_config: InstrumentConfig,
+        config: AbstractConfig,
         rng_key: Optional[PRNGKeyArray] = None,
         defocus_offset: Optional[float | Float[Array, ""]] = None,
-    ) -> Complex[
-        Array, "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim//2+1}"
-    ]:
-        object_spectrum = self.compute_object_spectrum(
-            potential, instrument_config, rng_key
-        )
+    ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim//2+1}"]:
+        object_spectrum = self.compute_object_spectrum(potential, config, rng_key)
         contrast_spectrum = self.transfer_theory.propagate_object(  # noqa: E501
             object_spectrum,
-            instrument_config,
+            config,
             is_projection_approximation=self.integrator.is_projection_approximation,
             defocus_offset=defocus_offset,
         )

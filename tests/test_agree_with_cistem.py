@@ -140,7 +140,7 @@ def test_compute_projection_with_cistem(
         config = cs.InstrumentConfig((box_size, box_size), voxel_size, 300.0)
         cryojax_projection = irfftn(
             (
-                projection_method.compute_integrated_potential(
+                projection_method.integrate(
                     potential.rotate_to_pose(pose), config, outputs_real_space=False
                 )
                 / voxel_size
