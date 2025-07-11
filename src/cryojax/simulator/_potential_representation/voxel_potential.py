@@ -14,14 +14,14 @@ from equinox import AbstractClassVar, AbstractVar, field
 from jaxtyping import Array, Complex, Float
 
 from ...coordinates import make_coordinate_grid, make_frequency_slice
-from ...image import (
+from ...internal import error_if_not_positive
+from ...ndimage import (
     compute_spline_coefficients,
     crop_to_shape,
     fftn,
     pad_to_shape,
 )
-from ...image.operators import AbstractFilter
-from ...internal import error_if_not_positive
+from ...ndimage.transforms import AbstractFilter
 from .._pose import AbstractPose
 from .base_potential import AbstractPotentialRepresentation
 

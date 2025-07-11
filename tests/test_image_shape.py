@@ -3,8 +3,8 @@ import numpy as np
 import pytest
 
 import cryojax.simulator as cs
-from cryojax.image import crop_to_shape
 from cryojax.io import read_array_with_spacing_from_mrc
+from cryojax.ndimage import crop_to_shape
 
 
 jax.config.update("jax_enable_x64", True)

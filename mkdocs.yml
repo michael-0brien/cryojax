@@ -74,8 +74,6 @@ nav:
                 - 'api/simulator/scattering_potential.md'
                 - 'api/simulator/pose.md'
                 - 'api/simulator/structural_ensemble.md'
-            - Modeling the solvent:
-                - 'api/simulator/solvent.md'
             - Image formation:
                 - 'api/simulator/potential_integrators.md'
                 - 'api/simulator/transfer_theory.md'
@@ -83,19 +81,19 @@ nav:
             - Putting it all together:
                 - 'api/simulator/instrument_config.md'
                 - 'api/simulator/image_model.md'
-        - cryojax.inference:
-            - cryojax.inference.distributions:
-                - 'api/inference/distributions.md'
-            - 'api/inference/grid_search.md'
-        - cryojax.data:
-            - 'api/data/relion.md'
+        - cryojax.distributions:
+            - 'api/distributions/gaussian.md'
+        - cryojax.dataset:
+            - 'api/dataset/relion.md'
         - cryojax.io:
             - 'api/io/mrc.md'
             - 'api/io/atom_loading.md'
-        - cryojax.image:
-            - 'api/image/functions.md'
-            - cryojax.image.operators:
-                - 'api/image/operators.md'
+        - cryojax.ndimage:
+            - 'api/ndimage/functions.md'
+            - cryojax.ndimage.operators:
+                - 'api/ndimage/operators.md'
+            - cryojax.ndimage.transforms:
+                - 'api/ndimage/transforms.md'
         - cryojax.coordinates:
             - 'api/coordinates/making_coordinates.md'
             - 'api/coordinates/transforming_coordinates.md'
@@ -105,7 +103,8 @@ nav:
         - cryojax.constants:
             - 'api/constants/units.md'
             - 'api/constants/scattering_factor_parameters.md'
-        - cryojax.utils:
-            - 'api/utils/filter_specs.md'
-            - 'api/utils/transforms.md'
-            - 'api/utils/useful_functions.md'
+        - cryojax.jax_util:
+            - 'api/jax_util/filter_specs.md'
+            - 'api/jax_util/grid_search.md'
+            - 'api/jax_util/pytree_transforms.md'
+            - 'api/jax_util/useful_functions.md'

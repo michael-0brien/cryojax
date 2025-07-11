@@ -11,7 +11,7 @@ import numpy as np
 from jaxtyping import Array, Float
 
 from ...internal import error_if_not_positive
-from ._operator import AbstractImageOperator
+from ._base_operator import AbstractImageOperator
 
 
 class AbstractRealOperator(AbstractImageOperator, strict=True):

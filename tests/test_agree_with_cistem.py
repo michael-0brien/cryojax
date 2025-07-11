@@ -7,8 +7,8 @@ import pytest
 
 import cryojax.simulator as cs
 from cryojax.coordinates import cartesian_to_polar, make_frequency_grid
-from cryojax.image import compute_binned_powerspectrum, irfftn
 from cryojax.io import read_array_with_spacing_from_mrc
+from cryojax.ndimage import compute_binned_powerspectrum, irfftn
 from cryojax.simulator import CTF, EulerAnglePose
 
 

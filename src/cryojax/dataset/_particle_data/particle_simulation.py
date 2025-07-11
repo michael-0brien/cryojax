@@ -6,7 +6,7 @@ import numpy as np
 from jaxtyping import Array, Float, Int, PyTree
 
 from ...internal import NDArrayLike
-from ...utils import batched_scan
+from ...jax_util import batched_scan
 from .base_particle_dataset import (
     AbstractParticleParameterFile,
     AbstractParticleStackDataset,

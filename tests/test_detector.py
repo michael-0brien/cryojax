@@ -3,7 +3,7 @@ import jax.numpy as jnp
 import numpy as np
 
 import cryojax.simulator as cs
-from cryojax.image import irfftn, rfftn
+from cryojax.ndimage import irfftn, rfftn
 
 
 def test_constant_wavefunction_gives_constant_expected_events():

@@ -12,8 +12,8 @@ from cryojax.constants import (
     get_tabulated_scattering_factor_parameters,
     read_peng_element_scattering_factor_parameter_table,
 )
-from cryojax.image import crop_to_shape, irfftn
 from cryojax.io import read_atoms_from_pdb
+from cryojax.ndimage import crop_to_shape, irfftn
 
 
 jax.config.update("jax_enable_x64", True)

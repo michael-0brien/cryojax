@@ -4,8 +4,8 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
-from ...image.operators import FourierOperatorLike
 from ...internal import error_if_not_fractional
+from ...ndimage.operators import FourierOperatorLike
 from .._instrument_config import InstrumentConfig
 from .transfer_function import AbstractCTF
 

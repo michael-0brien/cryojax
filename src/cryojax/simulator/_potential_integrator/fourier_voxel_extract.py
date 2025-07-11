@@ -8,7 +8,7 @@ from typing_extensions import override
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
-from ...image import (
+from ...ndimage import (
     convert_fftn_to_rfftn,
     fftn,
     ifftn,
@@ -17,7 +17,7 @@ from ...image import (
     map_coordinates_with_cubic_spline,
     rfftn,
 )
-from ...image.operators import InverseSincMask
+from ...ndimage.transforms import InverseSincMask
 from .._instrument_config import InstrumentConfig
 from .._potential_representation import (
     FourierVoxelGridPotential,

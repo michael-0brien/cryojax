@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import numpy as np
 from jaxtyping import Array
 
-from cryojax.utils import CustomTransform, StopGradientTransform, resolve_transforms
+from cryojax.jax_util import CustomTransform, StopGradientTransform, resolve_transforms
 
 
 class Exp(eqx.Module):

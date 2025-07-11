@@ -5,7 +5,7 @@ import pytest
 from jax import config
 from jaxtyping import Array, Float, install_import_hook
 
-from cryojax.image import downsample_with_fourier_cropping
+from cryojax.ndimage import downsample_with_fourier_cropping
 
 
 with install_import_hook("cryojax", "typeguard.typechecked"):
@@ -15,8 +15,8 @@ with install_import_hook("cryojax", "typeguard.typechecked"):
         read_peng_element_scattering_factor_parameter_table,
     )
     from cryojax.coordinates import make_coordinate_grid
-    from cryojax.image import ifftn
     from cryojax.io import read_atoms_from_pdb
+    from cryojax.ndimage import ifftn
     from cryojax.simulator import (
         FourierVoxelGridPotential,
         GaussianMixtureAtomicPotential,
