@@ -12,7 +12,7 @@ from jaxtyping import Array, Float, Inexact
 
 from ..constants import convert_keV_to_angstroms
 from ..coordinates import make_coordinate_grid, make_frequency_grid
-from ..internal import error_if_not_positive
+from ..internal import NDArrayLike, error_if_not_positive
 from ..ndimage import (
     crop_to_shape,
     pad_to_shape,
@@ -34,9 +34,9 @@ class InstrumentConfig(eqx.Module, strict=True):
     def __init__(
         self,
         shape: tuple[int, int],
-        pixel_size: float | Float[Array, ""],
-        voltage_in_kilovolts: float | Float[Array, ""],
-        electrons_per_angstrom_squared: float | Float[Array, ""] = 100.0,
+        pixel_size: float | Float[NDArrayLike, ""],
+        voltage_in_kilovolts: float | Float[NDArrayLike, ""],
+        electrons_per_angstrom_squared: float | Float[NDArrayLike, ""] = 100.0,
         padded_shape: Optional[tuple[int, int]] = None,
         *,
         pad_scale: float = 1.0,
