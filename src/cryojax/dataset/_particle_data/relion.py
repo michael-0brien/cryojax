@@ -5,10 +5,11 @@ import pathlib
 import re
 import warnings
 from copy import deepcopy
-from typing import Any, Callable, Literal, Optional, TypedDict
+from typing import Any, Callable, Literal, Optional, TypedDict, cast
 from typing_extensions import Self, override
 
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 import mrcfile
 import numpy as np
@@ -30,20 +31,21 @@ from .._particle_data import (
 )
 
 
-RELION_REQUIRED_OPTICS_ENTRIES = [
+# RELION column entries
+RELION_CTF_OPTICS_ENTRIES = [
+    ("rlnSphericalAberration", "Float64"),
+    ("rlnAmplitudeContrast", "Float64"),
+]
+RELION_INSTRUMENT_OPTICS_ENTRIES = [
     ("rlnImageSize", "Int64"),
     ("rlnVoltage", "Float64"),
     ("rlnImagePixelSize", "Float64"),
-    ("rlnSphericalAberration", "Float64"),
-    ("rlnAmplitudeContrast", "Float64"),
-    ("rlnOpticsGroup", "Int64"),
 ]
-RELION_REQUIRED_PARTICLE_ENTRIES = [
+RELION_CTF_PARTICLE_ENTRIES = [
     ("rlnDefocusU", "Float64"),
     ("rlnDefocusV", "Float64"),
     ("rlnDefocusAngle", "Float64"),
     ("rlnPhaseShift", "Float64"),
-    ("rlnOpticsGroup", "Int64"),
 ]
 RELION_POSE_PARTICLE_ENTRIES = [
     ("rlnOriginXAngst", "Float64"),
@@ -51,6 +53,28 @@ RELION_POSE_PARTICLE_ENTRIES = [
     ("rlnAngleRot", "Float64"),
     ("rlnAngleTilt", "Float64"),
     ("rlnAnglePsi", "Float64"),
+]
+# Default entries for writing
+RELION_DEFAULT_OPTICS_ENTRIES = [
+    *RELION_INSTRUMENT_OPTICS_ENTRIES,
+    *RELION_CTF_OPTICS_ENTRIES,
+    ("rlnOpticsGroup", "Int64"),
+]
+RELION_DEFAULT_PARTICLE_ENTRIES = [
+    *RELION_CTF_PARTICLE_ENTRIES,
+    *RELION_POSE_PARTICLE_ENTRIES,
+    ("rlnOpticsGroup", "Int64"),
+]
+# Required entries for loading
+RELION_REQUIRED_OPTICS_ENTRIES = RELION_DEFAULT_OPTICS_ENTRIES
+RELION_REQUIRED_PARTICLE_ENTRIES = [
+    *RELION_CTF_PARTICLE_ENTRIES,
+    ("rlnOpticsGroup", "Int64"),
+]
+RELION_SUPPORTED_PARTICLE_ENTRIES = [
+    *RELION_REQUIRED_PARTICLE_ENTRIES,
+    ("rlnCtfBfactor", "Float64"),
+    ("rlnCtfScalefactor", "Float64"),
 ]
 
 
@@ -61,7 +85,7 @@ class ParticleParameterInfo(TypedDict):
     pose: EulerAnglePose
     transfer_theory: ContrastTransferTheory
 
-    metadata: dict
+    metadata: Optional[pd.DataFrame]
 
 
 class ParticleStackInfo(TypedDict):
@@ -89,12 +113,7 @@ class MrcfileSettings(TypedDict):
     compression: str | None
 
 
-def _default_make_config_fn(
-    shape: tuple[int, int],
-    pixel_size: Float[Array, ""],
-    voltage_in_kilovolts: Float[Array, ""],
-    **kwargs: Any,
-):
+def _default_make_config_fn(shape, pixel_size, voltage_in_kilovolts, **kwargs):
     return InstrumentConfig(shape, pixel_size, voltage_in_kilovolts, **kwargs)
 
 
@@ -222,10 +241,10 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
             `selection_filter["rlnClassNumber"] = lambda x: x == 0`.
         - `loads_metadata`:
             If `True`, the resulting `ParticleParameterInfo` dict loads
-            the raw metadata from the STAR file.
-            If this is set to `True`, extra care must be taken to make sure that
-            these dictionaries can pass through JIT boundaries
-            without recompilation.
+            the raw metadata from the STAR file that is not otherwise included
+            in the `ParticleParameterInfo` as a `pandas.DataFrame`.
+            If this is set to `True`, note that dictionaries cannot pass through
+            JIT boundaries without removing the metadata.
         - `broadcasts_optics_group`:
             If `True`, select optics group parameters are broadcasted. If
             there are multiple optics groups in the STAR file, parameters
@@ -279,10 +298,20 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
             self.loads_envelope,
             self._make_config_fn,
         )
-        # ... convert to dataframe for serialization
-        if isinstance(particle_data_at_index, pd.Series):
-            particle_data_at_index = particle_data_at_index.to_frame().T
-        metadata = particle_data_at_index.to_dict() if self.loads_metadata else {}
+        if self.loads_metadata:
+            # ... convert to dataframe for serialization
+            if isinstance(particle_data_at_index, pd.Series):
+                particle_data_at_index = particle_data_at_index.to_frame().T
+            # ... no overlapping keys with loaded pytrees
+            redundant_entry_labels, _ = list(zip(*RELION_SUPPORTED_PARTICLE_ENTRIES))
+            columns = particle_data_at_index.columns
+            remove_columns = [
+                column for column in columns if column in redundant_entry_labels
+            ]
+            metadata = particle_data_at_index.drop(remove_columns, axis="columns")
+        else:
+            metadata = None
+
         return ParticleParameterInfo(
             config=config,
             pose=pose,
@@ -587,9 +616,8 @@ class RelionParticleStackDataset(
         # ... read parameters
         parameters = self.parameter_file[index]
         # ... and construct dataframe
-        metadata = parameters["metadata"]
-        particle_dataframe_at_index = pd.DataFrame.from_dict(metadata)  # type: ignore
-        if "rlnImageName" not in particle_dataframe_at_index.keys():
+        particle_dataframe_at_index = cast(pd.DataFrame, parameters["metadata"])
+        if "rlnImageName" not in particle_dataframe_at_index.columns:
             raise IOError(
                 "Tried to read STAR file for "
                 f"`RelionParticleStackDataset` index = {index}, "
@@ -606,7 +634,7 @@ class RelionParticleStackDataset(
         # ... reset boolean
         self.parameter_file.loads_metadata = loads_metadata
         if not loads_metadata:
-            parameters["metadata"] = {}
+            parameters["metadata"] = None
 
         return ParticleStackInfo(parameters=parameters, images=images)
 
@@ -799,16 +827,13 @@ def _load_starfile_data(
                     optics=pd.DataFrame(
                         data={
                             column: pd.Series(dtype=dtype)
-                            for column, dtype in RELION_REQUIRED_OPTICS_ENTRIES
+                            for column, dtype in RELION_DEFAULT_OPTICS_ENTRIES
                         }
                     ),
                     particles=pd.DataFrame(
                         data={
                             column: pd.Series(dtype=dtype)
-                            for column, dtype in [
-                                *RELION_REQUIRED_PARTICLE_ENTRIES,
-                                *RELION_POSE_PARTICLE_ENTRIES,
-                            ]
+                            for column, dtype in RELION_DEFAULT_PARTICLE_ENTRIES
                         }
                     ),
                 )
@@ -892,20 +917,24 @@ def _make_pytrees_from_starfile(
     make_config_fn,
 ) -> tuple[InstrumentConfig, ContrastTransferTheory, EulerAnglePose]:
     defocus_in_angstroms = (
-        jnp.asarray(starfile_dataframe["rlnDefocusU"])
-        + jnp.asarray(starfile_dataframe["rlnDefocusV"])
+        np.asarray(starfile_dataframe["rlnDefocusU"], dtype=float)
+        + np.asarray(starfile_dataframe["rlnDefocusV"], dtype=float)
     ) / 2
-    astigmatism_in_angstroms = jnp.asarray(
-        starfile_dataframe["rlnDefocusU"]
-    ) - jnp.asarray(starfile_dataframe["rlnDefocusV"])
-    astigmatism_angle = jnp.asarray(starfile_dataframe["rlnDefocusAngle"])
-    phase_shift = jnp.asarray(starfile_dataframe["rlnPhaseShift"])
+    astigmatism_in_angstroms = np.asarray(
+        starfile_dataframe["rlnDefocusU"], dtype=float
+    ) - np.asarray(starfile_dataframe["rlnDefocusV"], dtype=float)
+    astigmatism_angle = np.asarray(starfile_dataframe["rlnDefocusAngle"], dtype=float)
+    phase_shift = np.asarray(starfile_dataframe["rlnPhaseShift"], dtype=float)
     # ... optics group data
     image_size = int(optics_group["rlnImageSize"])
-    pixel_size = jnp.asarray(optics_group["rlnImagePixelSize"])
-    voltage_in_kilovolts = jnp.asarray(optics_group["rlnVoltage"])
-    spherical_aberration_in_mm = jnp.asarray(optics_group["rlnSphericalAberration"])
-    amplitude_contrast_ratio = jnp.asarray(optics_group["rlnAmplitudeContrast"])
+    pixel_size = np.asarray(optics_group["rlnImagePixelSize"], dtype=float)
+    voltage_in_kilovolts = np.asarray(optics_group["rlnVoltage"], dtype=float)
+    spherical_aberration_in_mm = np.asarray(
+        optics_group["rlnSphericalAberration"], dtype=float
+    )
+    amplitude_contrast_ratio = np.asarray(
+        optics_group["rlnAmplitudeContrast"], dtype=float
+    )
     # ... create cryojax objects. First, the InstrumentConfig
     image_shape = (image_size, image_size)
     batch_dim = 0 if defocus_in_angstroms.ndim == 0 else defocus_in_angstroms.shape[0]
@@ -921,12 +950,12 @@ def _make_pytrees_from_starfile(
     if loads_envelope:
         b_factor, scale_factor = (
             (
-                jnp.asarray(starfile_dataframe["rlnCtfBfactor"])
+                np.asarray(starfile_dataframe["rlnCtfBfactor"], dtype=float)
                 if "rlnCtfBfactor" in starfile_dataframe.keys()
                 else None
             ),
             (
-                jnp.asarray(starfile_dataframe["rlnCtfScalefactor"])
+                np.asarray(starfile_dataframe["rlnCtfScalefactor"], dtype=float)
                 if "rlnCtfScalefactor" in starfile_dataframe.keys()
                 else None
             ),
@@ -1011,24 +1040,27 @@ def _make_pytrees_from_starfile(
         "psi_angle",
     )
     pose_parameter_values = (
-        -rln_origin_x_angst,
-        -rln_origin_y_angst,
-        -rln_angle_rot,
-        -rln_angle_tilt,
-        -rln_angle_psi,
+        -np.asarray(rln_origin_x_angst, dtype=float),
+        -np.asarray(rln_origin_y_angst, dtype=float),
+        -np.asarray(rln_angle_rot, dtype=float),
+        -np.asarray(rln_angle_tilt, dtype=float),
+        -np.asarray(rln_angle_psi, dtype=float),
     )
     # ... fill the EulerAnglePose will keys that are present. if they are not
     # present, keep the default values in the `pose = EulerAnglePose()`
     # instantiation
     maybe_make_full = lambda param: (
-        np.full((batch_dim,), param)
-        if batch_dim > 0 and np.asarray(param).shape == ()
-        else param
+        np.full((batch_dim,), param) if batch_dim > 0 and param.shape == () else param
     )
     pose = eqx.tree_at(
         lambda p: tuple([getattr(p, name) for name in pose_parameter_names]),
         pose,
-        tuple([jnp.asarray(maybe_make_full(value)) for value in pose_parameter_values]),
+        tuple(
+            [
+                jnp.asarray(maybe_make_full(value), dtype=float)
+                for value in pose_parameter_values
+            ]
+        ),
     )
 
     return config, transfer_theory, pose
@@ -1395,7 +1427,7 @@ def _parameters_to_particle_data(
             if v.shape == ():
                 particles_dict[k] = np.full((n_particles,), np.asarray(v))
             elif v.size == n_particles:
-                particles_dict[k] = np.asarray(v.ravel())
+                particles_dict[k] = v.ravel()
             else:
                 raise ValueError(
                     "Found inconsistent number of particles "
@@ -1417,12 +1449,18 @@ def _parameters_to_particle_data(
     if "transfer_theory" in parameters:
         transfer_theory = parameters["transfer_theory"]
         if isinstance(transfer_theory.ctf, AberratedAstigmaticCTF):
+            if pose.offset_z_in_angstroms is None:
+                defocus_offset = 0.0
+            else:
+                defocus_offset = pose.offset_z_in_angstroms
             particles_dict["rlnDefocusU"] = (
                 transfer_theory.ctf.defocus_in_angstroms
+                + defocus_offset
                 + transfer_theory.ctf.astigmatism_in_angstroms / 2
             )
             particles_dict["rlnDefocusV"] = (
                 transfer_theory.ctf.defocus_in_angstroms
+                + defocus_offset
                 - transfer_theory.ctf.astigmatism_in_angstroms / 2
             )
             particles_dict["rlnDefocusAngle"] = transfer_theory.ctf.astigmatism_angle
@@ -1455,21 +1493,16 @@ def _parameters_to_particle_data(
         particles_dict["rlnOpticsGroup"] = np.full(
             (n_particles,), optics_group_index, dtype=int
         )
+    # Make sure parameters are numpy arrays
+    particles_dict = jax.tree.map(
+        lambda x: np.asarray(x) if isinstance(x, Array) else x, particles_dict
+    )
     particle_data = pd.DataFrame.from_dict(particles_dict)
     # Finally, see if the particle parameters has metadata and if so,
     # add this
     if "metadata" in parameters:
-        if parameters["metadata"]:
-            try:
-                metadata = pd.DataFrame.from_dict(parameters["metadata"])
-            except Exception as err:
-                raise ValueError(
-                    "When adding custom metadata to STAR file "
-                    "with `parameter_file[index] = foo` or `parameter_file.append(foo)`, "
-                    "caught an error converting "
-                    "the `foo['metadata']` to a pandas DataFrame. "
-                    f"The error message was:\n{err}"
-                )
+        if parameters["metadata"] is not None:
+            metadata = cast(pd.DataFrame, parameters["metadata"])
             if n_particles != metadata.index.size:
                 raise ValueError(
                     "When adding custom metadata to STAR file "
@@ -1478,7 +1511,10 @@ def _parameters_to_particle_data(
                     "in `foo['metadata']` was inconsistent with the "
                     "number of particles in `foo['pose']`."
                 )
-            particle_data = pd.concat([particle_data, metadata], axis=1)
+            # Add metadata to dataframe
+            particle_data = pd.concat(
+                [particle_data, metadata], axis="columns", verify_integrity=True
+            )
     return particle_data
 
 

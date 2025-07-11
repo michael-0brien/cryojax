@@ -2,9 +2,7 @@
 Filters to apply to images in Fourier space
 """
 
-import functools
 import math
-import operator
 from typing import Optional, overload
 
 import jax
@@ -51,30 +49,6 @@ class CustomFilter(AbstractFilter, strict=True):
         filter: Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"],
     ):
         self.array = filter
-
-
-class InverseSincFilter(AbstractFilter, strict=True):
-    """Apply sinc-correction to an image."""
-
-    array: Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"]
-
-    def __init__(
-        self,
-        frequency_grid_in_angstroms_or_pixels: (
-            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
-        ),
-        grid_spacing: float = 1.0,
-    ):
-        ndim = frequency_grid_in_angstroms_or_pixels.ndim - 1
-        self.array = jax.lax.reciprocal(
-            functools.reduce(
-                operator.mul,
-                [
-                    jnp.sinc(frequency_grid_in_angstroms_or_pixels[..., i] * grid_spacing)
-                    for i in range(ndim)
-                ],
-            )
-        )
 
 
 class LowpassFilter(AbstractFilter, strict=True):
