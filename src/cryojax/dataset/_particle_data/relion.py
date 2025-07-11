@@ -71,6 +71,11 @@ RELION_REQUIRED_PARTICLE_ENTRIES = [
     *RELION_CTF_PARTICLE_ENTRIES,
     ("rlnOpticsGroup", "Int64"),
 ]
+RELION_SUPPORTED_PARTICLE_ENTRIES = [
+    *RELION_REQUIRED_PARTICLE_ENTRIES,
+    ("rlnCtfBfactor", "Float64"),
+    ("rlnCtfScalefactor", "Float64"),
+]
 
 
 class ParticleParameterInfo(TypedDict):
@@ -298,7 +303,7 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
             if isinstance(particle_data_at_index, pd.Series):
                 particle_data_at_index = particle_data_at_index.to_frame().T
             # ... no overlapping keys with loaded pytrees
-            redundant_entry_labels, _ = list(zip(*RELION_DEFAULT_PARTICLE_ENTRIES))
+            redundant_entry_labels, _ = list(zip(*RELION_SUPPORTED_PARTICLE_ENTRIES))
             columns = particle_data_at_index.columns
             remove_columns = [
                 column for column in columns if column in redundant_entry_labels
