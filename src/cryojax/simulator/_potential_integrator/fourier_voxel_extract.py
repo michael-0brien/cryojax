@@ -34,7 +34,7 @@ class FourierSliceExtraction(AbstractVoxelPotentialIntegrator, strict=True):
     """
 
     pixel_size_rescaling_method: Optional[str]
-    sinc_mask: Optional[InverseSincMask]
+    correction_mask: Optional[InverseSincMask]
     out_of_bounds_mode: str
     fill_value: complex
 
@@ -44,7 +44,7 @@ class FourierSliceExtraction(AbstractVoxelPotentialIntegrator, strict=True):
         self,
         *,
         pixel_size_rescaling_method: Optional[str] = None,
-        sinc_mask: Optional[InverseSincMask] = None,
+        correction_mask: Optional[InverseSincMask] = None,
         out_of_bounds_mode: str = "fill",
         fill_value: complex = 0.0 + 0.0j,
     ):
@@ -53,7 +53,7 @@ class FourierSliceExtraction(AbstractVoxelPotentialIntegrator, strict=True):
         - `pixel_size_rescaling_method`:
             Method for rescaling the final image to the `InstrumentConfig`
             pixel size. See `cryojax.image.rescale_pixel_size` for documentation.
-        - `sinc_mask`:
+        - `correction_mask`:
             A `cryojax.image.operators.SincCorrectionMask` for performing
             sinc-correction on the linear-interpolated projections. This
             should be computed on a coordinate grid with shape matching
@@ -66,7 +66,7 @@ class FourierSliceExtraction(AbstractVoxelPotentialIntegrator, strict=True):
             `out_of_bounds_mode = "fill"`.
         """
         self.pixel_size_rescaling_method = pixel_size_rescaling_method
-        self.sinc_mask = sinc_mask
+        self.correction_mask = correction_mask
         self.out_of_bounds_mode = out_of_bounds_mode
         self.fill_value = fill_value
 
@@ -208,8 +208,8 @@ class FourierSliceExtraction(AbstractVoxelPotentialIntegrator, strict=True):
             mode=self.out_of_bounds_mode,
             cval=self.fill_value,
         )
-        if self.sinc_mask is not None:
-            fourier_slice = fftn(self.sinc_mask(ifftn(fourier_slice)))
+        if self.correction_mask is not None:
+            fourier_slice = fftn(self.correction_mask(ifftn(fourier_slice)))
 
         return fourier_slice
 
@@ -223,7 +223,7 @@ class EwaldSphereExtraction(AbstractVoxelPotentialIntegrator, strict=True):
     """
 
     pixel_size_rescaling_method: Optional[str]
-    sinc_mask: Optional[InverseSincMask]
+    correction_mask: Optional[InverseSincMask]
     out_of_bounds_mode: str
     fill_value: complex
 
@@ -233,7 +233,7 @@ class EwaldSphereExtraction(AbstractVoxelPotentialIntegrator, strict=True):
         self,
         *,
         pixel_size_rescaling_method: Optional[str] = None,
-        sinc_mask: Optional[InverseSincMask] = None,
+        correction_mask: Optional[InverseSincMask] = None,
         out_of_bounds_mode: str = "fill",
         fill_value: complex = 0.0 + 0.0j,
     ):
@@ -242,7 +242,7 @@ class EwaldSphereExtraction(AbstractVoxelPotentialIntegrator, strict=True):
         - `pixel_size_rescaling_method`:
             Method for rescaling the final image to the `InstrumentConfig`
             pixel size. See `cryojax.image.rescale_pixel_size` for documentation.
-        - `sinc_mask`:
+        - `correction_mask`:
             A `cryojax.image.operators.SincCorrectionMask` for performing
             sinc-correction on the linear-interpolated projections. This
             should be computed on a coordinate grid with shape matching
@@ -255,7 +255,7 @@ class EwaldSphereExtraction(AbstractVoxelPotentialIntegrator, strict=True):
             `out_of_bounds_mode = "fill"`.
         """
         self.pixel_size_rescaling_method = pixel_size_rescaling_method
-        self.sinc_mask = sinc_mask
+        self.correction_mask = correction_mask
         self.out_of_bounds_mode = out_of_bounds_mode
         self.fill_value = fill_value
 
@@ -411,8 +411,8 @@ class EwaldSphereExtraction(AbstractVoxelPotentialIntegrator, strict=True):
             mode=self.out_of_bounds_mode,
             cval=self.fill_value,
         )
-        if self.sinc_mask is not None:
-            ewald_sphere_surface = fftn(self.sinc_mask(ifftn(ewald_sphere_surface)))
+        if self.correction_mask is not None:
+            ewald_sphere_surface = fftn(self.correction_mask(ifftn(ewald_sphere_surface)))
 
         return ewald_sphere_surface
 
