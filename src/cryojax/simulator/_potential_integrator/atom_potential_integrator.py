@@ -7,9 +7,9 @@ import jax.numpy as jnp
 import jax.scipy as jsp
 from jaxtyping import Array, Complex, Float
 
-from ...constants._conventions import convert_variance_to_b_factor
+from ...constants import convert_variance_to_b_factor
 from ...coordinates import make_1d_coordinate_grid
-from ...image import (
+from ...ndimage import (
     downsample_to_shape_with_fourier_cropping,
     resize_with_crop_or_pad,
     rfftn,

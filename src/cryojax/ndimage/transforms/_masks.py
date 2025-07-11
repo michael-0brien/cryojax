@@ -2,6 +2,8 @@
 Masks to apply to images in real space.
 """
 
+import functools
+import operator
 from typing import Optional, overload
 
 import equinox as eqx
@@ -9,10 +11,10 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Bool, Float
 
-from ._operator import AbstractImageMultiplier
+from ._base_transform import AbstractImageTransform
 
 
-class AbstractMask(AbstractImageMultiplier, strict=True):
+class AbstractMask(AbstractImageTransform, strict=True):
     """Base class for computing and applying an image mask."""
 
     @overload
@@ -41,7 +43,7 @@ class AbstractBooleanMask(AbstractMask, strict=True):
     ]
 
 
-MaskLike = AbstractMask | AbstractImageMultiplier
+MaskLike = AbstractMask | AbstractImageTransform
 
 
 class CustomMask(AbstractMask, strict=True):
@@ -255,7 +257,7 @@ class Rectangular3DCosineMask(AbstractBooleanMask, strict=True):
         """**Arguments:**
 
         - `coordinate_grid`:
-            The image coordinates.
+            The volume coordinates.
         - `x_width`:
             The width of the rectangle along the x-axis.
         - `y_width`:
@@ -273,6 +275,39 @@ class Rectangular3DCosineMask(AbstractBooleanMask, strict=True):
             jnp.asarray(rolloff_width),
         )
         self.is_not_masked = self.array == 1.0
+
+
+class InverseSincMask(AbstractMask, strict=True):
+    """Apply sinc-correction to an image or volume.
+
+    This mask divides an image or volume by a 2D or 3D rectangular
+    sinc function computed on the unit box.
+    """
+
+    array: Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]
+
+    def __init__(
+        self,
+        coordinate_grid_in_pixels: (
+            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
+        ),
+    ):
+        """**Arguments:**
+
+        - `coordinate_grid_in_pixels`:
+            The image or volume coordinates.
+        """
+        ndim = coordinate_grid_in_pixels.ndim - 1
+        box_dims = coordinate_grid_in_pixels.shape[0:ndim][::-1]
+        self.array = jax.lax.reciprocal(
+            functools.reduce(
+                operator.mul,
+                [
+                    jnp.sinc(coordinate_grid_in_pixels[..., i] / box_dims[i])
+                    for i in range(ndim)
+                ],
+            )
+        )
 
 
 @overload

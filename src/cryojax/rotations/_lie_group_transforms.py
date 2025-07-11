@@ -18,9 +18,9 @@ import jax.tree_util as jtu
 from equinox import AbstractVar
 from jaxtyping import Array, Float, PyTree
 
+from ..jax_util import AbstractPyTreeTransform
 from ..rotations import SE3, SO3, AbstractMatrixLieGroup
 from ..simulator import QuaternionPose
-from ..utils import AbstractPyTreeTransform
 
 
 T = TypeVar("T")

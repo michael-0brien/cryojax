@@ -13,8 +13,8 @@ import numpy as np
 from equinox import AbstractVar, Module
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
-from ..image import irfftn, rfftn
 from ..internal import error_if_not_fractional
+from ..ndimage import irfftn, rfftn
 from ._instrument_config import InstrumentConfig
 
 

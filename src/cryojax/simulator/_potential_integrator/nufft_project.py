@@ -9,7 +9,7 @@ from typing_extensions import override
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
-from ...image import convert_fftn_to_rfftn, irfftn
+from ...ndimage import convert_fftn_to_rfftn, irfftn
 from .._instrument_config import InstrumentConfig
 from .._potential_representation import RealVoxelCloudPotential, RealVoxelGridPotential
 from .base_potential_integrator import AbstractVoxelPotentialIntegrator

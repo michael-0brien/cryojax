@@ -7,7 +7,6 @@ from typing import Any, Callable
 from typing_extensions import override
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float, Inexact
 
@@ -48,36 +47,6 @@ class AbstractImageOperator(eqx.Module, strict=True):
         if isinstance(other, AbstractImageOperator):
             return ProductImageOperator(other, self)
         return ProductImageOperator(Constant(other), self)
-
-
-class AbstractImageMultiplier(eqx.Module, strict=True):
-    """
-    Base class for computing and applying an ``Array`` to an image.
-
-    Attributes
-    ----------
-    operator :
-        The operator. Note that this is automatically
-        computed upon instantiation.
-    """
-
-    array: eqx.AbstractVar[
-        Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"]
-    ]
-
-    def get(self) -> Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"]:
-        return self.array
-
-    def __call__(
-        self, image: Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"]
-    ) -> Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"]:
-        return image * jax.lax.stop_gradient(self.array)
-
-    def __mul__(self, other) -> "AbstractImageMultiplier":
-        return ProductImageMultiplier(operator1=self, operator2=other)
-
-    def __rmul__(self, other) -> "AbstractImageMultiplier":
-        return ProductImageMultiplier(operator1=other, operator2=self)
 
 
 class Constant(AbstractImageOperator, strict=True):
@@ -153,27 +122,6 @@ class Empirical(AbstractImageOperator, strict=True):
     def __call__(self, *args: Any, **kwargs: Any) -> Inexact[Array, "y_dim x_dim"]:
         """Return the scaled and offset measurement."""
         return self.array
-
-
-class ProductImageMultiplier(AbstractImageMultiplier, strict=True):
-    """A helper to represent the product of two operators."""
-
-    array: Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"]
-
-    operator1: AbstractImageMultiplier
-    operator2: AbstractImageMultiplier
-
-    def __init__(
-        self,
-        operator1: AbstractImageMultiplier,
-        operator2: AbstractImageMultiplier,
-    ):
-        self.operator1 = operator1
-        self.operator2 = operator2
-        self.array = operator1.array * operator2.array
-
-    def __repr__(self):
-        return f"{repr(self.operator1)} * {repr(self.operator2)}"
 
 
 class SumImageOperator(AbstractImageOperator, strict=True):

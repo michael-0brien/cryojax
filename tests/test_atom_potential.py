@@ -11,8 +11,8 @@ with install_import_hook("cryojax", "typeguard.typechecked"):
         read_peng_element_scattering_factor_parameter_table,
     )
     from cryojax.coordinates import make_coordinate_grid
-    from cryojax.image import irfftn
     from cryojax.io import read_atoms_from_pdb
+    from cryojax.ndimage import irfftn
     from cryojax.simulator import (
         GaussianMixtureAtomicPotential,
         GaussianMixtureProjection,

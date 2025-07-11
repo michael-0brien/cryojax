@@ -16,7 +16,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Float, Inexact
 
 from ...internal import error_if_negative, error_if_not_positive
-from ._operator import AbstractImageOperator
+from ._base_operator import AbstractImageOperator
 
 
 class AbstractFourierOperator(AbstractImageOperator, strict=True):

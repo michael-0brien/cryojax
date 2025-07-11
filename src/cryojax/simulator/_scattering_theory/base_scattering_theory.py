@@ -6,7 +6,7 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
-from ...image import fftn, ifftn, rfftn
+from ...ndimage import fftn, ifftn, rfftn
 from .._instrument_config import InstrumentConfig
 from .._structural_ensemble import AbstractStructuralEnsemble
 from .._transfer_theory import (

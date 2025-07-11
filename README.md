@@ -108,8 +108,8 @@ image_without_noise = image_model.render(outputs_real_space=True)
 `cryojax` also defines a library of distributions from which to sample the data. These distributions define the stochastic model from which images are drawn. For example, instantiate an `IndependentGaussianFourierModes` distribution and either sample from it or compute its log-likelihood.
 
 ```python
+import cryojax.distributions as dist
 from cryojax.image import rfftn, operators as op
-from cryojax.inference import distributions as dist
 
 # Passing the ImagePipeline and a variance function, instantiate the distribution
 distribution = dist.IndependentGaussianFourierModes(

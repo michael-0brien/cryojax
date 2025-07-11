@@ -7,7 +7,7 @@ from jaxtyping import Array, install_import_hook
 
 
 with install_import_hook("cryojax", "typeguard.typechecked"):
-    import cryojax.inference as cxi
+    import cryojax.jax_util as cju
     from cryojax.coordinates import make_coordinate_grid
 
 
@@ -33,13 +33,13 @@ def test_pytree_grid_manipulation():
     is_leaf = lambda x: isinstance(x, ExampleModule)
     tree_grid = [ExampleModule(a_1, a_2, a_3), b, None, (c, (None,))]
     # Get grid point
-    shape = cxi.tree_grid_shape(tree_grid, is_leaf=is_leaf)
-    tree_grid_point = cxi.tree_grid_take(
-        tree_grid, cxi.tree_grid_unravel_index(0, tree_grid, is_leaf=is_leaf)
+    shape = cju.tree_grid_shape(tree_grid, is_leaf=is_leaf)
+    tree_grid_point = cju.tree_grid_take(
+        tree_grid, cju.tree_grid_unravel_index(0, tree_grid, is_leaf=is_leaf)
     )
-    tree_grid_points = cxi.tree_grid_take(
+    tree_grid_points = cju.tree_grid_take(
         tree_grid,
-        cxi.tree_grid_unravel_index(jnp.asarray([0, 10]), tree_grid, is_leaf=is_leaf),
+        cju.tree_grid_unravel_index(jnp.asarray([0, 10]), tree_grid, is_leaf=is_leaf),
     )
     # Define ground truth
     true_shape = (a_1.size, b.size, c.size)
@@ -97,7 +97,7 @@ def test_run_grid_search(batch_size, dim, offset, variance):
     )
     grid = (x, y)
     # Run the grid search
-    method = cxi.MinimumSearchMethod(batch_size=batch_size)
-    solution = cxi.run_grid_search(cost_fn, method, grid, (variance, offset))
+    method = cju.MinimumSearchMethod(batch_size=batch_size)
+    solution = cju.run_grid_search(cost_fn, method, grid, (variance, offset))
     np.testing.assert_allclose(solution.state.current_minimum_eval, true_min_eval)
     np.testing.assert_allclose(solution.value, true_min_pos)

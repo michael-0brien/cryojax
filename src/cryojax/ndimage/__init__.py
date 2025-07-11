@@ -1,4 +1,4 @@
-from . import operators as operators
+from . import operators as operators, transforms as transforms
 from ._average import (
     compute_binned_radial_average as compute_binned_radial_average,
     interpolate_radial_average_on_grid as interpolate_radial_average_on_grid,

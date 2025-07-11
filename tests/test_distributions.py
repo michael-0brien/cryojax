@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
+import cryojax.distributions as dist
 import cryojax.simulator as cxs
-from cryojax.inference import distributions as dist
 
 
 @pytest.mark.parametrize(

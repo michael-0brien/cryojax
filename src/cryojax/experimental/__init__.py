@@ -1,4 +1,4 @@
-from ..inference._lie_group_transforms import (
+from ..rotations._lie_group_transforms import (
     AbstractLieGroupTransform as AbstractLieGroupTransform,
     SE3Transform as SE3Transform,
     SO3Transform as SO3Transform,

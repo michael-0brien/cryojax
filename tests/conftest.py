@@ -10,8 +10,8 @@ from jaxtyping import install_import_hook
 with install_import_hook("cryojax", "typeguard.typechecked"):
     import cryojax.experimental as cxe
     import cryojax.simulator as cxs
-    from cryojax.image import operators as op, rfftn
     from cryojax.io import read_array_with_spacing_from_mrc
+    from cryojax.ndimage import operators as op, rfftn, transforms as tf
 
 
 # jax.config.update("jax_numpy_dtype_promotion", "strict")
@@ -109,12 +109,12 @@ def potential(sample_mrc_path):
 
 @pytest.fixture
 def filters(config):
-    return op.LowpassFilter(config.padded_frequency_grid_in_pixels)
+    return tf.LowpassFilter(config.padded_frequency_grid_in_pixels)
 
 
 @pytest.fixture
 def masks(config):
-    return op.CircularCosineMask(
+    return tf.CircularCosineMask(
         config.padded_coordinate_grid_in_angstroms,
         radius=20 * float(config.pixel_size),
         rolloff_width=3 * float(config.pixel_size),
