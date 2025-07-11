@@ -17,6 +17,7 @@ from ...ndimage import (
     map_coordinates_with_cubic_spline,
     rfftn,
 )
+from ...ndimage.transforms import InverseSincMask
 from .._instrument_config import InstrumentConfig
 from .._potential_representation import (
     FourierVoxelGridPotential,
@@ -33,6 +34,7 @@ class FourierSliceExtraction(AbstractVoxelPotentialIntegrator, strict=True):
     """
 
     pixel_size_rescaling_method: Optional[str]
+    correction_mask: Optional[InverseSincMask]
     out_of_bounds_mode: str
     fill_value: complex
 
@@ -42,6 +44,7 @@ class FourierSliceExtraction(AbstractVoxelPotentialIntegrator, strict=True):
         self,
         *,
         pixel_size_rescaling_method: Optional[str] = None,
+        correction_mask: Optional[InverseSincMask] = None,
         out_of_bounds_mode: str = "fill",
         fill_value: complex = 0.0 + 0.0j,
     ):
@@ -50,6 +53,11 @@ class FourierSliceExtraction(AbstractVoxelPotentialIntegrator, strict=True):
         - `pixel_size_rescaling_method`:
             Method for rescaling the final image to the `InstrumentConfig`
             pixel size. See `cryojax.image.rescale_pixel_size` for documentation.
+        - `correction_mask`:
+            A `cryojax.image.operators.SincCorrectionMask` for performing
+            sinc-correction on the linear-interpolated projections. This
+            should be computed on a coordinate grid with shape matching
+            the `FourierVoxelGridPotential.shape`.
         - `out_of_bounds_mode`:
             Specify how to handle out of bounds indexing. See
             `cryojax.image.map_coordinates` for documentation.
@@ -58,6 +66,7 @@ class FourierSliceExtraction(AbstractVoxelPotentialIntegrator, strict=True):
             `out_of_bounds_mode = "fill"`.
         """
         self.pixel_size_rescaling_method = pixel_size_rescaling_method
+        self.correction_mask = correction_mask
         self.out_of_bounds_mode = out_of_bounds_mode
         self.fill_value = fill_value
 
@@ -192,13 +201,17 @@ class FourierSliceExtraction(AbstractVoxelPotentialIntegrator, strict=True):
 
         The interpolated fourier slice at coordinates `frequency_slice_in_pixels`.
         """
-        return _extract_slice(
+        fourier_slice = _extract_slice(
             fourier_voxel_grid,
             frequency_slice_in_pixels,
             interpolation_order=1,
             mode=self.out_of_bounds_mode,
             cval=self.fill_value,
         )
+        if self.correction_mask is not None:
+            fourier_slice = fftn(self.correction_mask(ifftn(fourier_slice)))
+
+        return fourier_slice
 
 
 class EwaldSphereExtraction(AbstractVoxelPotentialIntegrator, strict=True):
@@ -210,6 +223,7 @@ class EwaldSphereExtraction(AbstractVoxelPotentialIntegrator, strict=True):
     """
 
     pixel_size_rescaling_method: Optional[str]
+    correction_mask: Optional[InverseSincMask]
     out_of_bounds_mode: str
     fill_value: complex
 
@@ -219,6 +233,7 @@ class EwaldSphereExtraction(AbstractVoxelPotentialIntegrator, strict=True):
         self,
         *,
         pixel_size_rescaling_method: Optional[str] = None,
+        correction_mask: Optional[InverseSincMask] = None,
         out_of_bounds_mode: str = "fill",
         fill_value: complex = 0.0 + 0.0j,
     ):
@@ -227,6 +242,11 @@ class EwaldSphereExtraction(AbstractVoxelPotentialIntegrator, strict=True):
         - `pixel_size_rescaling_method`:
             Method for rescaling the final image to the `InstrumentConfig`
             pixel size. See `cryojax.image.rescale_pixel_size` for documentation.
+        - `correction_mask`:
+            A `cryojax.image.operators.SincCorrectionMask` for performing
+            sinc-correction on the linear-interpolated projections. This
+            should be computed on a coordinate grid with shape matching
+            the `FourierVoxelGridPotential.shape`.
         - `out_of_bounds_mode`:
             Specify how to handle out of bounds indexing. See
             `cryojax.image.map_coordinates` for documentation.
@@ -235,6 +255,7 @@ class EwaldSphereExtraction(AbstractVoxelPotentialIntegrator, strict=True):
             `out_of_bounds_mode = "fill"`.
         """
         self.pixel_size_rescaling_method = pixel_size_rescaling_method
+        self.correction_mask = correction_mask
         self.out_of_bounds_mode = out_of_bounds_mode
         self.fill_value = fill_value
 
@@ -381,7 +402,7 @@ class EwaldSphereExtraction(AbstractVoxelPotentialIntegrator, strict=True):
         The interpolated ewald sphere surface at coordinates normal to
         `frequency_slice_in_pixels`.
         """
-        return _extract_ewald_sphere_surface(
+        ewald_sphere_surface = _extract_ewald_sphere_surface(
             fourier_voxel_grid,
             frequency_slice_in_pixels,
             voxel_size,
@@ -390,6 +411,10 @@ class EwaldSphereExtraction(AbstractVoxelPotentialIntegrator, strict=True):
             mode=self.out_of_bounds_mode,
             cval=self.fill_value,
         )
+        if self.correction_mask is not None:
+            ewald_sphere_surface = fftn(self.correction_mask(ifftn(ewald_sphere_surface)))
+
+        return ewald_sphere_surface
 
 
 def _extract_slice(
