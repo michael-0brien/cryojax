@@ -3,7 +3,6 @@ from ._filters import (
     CustomFilter as CustomFilter,
     FilterLike as FilterLike,
     HighpassFilter as HighpassFilter,
-    InverseSincFilter as InverseSincFilter,
     LowpassFilter as LowpassFilter,
     WhiteningFilter as WhiteningFilter,
 )
@@ -22,6 +21,7 @@ from ._masks import (
     CircularCosineMask as CircularCosineMask,
     CustomMask as CustomMask,
     Cylindrical2DCosineMask as Cylindrical2DCosineMask,
+    InverseSincMask as InverseSincMask,
     MaskLike as MaskLike,
     Rectangular2DCosineMask as Rectangular2DCosineMask,
     Rectangular3DCosineMask as Rectangular3DCosineMask,
