@@ -5,7 +5,7 @@ import pathlib
 import re
 import warnings
 from copy import deepcopy
-from typing import Any, Callable, Literal, Optional, TypedDict
+from typing import Any, Callable, Literal, Optional, TypedDict, cast
 from typing_extensions import Self, override
 
 import equinox as eqx
@@ -80,7 +80,7 @@ class ParticleParameterInfo(TypedDict):
     pose: EulerAnglePose
     transfer_theory: ContrastTransferTheory
 
-    metadata: dict
+    metadata: Optional[pd.DataFrame]
 
 
 class ParticleStackInfo(TypedDict):
@@ -237,10 +237,9 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
         - `loads_metadata`:
             If `True`, the resulting `ParticleParameterInfo` dict loads
             the raw metadata from the STAR file that is not otherwise included
-            in the `ParticleParameterInfo`.
-            If this is set to `True`, extra care must be taken to make sure that
-            these dictionaries can pass through JIT boundaries
-            without recompilation.
+            in the `ParticleParameterInfo` as a `pandas.DataFrame`.
+            If this is set to `True`, note that dictionaries cannot pass through
+            JIT boundaries without removing the metadata.
         - `broadcasts_optics_group`:
             If `True`, select optics group parameters are broadcasted. If
             there are multiple optics groups in the STAR file, parameters
@@ -304,10 +303,9 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
             remove_columns = [
                 column for column in columns if column in redundant_entry_labels
             ]
-            temp = particle_data_at_index.drop(remove_columns, axis="columns")
-            metadata = temp.to_dict()
+            metadata = particle_data_at_index.drop(remove_columns, axis="columns")
         else:
-            metadata = {}
+            metadata = None
 
         return ParticleParameterInfo(
             instrument_config=instrument_config,
@@ -613,9 +611,8 @@ class RelionParticleStackDataset(
         # ... read parameters
         parameters = self.parameter_file[index]
         # ... and construct dataframe
-        metadata = parameters["metadata"]
-        particle_dataframe_at_index = pd.DataFrame.from_dict(metadata)  # type: ignore
-        if "rlnImageName" not in particle_dataframe_at_index.keys():
+        particle_dataframe_at_index = cast(pd.DataFrame, parameters["metadata"])
+        if "rlnImageName" not in particle_dataframe_at_index.columns:
             raise IOError(
                 "Tried to read STAR file for "
                 f"`RelionParticleStackDataset` index = {index}, "
@@ -632,7 +629,7 @@ class RelionParticleStackDataset(
         # ... reset boolean
         self.parameter_file.loads_metadata = loads_metadata
         if not loads_metadata:
-            parameters["metadata"] = {}
+            parameters["metadata"] = None
 
         return ParticleStackInfo(parameters=parameters, images=images)
 
@@ -1499,17 +1496,8 @@ def _parameters_to_particle_data(
     # Finally, see if the particle parameters has metadata and if so,
     # add this
     if "metadata" in parameters:
-        if parameters["metadata"]:
-            try:
-                metadata = pd.DataFrame.from_dict(parameters["metadata"])
-            except Exception as err:
-                raise ValueError(
-                    "When adding custom metadata to STAR file "
-                    "with `parameter_file[index] = foo` or `parameter_file.append(foo)`, "
-                    "caught an error converting "
-                    "the `foo['metadata']` to a pandas DataFrame. "
-                    f"The error message was:\n{err}"
-                )
+        if parameters["metadata"] is not None:
+            metadata = cast(pd.DataFrame, parameters["metadata"])
             if n_particles != metadata.index.size:
                 raise ValueError(
                     "When adding custom metadata to STAR file "
