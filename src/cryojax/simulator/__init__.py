@@ -1,3 +1,4 @@
+from ._api_utils import make_image_model as make_image_model
 from ._config import (
     AbstractConfig as AbstractConfig,
     DoseConfig as DoseConfig,
