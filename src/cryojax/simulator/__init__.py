@@ -13,6 +13,12 @@ from ._detector import (
     NullDQE as NullDQE,
     PoissonDetector as PoissonDetector,
 )
+from ._distributions import (
+    AbstractDistribution as AbstractDistribution,
+    AbstractGaussianDistribution as AbstractGaussianDistribution,
+    IndependentGaussianFourierModes as IndependentGaussianFourierModes,
+    IndependentGaussianPixels as IndependentGaussianPixels,
+)
 from ._image_model import (
     AbstractImageModel as AbstractImageModel,
     AbstractPhysicalImageModel as AbstractPhysicalImageModel,

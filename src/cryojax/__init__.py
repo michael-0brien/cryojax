@@ -2,7 +2,6 @@ from . import (
     constants as constants,
     coordinates as coordinates,
     dataset as dataset,
-    distributions as distributions,
     experimental as experimental,
     internal as internal,
     io as io,

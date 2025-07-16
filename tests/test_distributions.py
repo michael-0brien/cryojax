@@ -1,15 +1,14 @@
 import numpy as np
 import pytest
 
-import cryojax.distributions as dist
 import cryojax.simulator as cxs
 
 
 @pytest.mark.parametrize(
     "cls, structure, scattering_theory, instrument_config",
     [
-        (dist.IndependentGaussianPixels, "specimen", "theory", "config"),
-        (dist.IndependentGaussianFourierModes, "specimen", "theory", "config"),
+        (cxs.IndependentGaussianPixels, "specimen", "theory", "config"),
+        (cxs.IndependentGaussianFourierModes, "specimen", "theory", "config"),
     ],
 )
 def test_simulate_signal_from_gaussian_distributions(
