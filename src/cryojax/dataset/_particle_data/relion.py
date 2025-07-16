@@ -21,9 +21,9 @@ from ...io import read_starfile, write_image_stack_to_mrc, write_starfile
 from ...ndimage.operators import Constant, FourierGaussian
 from ...simulator import (
     AberratedAstigmaticCTF,
+    BasicConfig,
     ContrastTransferTheory,
     EulerAnglePose,
-    InstrumentConfig,
 )
 from .._particle_data import (
     AbstractParticleParameterFile,
@@ -81,7 +81,7 @@ RELION_SUPPORTED_PARTICLE_ENTRIES = [
 class ParticleParameterInfo(TypedDict):
     """Parameters for a particle stack from RELION."""
 
-    config: InstrumentConfig
+    config: BasicConfig
     pose: EulerAnglePose
     transfer_theory: ContrastTransferTheory
 
@@ -114,7 +114,7 @@ class MrcfileSettings(TypedDict):
 
 
 def _default_make_config_fn(shape, pixel_size, voltage_in_kilovolts, **kwargs):
-    return InstrumentConfig(shape, pixel_size, voltage_in_kilovolts, **kwargs)
+    return BasicConfig(shape, pixel_size, voltage_in_kilovolts, **kwargs)
 
 
 class AbstractParticleStarFile(
@@ -213,7 +213,7 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
         updates_optics_group: bool = False,
         make_config_fn: Callable[
             [tuple[int, int], Float[Array, "..."], Float[Array, "..."]],
-            InstrumentConfig,
+            BasicConfig,
         ] = _default_make_config_fn,
     ):
         """**Arguments:**
@@ -256,8 +256,8 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
             If `True`, when re-writing STAR file entries via
             `dataset[idx] = parameters` syntax, creates a new optics group entry.
         - `make_config_fn`:
-            A function used for `InstrumentConfig` initialization that returns
-            an `InstrumentConfig`. This is used to customize the metadata of the
+            A function used for `BasicConfig` initialization that returns
+            an `BasicConfig`. This is used to customize the metadata of the
             read object.
         """
         # Private attributes
@@ -915,7 +915,7 @@ def _make_pytrees_from_starfile(
     broadcasts_optics_group,
     loads_envelope,
     make_config_fn,
-) -> tuple[InstrumentConfig, ContrastTransferTheory, EulerAnglePose]:
+) -> tuple[BasicConfig, ContrastTransferTheory, EulerAnglePose]:
     defocus_in_angstroms = (
         np.asarray(starfile_dataframe["rlnDefocusU"], dtype=float)
         + np.asarray(starfile_dataframe["rlnDefocusV"], dtype=float)
@@ -935,7 +935,7 @@ def _make_pytrees_from_starfile(
     amplitude_contrast_ratio = np.asarray(
         optics_group["rlnAmplitudeContrast"], dtype=float
     )
-    # ... create cryojax objects. First, the InstrumentConfig
+    # ... create cryojax objects. First, the BasicConfig
     image_shape = (image_size, image_size)
     batch_dim = 0 if defocus_in_angstroms.ndim == 0 else defocus_in_angstroms.shape[0]
     config = _make_config(
@@ -1313,10 +1313,10 @@ def _validate_parameters(parameters: ParticleParameterLike, force_keys: bool = F
                 "`foo` must have keys 'pose', 'transfer_theory', and 'config'."
             )
     if "config" in parameters:
-        if not isinstance(parameters["config"], InstrumentConfig):
+        if not isinstance(parameters["config"], BasicConfig):
             raise TypeError(
                 "Found that dict key 'config' was "
-                "not type `cryojax.simulator.InstrumentConfig`. "
+                "not type `cryojax.simulator.BasicConfig`. "
                 f"Instead, it was type "
                 f"{type(parameters['config']).__name__}."
             )
@@ -1381,7 +1381,7 @@ def _parameters_to_optics_data(
                         raise ValueError(
                             "Tried to fill a RELION optics group entry with an array "
                             "that has multiple unique values. Optics group compatible "
-                            "arrays such as `InstrumentConfig.pixel_size` "
+                            "arrays such as `BasicConfig.pixel_size` "
                             "must be either scalars or arrays all with the same value. "
                             f"Error occurred when filling '{k}' with array {v}."
                         )

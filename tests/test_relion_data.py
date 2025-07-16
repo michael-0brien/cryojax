@@ -75,12 +75,11 @@ def parameter_file(sample_starfile_path):
 
 @pytest.fixture
 def relion_parameters():
-    config = cxs.InstrumentConfig(
+    config = cxs.BasicConfig(
         shape=(4, 4),
         pixel_size=1.5,
         voltage_in_kilovolts=300.0,
-        padded_shape=(14, 14),
-        pad_mode="constant",
+        pad_options=dict(mode="constant", shape=(14, 14)),
     )
 
     pose = cxs.EulerAnglePose()
@@ -187,12 +186,11 @@ def test_default_make_config_fn(sample_starfile_path):
     )
     config = parameter_file[0]["config"]
 
-    ref_config = cxs.InstrumentConfig(
+    ref_config = cxs.BasicConfig(
         shape=(16, 16),
         pixel_size=12.0,
         voltage_in_kilovolts=300.0,
-        padded_shape=(16, 16),
-        pad_mode="constant",
+        pad_options=dict(mode="constant", shape=(16, 16)),
     )
 
     assert config.shape == ref_config.shape
@@ -464,7 +462,7 @@ def test_append_particle_parameters(index, loads_envelope):
 
     @eqx.filter_vmap
     def make_particle_params(dummy_idx):
-        config = cxs.InstrumentConfig(
+        config = cxs.BasicConfig(
             shape=(4, 4),
             pixel_size=1.5,
             voltage_in_kilovolts=300.0,
@@ -546,7 +544,7 @@ def test_set_particle_parameters(
         )
         pose = make_pose(rng_keys)
         return dict(
-            config=cxs.InstrumentConfig(
+            config=cxs.BasicConfig(
                 shape=(4, 4), pixel_size=3.324, voltage_in_kilovolts=121.3
             ),
             pose=pose,
@@ -611,9 +609,7 @@ def test_set_particle_parameters(
 def test_file_exists_error():
     # Create pytrees
     parameters = dict(
-        config=cxs.InstrumentConfig(
-            shape=(4, 4), pixel_size=1.1, voltage_in_kilovolts=300.0
-        ),
+        config=cxs.BasicConfig(shape=(4, 4), pixel_size=1.1, voltage_in_kilovolts=300.0),
         pose=cxs.EulerAnglePose(),
         transfer_theory=cxs.ContrastTransferTheory(ctf=cxs.CTF()),
     )
@@ -661,9 +657,7 @@ def test_set_wrong_parameters_error():
     # Right parameters
     right_pose = cxs.EulerAnglePose()
     right_transfer_theory = cxs.ContrastTransferTheory(ctf=cxs.CTF())
-    config = cxs.InstrumentConfig(
-        shape=(4, 4), pixel_size=1.1, voltage_in_kilovolts=300.0
-    )
+    config = cxs.BasicConfig(shape=(4, 4), pixel_size=1.1, voltage_in_kilovolts=300.0)
     # Create pytrees
     wrong_parameters_1 = dict(
         config=config,
@@ -714,9 +708,7 @@ def test_bad_pytree_error():
     )
     pose = eqx.tree_at(lambda x: x.offset_x_in_angstroms, pose, jnp.asarray((1.0, 2.0)))
     transfer_theory = cxs.ContrastTransferTheory(ctf=cxs.CTF())
-    config = cxs.InstrumentConfig(
-        shape=(4, 4), pixel_size=1.1, voltage_in_kilovolts=300.0
-    )
+    config = cxs.BasicConfig(shape=(4, 4), pixel_size=1.1, voltage_in_kilovolts=300.0)
     # Create pytrees
     parameters = dict(
         config=config,
@@ -799,7 +791,7 @@ def test_write_image(
 def test_write_particle_batched_particle_parameters():
     @partial(eqx.filter_vmap, in_axes=(0), out_axes=eqx.if_array(0))
     def _make_particle_params(dummy_idx):
-        config = cxs.InstrumentConfig(
+        config = cxs.BasicConfig(
             shape=(4, 4),
             pixel_size=1.5,
             voltage_in_kilovolts=300.0,
@@ -855,7 +847,7 @@ def test_write_particle_batched_particle_parameters():
 
 def test_write_starfile_different_envs():
     def _make_particle_params(envelope):
-        config = cxs.InstrumentConfig(
+        config = cxs.BasicConfig(
             shape=(4, 4),
             pixel_size=1.5,
             voltage_in_kilovolts=300.0,
@@ -1119,7 +1111,7 @@ def test_write_single_image(sample_starfile_path):
 def test_load_multiple_mrcs():
     @partial(eqx.filter_vmap, in_axes=(0), out_axes=eqx.if_array(0))
     def _make_particle_params(dummy_idx):
-        config = cxs.InstrumentConfig(
+        config = cxs.BasicConfig(
             shape=(4, 4),
             pixel_size=1.5,
             voltage_in_kilovolts=300.0,
@@ -1327,7 +1319,7 @@ def test_raise_errors_stack_dataset(sample_starfile_path, sample_relion_project_
 def test_append_relion_stack_dataset():
     @partial(eqx.filter_vmap, in_axes=(0), out_axes=eqx.if_array(0))
     def _make_particle_params(dummy_idx):
-        config = cxs.InstrumentConfig(
+        config = cxs.BasicConfig(
             shape=(4, 4),
             pixel_size=1.5,
             voltage_in_kilovolts=300.0,

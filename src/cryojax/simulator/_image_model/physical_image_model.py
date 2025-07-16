@@ -12,7 +12,7 @@ from jaxtyping import PRNGKeyArray
 from .._config import AbstractConfig, DoseConfig
 from .._detector import AbstractDetector
 from .._scattering_theory import AbstractScatteringTheory
-from .._structure import AbstractBiologicalStructure
+from .._structure import AbstractStructure
 from .base_image_model import AbstractImageModel, ImageArray, PaddedImageArray
 
 
@@ -29,13 +29,13 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
     scattering theory.
     """
 
-    structure: AbstractBiologicalStructure
+    structure: AbstractStructure
     config: AbstractConfig
     scattering_theory: AbstractScatteringTheory
 
     def __init__(
         self,
-        structure: AbstractBiologicalStructure,
+        structure: AbstractStructure,
         config: AbstractConfig,
         scattering_theory: AbstractScatteringTheory,
     ):
@@ -85,13 +85,13 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
     - `mask`: A mask to apply to the image.
     """
 
-    structure: AbstractBiologicalStructure
+    structure: AbstractStructure
     config: AbstractConfig
     scattering_theory: AbstractScatteringTheory
 
     def __init__(
         self,
-        structure: AbstractBiologicalStructure,
+        structure: AbstractStructure,
         config: AbstractConfig,
         scattering_theory: AbstractScatteringTheory,
     ):
@@ -131,14 +131,14 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
     model for the detector.
     """
 
-    structure: AbstractBiologicalStructure
+    structure: AbstractStructure
     config: DoseConfig
     scattering_theory: AbstractScatteringTheory
     detector: AbstractDetector
 
     def __init__(
         self,
-        structure: AbstractBiologicalStructure,
+        structure: AbstractStructure,
         config: DoseConfig,
         scattering_theory: AbstractScatteringTheory,
         detector: AbstractDetector,

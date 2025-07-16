@@ -6,10 +6,10 @@ from typing import Any, Optional
 
 import equinox as eqx
 
-from .base_structure import AbstractBiologicalStructure
+from .base_structure import AbstractStructure
 
 
-class AbstractStructuralEnsemble(AbstractBiologicalStructure, strict=True):
+class AbstractStructuralEnsemble(AbstractStructure, strict=True):
     """A map from a pose and conformational variable to an
     `AbstractPotentialRepresentation`.
     """

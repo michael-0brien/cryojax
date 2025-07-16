@@ -1,8 +1,9 @@
 from ._api_utils import make_image_model as make_image_model
 from ._config import (
     AbstractConfig as AbstractConfig,
+    BasicConfig as BasicConfig,
     DoseConfig as DoseConfig,
-    InstrumentConfig as InstrumentConfig,
+    GridHelper as GridHelper,
 )
 from ._detector import (
     AbstractDetector as AbstractDetector,
@@ -54,10 +55,10 @@ from ._scattering_theory import (
 )
 from ._solvent import AbstractRandomSolvent as AbstractRandomSolvent
 from ._structure import (
-    AbstractBiologicalStructure as AbstractBiologicalStructure,
     AbstractStructuralEnsemble as AbstractStructuralEnsemble,
+    AbstractStructure as AbstractStructure,
+    BasicStructure as BasicStructure,
     DiscreteStructuralEnsemble as DiscreteStructuralEnsemble,
-    Structure as Structure,
 )
 from ._transfer_theory import (
     AberratedAstigmaticCTF as AberratedAstigmaticCTF,

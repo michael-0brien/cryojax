@@ -96,7 +96,7 @@ def config(pixel_size, voltage_in_kilovolts):
         pixel_size,
         voltage_in_kilovolts,
         electrons_per_angstrom_squared=100.0,
-        pad_scale=1.1,
+        pad_options=dict(shape=(int(1.1 * 65), int(1.1 * 66))),
     )
 
 
@@ -150,7 +150,7 @@ def pose():
 
 @pytest.fixture
 def specimen(potential, pose):
-    return cxs.Structure(potential, pose)
+    return cxs.BasicStructure(potential, pose)
 
 
 @pytest.fixture

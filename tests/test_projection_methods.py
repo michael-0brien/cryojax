@@ -36,7 +36,7 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
     at the same orientation.
     """
     # Objects for imaging
-    config = cxs.InstrumentConfig(
+    config = cxs.BasicConfig(
         shape,
         pixel_size,
         voltage_in_kilovolts=300.0,
@@ -120,7 +120,7 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
 #     for real vs fourier, atoms vs voxels, etc.
 #     """
 #     # Objects for imaging
-#     instrument_config = cxs.InstrumentConfig(
+#     instrument_config = cxs.BasicConfig(
 #         shape,
 #         pixel_size,
 #         voltage_in_kilovolts=300.0,
@@ -199,7 +199,7 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
 def compute_projection(
     potential: cxs.AbstractPotentialRepresentation,
     integrator: cxs.AbstractPotentialIntegrator,
-    config: cxs.InstrumentConfig,
+    config: cxs.BasicConfig,
 ) -> Array:
     fourier_projection = integrator.integrate(potential, config, outputs_real_space=False)
     return crop_to_shape(
@@ -216,7 +216,7 @@ def compute_projection_at_pose(
     potential: cxs.AbstractPotentialRepresentation,
     integrator: cxs.AbstractPotentialIntegrator,
     pose: cxs.AbstractPose,
-    config: cxs.InstrumentConfig,
+    config: cxs.BasicConfig,
 ) -> Array:
     rotated_potential = potential.rotate_to_pose(pose)
     fourier_projection = integrator.integrate(

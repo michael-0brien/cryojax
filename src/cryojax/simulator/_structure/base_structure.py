@@ -14,7 +14,7 @@ from .._potential_representation import (
 )
 
 
-class AbstractBiologicalStructure(eqx.Module, strict=True):
+class AbstractStructure(eqx.Module, strict=True):
     """A map from a pose to an `AbstractPotentialRepresentation`."""
 
     pose: eqx.AbstractVar[AbstractPose]
@@ -36,7 +36,7 @@ class AbstractBiologicalStructure(eqx.Module, strict=True):
         return transformed_potential
 
 
-class Structure(AbstractBiologicalStructure, strict=True):
+class BasicStructure(AbstractStructure, strict=True):
     """An "ensemble" with one conformation."""
 
     potential: AbstractPotentialRepresentation

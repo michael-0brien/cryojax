@@ -30,7 +30,7 @@ from ._potential_representation import (
     RealVoxelGridPotential,
 )
 from ._scattering_theory import WeakPhaseScatteringTheory
-from ._structure import Structure
+from ._structure import BasicStructure
 from ._transfer_theory import ContrastTransferTheory
 
 
@@ -107,7 +107,7 @@ def make_image_model(
     """
     # Build the image model
     integrator = _select_default_integrator(potential)
-    structure = Structure(potential, pose)
+    structure = BasicStructure(potential, pose)
     if physical_units:
         scattering_theory = WeakPhaseScatteringTheory(integrator, transfer_theory)
         if mode == "counts":

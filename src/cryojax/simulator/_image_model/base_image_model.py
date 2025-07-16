@@ -3,7 +3,7 @@ Image formation models.
 """
 
 from abc import abstractmethod
-from typing import Optional
+from typing import Optional, TypedDict
 from typing_extensions import override
 
 import equinox as eqx
@@ -13,7 +13,7 @@ from ...ndimage import irfftn, rfftn
 from ...ndimage.transforms import FilterLike, MaskLike
 from .._config import AbstractConfig
 from .._potential_integrator import AbstractPotentialIntegrator
-from .._structure import AbstractBiologicalStructure
+from .._structure import AbstractStructure
 from .._transfer_theory import ContrastTransferTheory
 
 
@@ -32,14 +32,21 @@ ImageArray = RealImageArray | FourierImageArray
 PaddedImageArray = PaddedRealImageArray | PaddedFourierImageArray
 
 
+class NormalizeOptions(TypedDict):
+    applies_mask: bool
+    use_mask: bool
+
+
 class AbstractImageModel(eqx.Module, strict=True):
     """Base class for an image formation model.
 
     Call an `AbstractImageModel`'s `render` routine.
     """
 
-    structure: eqx.AbstractVar[AbstractBiologicalStructure]
+    structure: eqx.AbstractVar[AbstractStructure]
     config: eqx.AbstractVar[AbstractConfig]
+
+    # normalize_options: eqx.AbstractVar[Optional[dict[str, Any]]]
 
     @abstractmethod
     def compute_fourier_image(
@@ -65,8 +72,8 @@ class AbstractImageModel(eqx.Module, strict=True):
             The random number generator key. If not passed, render an image
             with no stochasticity.
         - `removes_padding`:
-            If `True`, return an image cropped to `InstrumentConfig.shape`.
-            Otherwise, return an image at the `InstrumentConfig.padded_shape`.
+            If `True`, return an image cropped to `BasicConfig.shape`.
+            Otherwise, return an image at the `BasicConfig.padded_shape`.
             If `removes_padding = False`, the `AbstractImageModel.filter`
             and `AbstractImageModel.mask` are not applied, overriding
             the booleans `applies_mask` and `applies_filter`.
@@ -166,14 +173,14 @@ class AbstractImageModel(eqx.Module, strict=True):
 class LinearImageModel(AbstractImageModel, strict=True):
     """An simple image model in linear image formation theory."""
 
-    structure: AbstractBiologicalStructure
+    structure: AbstractStructure
     integrator: AbstractPotentialIntegrator
     transfer_theory: ContrastTransferTheory
     config: AbstractConfig
 
     def __init__(
         self,
-        structure: AbstractBiologicalStructure,
+        structure: AbstractStructure,
         integrator: AbstractPotentialIntegrator,
         transfer_theory: ContrastTransferTheory,
         config: AbstractConfig,

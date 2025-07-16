@@ -40,13 +40,11 @@ def test_even_vs_odd_image_shape(shape, sample_mrc_path, pixel_size):
     assert control_shape == potential.fourier_voxel_grid.shape[0:2]
     pose = cs.EulerAnglePose()
     method = cs.FourierSliceExtraction()
-    specimen = cs.Structure(potential, pose)
+    specimen = cs.BasicStructure(potential, pose)
     transfer_theory = cs.ContrastTransferTheory(cs.CTF())
     theory = cs.WeakPhaseScatteringTheory(method, transfer_theory)
-    config_control = cs.InstrumentConfig(
-        control_shape, pixel_size, voltage_in_kilovolts=300.0
-    )
-    config_test = cs.InstrumentConfig(shape, pixel_size, voltage_in_kilovolts=300.0)
+    config_control = cs.BasicConfig(control_shape, pixel_size, voltage_in_kilovolts=300.0)
+    config_test = cs.BasicConfig(shape, pixel_size, voltage_in_kilovolts=300.0)
     model_control = cs.ContrastImageModel(specimen, config_control, theory)
     model_test = cs.ContrastImageModel(specimen, config_test, theory)
 
