@@ -21,11 +21,11 @@ from ._base_distribution import AbstractDistribution
 
 RealImageArray = Float[
     Array,
-    "{self.image_model.instrument_config.y_dim} {self.image_model.instrument_config.x_dim}",  # noqa: E501
+    "{self.image_model.config.y_dim} {self.image_model.config.x_dim}",  # noqa: E501
 ]
 FourierImageArray = Complex[
     Array,
-    "{self.image_model.instrument_config.y_dim} {self.image_model.instrument_config.x_dim//2+1}",  # noqa: E501
+    "{self.image_model.config.y_dim} {self.image_model.config.x_dim//2+1}",  # noqa: E501
 ]
 ImageArray = RealImageArray | FourierImageArray
 
@@ -89,7 +89,7 @@ class AbstractGaussianDistribution(AbstractDistribution, strict=True):
 
         !!! info
 
-            If the `AbstractImageModel` has a `mask` property, images will be
+            If a `mask` is passed, images will be
             normalized with the mean and standard deviation computed
             within the region where the mask is equal to 1.
 
@@ -122,7 +122,7 @@ class AbstractGaussianDistribution(AbstractDistribution, strict=True):
             A filter to apply to the final image.
         """
         simulated_image = self.image_model.render(
-            outputs_real_space=True, mask=mask, filter=filter
+            outputs_real_space=True, mask=None, filter=filter
         )
         if mask is None:
             if self.normalizes_signal:
@@ -240,8 +240,8 @@ class IndependentGaussianPixels(AbstractGaussianDistribution, strict=True):
             A filter to apply to the final image.
         """
         pipeline = self.image_model
-        n_pixels = pipeline.instrument_config.padded_n_pixels
-        freqs = pipeline.instrument_config.padded_frequency_grid_in_angstroms
+        n_pixels = pipeline.config.padded_n_pixels
+        freqs = pipeline.config.padded_frequency_grid_in_angstroms
         # Compute the zero mean variance and scale up to be independent of the number of
         # pixels
         std = jnp.sqrt(n_pixels * self.variance)
@@ -263,8 +263,7 @@ class IndependentGaussianPixels(AbstractGaussianDistribution, strict=True):
         self,
         observed: Float[
             Array,
-            "{self.image_model.instrument_config.y_dim} "
-            "{self.image_model.instrument_config.x_dim}",
+            "{self.image_model.config.y_dim} " "{self.image_model.config.x_dim}",
         ],
         *,
         mask: Optional[MaskLike] = None,
@@ -384,8 +383,8 @@ class IndependentGaussianFourierModes(AbstractGaussianDistribution, strict=True)
             A filter to apply to the final image.
         """
         pipeline = self.image_model
-        n_pixels = pipeline.instrument_config.padded_n_pixels
-        freqs = pipeline.instrument_config.padded_frequency_grid_in_angstroms
+        n_pixels = pipeline.config.padded_n_pixels
+        freqs = pipeline.config.padded_frequency_grid_in_angstroms
         # Compute the zero mean variance and scale up to be independent of the number of
         # pixels
         std = jnp.sqrt(n_pixels * self.variance_function(freqs))
@@ -407,8 +406,7 @@ class IndependentGaussianFourierModes(AbstractGaussianDistribution, strict=True)
         self,
         observed: Complex[
             Array,
-            "{self.image_model.instrument_config.y_dim} "
-            "{self.image_model.instrument_config.x_dim//2+1}",
+            "{self.image_model.config.y_dim} " "{self.image_model.config.x_dim//2+1}",
         ],
         *,
         mask: Optional[MaskLike] = None,
@@ -434,8 +432,8 @@ class IndependentGaussianFourierModes(AbstractGaussianDistribution, strict=True)
             A filter to apply to the final image.
         """
         pipeline = self.image_model
-        n_pixels = pipeline.instrument_config.n_pixels
-        freqs = pipeline.instrument_config.frequency_grid_in_angstroms
+        n_pixels = pipeline.config.n_pixels
+        freqs = pipeline.config.frequency_grid_in_angstroms
         # Compute the variance and scale up to be independent of the number of pixels
         variance = n_pixels * self.variance_function(freqs)
         # Create simulated data

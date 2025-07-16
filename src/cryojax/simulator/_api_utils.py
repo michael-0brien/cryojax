@@ -1,4 +1,4 @@
-from typing import Callable, Optional, Type
+from typing import Callable, Literal, Optional
 
 import equinox as eqx
 from jaxtyping import Array
@@ -8,7 +8,6 @@ from ._config import AbstractConfig, DoseConfig
 from ._detector import AbstractDetector
 from ._image_model import (
     AbstractImageModel,
-    AbstractPhysicalImageModel,
     ContrastImageModel,
     ElectronCountsImageModel,
     IntensityImageModel,
@@ -41,12 +40,13 @@ def make_image_model(
     pose: AbstractPose,
     transfer_theory: ContrastTransferTheory,
     integrator: Optional[AbstractPotentialIntegrator] = None,
+    detector: Optional[AbstractDetector] = None,
+    *,
     filter: Optional[FilterLike] = None,
     mask: Optional[MaskLike] = None,
     outputs_real_space: bool = True,
-    *,
-    model_class: Type[AbstractImageModel] = ContrastImageModel,
-    detector: Optional[AbstractDetector] = None,
+    physical_units: bool = True,
+    mode: Literal["contrast", "intensity", "counts"] = "contrast",
 ) -> tuple[AbstractImageModel, Callable[[AbstractImageModel], Array]]:
     """Construct an `AbstractImageModel` for most common use-cases.
 
@@ -71,24 +71,30 @@ def make_image_model(
         Optionally pass the method for integrating the electrostatic potential onto
         the plane (e.g. projection via fourier slice extraction). If not provided,
         a default option is chosen.
+    - `detector`:
+        If `mode = 'counts'` is chosen, then an `AbstractDetector` class must be
+        chosen to simulate electron counts.
     - `filter`:
         A filter to apply to the image.
     - `mask`:
         A mask to apply to the image.
     - `outputs_real_space`:
         Return the image in real or fourier space.
-
-    **Advanced arguments:**
-
-    - `model_class`:
-        The kind of the imaging model chosen. Options are the `ContrastImageModel`
-        (default), `IntensityImageModel`, or `ElectronCountsImageModel` for
-        simulating image contrast, intensity, and electron counts. Addtionally,
-        choose the `LinearImageModel` if a more streamlined model is desired that
-        does not try to simulate in physical units.
-    - `detector`:
-        If a `model_class = ElectronCountsImageModel` is chosen, then pass an
-        `AbstractDetector` class.
+    - `physical_units`:
+        If `True`, the image simulated is a physical quantity, which is
+        chosen with the `mode` argument. Otherwise, simulate an image without
+        scaling to absolute units.
+    - `mode`:
+        The physical observable to simulate. Not used if `physical_units = False`.
+        Options are
+        - 'contrast':
+            Uses the `ContrastImageModel` to simulate contrast. This is
+            default.
+        - 'intensity':
+            Uses the `IntensityImageModel` to simulate intensity.
+        - 'counts':
+            Uses the `ElectronCountsImageModel` to simulate electron counts.
+            If this is passed, a `detector` must also be passed.
 
     **Returns:**
 
@@ -102,37 +108,34 @@ def make_image_model(
     # Build the image model
     integrator = _select_default_integrator(potential)
     structure = Structure(potential, pose)
-    if issubclass(model_class, AbstractPhysicalImageModel):
+    if physical_units:
         scattering_theory = WeakPhaseScatteringTheory(integrator, transfer_theory)
-        if model_class is ElectronCountsImageModel:
+        if mode == "counts":
             if not isinstance(config, DoseConfig):
                 raise ValueError(
-                    f"If using image model {model_class.__name__}, "
+                    "If using `mode = 'counts'` to simulate electron counts, "
                     "pass `config = DoseConfig(...)`. Got config "
                     f"{type(config).__name__}."
                 )
             if detector is None:
                 raise ValueError(
-                    f"If using image model {model_class.__name__}, "
+                    "If using `mode = 'counts'` to simulate electron counts, "
                     "an `AbstractDetector` must be passed."
                 )
-            image_model = model_class(structure, config, scattering_theory, detector)
-        elif model_class in [ContrastImageModel, IntensityImageModel]:
-            image_model = model_class(structure, config, scattering_theory)
+            image_model = ElectronCountsImageModel(
+                structure, config, scattering_theory, detector
+            )
+        elif mode == "contrast":
+            image_model = ContrastImageModel(structure, config, scattering_theory)
+        elif mode == "intensity":
+            image_model = IntensityImageModel(structure, config, scattering_theory)
         else:
             raise ValueError(
-                f"Image model of class {model_class.__name__} not supported. "
-                "If creating a custom image model, please "
-                "use its constructor directly."
+                f"`mode = {mode}` not supported. Supported modes for simulating "
+                "physical quantities are 'contrast', 'intensity', and 'counts'."
             )
-    elif model_class is LinearImageModel:
-        image_model = LinearImageModel(structure, integrator, transfer_theory, config)
     else:
-        raise ValueError(
-            f"Unsupported `model_class` {model_class.__name__}. "
-            "If creating a custom image model, please "
-            "use its constructor directly."
-        )
+        image_model = LinearImageModel(structure, integrator, transfer_theory, config)
 
     # Grab the simulation function
     @eqx.filter_jit

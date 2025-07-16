@@ -42,19 +42,3 @@ class AbstractDistribution(Module, strict=True):
     ) -> Inexact[Array, "y_dim x_dim"]:
         """Render the image formation model."""
         raise NotImplementedError
-
-
-class AbstractMarginalDistribution(AbstractDistribution, strict=True):
-    """An `AbstractDistribution` equipped with a marginalized likelihood."""
-
-    @abstractmethod
-    def marginal_log_likelihood(
-        self, observed: Inexact[Array, "y_dim x_dim"]
-    ) -> Float[Array, ""]:
-        """Evaluate the marginalized log likelihood.
-
-        **Arguments:**
-
-        - `observed` : The observed data in real or fourier space.
-        """
-        raise NotImplementedError
