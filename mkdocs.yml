@@ -70,19 +70,19 @@ nav:
             - Run a cross-correlation search: 'examples/cross-correlation-search.ipynb'
     - API:
         - cryojax.simulator:
+            - 'api/simulator/api.md'
             - Representing volumes:
-                - 'api/simulator/scattering_potential.md'
+                - 'api/simulator/potential.md'
                 - 'api/simulator/pose.md'
-                - 'api/simulator/structural_ensemble.md'
+                - 'api/simulator/structure.md'
             - Image formation:
-                - 'api/simulator/potential_integrators.md'
+                - 'api/simulator/integrator.md'
                 - 'api/simulator/transfer_theory.md'
                 - 'api/simulator/scattering_theory.md'
             - Putting it all together:
-                - 'api/simulator/instrument_config.md'
+                - 'api/simulator/config.md'
                 - 'api/simulator/image_model.md'
-        - cryojax.distributions:
-            - 'api/distributions/gaussian.md'
+                - 'api/simulator/distribution.md'
         - cryojax.dataset:
             - 'api/dataset/relion.md'
         - cryojax.io:
