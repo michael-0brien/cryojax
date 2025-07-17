@@ -13,7 +13,7 @@ from jaxtyping import Array, Float
 @overload
 def read_array_from_mrc(
     filename: str | pathlib.Path,
-    loads_spacing: Literal[True] = True,
+    loads_spacing: Literal[True],
     *,
     mmap: bool = False,
     permissive: bool = False,
@@ -23,7 +23,7 @@ def read_array_from_mrc(
 @overload
 def read_array_from_mrc(
     filename: str | pathlib.Path,
-    loads_spacing: Literal[False] = False,
+    loads_spacing: Literal[False],
     *,
     mmap: bool = False,
     permissive: bool = False,
@@ -37,7 +37,7 @@ def read_array_from_mrc(
     *,
     mmap: bool = False,
     permissive: bool = False,
-) -> Float[np.ndarray, "..."] | tuple[Float[np.ndarray, "..."], float]: ...
+): ...
 
 
 def read_array_from_mrc(
@@ -215,63 +215,6 @@ def write_volume_to_mrc(
         mrc.set_data(voxel_grid_as_numpy)
         mrc.set_volume()
         mrc.voxel_size = (voxel_size_as_numpy, voxel_size_as_numpy, voxel_size_as_numpy)
-
-
-def _read_array_from_mrc(
-    filename: str | pathlib.Path,
-    loads_spacing: bool,
-    mmap: bool,
-    permissive: bool,
-) -> Float[np.ndarray, "..."] | tuple[Float[np.ndarray, "..."], float]:
-    # Validate filename as MRC path
-    _ = _validate_filename_and_return_suffix(filename)
-    # Read MRC
-    open = mrcfile.mmap if mmap else mrcfile.open
-    with open(filename, mode="r", permissive=permissive) as mrc:
-        array = cast(np.ndarray, mrc.data)
-        if mrc.is_single_image():
-            grid_spacing_per_dimension = np.asarray(
-                [mrc.voxel_size.x, mrc.voxel_size.y], dtype=float
-            )
-        elif mrc.is_image_stack():
-            grid_spacing_per_dimension = np.asarray(
-                [mrc.voxel_size.x, mrc.voxel_size.y], dtype=float
-            )
-        elif mrc.is_volume():
-            grid_spacing_per_dimension = np.asarray(
-                [mrc.voxel_size.x, mrc.voxel_size.y, mrc.voxel_size.z],
-                dtype=float,
-            )
-        elif mrc.is_volume_stack():
-            grid_spacing_per_dimension = np.asarray(
-                [mrc.voxel_size.x, mrc.voxel_size.y, mrc.voxel_size.z],
-                dtype=float,
-            )
-        else:
-            raise ValueError(
-                "Mrcfile could not be identified as an image, image stack, volume, or "
-                f"volume stack. Run mrcfile.validate(...) to make sure {filename} is a "
-                "valid MRC file."
-            )
-
-        if not mmap:
-            array = array.astype(np.float64)
-
-        if loads_spacing:
-            # Only allow the same spacing in each direction
-            assert all(
-                grid_spacing_per_dimension != np.zeros(grid_spacing_per_dimension.shape)
-            ), "Mrcfile.voxel_size must be set if reading the grid spacing. Found that "
-            "Mrcfile.voxel_size = (0.0, 0.0, 0.0)"
-            assert all(
-                grid_spacing_per_dimension == grid_spacing_per_dimension[0]
-            ), "Mrcfile.voxel_size must be same in all dimensions."
-            grid_spacing = grid_spacing_per_dimension[0]
-
-            return array, float(grid_spacing)
-        else:
-            # ... otherwise, just return
-            return array
 
 
 def _validate_filename_and_return_suffix(filename: str | pathlib.Path):

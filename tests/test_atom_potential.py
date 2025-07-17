@@ -94,6 +94,7 @@ def test_downsampled_gmm_potential_agreement(sample_pdb_path):
     """
     atom_positions, atom_identities = read_atoms_from_pdb(
         sample_pdb_path,
+        loads_b_factors=False,
         center=True,
         selection_string="not element H",
     )
@@ -142,6 +143,7 @@ def test_peng_vs_gmm_agreement(sample_pdb_path):
     # Load atoms and build potentials
     atom_positions, atom_identities = read_atoms_from_pdb(
         sample_pdb_path,
+        loads_b_factors=False,
         center=True,
         selection_string="not element H",
     )
