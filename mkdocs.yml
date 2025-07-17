@@ -63,11 +63,10 @@ nav:
         - Introductory:
             - Compute a scattering potential: 'examples/compute-potential.ipynb'
             - Simulate an image: 'examples/simulate-image.ipynb'
-            - Read a particle stack: 'examples/read-dataset.ipynb'
+            - JAX transformations: 'examples/jax-transformations.ipynb'
+            - Load cryo-EM images: 'examples/read-dataset.ipynb'
         - Intermediate:
-            - Simulate a superposition of images with vmap: 'examples/simulate-micrograph.ipynb'
             - Write a STAR file of simulated data: 'examples/simulate-relion-dataset.ipynb'
-            - Run a cross-correlation search: 'examples/cross-correlation-search.ipynb'
     - API:
         - cryojax.simulator:
             - 'api/simulator/api.md'
