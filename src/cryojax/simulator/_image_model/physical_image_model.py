@@ -7,7 +7,7 @@ from typing_extensions import override
 
 import equinox as eqx
 import jax
-from jaxtyping import PRNGKeyArray
+from jaxtyping import Array, Bool, PRNGKeyArray
 
 from .._config import AbstractConfig, DoseConfig
 from .._detector import AbstractDetector
@@ -33,11 +33,17 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
     config: AbstractConfig
     scattering_theory: AbstractScatteringTheory
 
+    normalizes_signal: bool
+    signal_region: Optional[Bool[Array, "_ _"]]
+
     def __init__(
         self,
         structure: AbstractStructure,
         config: AbstractConfig,
         scattering_theory: AbstractScatteringTheory,
+        *,
+        normalizes_signal: bool = False,
+        signal_region: Optional[Bool[Array, "_ _"]] = None,
     ):
         """**Arguments:**
 
@@ -48,10 +54,18 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
             and the wavelength.
         - `scattering_theory`:
             The scattering theory.
+        - `normalizes_signal`:
+            If `True`, normalize the image before returning.
+        - `signal_region`:
+            A boolean array that is 1 where there is signal,
+            and 0 otherwise used to normalize the image.
+            Must have shape equal to `AbstractImageModel.shape`.
         """
         self.structure = structure
         self.config = config
         self.scattering_theory = scattering_theory
+        self.normalizes_signal = normalizes_signal
+        self.signal_region = signal_region
 
     @override
     def compute_fourier_image(
@@ -75,25 +89,23 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
 class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
     """An image formation model that returns an intensity distribution---or in other
     words a squared wavefunction.
-
-    **Attributes:**
-
-    - `config`: The configuration of the instrument, such as for the pixel size
-                and the wavelength.
-    - `scattering_theory`: The scattering theory.
-    - `filter: `A filter to apply to the image.
-    - `mask`: A mask to apply to the image.
     """
 
     structure: AbstractStructure
     config: AbstractConfig
     scattering_theory: AbstractScatteringTheory
 
+    normalizes_signal: bool
+    signal_region: Optional[Bool[Array, "_ _"]]
+
     def __init__(
         self,
         structure: AbstractStructure,
         config: AbstractConfig,
         scattering_theory: AbstractScatteringTheory,
+        *,
+        normalizes_signal: bool = False,
+        signal_region: Optional[Bool[Array, "_ _"]] = None,
     ):
         """**Arguments:**
 
@@ -104,10 +116,18 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
             and the wavelength.
         - `scattering_theory`:
             The scattering theory.
+        - `normalizes_signal`:
+            If `True`, normalize the image before returning.
+        - `signal_region`:
+            A boolean array that is 1 where there is signal,
+            and 0 otherwise used to normalize the image.
+            Must have shape equal to `AbstractImageModel.shape`.
         """
         self.structure = structure
         self.config = config
         self.scattering_theory = scattering_theory
+        self.normalizes_signal = normalizes_signal
+        self.signal_region = signal_region
 
     @override
     def compute_fourier_image(
@@ -136,12 +156,18 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
     scattering_theory: AbstractScatteringTheory
     detector: AbstractDetector
 
+    normalizes_signal: bool
+    signal_region: Optional[Bool[Array, "_ _"]]
+
     def __init__(
         self,
         structure: AbstractStructure,
         config: DoseConfig,
         scattering_theory: AbstractScatteringTheory,
         detector: AbstractDetector,
+        *,
+        normalizes_signal: bool = False,
+        signal_region: Optional[Bool[Array, "_ _"]] = None,
     ):
         """**Arguments:**
 
@@ -152,11 +178,19 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
             and the wavelength.
         - `scattering_theory`:
             The scattering theory.
+        - `normalizes_signal`:
+            If `True`, normalize the image before returning.
+        - `signal_region`:
+            A boolean array that is 1 where there is signal,
+            and 0 otherwise used to normalize the image.
+            Must have shape equal to `AbstractImageModel.shape`.
         """
         self.structure = structure
         self.config = config
         self.scattering_theory = scattering_theory
         self.detector = detector
+        self.normalizes_signal = normalizes_signal
+        self.signal_region = signal_region
 
     @override
     def compute_fourier_image(

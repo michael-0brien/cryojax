@@ -32,12 +32,12 @@ def test_downsample_preserves_sum(shape, downsample_factor):
 def test_fourier_vs_real_normalize(noisy_model):
     key = jax.random.key(1234)
     im1 = cxi.normalize_image(
-        noisy_model.render(key, outputs_real_space=True),
+        noisy_model.simulate(key, outputs_real_space=True),
         input_is_real_space=True,
     )
     im2 = cxi.irfftn(
         cxi.normalize_image(
-            noisy_model.render(outputs_real_space=False),
+            noisy_model.simulate(outputs_real_space=False),
             input_is_real_space=False,
             input_is_rfft=True,
             shape_in_real_space=im1.shape,  # type: ignore

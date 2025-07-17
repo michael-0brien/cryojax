@@ -135,7 +135,7 @@ def make_image_model(
                 "physical quantities are 'contrast', 'intensity', and 'counts'."
             )
     else:
-        image_model = LinearImageModel(structure, integrator, transfer_theory, config)
+        image_model = LinearImageModel(structure, config, integrator, transfer_theory)
 
     # Grab the simulation function
     @eqx.filter_jit

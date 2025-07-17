@@ -6,7 +6,6 @@ import functools
 import operator
 from typing import Optional, overload
 
-import equinox as eqx
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Bool, Float
@@ -33,16 +32,6 @@ class AbstractMask(AbstractImageTransform, strict=True):
         return image * jax.lax.stop_gradient(self.array)
 
 
-class AbstractBooleanMask(AbstractMask, strict=True):
-    """Base class for computing and applying an image mask,
-    which takes on values equal to 1 where there are regions
-    of signal."""
-
-    is_not_masked: eqx.AbstractVar[
-        Bool[Array, "y_dim x_dim"] | Bool[Array, "z_dim y_dim x_dim"]
-    ]
-
-
 MaskLike = AbstractMask | AbstractImageTransform
 
 
@@ -57,13 +46,12 @@ class CustomMask(AbstractMask, strict=True):
         self.array = mask_array
 
 
-class CircularCosineMask(AbstractBooleanMask, strict=True):
+class CircularCosineMask(AbstractMask, strict=True):
     """Apply a circular mask to an image with a cosine
     soft-edge.
     """
 
     array: Float[Array, "y_dim x_dim"]
-    is_not_masked: Bool[Array, "y_dim x_dim"]
 
     def __init__(
         self,
@@ -85,16 +73,14 @@ class CircularCosineMask(AbstractBooleanMask, strict=True):
             jnp.asarray(radius),
             jnp.asarray(rolloff_width),
         )
-        self.is_not_masked = self.array == 1.0
 
 
-class SphericalCosineMask(AbstractBooleanMask, strict=True):
+class SphericalCosineMask(AbstractMask, strict=True):
     """Apply a spherical mask to a volume with a cosine
     soft-edge.
     """
 
     array: Float[Array, "z_dim y_dim x_dim"]
-    is_not_masked: Bool[Array, "z_dim y_dim x_dim"]
 
     def __init__(
         self,
@@ -116,16 +102,14 @@ class SphericalCosineMask(AbstractBooleanMask, strict=True):
             jnp.asarray(radius),
             jnp.asarray(rolloff_width),
         )
-        self.is_not_masked = self.array == 1.0
 
 
-class SquareCosineMask(AbstractBooleanMask, strict=True):
+class SquareCosineMask(AbstractMask, strict=True):
     """Apply a square mask to an image with a cosine
     soft-edge.
     """
 
     array: Float[Array, "y_dim x_dim"]
-    is_not_masked: Bool[Array, "y_dim x_dim"]
 
     def __init__(
         self,
@@ -145,17 +129,15 @@ class SquareCosineMask(AbstractBooleanMask, strict=True):
         self.array = _compute_square_mask(
             coordinate_grid, jnp.asarray(side_length), jnp.asarray(rolloff_width)
         )
-        self.is_not_masked = self.array == 1.0
 
 
-class Cylindrical2DCosineMask(AbstractBooleanMask, strict=True):
+class Cylindrical2DCosineMask(AbstractMask, strict=True):
     """Apply a cylindrical mask to an image with a cosine
     soft-edge. This implements an infinite in-plane cylinder,
     rotated at a given angle.
     """
 
     array: Float[Array, "y_dim x_dim"]
-    is_not_masked: Bool[Array, "y_dim x_dim"]
 
     def __init__(
         self,
@@ -195,16 +177,14 @@ class Cylindrical2DCosineMask(AbstractBooleanMask, strict=True):
                 jnp.asarray(in_plane_rotation_angle),
                 jnp.asarray(rolloff_width),
             )
-        self.is_not_masked = self.array == 1.0
 
 
-class Rectangular2DCosineMask(AbstractBooleanMask, strict=True):
+class Rectangular2DCosineMask(AbstractMask, strict=True):
     """Apply a rectangular mask in 2D to an image with a cosine
     soft-edge. Optionally, rotate the rectangle by an angle.
     """
 
     array: Float[Array, "y_dim x_dim"]
-    is_not_masked: Bool[Array, "y_dim x_dim"]
 
     def __init__(
         self,
@@ -235,10 +215,9 @@ class Rectangular2DCosineMask(AbstractBooleanMask, strict=True):
             jnp.asarray(in_plane_rotation_angle),
             jnp.asarray(rolloff_width),
         )
-        self.is_not_masked = self.array == 1.0
 
 
-class Rectangular3DCosineMask(AbstractBooleanMask, strict=True):
+class Rectangular3DCosineMask(AbstractMask, strict=True):
     """Apply a rectangular mask to a volume with a cosine
     soft-edge.
     """
@@ -274,7 +253,6 @@ class Rectangular3DCosineMask(AbstractBooleanMask, strict=True):
             jnp.asarray(z_width),
             jnp.asarray(rolloff_width),
         )
-        self.is_not_masked = self.array == 1.0
 
 
 class InverseSincMask(AbstractMask, strict=True):

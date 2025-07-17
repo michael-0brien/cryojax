@@ -6,4 +6,4 @@ def test_conformation(potential, pose, projection_method, transfer_theory, confi
     potential = tuple([potential for _ in range(3)])
     structure = DiscreteStructuralEnsemble(potential, pose, conformation=0)
     theory = cxs.LinearImageModel(structure, projection_method, transfer_theory, config)
-    _ = theory.render()
+    _ = theory.simulate()

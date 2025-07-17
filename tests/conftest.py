@@ -189,11 +189,11 @@ def noisy_model(specimen, config, theory_with_solvent, detector):
 
 @pytest.fixture
 def test_noisy_image(noisy_model):
-    image = noisy_model.render(jr.key(1234))
+    image = noisy_model.simulate(jr.key(1234))
     return rfftn(image)
 
 
 @pytest.fixture
 def test_noiseless_image(noiseless_model):
-    image = noiseless_model.render(jr.key(1234))
+    image = noiseless_model.simulate(jr.key(1234))
     return rfftn(image)

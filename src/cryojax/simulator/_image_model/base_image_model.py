@@ -2,12 +2,14 @@
 Image formation models.
 """
 
+import warnings
 from abc import abstractmethod
 from typing import Optional, TypedDict
 from typing_extensions import override
 
 import equinox as eqx
-from jaxtyping import Array, Complex, Float, PRNGKeyArray
+import jax.numpy as jnp
+from jaxtyping import Array, Bool, Complex, Float, PRNGKeyArray
 
 from ...ndimage import irfftn, rfftn
 from ...ndimage.transforms import FilterLike, MaskLike
@@ -46,7 +48,8 @@ class AbstractImageModel(eqx.Module, strict=True):
     structure: eqx.AbstractVar[AbstractStructure]
     config: eqx.AbstractVar[AbstractConfig]
 
-    # normalize_options: eqx.AbstractVar[Optional[dict[str, Any]]]
+    normalizes_signal: eqx.AbstractVar[bool]
+    signal_region: eqx.AbstractVar[Optional[Bool[Array, "_ _"]]]
 
     @abstractmethod
     def compute_fourier_image(
@@ -56,6 +59,28 @@ class AbstractImageModel(eqx.Module, strict=True):
         raise NotImplementedError
 
     def render(
+        self,
+        rng_key: Optional[PRNGKeyArray] = None,
+        *,
+        removes_padding: bool = True,
+        outputs_real_space: bool = True,
+        mask: Optional[MaskLike] = None,
+        filter: Optional[FilterLike] = None,
+    ) -> ImageArray | PaddedImageArray:
+        warnings.warn(
+            f"`{type(self).__name__}.render` is deprecated and "
+            "will be removed in cryoJAX version 0.5.0. Instead, "
+            f"use the `{type(self).__name__}.simulate` function."
+        )
+        return self.simulate(
+            rng_key,
+            removes_padding=removes_padding,
+            outputs_real_space=outputs_real_space,
+            mask=mask,
+            filter=filter,
+        )
+
+    def simulate(
         self,
         rng_key: Optional[PRNGKeyArray] = None,
         *,
@@ -96,46 +121,54 @@ class AbstractImageModel(eqx.Module, strict=True):
 
     def postprocess(
         self,
-        image: PaddedFourierImageArray,
+        fourier_image: PaddedFourierImageArray,
         *,
         outputs_real_space: bool = True,
         mask: Optional[MaskLike] = None,
         filter: Optional[FilterLike] = None,
     ) -> ImageArray:
-        """Return an image postprocessed with filters, cropping, and masking
-        in either real or fourier space.
+        """Return an image postprocessed with filters, cropping, masking,
+        and normalization in either real or fourier space.
         """
         config = self.config
-        if mask is None and config.padded_shape == config.shape:
-            # ... if there are no masks and we don't need to crop,
-            # minimize moving back and forth between real and fourier space
+        if (
+            mask is None
+            and config.padded_shape == config.shape
+            and not self.normalizes_signal
+        ):
+            # ... if there are no masks, we don't need to crop, and we are
+            # not normalizing, minimize moving back and forth between real
+            # and fourier space
             if filter is not None:
-                image = filter(image)
-            return irfftn(image, s=config.shape) if outputs_real_space else image
+                fourier_image = filter(fourier_image)
+            return (
+                irfftn(fourier_image, s=config.shape)
+                if outputs_real_space
+                else fourier_image
+            )
         else:
             # ... otherwise, apply filter, crop, and mask, again trying to
             # minimize moving back and forth between real and fourier space
-            is_filter_applied = True if filter is None else False
-            if (
-                filter is not None
-                and filter.array.shape
-                == config.padded_frequency_grid_in_pixels.shape[0:2]
-            ):
-                # ... apply the filter here if it is the same size as the padded
-                # coordinates
-                is_filter_applied = True
-                image = filter(image)
-            image = irfftn(image, s=config.padded_shape)
-            image = config.crop_to_shape(image)
+            padded_rfft_shape = config.padded_frequency_grid_in_pixels.shape[0:2]
+            if filter is not None:
+                # ... apply the filter
+                if not filter.array.shape == padded_rfft_shape:
+                    raise ValueError(
+                        "Found that the `filter` was shape "
+                        f"{filter.array.shape}, but expected it to be "
+                        f"shape {padded_rfft_shape}. You may have passed a "
+                        f"fitler according to the `AbstractImageModel.config.shape`, "
+                        "when the `AbstractImageModel.config.padded_shape` was expected."
+                    )
+                fourier_image = filter(fourier_image)
+            image = irfftn(fourier_image, s=config.padded_shape)
+            if config.padded_shape != config.shape:
+                image = config.crop_to_shape(image)
+            if self.normalizes_signal:
+                image = self._normalize_image(image)
             if mask is not None:
                 image = mask(image)
-            if is_filter_applied or filter is None:
-                return image if outputs_real_space else rfftn(image)
-            else:
-                # ... otherwise, apply the filter here and return. assume
-                # the filter is the same size as the non-padded coordinates
-                image = filter(rfftn(image))
-                return irfftn(image, s=config.shape) if outputs_real_space else image
+            return image if outputs_real_space else rfftn(image)
 
     def _apply_translation(
         self, fourier_image: PaddedFourierImageArray
@@ -151,6 +184,15 @@ class AbstractImageModel(eqx.Module, strict=True):
         )
 
         return fourier_image
+
+    def _normalize_image(self, image: RealImageArray) -> RealImageArray:
+        mean, std = (
+            jnp.mean(image, where=self.signal_region),
+            jnp.std(image, where=self.signal_region),
+        )
+        image = (image - mean) / std
+
+        return image
 
     def _maybe_postprocess(
         self,
@@ -178,17 +220,43 @@ class LinearImageModel(AbstractImageModel, strict=True):
     transfer_theory: ContrastTransferTheory
     config: AbstractConfig
 
+    normalizes_signal: bool
+    signal_region: Optional[Bool[Array, "_ _"]]
+
     def __init__(
         self,
         structure: AbstractStructure,
+        config: AbstractConfig,
         integrator: AbstractPotentialIntegrator,
         transfer_theory: ContrastTransferTheory,
-        config: AbstractConfig,
+        *,
+        normalizes_signal: bool = False,
+        signal_region: Optional[Bool[Array, "_ _"]] = None,
     ):
+        """**Arguments:**
+
+        - `structure`:
+            The biological structure.
+        - `config`:
+            The configuration of the instrument, such as for the pixel size
+            and the wavelength.
+        - `integrator`: The method for integrating the scattering potential.
+        - `transfer_theory`: The contrast transfer theory.
+        - `normalizes_signal`:
+            If `True`, normalizes_signal the image before returning.
+        - `signal_region`:
+            A boolean array that is 1 where there is signal,
+            and 0 otherwise used to normalize the image.
+            Must have shape equal to `AbstractImageModel.shape`.
+        """
+        # Simulator components
         self.config = config
         self.integrator = integrator
         self.structure = structure
         self.transfer_theory = transfer_theory
+        # Options
+        self.normalizes_signal = normalizes_signal
+        self.signal_region = signal_region
 
     @override
     def compute_fourier_image(

@@ -14,8 +14,8 @@ jax.config.update("jax_enable_x64", True)
 def test_real_shape(model, request):
     """Make sure shapes are as expected in real space."""
     model = request.getfixturevalue(model)
-    image = model.render()
-    padded_image = model.render(removes_padding=False)
+    image = model.simulate()
+    padded_image = model.simulate(removes_padding=False)
     assert image.shape == model.config.shape
     assert padded_image.shape == model.config.padded_shape
 
@@ -24,8 +24,8 @@ def test_real_shape(model, request):
 def test_fourier_shape(model, request):
     """Make sure shapes are as expected in fourier space."""
     model = request.getfixturevalue(model)
-    image = model.render(outputs_real_space=False)
-    padded_image = model.render(removes_padding=False, outputs_real_space=False)
+    image = model.simulate(outputs_real_space=False)
+    padded_image = model.simulate(removes_padding=False, outputs_real_space=False)
     assert image.shape == model.config.frequency_grid_in_pixels.shape[0:2]
     assert padded_image.shape == model.config.padded_frequency_grid_in_pixels.shape[0:2]
 
@@ -49,7 +49,7 @@ def test_even_vs_odd_image_shape(shape, sample_mrc_path, pixel_size):
     model_test = cs.ContrastImageModel(specimen, config_test, theory)
 
     np.testing.assert_allclose(
-        crop_to_shape(model_test.render(), control_shape),
-        model_control.render(),
+        crop_to_shape(model_test.simulate(), control_shape),
+        model_control.simulate(),
         atol=1e-4,
     )

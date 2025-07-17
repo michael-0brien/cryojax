@@ -19,4 +19,4 @@ def test_simulate_signal_from_gaussian_distributions(
     config = request.getfixturevalue(instrument_config)
     image_model = cxs.ContrastImageModel(structure, config, scattering_theory)
     distribution = cls(image_model, normalizes_signal=False)
-    np.testing.assert_allclose(image_model.render(), distribution.compute_signal())
+    np.testing.assert_allclose(image_model.simulate(), distribution.compute_signal())

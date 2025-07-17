@@ -8,13 +8,13 @@ from typing_extensions import override
 
 import jax.numpy as jnp
 import jax.random as jr
-from equinox import AbstractVar, field
+from equinox import AbstractVar
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
 from ...internal import NDArrayLike, error_if_not_positive
 from ...ndimage import rfftn
 from ...ndimage.operators import Constant, FourierOperatorLike
-from ...ndimage.transforms import AbstractBooleanMask, FilterLike, MaskLike
+from ...ndimage.transforms import FilterLike, MaskLike
 from .._image_model import AbstractImageModel
 from ._base_distribution import AbstractDistribution
 
@@ -41,9 +41,6 @@ class AbstractGaussianDistribution(AbstractDistribution, strict=True):
     image_model: AbstractVar[AbstractImageModel]
     signal_scale_factor: AbstractVar[Float[Array, ""]]
     signal_offset: AbstractVar[Float[Array, ""]]
-
-    normalizes_signal: AbstractVar[bool]
-    applies_mask: AbstractVar[bool]
 
     @override
     def sample(
@@ -87,30 +84,6 @@ class AbstractGaussianDistribution(AbstractDistribution, strict=True):
     ) -> ImageArray:
         """Render the signal from the image formation model.
 
-        !!! info
-
-            If a `mask` is passed, images will be
-            normalized with the mean and standard deviation computed
-            within the region where the mask is equal to 1.
-
-            In particular, the following code is used
-
-            ```python
-                import jax.numpy as jnp
-
-                signal = ...
-                mask_array = ...
-                is_signal = mask_array == 1.0
-                mean, std = (
-                    jnp.mean(signal, where=is_signal),
-                    jnp.std(signal, where=is_signal),
-                )
-                normalized_signal = (signal - mean) / std
-            ```
-
-            If `applies_mask = False`, the mask will not be applied to the signal
-            but it will still be used for normalization.
-
         **Arguments:**
 
         - `outputs_real_space`:
@@ -121,32 +94,12 @@ class AbstractGaussianDistribution(AbstractDistribution, strict=True):
         - `filter`:
             A filter to apply to the final image.
         """
-        simulated_image = self.image_model.render(
+        simulated_image = self.image_model.simulate(
             outputs_real_space=True, mask=None, filter=filter
         )
-        if mask is None:
-            if self.normalizes_signal:
-                mean, std = jnp.mean(simulated_image), jnp.std(simulated_image)
-                simulated_image = (simulated_image - mean) / std
-            simulated_image = (
-                self.signal_scale_factor * simulated_image + self.signal_offset
-            )
-        else:
-            if self.normalizes_signal:
-                if isinstance(mask, AbstractBooleanMask):
-                    is_signal = mask.is_not_masked
-                else:
-                    is_signal = mask.array == 1.0
-                mean, std = (
-                    jnp.mean(simulated_image, where=is_signal),
-                    jnp.std(simulated_image, where=is_signal),
-                )
-                simulated_image = (simulated_image - mean) / std
-            simulated_image = (
-                self.signal_scale_factor * simulated_image + self.signal_offset
-            )
-            if self.applies_mask:
-                simulated_image = mask(simulated_image)
+        simulated_image = self.signal_scale_factor * simulated_image + self.signal_offset
+        if mask is not None:
+            simulated_image = mask(simulated_image)
         return simulated_image if outputs_real_space else rfftn(simulated_image)
 
     @abstractmethod
@@ -177,17 +130,12 @@ class IndependentGaussianPixels(AbstractGaussianDistribution, strict=True):
     signal_scale_factor: Float[Array, ""]
     signal_offset: Float[Array, ""]
 
-    normalizes_signal: bool = field(static=True)
-    applies_mask: bool = field(static=True)
-
     def __init__(
         self,
         image_model: AbstractImageModel,
         variance: float | Float[NDArrayLike, ""] = 1.0,
         signal_scale_factor: float | Float[NDArrayLike, ""] = 1.0,
         signal_offset: float | Float[NDArrayLike, ""] = 0.0,
-        normalizes_signal: bool = False,
-        applies_mask: bool = False,
     ):
         """**Arguments:**
 
@@ -200,23 +148,13 @@ class IndependentGaussianPixels(AbstractGaussianDistribution, strict=True):
             from `image_model`.
         - `signal_offset`:
             An offset for the underlying signal simulated from `image_model`.
-        - `normalizes_signal`:
-            Whether or not the signal is normalized before applying the `signal_scale_factor`
-            and `signal_offset`.
-            If an `AbstractMask` is given to `image_model.mask`, the signal is normalized
-            within the region where the mask is equal to `1`.
-        - `applies_mask`:
-            If `True`, apply masks passed at run-time. Otherwise, just
-            use masks for normalization.
         """  # noqa: E501
         self.image_model = image_model
         self.variance = error_if_not_positive(jnp.asarray(variance, dtype=float))
         self.signal_scale_factor = error_if_not_positive(
             jnp.asarray(signal_scale_factor, dtype=float)
         )
-        self.signal_offset = jnp.asarray(jnp.asarray(signal_offset, dtype=float))
-        self.normalizes_signal = normalizes_signal
-        self.applies_mask = applies_mask
+        self.signal_offset = jnp.asarray(signal_offset, dtype=float)
 
     @override
     def compute_noise(
@@ -252,7 +190,7 @@ class IndependentGaussianPixels(AbstractGaussianDistribution, strict=True):
             .set(0.0)
             .astype(complex),
             outputs_real_space=outputs_real_space,
-            mask=(mask if self.applies_mask else None),
+            mask=mask,
             filter=filter,
         )
 
@@ -321,17 +259,12 @@ class IndependentGaussianFourierModes(AbstractGaussianDistribution, strict=True)
     signal_scale_factor: Float[Array, ""]
     signal_offset: Float[Array, ""]
 
-    normalizes_signal: bool = field(static=True)
-    applies_mask: bool = field(static=True)
-
     def __init__(
         self,
         image_model: AbstractImageModel,
         variance_function: Optional[FourierOperatorLike] = None,
         signal_scale_factor: float | Float[NDArrayLike, ""] = 1.0,
         signal_offset: float | Float[NDArrayLike, ""] = 0.0,
-        normalizes_signal: bool = False,
-        applies_mask: bool = False,
     ):
         """**Arguments:**
 
@@ -344,14 +277,6 @@ class IndependentGaussianFourierModes(AbstractGaussianDistribution, strict=True)
             A scale factor for the underlying signal simulated from `image_model`.
         - `signal_offset`:
             An offset for the underlying signal simulated from `image_model`.
-        - `normalizes_signal`:
-            Whether or not the signal is normalized before applying the `signal_scale_factor`
-            and `signal_offset`.
-            If an `AbstractMask` is given to `image_model.mask`, the signal is normalized
-            within the region where the mask is equal to `1`.
-        - `applies_mask`:
-            If `True`, apply masks passed at run-time. Otherwise, just
-            use masks for normalization.
         """  # noqa: E501
         self.image_model = image_model
         self.variance_function = variance_function or Constant(1.0)
@@ -359,8 +284,6 @@ class IndependentGaussianFourierModes(AbstractGaussianDistribution, strict=True)
             jnp.asarray(signal_scale_factor, dtype=float)
         )
         self.signal_offset = jnp.asarray(signal_offset, dtype=float)
-        self.normalizes_signal = normalizes_signal
-        self.applies_mask = applies_mask
 
     def compute_noise(
         self,
@@ -395,7 +318,7 @@ class IndependentGaussianFourierModes(AbstractGaussianDistribution, strict=True)
             .set(0.0)
             .astype(complex),
             outputs_real_space=outputs_real_space,
-            mask=(mask if self.applies_mask else None),
+            mask=mask,
             filter=filter,
         )
 
@@ -439,7 +362,7 @@ class IndependentGaussianFourierModes(AbstractGaussianDistribution, strict=True)
         # Create simulated data
         simulated = self.compute_signal(
             outputs_real_space=False,
-            mask=(mask if self.applies_mask else None),
+            mask=mask,
             filter=filter,
         )
         # Compute residuals
