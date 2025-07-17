@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 import cryojax.simulator as cxs
-from cryojax.io import read_array_with_spacing_from_mrc
+from cryojax.io import read_array_from_mrc
 from cryojax.ndimage import crop_to_shape
 
 
@@ -12,7 +12,7 @@ jax.config.update("jax_enable_x64", True)
 
 @pytest.fixture
 def voxel_potential(sample_mrc_path):
-    real_voxel_grid, voxel_size = read_array_with_spacing_from_mrc(sample_mrc_path)
+    real_voxel_grid, voxel_size = read_array_from_mrc(sample_mrc_path, loads_spacing=True)
     return cxs.FourierVoxelGridPotential.from_real_voxel_grid(
         real_voxel_grid, voxel_size, pad_scale=1.3
     )

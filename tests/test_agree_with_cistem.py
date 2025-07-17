@@ -7,7 +7,7 @@ import pytest
 
 import cryojax.simulator as cxs
 from cryojax.coordinates import cartesian_to_polar, make_frequency_grid
-from cryojax.io import read_array_with_spacing_from_mrc
+from cryojax.io import read_array_from_mrc
 from cryojax.ndimage import compute_binned_powerspectrum, irfftn
 from cryojax.simulator import CTF, EulerAnglePose
 
@@ -129,7 +129,9 @@ def test_compute_projection_with_cistem(
 ):
     if AnglesAndShifts is not None:
         # cryojax
-        real_voxel_grid, voxel_size = read_array_with_spacing_from_mrc(sample_mrc_path)
+        real_voxel_grid, voxel_size = read_array_from_mrc(
+            sample_mrc_path, loads_spacing=True
+        )
         potential = cxs.FourierVoxelGridPotential.from_real_voxel_grid(
             real_voxel_grid, voxel_size
         )

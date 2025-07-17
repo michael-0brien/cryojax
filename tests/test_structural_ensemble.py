@@ -5,13 +5,13 @@ from cryojax.constants import (
     get_tabulated_scattering_factor_parameters,
     read_peng_element_scattering_factor_parameter_table,
 )
-from cryojax.io import read_array_with_spacing_from_mrc, read_atoms_from_pdb
+from cryojax.io import read_array_from_mrc, read_atoms_from_pdb
 from cryojax.simulator import DiscreteStructuralEnsemble
 
 
 @pytest.fixture
 def voxel_potential(sample_mrc_path):
-    real_voxel_grid, voxel_size = read_array_with_spacing_from_mrc(sample_mrc_path)
+    real_voxel_grid, voxel_size = read_array_from_mrc(sample_mrc_path, loads_spacing=True)
     return cxs.FourierVoxelGridPotential.from_real_voxel_grid(
         real_voxel_grid, voxel_size, pad_scale=1.3
     )

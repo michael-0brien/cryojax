@@ -3,64 +3,111 @@ Routines for working with MRC files.
 """
 
 import pathlib
-from typing import Optional, cast
+from typing import Literal, Optional, cast, overload
 
 import mrcfile
 import numpy as np
 from jaxtyping import Array, Float
 
 
+@overload
 def read_array_from_mrc(
     filename: str | pathlib.Path,
+    loads_spacing: Literal[True] = True,
     *,
     mmap: bool = False,
     permissive: bool = False,
-) -> Float[np.ndarray, "..."]:
+) -> tuple[Float[np.ndarray, "..."], float]: ...
+
+
+@overload
+def read_array_from_mrc(
+    filename: str | pathlib.Path,
+    loads_spacing: Literal[False] = False,
+    *,
+    mmap: bool = False,
+    permissive: bool = False,
+) -> Float[np.ndarray, "..."]: ...
+
+
+@overload
+def read_array_from_mrc(
+    filename: str | pathlib.Path,
+    loads_spacing: bool = False,
+    *,
+    mmap: bool = False,
+    permissive: bool = False,
+) -> Float[np.ndarray, "..."] | tuple[Float[np.ndarray, "..."], float]: ...
+
+
+def read_array_from_mrc(
+    filename: str | pathlib.Path,
+    loads_spacing: bool = False,
+    *,
+    mmap: bool = False,
+    permissive: bool = False,
+) -> Float[np.ndarray, "..."] | tuple[Float[np.ndarray, "..."], float]:
     """Read an MRC data into a a numpy array.
 
     **Arguments:**
 
-    - 'filename' : Path to data.
+    - `filename` : Path to data.
     - `mmap`: Whether or not to open the data as a `numpy.memmap` array.
+    - `loads_spacing`: If `True`, load the pixel or voxel size of the array.
 
     **Returns:**
 
     - 'array' : The array stored in the Mrcfile.
     """
-    array = _read_array_from_mrc(
-        filename, get_spacing=False, mmap=mmap, permissive=permissive
-    )
+    # Validate filename as MRC path
+    _ = _validate_filename_and_return_suffix(filename)
+    # Read MRC
+    open = mrcfile.mmap if mmap else mrcfile.open
+    with open(filename, mode="r", permissive=permissive) as mrc:
+        array = cast(np.ndarray, mrc.data)
+        if mrc.is_single_image():
+            grid_spacing_per_dimension = np.asarray(
+                [mrc.voxel_size.x, mrc.voxel_size.y], dtype=float
+            )
+        elif mrc.is_image_stack():
+            grid_spacing_per_dimension = np.asarray(
+                [mrc.voxel_size.x, mrc.voxel_size.y], dtype=float
+            )
+        elif mrc.is_volume():
+            grid_spacing_per_dimension = np.asarray(
+                [mrc.voxel_size.x, mrc.voxel_size.y, mrc.voxel_size.z],
+                dtype=float,
+            )
+        elif mrc.is_volume_stack():
+            grid_spacing_per_dimension = np.asarray(
+                [mrc.voxel_size.x, mrc.voxel_size.y, mrc.voxel_size.z],
+                dtype=float,
+            )
+        else:
+            raise ValueError(
+                "Mrcfile could not be identified as an image, image stack, volume, or "
+                f"volume stack. Run mrcfile.validate(...) to make sure {filename} is a "
+                "valid MRC file."
+            )
 
-    return cast(np.ndarray, array)
+        if not mmap:
+            array = array.astype(np.float64)
 
+        if loads_spacing:
+            # Only allow the same spacing in each direction
+            assert all(
+                grid_spacing_per_dimension != np.zeros(grid_spacing_per_dimension.shape)
+            ), "Mrcfile.voxel_size must be set if reading the grid spacing. Found that "
+            "Mrcfile.voxel_size = (0.0, 0.0, 0.0)"
+            assert all(
+                grid_spacing_per_dimension == grid_spacing_per_dimension[0]
+            ), "Mrcfile.voxel_size must be same in all dimensions."
+            grid_spacing = grid_spacing_per_dimension[0]
 
-def read_array_with_spacing_from_mrc(
-    filename: str | pathlib.Path,
-    *,
-    mmap: bool = False,
-    permissive: bool = False,
-) -> tuple[Float[np.ndarray, "..."], float]:
-    """Read MRC data to a numpy array, including the grid spacing.
-
-    !!! note
-        This function only supports a grid spacing that is the same
-        in all dimensions.
-
-    **Arguments:**
-
-    - 'filename': Path to data.
-    - `mmap`: Whether or not to open the data as a `numpy.memmap` array.
-
-    **Returns:**
-
-    - 'array': The array stored in the Mrcfile.
-    - 'grid_spacing': The grid spacing of `array`, i.e. the pixel or voxel size.
-    """
-    array, grid_spacing = _read_array_from_mrc(
-        filename, get_spacing=True, mmap=mmap, permissive=permissive
-    )
-
-    return array, grid_spacing
+            return cast(np.ndarray, array), float(grid_spacing)
+        else:
+            # ... otherwise, just return
+            return cast(np.ndarray, array)
 
 
 def write_image_to_mrc(
@@ -172,7 +219,7 @@ def write_volume_to_mrc(
 
 def _read_array_from_mrc(
     filename: str | pathlib.Path,
-    get_spacing: bool,
+    loads_spacing: bool,
     mmap: bool,
     permissive: bool,
 ) -> Float[np.ndarray, "..."] | tuple[Float[np.ndarray, "..."], float]:
@@ -210,7 +257,7 @@ def _read_array_from_mrc(
         if not mmap:
             array = array.astype(np.float64)
 
-        if get_spacing:
+        if loads_spacing:
             # Only allow the same spacing in each direction
             assert all(
                 grid_spacing_per_dimension != np.zeros(grid_spacing_per_dimension.shape)
