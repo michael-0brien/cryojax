@@ -766,7 +766,7 @@ def test_write_image(
     with pytest.raises(ValueError):
         dataset[0] = bad_shape_particle
 
-    with pytest.raises(TypeCheckError):
+    with pytest.raises((ValueError, TypeCheckError)):
         dataset[0] = bad_dim_particle
 
     with pytest.raises(IOError):

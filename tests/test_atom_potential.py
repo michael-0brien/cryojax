@@ -24,6 +24,36 @@ with install_import_hook("cryojax", "typeguard.typechecked"):
 config.update("jax_enable_x64", True)
 
 
+@pytest.fixture
+def toy_gaussian_cloud():
+    atom_positions = jnp.array(
+        [
+            [0.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+        ]
+    )
+    num_atoms = atom_positions.shape[0]
+    ff_a = jnp.array(
+        num_atoms
+        * [
+            [1.0, 0.5],
+        ]
+    )
+
+    ff_b = jnp.array(
+        num_atoms
+        * [
+            [0.3, 0.2],
+        ]
+    )
+
+    n_voxels_per_side = (128, 128, 128)
+    voxel_size = 0.05
+    return (atom_positions, ff_a, ff_b, n_voxels_per_side, voxel_size)
+
+
 @pytest.mark.parametrize("shape", ((64, 64), (63, 63), (63, 64), (64, 63)))
 def test_atom_integrator_shape(sample_pdb_path, shape):
     atom_positions, atom_identities, b_factors = read_atoms_from_pdb(

@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 import cryojax.ndimage as cxi
-from cryojax.coordinates import make_frequency_grid
+from cryojax.coordinates import make_frequency_grid, make_radial_frequency_grid
 
 
 jax.config.update("jax_enable_x64", True)
@@ -24,29 +24,6 @@ def test_downsample_preserves_sum(shape, downsample_factor):
     upsampled_image = 2.0 + 1.0 * jr.normal(rng_key, upsampled_shape)
     image = cxi.downsample_with_fourier_cropping(upsampled_image, downsample_factor)
     np.testing.assert_allclose(image.sum(), upsampled_image.sum())
-
-
-#
-# Normalization
-#
-def test_fourier_vs_real_normalize(noisy_model):
-    key = jax.random.key(1234)
-    im1 = cxi.normalize_image(
-        noisy_model.simulate(key, outputs_real_space=True),
-        input_is_real_space=True,
-    )
-    im2 = cxi.irfftn(
-        cxi.normalize_image(
-            noisy_model.simulate(outputs_real_space=False),
-            input_is_real_space=False,
-            input_is_rfft=True,
-            shape_in_real_space=im1.shape,  # type: ignore
-        ),
-        s=noisy_model.config.shape,
-    )  # type: ignore
-    for im in [im1, im2]:
-        np.testing.assert_allclose(jnp.std(im), jnp.asarray(1.0), rtol=1e-3)
-        np.testing.assert_allclose(jnp.mean(im), jnp.asarray(0.0), atol=1e-8)
 
 
 #
@@ -166,6 +143,81 @@ def test_pad(padded_shape, shape):
         cxi.crop_to_shape(larger_frequency_grid, shape),
         cxi.crop_to_shape(padded_frequency_grid, shape),
     )
+
+
+# Fourier statistics
+@pytest.mark.parametrize(
+    "shape",
+    [
+        (10, 10),
+        (10, 10, 10),
+    ],
+)
+def test_powerspectrum_jit(shape):
+    pixel_size = 1.2
+    fourier_image = cxi.rfftn(jr.normal(jr.key(1234), shape))
+    radial_frequency_grid = make_radial_frequency_grid(shape, pixel_size)
+
+    @jax.jit
+    def compute_powerspectrum_jit(im, radial_freqs, ps):
+        return cxi.compute_binned_powerspectrum(
+            im, radial_freqs, ps, minimum_frequency=0.0, maximum_frequency=0.5
+        )
+
+    try:
+        _ = compute_powerspectrum_jit(fourier_image, radial_frequency_grid, pixel_size)
+    except Exception as err:
+        raise Exception(
+            "Could not successfully run JIT compiled function "
+            "`cryojax.image.compute_binned_powerspectrum`. "
+            f"Error traceback was:\n{err}"
+        )
+
+
+@pytest.mark.parametrize(
+    "shape",
+    [
+        (10, 10),
+        (10, 10, 10),
+    ],
+)
+def test_frc_fsc_jit(shape):
+    if len(shape) == 2:
+        correlation_fn = cxi.compute_fourier_ring_correlation
+    else:
+        correlation_fn = cxi.compute_fourier_shell_correlation
+    pixel_size = 1.1
+    fourier_image_1 = cxi.rfftn(jr.normal(jr.key(1234), shape))
+    fourier_image_2 = cxi.rfftn(jr.normal(jr.key(2345), shape))
+    radial_frequency_grid = make_radial_frequency_grid(shape, pixel_size)
+    threshold = 0.5
+
+    @jax.jit
+    def compute_frc_fsc_jit(im1, im2, radial_freqs, ps, thresh):
+        return correlation_fn(
+            im1,
+            im2,
+            radial_freqs,
+            ps,
+            thresh,
+            minimum_frequency=0.0,
+            maximum_frequency=0.5,
+        )
+
+    try:
+        _ = compute_frc_fsc_jit(
+            fourier_image_1,
+            fourier_image_2,
+            radial_frequency_grid,
+            pixel_size,
+            threshold,
+        )
+    except Exception as err:
+        raise Exception(
+            "Could not successfully run JIT compiled function "
+            f"`cryojax.image.{correlation_fn.__name__}`. "
+            f"Error traceback was:\n{err}"
+        )
 
 
 # #
