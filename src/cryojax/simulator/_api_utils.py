@@ -1,7 +1,7 @@
 from typing import Callable, Literal, Optional
 
 import equinox as eqx
-from jaxtyping import Array
+from jaxtyping import Array, Bool
 
 from ..ndimage.transforms import FilterLike, MaskLike
 from ._config import AbstractConfig, DoseConfig
@@ -44,6 +44,8 @@ def make_image_model(
     *,
     filter: Optional[FilterLike] = None,
     mask: Optional[MaskLike] = None,
+    normalizes_signal: bool = False,
+    signal_region: Optional[Bool[Array, "{config.y_dim} {config.x_dim}"]] = None,
     outputs_real_space: bool = True,
     physical_units: bool = True,
     mode: Literal["contrast", "intensity", "counts"] = "contrast",
@@ -80,6 +82,11 @@ def make_image_model(
         A mask to apply to the image.
     - `outputs_real_space`:
         Return the image in real or fourier space.
+    - `normalizes_signal`:
+        Whether or not to normalize the image.
+    - `signal_region`:
+        If `normalizes_signal = True`, this is a boolean array that is 1 where
+        there is signal and 0 otherwise.
     - `physical_units`:
         If `True`, the image simulated is a physical quantity, which is
         chosen with the `mode` argument. Otherwise, simulate an image without
@@ -123,19 +130,43 @@ def make_image_model(
                     "an `AbstractDetector` must be passed."
                 )
             image_model = ElectronCountsImageModel(
-                structure, config, scattering_theory, detector
+                structure,
+                config,
+                scattering_theory,
+                detector,
+                normalizes_signal=normalizes_signal,
+                signal_region=signal_region,
             )
         elif mode == "contrast":
-            image_model = ContrastImageModel(structure, config, scattering_theory)
+            image_model = ContrastImageModel(
+                structure,
+                config,
+                scattering_theory,
+                normalizes_signal=normalizes_signal,
+                signal_region=signal_region,
+            )
         elif mode == "intensity":
-            image_model = IntensityImageModel(structure, config, scattering_theory)
+            image_model = IntensityImageModel(
+                structure,
+                config,
+                scattering_theory,
+                normalizes_signal=normalizes_signal,
+                signal_region=signal_region,
+            )
         else:
             raise ValueError(
                 f"`mode = {mode}` not supported. Supported modes for simulating "
                 "physical quantities are 'contrast', 'intensity', and 'counts'."
             )
     else:
-        image_model = LinearImageModel(structure, config, integrator, transfer_theory)
+        image_model = LinearImageModel(
+            structure,
+            config,
+            integrator,
+            transfer_theory,
+            normalizes_signal=normalizes_signal,
+            signal_region=signal_region,
+        )
 
     # Grab the simulation function
     @eqx.filter_jit
