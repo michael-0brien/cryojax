@@ -80,5 +80,5 @@ For more advanced image simulation examples and to understand the many features 
 
 ## Acknowledgements
 
-- `cryojax` has been greatly informed by the open-source cryo-EM softwares [`cisTEM`](https://github.com/timothygrant80/cisTEM) and [`BioEM`](https://github.com/bio-phys/BioEM).
-- `cryojax` relies heavily on and has taken great inspiration from [`equinox`](https://github.com/patrick-kidger/equinox/). We think that `equinox` has great design principles and highly recommend learning about it to fully make use of the power of `jax`.
+- `cryojax` implementations of several models and algorithms, such as the CTF, fourier slice extraction, and electrostatic potential computations has been informed by the open-source cryo-EM software [`cisTEM`](https://github.com/timothygrant80/cisTEM).
+- `cryojax` is built on [`equinox`](https://github.com/patrick-kidger/equinox/), a popular JAX library for PyTorch-like classes that smoothly integrate with JAX functional programming. We highly recommend learning about `equinox` to fully make use of the power of `jax`.

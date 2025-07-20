@@ -61,9 +61,9 @@ nav:
     - 'index.md'
     - Examples:
         - Introductory:
-            - Compute a scattering potential: 'examples/compute-potential.ipynb'
             - Simulate an image: 'examples/simulate-image.ipynb'
             - JAX transformations: 'examples/jax-transformations.ipynb'
+            - Render a volume: 'examples/compute-potential.ipynb'
             - Load cryo-EM images: 'examples/read-dataset.ipynb'
         - Intermediate:
             - Write a STAR file of simulated data: 'examples/simulate-relion-dataset.ipynb'
