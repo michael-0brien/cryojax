@@ -24,7 +24,7 @@ def basic_config(voxel_potential):
 
 @pytest.fixture
 def image_model(voxel_potential, basic_config):
-    image_model, _ = cxs.make_image_model(
+    image_model = cxs.make_image_model(
         voxel_potential,
         basic_config,
         pose=cxs.EulerAnglePose(),

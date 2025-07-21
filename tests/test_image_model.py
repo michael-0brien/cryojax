@@ -31,7 +31,7 @@ def basic_config(voxel_potential):
 
 @pytest.fixture
 def image_model(voxel_potential, basic_config):
-    image_model, _ = cxs.make_image_model(
+    image_model = cxs.make_image_model(
         voxel_potential,
         basic_config,
         pose=cxs.EulerAnglePose(),
@@ -73,10 +73,10 @@ def test_even_vs_odd_image_shape(extra_dim_y, extra_dim_x, voxel_potential):
     )
     pose = cxs.EulerAnglePose()
     transfer_theory = cxs.ContrastTransferTheory(cxs.AberratedAstigmaticCTF())
-    model_control, _ = cxs.make_image_model(
+    model_control = cxs.make_image_model(
         voxel_potential, config_control, pose=pose, transfer_theory=transfer_theory
     )
-    model_test, _ = cxs.make_image_model(
+    model_test = cxs.make_image_model(
         voxel_potential, config_test, pose=pose, transfer_theory=transfer_theory
     )
     np.testing.assert_allclose(
