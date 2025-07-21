@@ -1,9 +1,7 @@
-from typing import Callable, Literal, Optional
+from typing import Literal, Optional
 
-import equinox as eqx
 from jaxtyping import Array, Bool
 
-from ..ndimage.transforms import FilterLike, MaskLike
 from ._config import AbstractConfig, DoseConfig
 from ._detector import AbstractDetector
 from ._image_model import (
@@ -42,14 +40,11 @@ def make_image_model(
     integrator: Optional[AbstractPotentialIntegrator] = None,
     detector: Optional[AbstractDetector] = None,
     *,
-    filter: Optional[FilterLike] = None,
-    mask: Optional[MaskLike] = None,
     normalizes_signal: bool = False,
     signal_region: Optional[Bool[Array, "{config.y_dim} {config.x_dim}"]] = None,
-    outputs_real_space: bool = True,
     physical_units: bool = True,
     mode: Literal["contrast", "intensity", "counts"] = "contrast",
-) -> tuple[AbstractImageModel, Callable[[AbstractImageModel], Array]]:
+) -> AbstractImageModel:
     """Construct an `AbstractImageModel` for most common use-cases.
 
     **Arguments:**
@@ -76,12 +71,6 @@ def make_image_model(
     - `detector`:
         If `mode = 'counts'` is chosen, then an `AbstractDetector` class must be
         chosen to simulate electron counts.
-    - `filter`:
-        A filter to apply to the image.
-    - `mask`:
-        A mask to apply to the image.
-    - `outputs_real_space`:
-        Return the image in real or fourier space.
     - `normalizes_signal`:
         Whether or not to normalize the image.
     - `signal_region`:
@@ -105,11 +94,11 @@ def make_image_model(
 
     **Returns:**
 
-    A tuple of the `AbstractImageModel` and a function of the form
+    An `AbstractImageModel`. Simulate an image with syntax
 
     ```python
-    image_model, simulate_fn = make_image_model(...)
-    image = simulate_fn(image_model)
+    image_model = make_image_model(...)
+    image = image_model.simulate()
     ```
     """
     # Build the image model
@@ -168,14 +157,7 @@ def make_image_model(
             signal_region=signal_region,
         )
 
-    # Grab the simulation function
-    @eqx.filter_jit
-    def simulate_fn(model: AbstractImageModel) -> Array:
-        return model.render(
-            outputs_real_space=outputs_real_space, filter=filter, mask=mask
-        )
-
-    return image_model, simulate_fn
+    return image_model
 
 
 def _select_default_integrator(

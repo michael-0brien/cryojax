@@ -66,17 +66,94 @@ transfer_theory = cxs.ContrastTransferTheory(ctf, amplitude_contrast_ratio=0.1)
 # Finally, create the configuration and build the image model
 config = cxs.BasicConfig(shape=(320, 320), pixel_size=voxel_size, voltage_in_kilovolts=300.0)
 # Instantiate a cryoJAX `image_model` using the `make_image_model` function
-image_model, simulate_fn = make_image_model(
-    potential, config, pose, transfer_theory, outputs_real_space=True
-)
+image_model = make_image_model(potential, config, pose, transfer_theory)
 # Simulate an image
-image = simulate_fn(image_model)
+image = image_model.simulate(outputs_real_space=True)
 ```
 
 For more advanced image simulation examples and to understand the many features in this library, see the [documentation](https://mjo22.github.io/cryojax/).
 
 ## JAX transformations
 
+CryoJAX is built on JAX to make use of JIT-compilation, automatic differentiation, and vectorization for cryo-EM data analysis. Below are examples of each in cryoJAX's recommended pattern of performing these transformations on image simulation. To learn more about how `equinox` assists with JAX transformations, see [here](https://docs.kidger.site/equinox/all-of-equinox/#2-filtering).
+
+### Your first JIT compiled function
+
+```python
+import equinox as eqx
+
+# Define image simulation function using `equinox.filter_jit`
+@eqx.filter_jit
+def simulate_fn(image_model):
+    """Simulate an image with JIT compilation"""
+    return image_model.simulate()
+
+# Simulate an image
+image = simulate_fn(image_model)
+```
+
+### Computing gradients of a loss function
+
+```python
+import equinox as eqx
+import jax.numpy as jnp
+from cryojax.jax_util import get_filter_spec
+
+# Load observed data
+observed_image = ...
+
+# Split the `image_model` by differentiated and non-differentiated
+# arguments
+where_pose = lambda model: model.structure.pose
+filter_spec = get_filter_spec(image_model, where_pose)
+model_grad, model_nograd = eqx.partition(image_model, filter_spec)
+
+@eqx.filter_jit
+@eqx.filter_grad
+def gradient_fn(model_grad, model_nograd, observed_image):
+    """Compute gradients with respect to parameters specified by
+    a `where` function.
+    """
+    image_model = eqx.combine(model_grad, model_nograd)
+    return jnp.sum((image_model.simulate() - observed_image)**2)
+
+# Compute gradients
+gradients = gradient_fn(model_grad, model_nograd, observed_image)
+```
+
+### Vectorizing image simulation
+
+```python
+import equinox as eqx
+from cryojax.jax_util import get_filter_spec
+
+# Vectorize model instantiation
+@eqx.filter_jit
+@eqx.filter_vmap(in_axes=(0, None, None, None), out_axes=(eqx.if_array(0), None))
+def make_image_model_vmap(wxyz, potential, config, transfer_theory):
+    pose = cxs.QuaternionPose(wxyz=wxyz)
+    image_model = cxs.make_image_model(
+        potential, config, pose, transfer_theory, normalizes_signal=True
+    )
+    where_pose = lambda model: model.structure.pose
+    filter_spec = get_filter_spec(image_model, where_pose)
+    model_vmap, model_novmap = eqx.partition(image_model, filter_spec)
+
+    return model_vmap, model_novmap
+
+
+# Define image simulation function
+@eqx.filter_jit
+@eqx.filter_vmap(in_axes=(eqx.if_array(0), None))
+def simulate_fn_vmap(model_vmap, model_novmap):
+    image_model = eqx.combine(model_vmap, model_novmap)
+    return image_model.simulate()
+
+# Simulate batch of images
+wxyz = ...  # ... load quaternions
+model_vmap, model_novmap = make_image_model_vmap(wxyz, potential, config, transfer_theory)
+images = simulate_fn_vmap(model_vmap, model_novmap)
+```
 
 ## Acknowledgements
 

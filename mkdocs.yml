@@ -60,12 +60,12 @@ plugins:
 nav:
     - 'index.md'
     - Examples:
-        - Introductory:
+        - Getting started:
             - Simulate an image: 'examples/simulate-image.ipynb'
             - JAX transformations: 'examples/jax-transformations.ipynb'
             - Render a volume: 'examples/compute-potential.ipynb'
             - Load cryo-EM images: 'examples/read-dataset.ipynb'
-        - Intermediate:
+        - Your first program:
             - Write a STAR file of simulated data: 'examples/simulate-relion-dataset.ipynb'
     - API:
         - cryojax.simulator:
