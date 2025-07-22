@@ -47,21 +47,21 @@ class AbstractVoxelPotentialIntegrator(
 ):
     """Base class for a method of integrating a voxel-based potential."""
 
-    pixel_size_rescaling_method: AbstractVar[Optional[str]]
+    pixel_rescaling_method: AbstractVar[Optional[str]]
 
-    def _convert_raw_image_to_integrated_potential(
+    def _postprocess_in_plane_potential(
         self,
-        fourier_in_plane_potential_without_postprocess,
-        potential,
-        config,
-        input_is_rfft,
-    ):
+        fourier_in_plane_potential: Array,
+        potential: AbstractVoxelPotential,
+        config: AbstractConfig,
+        input_is_rfft: bool,
+    ) -> Array:
         """Return the integrated potential in fourier space at the
         `config.pixel_size` and the `config.padded_shape.`
         """
-        if self.pixel_size_rescaling_method is None:
+        if self.pixel_rescaling_method is None:
             fourier_in_plane_potential = error_if(
-                potential.voxel_size * fourier_in_plane_potential_without_postprocess,
+                potential.voxel_size * fourier_in_plane_potential,
                 ~jnp.isclose(potential.voxel_size, config.pixel_size),
                 f"Tried to use {type(self).__name__} with `{type(potential).__name__}."
                 f"voxel_size != {type(potential).__name__}.pixel_size`. If this is true, "
@@ -72,7 +72,7 @@ class AbstractVoxelPotentialIntegrator(
             return fourier_in_plane_potential
         else:
             fourier_in_plane_potential = maybe_rescale_pixel_size(
-                potential.voxel_size * fourier_in_plane_potential_without_postprocess,
+                potential.voxel_size * fourier_in_plane_potential,
                 potential.voxel_size,
                 config.pixel_size,
                 input_is_real=False,
