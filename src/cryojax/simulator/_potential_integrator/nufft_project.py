@@ -21,23 +21,23 @@ class NufftProjection(
 ):
     """Integrate points onto the exit plane using non-uniform FFTs."""
 
-    pixel_size_rescaling_method: Optional[str]
+    pixel_rescaling_method: Optional[str]
     eps: float
 
     is_projection_approximation: ClassVar[bool] = True
 
     def __init__(
-        self, *, pixel_size_rescaling_method: Optional[str] = None, eps: float = 1e-6
+        self, *, pixel_rescaling_method: Optional[str] = None, eps: float = 1e-6
     ):
         """**Arguments:**
 
-        - `pixel_size_rescaling_method`: Method for interpolating the final image to
+        - `pixel_rescaling_method`: Method for interpolating the final image to
                                     the `AbstractConfig` pixel size. See
                                     `cryojax.image.rescale_pixel_size` for documentation.
         - `eps`: See [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft)
                  for documentation.
         """
-        self.pixel_size_rescaling_method = pixel_size_rescaling_method
+        self.pixel_rescaling_method = pixel_rescaling_method
         self.eps = eps
 
     def project_voxel_cloud_with_nufft(
@@ -109,7 +109,7 @@ class NufftProjection(
                 "Supported types for `potential` are `RealVoxelGridPotential` and "
                 "`RealVoxelCloudPotential`."
             )
-        fourier_in_plane_potential = self._convert_raw_image_to_integrated_potential(
+        fourier_in_plane_potential = self._postprocess_in_plane_potential(
             fourier_in_plane_potential, potential, config, input_is_rfft=True
         )
         return (
