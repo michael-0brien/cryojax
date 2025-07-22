@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 from jaxtyping import Array
 
+import cryojax.experimental as cxe
 import cryojax.simulator as cxs
 from cryojax.constants import (
     get_tabulated_scattering_factor_parameters,
@@ -104,14 +105,132 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
         )
 
 
-# @pytest.mark.parametrize(
-#     "pixel_size, shape, euler_pose_params",
-#     (
-#         (1.0, (32, 32), (2.5, -5.0, 0.0, 0.0, 0.0)),
-#         (1.0, (32, 32), (0.0, 0.0, 10.0, -30.0, 60.0)),
-#         (1.0, (32, 32), (2.5, -5.0, 10.0, -30.0, 60.0)),
-#     ),
-# )
+@pytest.mark.parametrize(
+    "pixel_size, shape, euler_pose_params, ctf_params",
+    (
+        (
+            2.0,
+            (150, 150),
+            (2.5, -5.0, 0.0, 0.0, 0.0),
+            (0.1, 300.0, 10000.0, -100.0, 10.0),
+        ),
+        (
+            2.0,
+            (150, 150),
+            (0.0, 0.0, 10.0, -30.0, 60.0),
+            (0.1, 300.0, 10000.0, -100.0, 10.0),
+        ),
+        (
+            2.0,
+            (150, 150),
+            (2.5, -5.0, 10.0, -30.0, 60.0),
+            (0.1, 300.0, 10000.0, -100.0, 10.0),
+        ),
+    ),
+)
+def test_multislice_with_pose(
+    sample_pdb_path,
+    pixel_size,
+    shape,
+    euler_pose_params,
+    ctf_params,
+):
+    (
+        ac,
+        voltage_in_kilovolts,
+        defocus_in_angstroms,
+        astigmatism_in_angstroms,
+        astigmatism_angle,
+    ) = ctf_params
+
+    atom_positions, atom_identities, b_factors = read_atoms_from_pdb(
+        sample_pdb_path,
+        center=True,
+        selection_string="not element H",
+        loads_b_factors=True,
+    )
+    scattering_factor_parameters = get_tabulated_scattering_factor_parameters(
+        atom_identities, read_peng_element_scattering_factor_parameter_table()
+    )
+    atom_potential = cxs.PengAtomicPotential(
+        atom_positions,
+        scattering_factor_a=scattering_factor_parameters["a"],
+        scattering_factor_b=scattering_factor_parameters["b"],
+        b_factors=b_factors,
+    )
+
+    instrument_config = cxs.InstrumentConfig(
+        shape=shape,
+        pixel_size=pixel_size,
+        voltage_in_kilovolts=voltage_in_kilovolts,
+    )
+
+    multislice_integrator = cxe.FFTMultisliceIntegrator(
+        slice_thickness_in_voxels=3,
+    )
+    pose = cxs.EulerAnglePose(*euler_pose_params)
+    structural_ensemble = cxs.SingleStructureEnsemble(atom_potential, pose)
+
+    ctf = cxs.AberratedAstigmaticCTF(
+        defocus_in_angstroms=defocus_in_angstroms,
+        astigmatism_in_angstroms=astigmatism_in_angstroms,
+        astigmatism_angle=astigmatism_angle,
+    )
+
+    multislice_scattering_theory = cxe.MultisliceScatteringTheory(
+        structural_ensemble,
+        multislice_integrator,
+        cxe.WaveTransferTheory(ctf),
+        amplitude_contrast_ratio=ac,
+    )
+    high_energy_scattering_theory = cxe.HighEnergyScatteringTheory(
+        structural_ensemble,
+        cxs.GaussianMixtureProjection(use_error_functions=True),
+        cxe.WaveTransferTheory(ctf),
+        amplitude_contrast_ratio=ac,
+    )
+    weak_phase_scattering_theory = cxs.WeakPhaseScatteringTheory(
+        structural_ensemble,
+        cxs.GaussianMixtureProjection(use_error_functions=True),
+        cxs.ContrastTransferTheory(ctf, amplitude_contrast_ratio=ac, phase_shift=0.0),
+    )
+
+    multislice_image_model = cxs.IntensityImageModel(
+        instrument_config, multislice_scattering_theory
+    )
+    high_energy_image_model = cxs.IntensityImageModel(
+        instrument_config, high_energy_scattering_theory
+    )
+    weak_phase_image_model = cxs.IntensityImageModel(
+        instrument_config, weak_phase_scattering_theory
+    )
+
+    ms = multislice_image_model.render()
+    he = high_energy_image_model.render()
+    wp = weak_phase_image_model.render()
+
+    def _normalize_image(image):
+        """Normalize the image to have zero mean and unit variance."""
+        return (image - image.mean()) / image.std()
+
+    atol = 4.0
+    np.testing.assert_allclose(
+        _normalize_image(he),
+        _normalize_image(wp),
+        atol=atol,
+    )
+    np.testing.assert_allclose(
+        _normalize_image(he),
+        _normalize_image(ms),
+        atol=atol,
+    )
+    np.testing.assert_allclose(
+        _normalize_image(ms),
+        _normalize_image(wp),
+        atol=atol,
+    )
+
+
 # def test_projection_methods_with_pose(
 #     sample_pdb_path, pixel_size, shape, euler_pose_params
 # ):
