@@ -28,6 +28,36 @@ with install_import_hook("cryojax", "typeguard.typechecked"):
 config.update("jax_enable_x64", True)
 
 
+@pytest.fixture
+def toy_gaussian_cloud():
+    atom_positions = jnp.array(
+        [
+            [0.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+        ]
+    )
+    num_atoms = atom_positions.shape[0]
+    ff_a = jnp.array(
+        num_atoms
+        * [
+            [1.0, 0.5],
+        ]
+    )
+
+    ff_b = jnp.array(
+        num_atoms
+        * [
+            [0.3, 0.2],
+        ]
+    )
+
+    n_voxels_per_side = (128, 128, 128)
+    voxel_size = 0.05
+    return (atom_positions, ff_a, ff_b, n_voxels_per_side, voxel_size)
+
+
 #
 # Test different representations
 #
@@ -69,6 +99,7 @@ def test_fourier_vs_real_voxel_potential_agreement(sample_pdb_path):
     atom_positions, atom_elements = read_atoms_from_pdb(
         sample_pdb_path,
         center=True,
+        loads_b_factors=False,
         selection_string="not element H",
     )
     # Load atomistic potential
@@ -117,6 +148,7 @@ def test_downsampled_voxel_potential_agreement(sample_pdb_path):
     atom_positions, atom_elements = read_atoms_from_pdb(
         sample_pdb_path,
         center=True,
+        loads_b_factors=False,
         selection_string="not element H",
     )
     # Load atomistic potential
@@ -156,6 +188,7 @@ def test_z_plane_batched_vs_non_batched_loop_agreement(
     atom_positions, atom_elements = read_atoms_from_pdb(
         sample_pdb_path,
         center=True,
+        loads_b_factors=False,
         selection_string="not element H",
     )
     # Load atomistic potential
@@ -186,6 +219,7 @@ def test_compute_rectangular_voxel_grid(sample_pdb_path, shape):
     atom_positions, atom_elements = read_atoms_from_pdb(
         sample_pdb_path,
         center=True,
+        loads_b_factors=False,
         selection_string="not element H",
     )
     # Load atomistic potential

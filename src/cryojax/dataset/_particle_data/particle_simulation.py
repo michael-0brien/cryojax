@@ -251,7 +251,7 @@ def _configure_simulation_fn(
     if batch_size is None:
 
         def compute_image_stack_fn(parameters, constant_args, per_particle_args):  # type: ignore
-            shape = parameters["instrument_config"].shape
+            shape = parameters["config"].shape
             image_stack = np.empty((images_per_file, *shape))
             for i in range(images_per_file):
                 parameters_at_i = _index_pytree(i, parameters)

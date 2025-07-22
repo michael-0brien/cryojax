@@ -3,26 +3,21 @@ Abstractions of ensembles of biological specimen.
 """
 
 from abc import abstractmethod
-from typing import Optional
 from typing_extensions import override
 
-from equinox import AbstractVar, Module
+import equinox as eqx
 
 from .._pose import AbstractPose, EulerAnglePose
 from .._potential_representation import (
     AbstractAtomicPotential,
     AbstractPotentialRepresentation,
 )
-from .base_conformation import AbstractConformationalVariable
 
 
-class AbstractStructuralEnsemble(Module, strict=True):
-    """A map from a pose and conformational variable to an
-    `AbstractPotentialRepresentation`.
-    """
+class AbstractStructure(eqx.Module, strict=True):
+    """A map from a pose to an `AbstractPotentialRepresentation`."""
 
-    pose: AbstractVar[AbstractPose]
-    conformation: AbstractVar[Optional[AbstractConformationalVariable]]
+    pose: eqx.AbstractVar[AbstractPose]
 
     @abstractmethod
     def get_potential_in_body_frame(self) -> AbstractPotentialRepresentation:
@@ -41,18 +36,13 @@ class AbstractStructuralEnsemble(Module, strict=True):
         return transformed_potential
 
 
-class SingleStructureEnsemble(AbstractStructuralEnsemble, strict=True):
+class BasicStructure(AbstractStructure, strict=True):
     """An "ensemble" with one conformation."""
 
     potential: AbstractPotentialRepresentation
     pose: AbstractPose
-    conformation: None
 
-    def __init__(
-        self,
-        potential: AbstractPotentialRepresentation,
-        pose: Optional[AbstractPose] = None,
-    ):
+    def __init__(self, potential: AbstractPotentialRepresentation, pose: AbstractPose):
         """**Arguments:**
 
         - `potential`:
@@ -62,7 +52,6 @@ class SingleStructureEnsemble(AbstractStructuralEnsemble, strict=True):
         """
         self.potential = potential
         self.pose = pose or EulerAnglePose()
-        self.conformation = None
 
     @override
     def get_potential_in_body_frame(self) -> AbstractPotentialRepresentation:

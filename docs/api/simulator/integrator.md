@@ -1,6 +1,6 @@
 # Scattering potential integration methods
 
-`cryojax` provides different methods for integrating [scattering potentials](./scattering_potential.md#scattering-potential-representations) onto a plane.
+`cryojax` provides different methods for integrating [scattering potentials](./potential.md#scattering-potential-representations) onto a plane.
 
 ???+ abstract "`cryojax.simulator.AbstractPotentialIntegrator`"
     ::: cryojax.simulator.AbstractPotentialIntegrator

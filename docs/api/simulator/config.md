@@ -1,8 +1,8 @@
 # Configuring an image
 
-The `InstrumentConfig` is an object at the core of simulating images in `cryojax`. It stores a configuration for the simulated image and the electron microscope, such as the shape of the desired image and the wavelength of the incident electron beam.
+The `AbstractConfig` is an object at the core of simulating images in `cryojax`. It stores a configuration for the simulated image and the electron microscope, such as the shape of the desired image and the wavelength of the incident electron beam.
 
-::: cryojax.simulator.InstrumentConfig
+::: cryojax.simulator.AbstractConfig
         options:
             members:
                 - __init__
