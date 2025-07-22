@@ -32,7 +32,7 @@ class FFTMultisliceIntegrator(
         slice_thickness_in_voxels: int = 1,
         *,
         options_for_rasterization: dict[str, Any] = {},
-        options_for_interpolation: dict[str, Any] = {},
+        options_for_interpolation: dict[str, Any] = {"order": 1},
     ):
         """**Arguments:**
 
@@ -86,7 +86,7 @@ class FFTMultisliceIntegrator(
             potential_voxel_grid = potential.as_real_voxel_grid(
                 (z_dim, y_dim, x_dim), voxel_size, **self.options_for_rasterization
             )
-        else:
+        elif isinstance(potential, RealVoxelGridPotential):
             # Interpolate volume to new pose at given coordinate system
             z_dim, y_dim, x_dim = potential.real_voxel_grid.shape
             voxel_size = potential.voxel_size
