@@ -2,7 +2,6 @@
 Image formation models.
 """
 
-import warnings
 from abc import abstractmethod
 from typing import Optional, TypedDict
 from typing_extensions import override
@@ -57,28 +56,6 @@ class AbstractImageModel(eqx.Module, strict=True):
     ) -> ImageArray | PaddedImageArray:
         """Render an image without postprocessing."""
         raise NotImplementedError
-
-    def render(
-        self,
-        rng_key: Optional[PRNGKeyArray] = None,
-        *,
-        removes_padding: bool = True,
-        outputs_real_space: bool = True,
-        mask: Optional[MaskLike] = None,
-        filter: Optional[FilterLike] = None,
-    ) -> ImageArray | PaddedImageArray:
-        warnings.warn(
-            f"`{type(self).__name__}.render` is deprecated and "
-            "will be removed in cryoJAX version 0.5.0. Instead, "
-            f"use the `{type(self).__name__}.simulate` function."
-        )
-        return self.simulate(
-            rng_key,
-            removes_padding=removes_padding,
-            outputs_real_space=outputs_real_space,
-            mask=mask,
-            filter=filter,
-        )
 
     def simulate(
         self,
