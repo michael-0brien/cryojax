@@ -37,3 +37,32 @@ def compute_phase_shift_from_amplitude_contrast_ratio(
     return jnp.arctan(
         amplitude_contrast_ratio / jnp.sqrt(1.0 - amplitude_contrast_ratio**2)
     )
+
+def compute_phase_shift_from_zernike_basis (
+    frequency_grid_in_angstroms: Float[Array, "y_dim x_dim 2"],
+    wavelength_in_angstroms: Float[Array, ""],
+
+    coefficients_matrix: Float[Array,""],
+    ):
+
+    N, M = coefficients_matrix.shape
+    N = jnp.arange(N)
+    M = jnp.arange(M)
+
+
+    k, azimuth = cartesian_to_polar (frequency_grid_in_angstroms, square = False)
+
+    k_powers = (k*wavelength_in_angstroms)**(n + 1) / (n + 1) 
+
+    sum_weights = k_powers[:, None]  # shape (N, 1)
+
+    cos_mphi = jnp.cos(m * azimuth)             
+    sin_mphi = jnp.sin(m * azimuth)             
+
+    # Compute the sum with einsum
+    term_cos = jnp.einsum('nm,n,m->', coefficients_matrix[:, :, 0], sum_weights[:, 0], cos_mphi)
+    term_sin = jnp.einsum('nm,n,m->', coefficients_matrix[:, :, 1], sum_weights[:, 0], sin_mphi)
+
+    phase_shifts = (2 * jnp.pi / wavelength_in_angstroms) * (term_cos + term_sin)
+
+    return phase_shifts
