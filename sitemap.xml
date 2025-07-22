@@ -2,146 +2,146 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://mjo22.github.io/cryojax/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/api/constants/conventions/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/api/constants/scattering_factor_parameters/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/api/constants/units/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/api/coordinates/making_coordinates/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/api/coordinates/transforming_coordinates/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/api/data/relion/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/api/image/functions/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/api/image/operators/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/api/inference/distributions/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/api/inference/grid_search/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/api/io/atom_loading/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/api/io/mrc/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/api/rotations/conversions/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/api/rotations/lie_groups/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/api/simulator/image_model/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/api/simulator/instrument_config/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/api/simulator/pose/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/api/simulator/potential_integrators/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/api/simulator/scattering_potential/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/api/simulator/scattering_theory/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/api/simulator/solvent/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/api/simulator/structural_ensemble/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/api/simulator/transfer_theory/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/api/utils/filter_specs/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/api/utils/transforms/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/api/utils/useful_functions/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/examples/compute-potential/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/examples/cross-correlation-search/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/examples/ewald-sphere/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/examples/multislice/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/examples/read-dataset/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/examples/simulate-image/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/examples/simulate-micrograph/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/examples/simulate-relion-dataset/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
     <url>
          <loc>https://mjo22.github.io/cryojax/examples/simulating-and-reweighting-ensembles/</loc>
-         <lastmod>2025-06-16</lastmod>
+         <lastmod>2025-07-22</lastmod>
     </url>
 </urlset>
