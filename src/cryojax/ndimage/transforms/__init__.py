@@ -11,7 +11,6 @@ from ._filters import (
     WhiteningFilter as WhiteningFilter,
 )
 from ._masks import (
-    AbstractBooleanMask as AbstractBooleanMask,
     AbstractMask as AbstractMask,
     CircularCosineMask as CircularCosineMask,
     CustomMask as CustomMask,

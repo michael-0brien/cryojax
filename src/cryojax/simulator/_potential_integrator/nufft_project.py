@@ -10,7 +10,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
 from ...ndimage import convert_fftn_to_rfftn, irfftn
-from .._instrument_config import InstrumentConfig
+from .._config import AbstractConfig
 from .._potential_representation import RealVoxelCloudPotential, RealVoxelGridPotential
 from .base_potential_integrator import AbstractVoxelPotentialIntegrator
 
@@ -21,23 +21,21 @@ class NufftProjection(
 ):
     """Integrate points onto the exit plane using non-uniform FFTs."""
 
-    pixel_size_rescaling_method: Optional[str]
+    pixel_rescaling_mode: Optional[str]
     eps: float
 
     is_projection_approximation: ClassVar[bool] = True
 
-    def __init__(
-        self, *, pixel_size_rescaling_method: Optional[str] = None, eps: float = 1e-6
-    ):
+    def __init__(self, *, pixel_rescaling_mode: Optional[str] = None, eps: float = 1e-6):
         """**Arguments:**
 
-        - `pixel_size_rescaling_method`: Method for interpolating the final image to
-                                    the `InstrumentConfig` pixel size. See
+        - `pixel_rescaling_mode`: Method for interpolating the final image to
+                                    the `AbstractConfig` pixel size. See
                                     `cryojax.image.rescale_pixel_size` for documentation.
         - `eps`: See [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft)
                  for documentation.
         """
-        self.pixel_size_rescaling_method = pixel_size_rescaling_method
+        self.pixel_rescaling_mode = pixel_rescaling_mode
         self.eps = eps
 
     def project_voxel_cloud_with_nufft(
@@ -66,58 +64,56 @@ class NufftProjection(
         return _project_with_nufft(weights, coordinate_list_in_angstroms, shape, self.eps)
 
     @override
-    def compute_integrated_potential(
+    def integrate(
         self,
         potential: RealVoxelGridPotential | RealVoxelCloudPotential,
-        instrument_config: InstrumentConfig,
+        config: AbstractConfig,
         outputs_real_space: bool = False,
     ) -> (
         Complex[
             Array,
-            "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim//2+1}",
+            "{config.padded_y_dim} {config.padded_x_dim//2+1}",
         ]
-        | Float[
-            Array, "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim}"
-        ]
+        | Float[Array, "{config.padded_y_dim} {config.padded_x_dim}"]
     ):
-        """Compute the integrated scattering potential at the `InstrumentConfig` settings
+        """Compute the integrated scattering potential at the `AbstractConfig` settings
         of a voxel-based representation in real-space, using non-uniform FFTs.
 
         **Arguments:**
 
         - `potential`: The scattering potential representation.
-        - `instrument_config`: The configuration of the resulting image.
+        - `config`: The configuration of the resulting image.
 
         **Returns:**
 
         The projection integral of the `potential` in fourier space, at the
-        `instrument_config.padded_shape` and the `instrument_config.pixel_size`.
+        `config.padded_shape` and the `config.pixel_size`.
         """
         if isinstance(potential, RealVoxelGridPotential):
             shape = potential.shape
-            fourier_projection = self.project_voxel_cloud_with_nufft(
+            fourier_in_plane_potential = self.project_voxel_cloud_with_nufft(
                 potential.real_voxel_grid.ravel(),
                 potential.coordinate_grid_in_pixels.reshape((math.prod(shape), 3)),
-                instrument_config.padded_shape,
+                config.padded_shape,
             )
         elif isinstance(potential, RealVoxelCloudPotential):
-            fourier_projection = self.project_voxel_cloud_with_nufft(
+            fourier_in_plane_potential = self.project_voxel_cloud_with_nufft(
                 potential.voxel_weights,
                 potential.coordinate_list_in_pixels,
-                instrument_config.padded_shape,
+                config.padded_shape,
             )
         else:
             raise ValueError(
                 "Supported types for `potential` are `RealVoxelGridPotential` and "
                 "`RealVoxelCloudPotential`."
             )
-        fourier_projection = self._convert_raw_image_to_integrated_potential(
-            fourier_projection, potential, instrument_config, input_is_rfft=True
+        fourier_in_plane_potential = self._postprocess_in_plane_potential(
+            fourier_in_plane_potential, potential, config, input_is_rfft=True
         )
         return (
-            irfftn(fourier_projection, s=instrument_config.padded_shape)
+            irfftn(fourier_in_plane_potential, s=config.padded_shape)
             if outputs_real_space
-            else fourier_projection
+            else fourier_in_plane_potential
         )
 
 

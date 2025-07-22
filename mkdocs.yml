@@ -60,29 +60,28 @@ plugins:
 nav:
     - 'index.md'
     - Examples:
-        - Introductory:
-            - Compute a scattering potential: 'examples/compute-potential.ipynb'
+        - Getting started:
             - Simulate an image: 'examples/simulate-image.ipynb'
-            - Read a particle stack: 'examples/read-dataset.ipynb'
-        - Intermediate:
-            - Simulate a superposition of images with vmap: 'examples/simulate-micrograph.ipynb'
+            - JAX transformations: 'examples/jax-transformations.ipynb'
+            - Render a volume: 'examples/compute-potential.ipynb'
+            - Load cryo-EM images: 'examples/read-dataset.ipynb'
+        - Your first program:
             - Write a STAR file of simulated data: 'examples/simulate-relion-dataset.ipynb'
-            - Run a cross-correlation search: 'examples/cross-correlation-search.ipynb'
     - API:
         - cryojax.simulator:
+            - 'api/simulator/api.md'
             - Representing volumes:
-                - 'api/simulator/scattering_potential.md'
+                - 'api/simulator/potential.md'
                 - 'api/simulator/pose.md'
-                - 'api/simulator/structural_ensemble.md'
+                - 'api/simulator/structure.md'
             - Image formation:
-                - 'api/simulator/potential_integrators.md'
+                - 'api/simulator/integrator.md'
                 - 'api/simulator/transfer_theory.md'
                 - 'api/simulator/scattering_theory.md'
             - Putting it all together:
-                - 'api/simulator/instrument_config.md'
+                - 'api/simulator/config.md'
                 - 'api/simulator/image_model.md'
-        - cryojax.distributions:
-            - 'api/distributions/gaussian.md'
+                - 'api/simulator/distribution.md'
         - cryojax.dataset:
             - 'api/dataset/relion.md'
         - cryojax.io:

@@ -13,10 +13,7 @@ T1 = TypeVar("T1")
 T2 = TypeVar("T2")
 
 
-class AbstractParticleParameterFile(
-    AbstractDataset[T1],
-    Generic[T1, T2],
-):
+class AbstractParticleParameterFile(AbstractDataset[T1], Generic[T1, T2]):
     @abc.abstractmethod
     def __setitem__(self, index, value: T2):
         raise NotImplementedError

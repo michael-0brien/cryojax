@@ -10,7 +10,7 @@ from equinox import AbstractClassVar, AbstractVar, Module, error_if
 from jaxtyping import Array, Complex, Float
 
 from ...ndimage import maybe_rescale_pixel_size
-from .._instrument_config import InstrumentConfig
+from .._config import AbstractConfig
 from .._potential_representation import AbstractVoxelPotential
 
 
@@ -26,22 +26,18 @@ class AbstractPotentialIntegrator(Module, Generic[PotentialT], strict=True):
     is_projection_approximation: AbstractClassVar[bool]
 
     @abstractmethod
-    def compute_integrated_potential(
+    def integrate(
         self,
         potential: PotentialT,
-        instrument_config: InstrumentConfig,
+        config: AbstractConfig,
         outputs_real_space: bool = False,
     ) -> (
         Complex[
             Array,
-            "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim//2+1}",
+            "{config.padded_y_dim} {config.padded_x_dim//2+1}",
         ]
-        | Complex[
-            Array, "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim}"
-        ]
-        | Float[
-            Array, "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim}"
-        ]
+        | Complex[Array, "{config.padded_y_dim} {config.padded_x_dim}"]
+        | Float[Array, "{config.padded_y_dim} {config.padded_x_dim}"]
     ):
         raise NotImplementedError
 
@@ -51,36 +47,36 @@ class AbstractVoxelPotentialIntegrator(
 ):
     """Base class for a method of integrating a voxel-based potential."""
 
-    pixel_size_rescaling_method: AbstractVar[Optional[str]]
+    pixel_rescaling_mode: AbstractVar[Optional[str]]
 
-    def _convert_raw_image_to_integrated_potential(
+    def _postprocess_in_plane_potential(
         self,
-        fourier_integrated_potential_without_postprocess,
-        potential,
-        instrument_config,
-        input_is_rfft,
-    ):
+        fourier_in_plane_potential: Array,
+        potential: AbstractVoxelPotential,
+        config: AbstractConfig,
+        input_is_rfft: bool,
+    ) -> Array:
         """Return the integrated potential in fourier space at the
-        `instrument_config.pixel_size` and the `instrument_config.padded_shape.`
+        `config.pixel_size` and the `config.padded_shape.`
         """
-        if self.pixel_size_rescaling_method is None:
-            fourier_integrated_potential = error_if(
-                potential.voxel_size * fourier_integrated_potential_without_postprocess,
-                ~jnp.isclose(potential.voxel_size, instrument_config.pixel_size),
+        if self.pixel_rescaling_mode is None:
+            fourier_in_plane_potential = error_if(
+                potential.voxel_size * fourier_in_plane_potential,
+                ~jnp.isclose(potential.voxel_size, config.pixel_size),
                 f"Tried to use {type(self).__name__} with `{type(potential).__name__}."
-                "voxel_size != InstrumentConfig.pixel_size`. If this is true, then "
+                f"voxel_size != {type(potential).__name__}.pixel_size`. If this is true, "
                 f"`{type(self).__name__}.pixel_size_rescaling_method` must not be set to "
                 f"`None`. Try setting `{type(self).__name__}.pixel_size_rescaling_method "
                 "= 'bicubic'`.",
             )
-            return fourier_integrated_potential
+            return fourier_in_plane_potential
         else:
-            fourier_integrated_potential = maybe_rescale_pixel_size(
-                potential.voxel_size * fourier_integrated_potential_without_postprocess,
+            fourier_in_plane_potential = maybe_rescale_pixel_size(
+                potential.voxel_size * fourier_in_plane_potential,
                 potential.voxel_size,
-                instrument_config.pixel_size,
+                config.pixel_size,
                 input_is_real=False,
                 input_is_rfft=input_is_rfft,
-                shape_in_real_space=instrument_config.padded_shape,
+                shape_in_real_space=config.padded_shape,
             )
-            return fourier_integrated_potential
+            return fourier_in_plane_potential
