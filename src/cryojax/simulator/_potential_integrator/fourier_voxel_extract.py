@@ -33,7 +33,7 @@ class FourierSliceExtraction(AbstractVoxelPotentialIntegrator, strict=True):
     `cryojax.image.map_coordinates` and `cryojax.image.map_coordinates_with_cubic_spline`.
     """
 
-    pixel_rescaling_method: Optional[str]
+    pixel_rescaling_mode: Optional[str]
     correction_mask: Optional[InverseSincMask]
     out_of_bounds_mode: str
     fill_value: complex
@@ -43,14 +43,14 @@ class FourierSliceExtraction(AbstractVoxelPotentialIntegrator, strict=True):
     def __init__(
         self,
         *,
-        pixel_rescaling_method: Optional[str] = None,
+        pixel_rescaling_mode: Optional[str] = None,
         correction_mask: Optional[InverseSincMask] = None,
         out_of_bounds_mode: str = "fill",
         fill_value: complex = 0.0 + 0.0j,
     ):
         """**Arguments:**
 
-        - `pixel_rescaling_method`:
+        - `pixel_rescaling_mode`:
             Method for rescaling the final image to the `AbstractConfig`
             pixel size. See `cryojax.image.rescale_pixel_size` for documentation.
         - `correction_mask`:
@@ -65,7 +65,7 @@ class FourierSliceExtraction(AbstractVoxelPotentialIntegrator, strict=True):
             Value for filling out-of-bounds indices. Used only when
             `out_of_bounds_mode = "fill"`.
         """
-        self.pixel_rescaling_method = pixel_rescaling_method
+        self.pixel_rescaling_mode = pixel_rescaling_mode
         self.correction_mask = correction_mask
         self.out_of_bounds_mode = out_of_bounds_mode
         self.fill_value = fill_value
@@ -222,7 +222,7 @@ class EwaldSphereExtraction(AbstractVoxelPotentialIntegrator, strict=True):
     `cryojax.image.map_coordinates` and `cryojax.image.map_coordinates_with_cubic_spline`.
     """
 
-    pixel_rescaling_method: Optional[str]
+    pixel_rescaling_mode: Optional[str]
     correction_mask: Optional[InverseSincMask]
     out_of_bounds_mode: str
     fill_value: complex
@@ -232,14 +232,14 @@ class EwaldSphereExtraction(AbstractVoxelPotentialIntegrator, strict=True):
     def __init__(
         self,
         *,
-        pixel_rescaling_method: Optional[str] = None,
+        pixel_rescaling_mode: Optional[str] = None,
         correction_mask: Optional[InverseSincMask] = None,
         out_of_bounds_mode: str = "fill",
         fill_value: complex = 0.0 + 0.0j,
     ):
         """**Arguments:**
 
-        - `pixel_rescaling_method`:
+        - `pixel_rescaling_mode`:
             Method for rescaling the final image to the `AbstractConfig`
             pixel size. See `cryojax.image.rescale_pixel_size` for documentation.
         - `correction_mask`:
@@ -254,7 +254,7 @@ class EwaldSphereExtraction(AbstractVoxelPotentialIntegrator, strict=True):
             Value for filling out-of-bounds indices. Used only when
             `out_of_bounds_mode = "fill"`.
         """
-        self.pixel_rescaling_method = pixel_rescaling_method
+        self.pixel_rescaling_mode = pixel_rescaling_mode
         self.correction_mask = correction_mask
         self.out_of_bounds_mode = out_of_bounds_mode
         self.fill_value = fill_value

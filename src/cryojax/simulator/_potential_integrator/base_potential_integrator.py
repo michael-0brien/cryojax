@@ -47,7 +47,7 @@ class AbstractVoxelPotentialIntegrator(
 ):
     """Base class for a method of integrating a voxel-based potential."""
 
-    pixel_rescaling_method: AbstractVar[Optional[str]]
+    pixel_rescaling_mode: AbstractVar[Optional[str]]
 
     def _postprocess_in_plane_potential(
         self,
@@ -59,7 +59,7 @@ class AbstractVoxelPotentialIntegrator(
         """Return the integrated potential in fourier space at the
         `config.pixel_size` and the `config.padded_shape.`
         """
-        if self.pixel_rescaling_method is None:
+        if self.pixel_rescaling_mode is None:
             fourier_in_plane_potential = error_if(
                 potential.voxel_size * fourier_in_plane_potential,
                 ~jnp.isclose(potential.voxel_size, config.pixel_size),
