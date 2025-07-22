@@ -244,15 +244,75 @@ class LinearImageModel(AbstractImageModel, strict=True):
             apply_translation=False
         )
         # Compute the projection image
-        fourier_projection = self.integrator.integrate(
+        fourier_image = self.integrator.integrate(
             potential, self.config, outputs_real_space=False
         )
         # Compute the image
         fourier_image = self.transfer_theory.propagate_object(  # noqa: E501
-            fourier_projection,
+            fourier_image,
             self.config,
             is_projection_approximation=self.integrator.is_projection_approximation,
             defocus_offset=self.structure.pose.offset_z_in_angstroms,
+        )
+        # Now for the in-plane translation
+        fourier_image = self._apply_translation(fourier_image)
+
+        return fourier_image
+
+
+class ProjectionImageModel(AbstractImageModel, strict=True):
+    """An simple image model for computing a projection."""
+
+    structure: AbstractStructure
+    integrator: AbstractPotentialIntegrator
+    config: AbstractConfig
+
+    normalizes_signal: bool
+    signal_region: Optional[Bool[Array, "_ _"]]
+
+    def __init__(
+        self,
+        structure: AbstractStructure,
+        config: AbstractConfig,
+        integrator: AbstractPotentialIntegrator,
+        *,
+        normalizes_signal: bool = False,
+        signal_region: Optional[Bool[Array, "_ _"]] = None,
+    ):
+        """**Arguments:**
+
+        - `structure`:
+            The biological structure.
+        - `config`:
+            The configuration of the instrument, such as for the pixel size
+            and the wavelength.
+        - `integrator`: The method for integrating the scattering potential.
+        - `normalizes_signal`:
+            If `True`, normalizes_signal the image before returning.
+        - `signal_region`:
+            A boolean array that is 1 where there is signal,
+            and 0 otherwise used to normalize the image.
+            Must have shape equal to `AbstractImageModel.shape`.
+        """
+        # Simulator components
+        self.config = config
+        self.integrator = integrator
+        self.structure = structure
+        # Options
+        self.normalizes_signal = normalizes_signal
+        self.signal_region = signal_region
+
+    @override
+    def compute_fourier_image(
+        self, rng_key: Optional[PRNGKeyArray] = None
+    ) -> ImageArray | PaddedImageArray:
+        # Get potential in the lab frame
+        potential = self.structure.get_potential_in_transformed_frame(
+            apply_translation=False
+        )
+        # Compute the projection image
+        fourier_image = self.integrator.integrate(
+            potential, self.config, outputs_real_space=False
         )
         # Now for the in-plane translation
         fourier_image = self._apply_translation(fourier_image)

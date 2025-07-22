@@ -10,6 +10,7 @@ from ._image_model import (
     ElectronCountsImageModel,
     IntensityImageModel,
     LinearImageModel,
+    ProjectionImageModel as ProjectionImageModel,
 )
 from ._pose import AbstractPose
 from ._potential_integrator import (
@@ -36,7 +37,7 @@ def make_image_model(
     potential: AbstractPotentialRepresentation,
     config: AbstractConfig,
     pose: AbstractPose,
-    transfer_theory: ContrastTransferTheory,
+    transfer_theory: Optional[ContrastTransferTheory] = None,
     integrator: Optional[AbstractPotentialIntegrator] = None,
     detector: Optional[AbstractDetector] = None,
     *,
@@ -104,58 +105,67 @@ def make_image_model(
     # Build the image model
     integrator = _select_default_integrator(potential)
     structure = BasicStructure(potential, pose)
-    if physical_units:
-        scattering_theory = WeakPhaseScatteringTheory(integrator, transfer_theory)
-        if mode == "counts":
-            if not isinstance(config, DoseConfig):
-                raise ValueError(
-                    "If using `mode = 'counts'` to simulate electron counts, "
-                    "pass `config = DoseConfig(...)`. Got config "
-                    f"{type(config).__name__}."
-                )
-            if detector is None:
-                raise ValueError(
-                    "If using `mode = 'counts'` to simulate electron counts, "
-                    "an `AbstractDetector` must be passed."
-                )
-            image_model = ElectronCountsImageModel(
-                structure,
-                config,
-                scattering_theory,
-                detector,
-                normalizes_signal=normalizes_signal,
-                signal_region=signal_region,
-            )
-        elif mode == "contrast":
-            image_model = ContrastImageModel(
-                structure,
-                config,
-                scattering_theory,
-                normalizes_signal=normalizes_signal,
-                signal_region=signal_region,
-            )
-        elif mode == "intensity":
-            image_model = IntensityImageModel(
-                structure,
-                config,
-                scattering_theory,
-                normalizes_signal=normalizes_signal,
-                signal_region=signal_region,
-            )
-        else:
-            raise ValueError(
-                f"`mode = {mode}` not supported. Supported modes for simulating "
-                "physical quantities are 'contrast', 'intensity', and 'counts'."
-            )
-    else:
-        image_model = LinearImageModel(
+    if transfer_theory is None:
+        image_model = ProjectionImageModel(
             structure,
             config,
             integrator,
-            transfer_theory,
             normalizes_signal=normalizes_signal,
             signal_region=signal_region,
         )
+    else:
+        if physical_units:
+            scattering_theory = WeakPhaseScatteringTheory(integrator, transfer_theory)
+            if mode == "counts":
+                if not isinstance(config, DoseConfig):
+                    raise ValueError(
+                        "If using `mode = 'counts'` to simulate electron counts, "
+                        "pass `config = DoseConfig(...)`. Got config "
+                        f"{type(config).__name__}."
+                    )
+                if detector is None:
+                    raise ValueError(
+                        "If using `mode = 'counts'` to simulate electron counts, "
+                        "an `AbstractDetector` must be passed."
+                    )
+                image_model = ElectronCountsImageModel(
+                    structure,
+                    config,
+                    scattering_theory,
+                    detector,
+                    normalizes_signal=normalizes_signal,
+                    signal_region=signal_region,
+                )
+            elif mode == "contrast":
+                image_model = ContrastImageModel(
+                    structure,
+                    config,
+                    scattering_theory,
+                    normalizes_signal=normalizes_signal,
+                    signal_region=signal_region,
+                )
+            elif mode == "intensity":
+                image_model = IntensityImageModel(
+                    structure,
+                    config,
+                    scattering_theory,
+                    normalizes_signal=normalizes_signal,
+                    signal_region=signal_region,
+                )
+            else:
+                raise ValueError(
+                    f"`mode = {mode}` not supported. Supported modes for simulating "
+                    "physical quantities are 'contrast', 'intensity', and 'counts'."
+                )
+        else:
+            image_model = LinearImageModel(
+                structure,
+                config,
+                integrator,
+                transfer_theory,
+                normalizes_signal=normalizes_signal,
+                signal_region=signal_region,
+            )
 
     return image_model
 

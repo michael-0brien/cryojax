@@ -171,7 +171,7 @@ class GaussianMixtureAtomicPotential(AbstractAtomicPotential, strict=True):
     ) -> Float[Array, "{shape[0]} {shape[1]} {shape[2]}"]:
         """Return a voxel grid of the potential in real space.
 
-        See [`PengAtomicPotential.as_real_voxel_grid`](scattering_potential.md#cryojax.simulator.PengAtomicPotential.as_real_voxel_grid)
+        See [`PengAtomicPotential.as_real_voxel_grid`](potential.md#cryojax.simulator.PengAtomicPotential.as_real_voxel_grid)
         for the numerical conventions used when computing the sum of gaussians.
 
         **Arguments:**

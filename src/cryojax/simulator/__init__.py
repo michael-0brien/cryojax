@@ -26,6 +26,7 @@ from ._image_model import (
     ElectronCountsImageModel as ElectronCountsImageModel,
     IntensityImageModel as IntensityImageModel,
     LinearImageModel as LinearImageModel,
+    ProjectionImageModel as ProjectionImageModel,
 )
 from ._pose import (
     AbstractPose as AbstractPose,
