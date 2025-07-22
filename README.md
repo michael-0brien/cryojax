@@ -66,7 +66,7 @@ transfer_theory = cxs.ContrastTransferTheory(ctf, amplitude_contrast_ratio=0.1)
 # Finally, create the configuration and build the image model
 config = cxs.BasicConfig(shape=(320, 320), pixel_size=voxel_size, voltage_in_kilovolts=300.0)
 # Instantiate a cryoJAX `image_model` using the `make_image_model` function
-image_model = make_image_model(potential, config, pose, transfer_theory)
+image_model = cxs.make_image_model(potential, config, pose, transfer_theory)
 # Simulate an image
 image = image_model.simulate(outputs_real_space=True)
 ```

@@ -100,8 +100,8 @@ ParticleStackLike = dict[str, Any] | ParticleStackInfo
 
 
 class StarfileData(TypedDict):
-    particles: pd.DataFrame
     optics: pd.DataFrame
+    particles: pd.DataFrame
 
 
 class MrcfileSettings(TypedDict):
@@ -361,7 +361,7 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
         particle_data.loc[
             particle_data.index[index], particle_data_for_update.columns
         ] = particle_data_for_update.values
-        self._starfile_data = StarfileData(particles=particle_data, optics=optics_data)
+        self._starfile_data = StarfileData(optics=optics_data, particles=particle_data)
 
     @override
     def append(self, value: ParticleParameterLike):
@@ -396,7 +396,7 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
             if len(particle_data) > 0
             else particle_data_to_append
         )
-        self._starfile_data = StarfileData(particles=particle_data, optics=optics_data)
+        self._starfile_data = StarfileData(optics=optics_data, particles=particle_data)
 
     @override
     def save(
@@ -446,7 +446,7 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
                 optics_data, pd.DataFrame
             ):
                 self._starfile_data = StarfileData(
-                    particles=particle_data, optics=optics_data
+                    optics=optics_data, particles=particle_data
                 )
             else:
                 raise ValueError(
@@ -845,7 +845,7 @@ def _load_starfile_data(
                 )
 
     return StarfileData(
-        particles=starfile_data["particles"], optics=starfile_data["optics"]
+        optics=starfile_data["optics"], particles=starfile_data["particles"]
     )
 
 
