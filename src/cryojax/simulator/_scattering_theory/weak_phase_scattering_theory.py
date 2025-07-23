@@ -3,25 +3,25 @@ from typing_extensions import override
 
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
+from .._common_functions import apply_interaction_constant
 from .._config import AbstractConfig
-from .._potential_integrator import AbstractPotentialIntegrator
+from .._potential_integrator import AbstractDirectIntegrator
 from .._potential_representation import AbstractPotentialRepresentation
 from .._solvent import AbstractRandomSolvent
 from .._transfer_theory import ContrastTransferTheory
 from .base_scattering_theory import AbstractWeakPhaseScatteringTheory
-from .common_functions import apply_interaction_constant
 
 
 class WeakPhaseScatteringTheory(AbstractWeakPhaseScatteringTheory, strict=True):
     """Base linear image formation theory."""
 
-    integrator: AbstractPotentialIntegrator
+    integrator: AbstractDirectIntegrator
     transfer_theory: ContrastTransferTheory
     solvent: Optional[AbstractRandomSolvent] = None
 
     def __init__(
         self,
-        integrator: AbstractPotentialIntegrator,
+        integrator: AbstractDirectIntegrator,
         transfer_theory: ContrastTransferTheory,
         solvent: Optional[AbstractRandomSolvent] = None,
     ):

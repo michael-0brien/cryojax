@@ -9,14 +9,14 @@ from typing_extensions import override
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
-from ...ndimage import convert_fftn_to_rfftn, irfftn
-from .._config import AbstractConfig
-from .._potential_representation import RealVoxelCloudPotential, RealVoxelGridPotential
-from .base_potential_integrator import AbstractVoxelPotentialIntegrator
+from ....ndimage import convert_fftn_to_rfftn, irfftn
+from ..._config import AbstractConfig
+from ..._potential_representation import RealVoxelCloudPotential, RealVoxelGridPotential
+from .base_direct_integrator import AbstractDirectVoxelIntegrator
 
 
 class NufftProjection(
-    AbstractVoxelPotentialIntegrator[RealVoxelGridPotential | RealVoxelCloudPotential],
+    AbstractDirectVoxelIntegrator[RealVoxelGridPotential | RealVoxelCloudPotential],
     strict=True,
 ):
     """Integrate points onto the exit plane using non-uniform FFTs."""
@@ -25,6 +25,7 @@ class NufftProjection(
     eps: float
 
     is_projection_approximation: ClassVar[bool] = True
+    requires_inverse_rotation: ClassVar[bool] = False
 
     def __init__(self, *, pixel_rescaling_mode: Optional[str] = None, eps: float = 1e-6):
         """**Arguments:**
@@ -107,7 +108,10 @@ class NufftProjection(
                 "Supported types for `potential` are `RealVoxelGridPotential` and "
                 "`RealVoxelCloudPotential`."
             )
-        fourier_in_plane_potential = self._postprocess_in_plane_potential(
+        # Scale by voxel size to convert from projection to integral
+        fourier_in_plane_potential *= potential.voxel_size
+        # Re-scale to correct pixel size if its different
+        fourier_in_plane_potential = self._maybe_rescale_pixel_size(
             fourier_in_plane_potential, potential, config, input_is_rfft=True
         )
         return (

@@ -67,12 +67,12 @@ class AbstractAtomicPotential(AbstractPotentialRepresentation, strict=True):
 
     atom_positions: eqx.AbstractVar[Float[Array, "n_atoms 3"]]
 
-    def rotate_to_pose(self, pose: AbstractPose) -> Self:
+    def rotate_to_pose(self, pose: AbstractPose, inverse: bool = False) -> Self:
         """Return a new potential with rotated `atom_positions`."""
         return eqx.tree_at(
             lambda d: d.atom_positions,
             self,
-            pose.rotate_coordinates(self.atom_positions),
+            pose.rotate_coordinates(self.atom_positions, inverse=inverse),
         )
 
     def translate_to_pose(self, pose: AbstractPose) -> Self:

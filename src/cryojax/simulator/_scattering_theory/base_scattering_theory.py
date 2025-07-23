@@ -8,6 +8,7 @@ from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
 from ...ndimage import fftn, ifftn, rfftn
 from .._config import AbstractConfig
+from .._potential_integrator import AbstractPotentialIntegrator
 from .._potential_representation import AbstractPotentialRepresentation
 from .._transfer_theory import (
     ContrastTransferTheory,
@@ -17,6 +18,8 @@ from .._transfer_theory import (
 
 class AbstractScatteringTheory(eqx.Module, strict=True):
     """Base class for a scattering theory."""
+
+    integrator: eqx.AbstractVar[AbstractPotentialIntegrator]
 
     @abstractmethod
     def compute_contrast_spectrum(

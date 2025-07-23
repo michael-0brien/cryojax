@@ -14,7 +14,7 @@ from ._image_model import (
 )
 from ._pose import AbstractPose
 from ._potential_integrator import (
-    AbstractPotentialIntegrator,
+    AbstractDirectIntegrator,
     FourierSliceExtraction,
     GaussianMixtureProjection,
     NufftProjection,
@@ -38,7 +38,7 @@ def make_image_model(
     config: AbstractConfig,
     pose: AbstractPose,
     transfer_theory: Optional[ContrastTransferTheory] = None,
-    integrator: Optional[AbstractPotentialIntegrator] = None,
+    integrator: Optional[AbstractDirectIntegrator] = None,
     detector: Optional[AbstractDetector] = None,
     *,
     normalizes_signal: bool = False,
@@ -172,7 +172,7 @@ def make_image_model(
 
 def _select_default_integrator(
     potential: AbstractPotentialRepresentation,
-) -> AbstractPotentialIntegrator:
+) -> AbstractDirectIntegrator:
     if isinstance(potential, (FourierVoxelGridPotential, FourierVoxelSplinePotential)):
         integrator = FourierSliceExtraction()
     elif isinstance(potential, (PengAtomicPotential, GaussianMixtureAtomicPotential)):

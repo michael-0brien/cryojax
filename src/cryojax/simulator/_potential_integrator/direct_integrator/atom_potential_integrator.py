@@ -7,23 +7,23 @@ import jax.numpy as jnp
 import jax.scipy as jsp
 from jaxtyping import Array, Complex, Float
 
-from ...constants import convert_variance_to_b_factor
-from ...coordinates import make_1d_coordinate_grid
-from ...ndimage import (
+from ....constants import convert_variance_to_b_factor
+from ....coordinates import make_1d_coordinate_grid
+from ....ndimage import (
     downsample_to_shape_with_fourier_cropping,
     resize_with_crop_or_pad,
     rfftn,
 )
-from .._config import AbstractConfig
-from .._potential_representation import (
+from ..._config import AbstractConfig
+from ..._potential_representation import (
     GaussianMixtureAtomicPotential,
     PengAtomicPotential,
 )
-from .base_potential_integrator import AbstractPotentialIntegrator
+from .base_direct_integrator import AbstractDirectIntegrator
 
 
 class GaussianMixtureProjection(
-    AbstractPotentialIntegrator[GaussianMixtureAtomicPotential | PengAtomicPotential],
+    AbstractDirectIntegrator[GaussianMixtureAtomicPotential | PengAtomicPotential],
     strict=True,
 ):
     upsampling_factor: Optional[int]
@@ -32,6 +32,7 @@ class GaussianMixtureProjection(
     n_batches: int
 
     is_projection_approximation: ClassVar[bool] = True
+    requires_inverse_rotation: ClassVar[bool] = False
 
     def __init__(
         self,

@@ -6,13 +6,13 @@ from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
 from ...internal import error_if_not_fractional
 from ...ndimage import ifftn, irfftn
+from .._common_functions import apply_amplitude_contrast_ratio, apply_interaction_constant
 from .._config import AbstractConfig
-from .._potential_integrator import AbstractPotentialIntegrator
+from .._potential_integrator import AbstractDirectIntegrator
 from .._potential_representation import AbstractPotentialRepresentation
 from .._solvent import AbstractRandomSolvent
 from .._transfer_theory import WaveTransferTheory
 from .base_scattering_theory import AbstractWaveScatteringTheory
-from .common_functions import apply_amplitude_contrast_ratio, apply_interaction_constant
 
 
 class HighEnergyScatteringTheory(AbstractWaveScatteringTheory, strict=True):
@@ -27,14 +27,14 @@ class HighEnergyScatteringTheory(AbstractWaveScatteringTheory, strict=True):
       Optics, Volume 4: Advanced Wave Optics. Academic Press, 2022.*
     """
 
-    integrator: AbstractPotentialIntegrator
+    integrator: AbstractDirectIntegrator
     transfer_theory: WaveTransferTheory
     solvent: Optional[AbstractRandomSolvent]
     amplitude_contrast_ratio: Float[Array, ""]
 
     def __init__(
         self,
-        integrator: AbstractPotentialIntegrator,
+        integrator: AbstractDirectIntegrator,
         transfer_theory: WaveTransferTheory,
         solvent: Optional[AbstractRandomSolvent] = None,
         amplitude_contrast_ratio: float | Float[Array, ""] = 0.1,

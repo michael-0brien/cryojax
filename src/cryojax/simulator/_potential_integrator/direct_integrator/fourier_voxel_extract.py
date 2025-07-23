@@ -8,7 +8,7 @@ from typing_extensions import override
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
-from ...ndimage import (
+from ....ndimage import (
     convert_fftn_to_rfftn,
     fftn,
     ifftn,
@@ -17,16 +17,16 @@ from ...ndimage import (
     map_coordinates_with_cubic_spline,
     rfftn,
 )
-from ...ndimage.transforms import InverseSincMask
-from .._config import AbstractConfig
-from .._potential_representation import (
+from ....ndimage.transforms import InverseSincMask
+from ..._config import AbstractConfig
+from ..._potential_representation import (
     FourierVoxelGridPotential,
     FourierVoxelSplinePotential,
 )
-from .base_potential_integrator import AbstractVoxelPotentialIntegrator
+from .base_direct_integrator import AbstractDirectVoxelIntegrator
 
 
-class FourierSliceExtraction(AbstractVoxelPotentialIntegrator, strict=True):
+class FourierSliceExtraction(AbstractDirectVoxelIntegrator, strict=True):
     """Integrate points to the exit plane using the Fourier projection-slice theorem.
 
     This extracts slices using interpolation methods housed in
@@ -39,6 +39,7 @@ class FourierSliceExtraction(AbstractVoxelPotentialIntegrator, strict=True):
     fill_value: complex
 
     is_projection_approximation: ClassVar[bool] = True
+    requires_inverse_rotation: ClassVar[bool] = True
 
     def __init__(
         self,
@@ -128,7 +129,10 @@ class FourierSliceExtraction(AbstractVoxelPotentialIntegrator, strict=True):
                     irfftn(fourier_in_plane_potential, s=(N, N))
                 )
             )
-        fourier_in_plane_potential = self._postprocess_in_plane_potential(
+        # Scale by voxel size to convert from projection to integral
+        fourier_in_plane_potential *= potential.voxel_size
+        # Re-scale to correct pixel size if its different
+        fourier_in_plane_potential = self._maybe_rescale_pixel_size(
             fourier_in_plane_potential, potential, config, input_is_rfft=True
         )
         return (
@@ -214,7 +218,7 @@ class FourierSliceExtraction(AbstractVoxelPotentialIntegrator, strict=True):
         return fourier_slice
 
 
-class EwaldSphereExtraction(AbstractVoxelPotentialIntegrator, strict=True):
+class EwaldSphereExtraction(AbstractDirectVoxelIntegrator, strict=True):
     """Integrate points to the exit plane by extracting a surface of the ewald
     sphere in fourier space.
 
@@ -228,6 +232,7 @@ class EwaldSphereExtraction(AbstractVoxelPotentialIntegrator, strict=True):
     fill_value: complex
 
     is_projection_approximation: ClassVar[bool] = False
+    requires_inverse_rotation: ClassVar[bool] = True
 
     def __init__(
         self,
@@ -314,11 +319,11 @@ class EwaldSphereExtraction(AbstractVoxelPotentialIntegrator, strict=True):
             ewald_sphere_surface = fftn(
                 config.crop_or_pad_to_padded_shape(ifftn(ewald_sphere_surface, s=(N, N)))
             )
-        ewald_sphere_surface = self._postprocess_in_plane_potential(
-            ewald_sphere_surface,
-            potential,
-            config,
-            input_is_rfft=False,
+        # Scale by voxel size to convert from projection to integral
+        ewald_sphere_surface *= potential.voxel_size
+        # Re-scale to correct pixel size if its different
+        ewald_sphere_surface = self._maybe_rescale_pixel_size(
+            ewald_sphere_surface, potential, config, input_is_rfft=False
         )
         return (
             irfftn(ewald_sphere_surface, s=config.padded_shape)

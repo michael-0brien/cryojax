@@ -13,7 +13,7 @@ from jaxtyping import Array, Bool, Complex, Float, PRNGKeyArray
 from ...ndimage import irfftn, rfftn
 from ...ndimage.transforms import FilterLike, MaskLike
 from .._config import AbstractConfig
-from .._potential_integrator import AbstractPotentialIntegrator
+from .._potential_integrator import AbstractDirectIntegrator
 from .._structure import AbstractStructure
 from .._transfer_theory import ContrastTransferTheory
 
@@ -193,7 +193,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
     """An simple image model in linear image formation theory."""
 
     structure: AbstractStructure
-    integrator: AbstractPotentialIntegrator
+    integrator: AbstractDirectIntegrator
     transfer_theory: ContrastTransferTheory
     config: AbstractConfig
 
@@ -204,7 +204,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
         self,
         structure: AbstractStructure,
         config: AbstractConfig,
-        integrator: AbstractPotentialIntegrator,
+        integrator: AbstractDirectIntegrator,
         transfer_theory: ContrastTransferTheory,
         *,
         normalizes_signal: bool = False,
@@ -241,7 +241,8 @@ class LinearImageModel(AbstractImageModel, strict=True):
     ) -> ImageArray | PaddedImageArray:
         # Get potential in the lab frame
         potential = self.structure.get_potential_in_transformed_frame(
-            apply_translation=False
+            apply_translation=False,
+            apply_inverse_rotation=self.integrator.requires_inverse_rotation,
         )
         # Compute the projection image
         fourier_image = self.integrator.integrate(
@@ -264,7 +265,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
     """An simple image model for computing a projection."""
 
     structure: AbstractStructure
-    integrator: AbstractPotentialIntegrator
+    integrator: AbstractDirectIntegrator
     config: AbstractConfig
 
     normalizes_signal: bool
@@ -274,7 +275,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
         self,
         structure: AbstractStructure,
         config: AbstractConfig,
-        integrator: AbstractPotentialIntegrator,
+        integrator: AbstractDirectIntegrator,
         *,
         normalizes_signal: bool = False,
         signal_region: Optional[Bool[Array, "_ _"]] = None,
@@ -308,7 +309,8 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
     ) -> ImageArray | PaddedImageArray:
         # Get potential in the lab frame
         potential = self.structure.get_potential_in_transformed_frame(
-            apply_translation=False
+            apply_translation=False,
+            apply_inverse_rotation=self.integrator.requires_inverse_rotation,
         )
         # Compute the projection image
         fourier_image = self.integrator.integrate(

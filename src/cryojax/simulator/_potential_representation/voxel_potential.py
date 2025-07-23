@@ -107,12 +107,12 @@ class FourierVoxelGridPotential(AbstractFourierVoxelGridPotential):
             self.frequency_slice_in_pixels, 1 / self.voxel_size
         )
 
-    def rotate_to_pose(self, pose: AbstractPose) -> Self:
+    def rotate_to_pose(self, pose: AbstractPose, inverse: bool = False) -> Self:
         """Return a new potential with a rotated `frequency_slice_in_pixels`."""
         return eqx.tree_at(
             lambda d: d.frequency_slice_in_pixels,
             self,
-            pose.rotate_coordinates(self.frequency_slice_in_pixels, inverse=True),
+            pose.rotate_coordinates(self.frequency_slice_in_pixels, inverse=inverse),
         )
 
     @classmethod
@@ -222,12 +222,12 @@ class FourierVoxelSplinePotential(AbstractFourierVoxelGridPotential):
             self.frequency_slice_in_pixels, 1 / self.voxel_size
         )
 
-    def rotate_to_pose(self, pose: AbstractPose) -> Self:
+    def rotate_to_pose(self, pose: AbstractPose, inverse: bool = False) -> Self:
         """Return a new potential with a rotated `frequency_slice_in_pixels`."""
         return eqx.tree_at(
             lambda d: d.frequency_slice_in_pixels,
             self,
-            pose.rotate_coordinates(self.frequency_slice_in_pixels, inverse=True),
+            pose.rotate_coordinates(self.frequency_slice_in_pixels, inverse=inverse),
         )
 
     @classmethod
@@ -329,14 +329,14 @@ class RealVoxelGridPotential(AbstractVoxelPotential, strict=True):
             self.coordinate_grid_in_pixels, self.voxel_size
         )
 
-    def rotate_to_pose(self, pose: AbstractPose) -> Self:
+    def rotate_to_pose(self, pose: AbstractPose, inverse: bool = False) -> Self:
         """Return a new potential with a rotated
         `coordinate_grid_in_pixels`.
         """
         return eqx.tree_at(
             lambda d: d.coordinate_grid_in_pixels,
             self,
-            pose.rotate_coordinates(self.coordinate_grid_in_pixels, inverse=False),
+            pose.rotate_coordinates(self.coordinate_grid_in_pixels, inverse=inverse),
         )
 
     @classmethod
@@ -425,14 +425,14 @@ class RealVoxelCloudPotential(AbstractVoxelPotential, strict=True):
             self.coordinate_list_in_pixels, self.voxel_size
         )
 
-    def rotate_to_pose(self, pose: AbstractPose) -> Self:
+    def rotate_to_pose(self, pose: AbstractPose, inverse: bool = False) -> Self:
         """Return a new potential with a rotated
         `coordinate_list_in_pixels`.
         """
         return eqx.tree_at(
             lambda d: d.coordinate_list_in_pixels,
             self,
-            pose.rotate_coordinates(self.coordinate_list_in_pixels, inverse=False),
+            pose.rotate_coordinates(self.coordinate_list_in_pixels, inverse=inverse),
         )
 
     @classmethod

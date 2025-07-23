@@ -25,11 +25,13 @@ class AbstractStructure(eqx.Module, strict=True):
         raise NotImplementedError
 
     def get_potential_in_transformed_frame(
-        self, *, apply_translation: bool = False
+        self, *, apply_translation: bool = False, apply_inverse_rotation: bool = False
     ) -> AbstractPotentialRepresentation:
         """Get the scattering potential, transformed by the pose."""
         potential = self.get_potential_in_body_frame()
-        transformed_potential = potential.rotate_to_pose(self.pose)
+        transformed_potential = potential.rotate_to_pose(
+            self.pose, inverse=apply_inverse_rotation
+        )
         if isinstance(transformed_potential, AbstractAtomicPotential):
             if apply_translation:
                 transformed_potential = transformed_potential.translate_to_pose(self.pose)

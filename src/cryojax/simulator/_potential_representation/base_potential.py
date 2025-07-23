@@ -16,7 +16,7 @@ class AbstractPotentialRepresentation(Module, strict=True):
     """
 
     @abstractmethod
-    def rotate_to_pose(self, pose: AbstractPose) -> Self:
+    def rotate_to_pose(self, pose: AbstractPose, inverse: bool = False) -> Self:
         """Return a new `AbstractPotentialRepresentation` at the given pose.
 
         **Arguments:**

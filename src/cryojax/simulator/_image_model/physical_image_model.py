@@ -72,7 +72,9 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
         self, rng_key: Optional[PRNGKeyArray] = None
     ) -> ImageArray | PaddedImageArray:
         # Get the potential
-        potential = self.structure.get_potential_in_transformed_frame()
+        potential = self.structure.get_potential_in_transformed_frame(
+            apply_inverse_rotation=self.scattering_theory.integrator.requires_inverse_rotation
+        )
         # Compute the squared wavefunction
         contrast_spectrum = self.scattering_theory.compute_contrast_spectrum(
             potential,
@@ -133,7 +135,9 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
     def compute_fourier_image(
         self, rng_key: Optional[PRNGKeyArray] = None
     ) -> ImageArray | PaddedImageArray:
-        potential = self.structure.get_potential_in_transformed_frame()
+        potential = self.structure.get_potential_in_transformed_frame(
+            apply_inverse_rotation=self.scattering_theory.integrator.requires_inverse_rotation
+        )
         scattering_theory = self.scattering_theory
         fourier_intensity = scattering_theory.compute_intensity_spectrum(
             potential,
@@ -196,7 +200,9 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
     def compute_fourier_image(
         self, rng_key: Optional[PRNGKeyArray] = None
     ) -> ImageArray | PaddedImageArray:
-        potential = self.structure.get_potential_in_transformed_frame()
+        potential = self.structure.get_potential_in_transformed_frame(
+            apply_inverse_rotation=self.scattering_theory.integrator.requires_inverse_rotation
+        )
         if rng_key is None:
             # Compute the squared wavefunction
             scattering_theory = self.scattering_theory

@@ -1,10 +1,7 @@
-"""Functions common to multiple scattering theories."""
-
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float, Inexact
 
 
-# Not currently public API
 def apply_interaction_constant(
     integrated_potential: Inexact[Array, "y_dim x_dim"],
     wavelength_in_angstroms: Float[Array, ""] | float,
@@ -46,7 +43,6 @@ def apply_interaction_constant(
     return integrated_potential * jnp.asarray(wavelength_in_angstroms) / (4 * jnp.pi)
 
 
-# Not currently public API
 def apply_amplitude_contrast_ratio(
     integrated_potential: Float[Array, "y_dim x_dim"] | Complex[Array, "y_dim x_dim"],
     amplitude_contrast_ratio: Float[Array, ""] | float,

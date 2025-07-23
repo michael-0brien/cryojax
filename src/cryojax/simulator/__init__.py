@@ -1,4 +1,8 @@
 from ._api_utils import make_image_model as make_image_model
+from ._common_functions import (
+    apply_amplitude_contrast_ratio as apply_amplitude_contrast_ratio,
+    apply_interaction_constant as apply_interaction_constant,
+)
 from ._config import (
     AbstractConfig as AbstractConfig,
     BasicConfig as BasicConfig,
@@ -35,8 +39,9 @@ from ._pose import (
     QuaternionPose as QuaternionPose,
 )
 from ._potential_integrator import (
+    AbstractDirectIntegrator as AbstractDirectIntegrator,
+    AbstractDirectVoxelIntegrator as AbstractDirectVoxelIntegrator,
     AbstractPotentialIntegrator as AbstractPotentialIntegrator,
-    AbstractVoxelPotentialIntegrator as AbstractVoxelPotentialIntegrator,
     FourierSliceExtraction as FourierSliceExtraction,
     GaussianMixtureProjection as GaussianMixtureProjection,
     NufftProjection as NufftProjection,
@@ -57,8 +62,6 @@ from ._scattering_theory import (
     AbstractScatteringTheory as AbstractScatteringTheory,
     AbstractWeakPhaseScatteringTheory as AbstractWeakPhaseScatteringTheory,
     WeakPhaseScatteringTheory as WeakPhaseScatteringTheory,
-    apply_amplitude_contrast_ratio as apply_amplitude_contrast_ratio,
-    apply_interaction_constant as apply_interaction_constant,
 )
 from ._solvent import AbstractRandomSolvent as AbstractRandomSolvent
 from ._structure import (
