@@ -1,6 +1,6 @@
 # Welcome to cryoJAX!
 
-CryoJAX is a library that simulates cryo-electron microscopy (cryo-EM) images in [JAX](https://jax.readthedocs.io/en/latest/). Its purpose is to provide the tools for building downstream data analysis in external workflows and libraries that leverage the statistical inference and machine learning resources of the JAX scientific computing ecosystem. To achieve this, image simulation in cryoJAX is built for reliability and flexibility: it implements a variety of established models and algorithms as well as a framework for implementing new models and algorithms downstream. If your application uses cryo-EM image simulation and it cannot be built downstream, open a [Pull Request](https://github.com/mjo22/cryojax/pulls).
+CryoJAX is a library that simulates cryo-electron microscopy (cryo-EM) images in [JAX](https://jax.readthedocs.io/en/latest/). Its purpose is to provide the tools for building downstream data analysis in external workflows and libraries that leverage the statistical inference and machine learning resources of the JAX scientific computing ecosystem. To achieve this, image simulation in cryoJAX is built for reliability and flexibility: it implements a variety of established models and algorithms as well as a framework for implementing new models and algorithms downstream. If your application uses cryo-EM image simulation and it cannot be built downstream, open a [pull request](https://github.com/mjo22/cryojax/pulls).
 
 This documentation is currently a work-in-progress. Your patience while we get this project properly documented is much appreciated! Feel free to get in touch on github [issues](https://github.com/mjo22/cryojax/issues) if you have any questions, bug reports, or feature requests.
 
@@ -43,7 +43,7 @@ from cryojax.io import read_array_with_spacing_from_mrc
 filename = "example_scattering_potential.mrc"
 real_voxel_grid, voxel_size = read_array_from_mrc(filename, loads_spacing=True)
 potential = cxs.FourierVoxelGridPotential.from_real_voxel_grid(real_voxel_grid, voxel_size)
-# Now, the pose. Angles are given in degrees.
+# The pose. Angles are given in degrees.
 pose = cxs.EulerAnglePose(
     offset_x_in_angstroms=5.0,
     offset_y_in_angstroms=-3.0,
@@ -51,15 +51,15 @@ pose = cxs.EulerAnglePose(
     theta_angle=80.0,
     psi_angle=-10.0,
 )
-# Next the model for the CTF
-ctf = cxs.AberratedAstigmaticCTF(
+# The model for the CTF
+ctf = cxs.CTF(
     defocus_in_angstroms=9800.0, astigmatism_in_angstroms=200.0, astigmatism_angle=10.0
 )
 transfer_theory = cxs.ContrastTransferTheory(ctf, amplitude_contrast_ratio=0.1)
-# Finally, create the configuration and build the image model
+# The image configuration
 config = cxs.BasicConfig(shape=(320, 320), pixel_size=voxel_size, voltage_in_kilovolts=300.0)
 # Instantiate a cryoJAX `image_model` using the `make_image_model` function
-image_model = make_image_model(potential, config, pose, transfer_theory)
+image_model = cxs.make_image_model(potential, config, pose, transfer_theory)
 # Simulate an image
 image = image_model.simulate(outputs_real_space=True)
 ```
@@ -68,7 +68,9 @@ For more advanced image simulation examples and to understand the many features 
 
 ## JAX transformations
 
-CryoJAX is built on JAX to make use of JIT-compilation, automatic differentiation, and vectorization for cryo-EM data analysis. Below are examples of each in cryoJAX's recommended pattern of performing these transformations on image simulation. To learn more about how `equinox` assists with JAX transformations, see [here](https://docs.kidger.site/equinox/all-of-equinox/#2-filtering).
+CryoJAX is built on JAX to make use of JIT-compilation, automatic differentiation, and vectorization for cryo-EM data analysis. JAX implements these operations as *function transformations*. If you aren't familiar with this concept, see the [JAX documentation](https://docs.jax.dev/en/latest/key-concepts.html#transformations).
+
+Below are examples of implementing these transformations using [`equinox`](https://docs.kidger.site/equinox/), a popular JAX library for PyTorch-like classes that smoothly integrate with JAX functional programming. To learn more about how `equinox` assists with JAX transformations, see [here](https://docs.kidger.site/equinox/all-of-equinox/#2-filtering).
 
 ### Your first JIT compiled function
 
@@ -151,4 +153,4 @@ images = simulate_fn_vmap(model_vmap, model_novmap)
 ## Acknowledgements
 
 - `cryojax` implementations of several models and algorithms, such as the CTF, fourier slice extraction, and electrostatic potential computations has been informed by the open-source cryo-EM software [`cisTEM`](https://github.com/timothygrant80/cisTEM).
-- `cryojax` is built on [`equinox`](https://github.com/patrick-kidger/equinox/), a popular JAX library for PyTorch-like classes that smoothly integrate with JAX functional programming. We highly recommend learning about `equinox` to fully make use of the power of `jax`.
+- `cryojax` is built using `equinox`, a popular JAX library for PyTorch-like classes that smoothly integrate with JAX functional programming. We highly recommend learning about `equinox` to fully make use of the power of `jax`.
