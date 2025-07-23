@@ -50,7 +50,7 @@ from cryojax.io import read_array_with_spacing_from_mrc
 filename = "example_scattering_potential.mrc"
 real_voxel_grid, voxel_size = read_array_from_mrc(filename, loads_spacing=True)
 potential = cxs.FourierVoxelGridPotential.from_real_voxel_grid(real_voxel_grid, voxel_size)
-# Now, the pose. Angles are given in degrees.
+# The pose. Angles are given in degrees.
 pose = cxs.EulerAnglePose(
     offset_x_in_angstroms=5.0,
     offset_y_in_angstroms=-3.0,
@@ -58,12 +58,12 @@ pose = cxs.EulerAnglePose(
     theta_angle=80.0,
     psi_angle=-10.0,
 )
-# Next the model for the CTF
+# The model for the CTF
 ctf = cxs.CTF(
     defocus_in_angstroms=9800.0, astigmatism_in_angstroms=200.0, astigmatism_angle=10.0
 )
 transfer_theory = cxs.ContrastTransferTheory(ctf, amplitude_contrast_ratio=0.1)
-# Finally, create the configuration and build the image model
+# The image configuration
 config = cxs.BasicConfig(shape=(320, 320), pixel_size=voxel_size, voltage_in_kilovolts=300.0)
 # Instantiate a cryoJAX `image_model` using the `make_image_model` function
 image_model = cxs.make_image_model(potential, config, pose, transfer_theory)
@@ -75,7 +75,7 @@ For more advanced image simulation examples and to understand the many features 
 
 ## JAX transformations
 
-CryoJAX is built on JAX to make use of JIT-compilation, automatic differentiation, and vectorization for cryo-EM data analysis. Below are examples of each in cryoJAX's recommended pattern of performing these transformations on image simulation. To learn more about how `equinox` assists with JAX transformations, see [here](https://docs.kidger.site/equinox/all-of-equinox/#2-filtering).
+CryoJAX is built on JAX to make use of JIT-compilation, automatic differentiation, and vectorization for cryo-EM data analysis. Below are examples of each in cryoJAX's recommended pattern of performing these transformations on image simulation leveraging [`equinox`](https://docs.kidger.site/equinox/). To learn more about how `equinox` assists with JAX transformations, see [here](https://docs.kidger.site/equinox/all-of-equinox/#2-filtering).
 
 ### Your first JIT compiled function
 
