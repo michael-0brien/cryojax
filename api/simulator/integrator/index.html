@@ -1984,7 +1984,7 @@ the exit plane.</p>
 
 
 <h5 id="cryojax.simulator.FourierSliceExtraction.__init__" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierSliceExtraction</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">pixel_rescaling_mode</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">correction_mask</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">InverseSincMask</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">out_of_bounds_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;fill&#39;</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="nb">complex</span> <span class="o">=</span> <span class="mf">0.0</span> <span class="o">+</span> <span class="mi">0</span><span class="n">j</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierSliceExtraction</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">checks_pixel_size</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">correction_mask</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">InverseSincMask</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">out_of_bounds_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;fill&#39;</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="nb">complex</span> <span class="o">=</span> <span class="mf">0.0</span> <span class="o">+</span> <span class="mi">0</span><span class="n">j</span><span class="p">)</span></code>
 
 <a href="#cryojax.simulator.FourierSliceExtraction.__init__" class="headerlink" title="Permanent link">¤</a></h5>
 
@@ -1993,9 +1993,11 @@ the exit plane.</p>
 
         <p><strong>Arguments:</strong></p>
 <ul>
-<li><code>pixel_rescaling_mode</code>:
-    Method for rescaling the final image to the <code>AbstractConfig</code>
-    pixel size. See <code>cryojax.image.rescale_pixel_size</code> for documentation.</li>
+<li><code>checks_pixel_size</code>:
+    If <code>True</code>, check at run-time if the <code>config.pixel_size</code>
+    matches the <code>potential.voxel_size</code>. If <code>False</code>, this is
+    not checked and will return incorrect results if they
+    do not match.</li>
 <li><code>correction_mask</code>:
     A <code>cryojax.image.operators.SincCorrectionMask</code> for performing
     sinc-correction on the linear-interpolated projections. This
@@ -2178,7 +2180,7 @@ of a voxel-based representation in fourier-space, using fourier slice extraction
 
 
 <h5 id="cryojax.simulator.NufftProjection.__init__" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">NufftProjection</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">pixel_rescaling_mode</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">eps</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-06</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">NufftProjection</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">checks_pixel_size</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">eps</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-06</span><span class="p">)</span></code>
 
 <a href="#cryojax.simulator.NufftProjection.__init__" class="headerlink" title="Permanent link">¤</a></h5>
 
@@ -2187,11 +2189,14 @@ of a voxel-based representation in fourier-space, using fourier slice extraction
 
         <p><strong>Arguments:</strong></p>
 <ul>
-<li><code>pixel_rescaling_mode</code>: Method for interpolating the final image to
-                            the <code>AbstractConfig</code> pixel size. See
-                            <code>cryojax.image.rescale_pixel_size</code> for documentation.</li>
-<li><code>eps</code>: See <a href="https://github.com/flatironinstitute/jax-finufft"><code>jax-finufft</code></a>
-         for documentation.</li>
+<li><code>checks_pixel_size</code>:
+    If <code>True</code>, check at run-time if the <code>config.pixel_size</code>
+    matches the <code>potential.voxel_size</code>. If <code>False</code>, this is
+    not checked and will return incorrect results if they
+    do not match.</li>
+<li><code>eps</code>:
+    See <a href="https://github.com/flatironinstitute/jax-finufft"><code>jax-finufft</code></a>
+    for documentation.</li>
 </ul>
 
 
