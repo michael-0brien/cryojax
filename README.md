@@ -75,7 +75,7 @@ For more advanced image simulation examples and to understand the many features 
 
 ## JAX transformations
 
-CryoJAX is built on JAX to make use of JIT-compilation, automatic differentiation, and vectorization for cryo-EM data analysis. These operations are implemented as function transformations in JAX. If you aren't familiar with these transformations, see the [JAX documentation](https://docs.jax.dev/en/latest/key-concepts.html#transformations).
+CryoJAX is built on JAX to make use of JIT-compilation, automatic differentiation, and vectorization for cryo-EM data analysis. JAX implements these operations as *function transformations*. If you aren't familiar with this concept, see the [JAX documentation](https://docs.jax.dev/en/latest/key-concepts.html#transformations).
 
 Below are examples of implementing these transformations leveraging the package [`equinox`](https://docs.kidger.site/equinox/). To learn more about how `equinox` assists with JAX transformations, see [here](https://docs.kidger.site/equinox/all-of-equinox/#2-filtering).
 
