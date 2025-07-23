@@ -36,7 +36,7 @@ The following is a basic workflow to simulate an image.
 import jax
 import jax.numpy as jnp
 import cryojax.simulator as cxs
-from cryojax.io import read_array_with_spacing_from_mrc
+from cryojax.io import read_array_from_mrc
 
 # Instantiate the scattering potential from a voxel grid. See the documentation
 # for how to generate voxel grids from a PDB
