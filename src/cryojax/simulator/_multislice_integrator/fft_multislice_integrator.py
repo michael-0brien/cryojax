@@ -93,6 +93,12 @@ class FFTMultisliceIntegrator(
                 potential.coordinate_grid_in_pixels,
                 **self.options_for_interpolation,
             )
+        else:
+            raise TypeError(
+                f"FFTMultisliceIntegrator.integrate only supports "
+                f"`AbstractAtomicPotential` and `RealVoxelGridPotential`, "
+                f"not `{type(potential).__name__}`."
+            )
         # Initialize multislice geometry
         n_slices = z_dim // self.slice_thickness_in_voxels
         slice_thickness = voxel_size * self.slice_thickness_in_voxels
