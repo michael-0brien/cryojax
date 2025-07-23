@@ -12,7 +12,7 @@ from typing import List, Sequence, Tuple
 
 import jax.numpy as jnp
 import lineax as lx
-from jax import lax, util, vmap
+from jax import lax, vmap
 from jaxtyping import Array, ArrayLike
 
 
@@ -114,7 +114,7 @@ def _map_coordinates_nn_or_linear(
         interpolations_1d.append(interp_nodes)
     outputs = []
     for items in itertools.product(*interpolations_1d):
-        indices, weights = util.unzip2(items)
+        indices, weights = _unzip2(items)
         contribution = input_arr.at[indices].get(mode=mode, fill_value=cval)
         interpolated = _nonempty_prod(weights) * contribution
         outputs.append(interpolated)
@@ -249,3 +249,15 @@ def _spline_point(
     indices = jnp.array(jnp.meshgrid(*index_vals, indexing="ij"))
     fn = lambda index: _spline_value(coefficients, coordinate, index, mode, cval)
     return vmap(fn)(indices.reshape(coefficients.ndim, -1).T).sum()
+
+
+#
+# Utilities
+#
+def _unzip2(xys):
+    xs = []
+    ys = []
+    for x, y in xys:
+        xs.append(x)
+        ys.append(y)
+    return tuple(xs), tuple(ys)
