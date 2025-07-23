@@ -1042,7 +1042,7 @@ def test_write_simulated_image_stack_from_starfile_nojit(sample_starfile_path):
         mode="r",
     )
     images = particle_dataset[:]["images"]
-    np.testing.assert_allclose(
+    assert jnp.allclose(
         images,
         true_images / np.linalg.norm(true_images, axis=(1, 2), keepdims=True),
     )
