@@ -3,7 +3,7 @@ Using non-uniform FFTs for computing volume projections.
 """
 
 import math
-from typing import ClassVar, Optional
+from typing import ClassVar
 from typing_extensions import override
 
 import jax.numpy as jnp
@@ -21,22 +21,25 @@ class NufftProjection(
 ):
     """Integrate points onto the exit plane using non-uniform FFTs."""
 
-    pixel_rescaling_mode: Optional[str]
     eps: float
+    checks_pixel_size: bool
 
     is_projection_approximation: ClassVar[bool] = True
     requires_inverse_rotation: ClassVar[bool] = False
 
-    def __init__(self, *, pixel_rescaling_mode: Optional[str] = None, eps: float = 1e-6):
+    def __init__(self, *, checks_pixel_size: bool = True, eps: float = 1e-6):
         """**Arguments:**
 
-        - `pixel_rescaling_mode`: Method for interpolating the final image to
-                                    the `AbstractConfig` pixel size. See
-                                    `cryojax.image.rescale_pixel_size` for documentation.
-        - `eps`: See [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft)
-                 for documentation.
+        - `checks_pixel_size`:
+            If `True`, check at run-time if the `config.pixel_size`
+            matches the `potential.voxel_size`. If `False`, this is
+            not checked and will return incorrect results if they
+            do not match.
+        - `eps`:
+            See [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft)
+            for documentation.
         """
-        self.pixel_rescaling_mode = pixel_rescaling_mode
+        self.checks_pixel_size = checks_pixel_size
         self.eps = eps
 
     def project_voxel_cloud_with_nufft(
@@ -105,15 +108,18 @@ class NufftProjection(
             )
         else:
             raise ValueError(
-                "Supported types for `potential` are `RealVoxelGridPotential` and "
+                "Supported type for `potential` is `RealVoxelGridPotential` and "
                 "`RealVoxelCloudPotential`."
             )
         # Scale by voxel size to convert from projection to integral
         fourier_in_plane_potential *= potential.voxel_size
         # Re-scale to correct pixel size if its different
-        fourier_in_plane_potential = self._maybe_rescale_pixel_size(
-            fourier_in_plane_potential, potential, config, input_is_rfft=True
-        )
+        if self.checks_pixel_size:
+            fourier_in_plane_potential = self._check_pixel_size(
+                fourier_in_plane_potential,
+                potential,
+                config,
+            )
         return (
             irfftn(fourier_in_plane_potential, s=config.padded_shape)
             if outputs_real_space

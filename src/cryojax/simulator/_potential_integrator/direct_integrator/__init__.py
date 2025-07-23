@@ -1,4 +1,4 @@
-from .atom_potential_integrator import (
+from .atom_integrator import (
     GaussianMixtureProjection as GaussianMixtureProjection,
 )
 from .base_direct_integrator import (

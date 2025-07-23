@@ -33,7 +33,7 @@ class FourierSliceExtraction(AbstractDirectVoxelIntegrator, strict=True):
     `cryojax.image.map_coordinates` and `cryojax.image.map_coordinates_with_cubic_spline`.
     """
 
-    pixel_rescaling_mode: Optional[str]
+    checks_pixel_size: bool
     correction_mask: Optional[InverseSincMask]
     out_of_bounds_mode: str
     fill_value: complex
@@ -44,16 +44,18 @@ class FourierSliceExtraction(AbstractDirectVoxelIntegrator, strict=True):
     def __init__(
         self,
         *,
-        pixel_rescaling_mode: Optional[str] = None,
+        checks_pixel_size: bool = True,
         correction_mask: Optional[InverseSincMask] = None,
         out_of_bounds_mode: str = "fill",
         fill_value: complex = 0.0 + 0.0j,
     ):
         """**Arguments:**
 
-        - `pixel_rescaling_mode`:
-            Method for rescaling the final image to the `AbstractConfig`
-            pixel size. See `cryojax.image.rescale_pixel_size` for documentation.
+        - `checks_pixel_size`:
+            If `True`, check at run-time if the `config.pixel_size`
+            matches the `potential.voxel_size`. If `False`, this is
+            not checked and will return incorrect results if they
+            do not match.
         - `correction_mask`:
             A `cryojax.image.operators.SincCorrectionMask` for performing
             sinc-correction on the linear-interpolated projections. This
@@ -66,7 +68,7 @@ class FourierSliceExtraction(AbstractDirectVoxelIntegrator, strict=True):
             Value for filling out-of-bounds indices. Used only when
             `out_of_bounds_mode = "fill"`.
         """
-        self.pixel_rescaling_mode = pixel_rescaling_mode
+        self.checks_pixel_size = checks_pixel_size
         self.correction_mask = correction_mask
         self.out_of_bounds_mode = out_of_bounds_mode
         self.fill_value = fill_value
@@ -132,9 +134,10 @@ class FourierSliceExtraction(AbstractDirectVoxelIntegrator, strict=True):
         # Scale by voxel size to convert from projection to integral
         fourier_in_plane_potential *= potential.voxel_size
         # Re-scale to correct pixel size if its different
-        fourier_in_plane_potential = self._maybe_rescale_pixel_size(
-            fourier_in_plane_potential, potential, config, input_is_rfft=True
-        )
+        if self.checks_pixel_size:
+            fourier_in_plane_potential = self._check_pixel_size(
+                fourier_in_plane_potential, potential, config
+            )
         return (
             irfftn(fourier_in_plane_potential, s=config.padded_shape)
             if outputs_real_space
@@ -226,7 +229,6 @@ class EwaldSphereExtraction(AbstractDirectVoxelIntegrator, strict=True):
     `cryojax.image.map_coordinates` and `cryojax.image.map_coordinates_with_cubic_spline`.
     """
 
-    pixel_rescaling_mode: Optional[str]
     correction_mask: Optional[InverseSincMask]
     out_of_bounds_mode: str
     fill_value: complex
@@ -237,16 +239,18 @@ class EwaldSphereExtraction(AbstractDirectVoxelIntegrator, strict=True):
     def __init__(
         self,
         *,
-        pixel_rescaling_mode: Optional[str] = None,
+        checks_pixel_size: bool = True,
         correction_mask: Optional[InverseSincMask] = None,
         out_of_bounds_mode: str = "fill",
         fill_value: complex = 0.0 + 0.0j,
     ):
         """**Arguments:**
 
-        - `pixel_rescaling_mode`:
-            Method for rescaling the final image to the `AbstractConfig`
-            pixel size. See `cryojax.image.rescale_pixel_size` for documentation.
+        - `checks_pixel_size`:
+            If `True`, check at run-time if the `config.pixel_size`
+            matches the `potential.voxel_size`. If `False`, this is
+            not checked and will return incorrect results if they
+            do not match.
         - `correction_mask`:
             A `cryojax.image.operators.SincCorrectionMask` for performing
             sinc-correction on the linear-interpolated projections. This
@@ -259,7 +263,7 @@ class EwaldSphereExtraction(AbstractDirectVoxelIntegrator, strict=True):
             Value for filling out-of-bounds indices. Used only when
             `out_of_bounds_mode = "fill"`.
         """
-        self.pixel_rescaling_mode = pixel_rescaling_mode
+        self.checks_pixel_size = checks_pixel_size
         self.correction_mask = correction_mask
         self.out_of_bounds_mode = out_of_bounds_mode
         self.fill_value = fill_value
@@ -322,9 +326,10 @@ class EwaldSphereExtraction(AbstractDirectVoxelIntegrator, strict=True):
         # Scale by voxel size to convert from projection to integral
         ewald_sphere_surface *= potential.voxel_size
         # Re-scale to correct pixel size if its different
-        ewald_sphere_surface = self._maybe_rescale_pixel_size(
-            ewald_sphere_surface, potential, config, input_is_rfft=False
-        )
+        if self.checks_pixel_size:
+            ewald_sphere_surface = self._check_pixel_size(
+                ewald_sphere_surface, potential, config
+            )
         return (
             irfftn(ewald_sphere_surface, s=config.padded_shape)
             if outputs_real_space
