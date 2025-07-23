@@ -12,8 +12,8 @@ from cryojax.constants import (
     get_tabulated_scattering_factor_parameters,
     read_peng_element_scattering_factor_parameter_table,
 )
-from cryojax.image import crop_to_shape, irfftn
 from cryojax.io import read_atoms_from_pdb
+from cryojax.ndimage import crop_to_shape, irfftn
 
 
 jax.config.update("jax_enable_x64", True)
@@ -36,7 +36,7 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
     at the same orientation.
     """
     # Objects for imaging
-    instrument_config = cxs.InstrumentConfig(
+    config = cxs.BasicConfig(
         shape,
         pixel_size,
         voltage_in_kilovolts=300.0,
@@ -80,13 +80,13 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
     ]
 
     projection_by_gaussian_integration = compute_projection(
-        base_potential, base_method, instrument_config
+        base_potential, base_method, config
     )
     for potential, projection_method in zip(other_potentials, other_projection_methods):
         if isinstance(projection_method, cxs.NufftProjection):
             try:
                 projection_by_other_method = compute_projection(
-                    potential, projection_method, instrument_config
+                    potential, projection_method, config
                 )
             except Exception as err:
                 warnings.warn(
@@ -97,7 +97,7 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
                 continue
         else:
             projection_by_other_method = compute_projection(
-                potential, projection_method, instrument_config
+                potential, projection_method, config
             )
         np.testing.assert_allclose(
             projection_by_gaussian_integration, projection_by_other_method, atol=1e-12
@@ -120,7 +120,7 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
 #     for real vs fourier, atoms vs voxels, etc.
 #     """
 #     # Objects for imaging
-#     instrument_config = cxs.InstrumentConfig(
+#     instrument_config = cxs.BasicConfig(
 #         shape,
 #         pixel_size,
 #         voltage_in_kilovolts=300.0,
@@ -198,12 +198,10 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
 @eqx.filter_jit
 def compute_projection(
     potential: cxs.AbstractPotentialRepresentation,
-    method: cxs.AbstractPotentialIntegrator,
-    config: cxs.InstrumentConfig,
+    integrator: cxs.AbstractDirectIntegrator,
+    config: cxs.BasicConfig,
 ) -> Array:
-    fourier_projection = method.compute_integrated_potential(
-        potential, config, outputs_real_space=False
-    )
+    fourier_projection = integrator.integrate(potential, config, outputs_real_space=False)
     return crop_to_shape(
         irfftn(
             fourier_projection,
@@ -216,12 +214,12 @@ def compute_projection(
 @eqx.filter_jit
 def compute_projection_at_pose(
     potential: cxs.AbstractPotentialRepresentation,
-    method: cxs.AbstractPotentialIntegrator,
+    integrator: cxs.AbstractDirectIntegrator,
     pose: cxs.AbstractPose,
-    config: cxs.InstrumentConfig,
+    config: cxs.BasicConfig,
 ) -> Array:
     rotated_potential = potential.rotate_to_pose(pose)
-    fourier_projection = method.compute_integrated_potential(
+    fourier_projection = integrator.integrate(
         rotated_potential, config, outputs_real_space=False
     )
     translation_operator = pose.compute_translation_operator(

@@ -5,10 +5,10 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-import cryojax.simulator as cs
+import cryojax.simulator as cxs
 from cryojax.coordinates import cartesian_to_polar, make_frequency_grid
-from cryojax.image import compute_binned_powerspectrum, irfftn
-from cryojax.io import read_array_with_spacing_from_mrc
+from cryojax.io import read_array_from_mrc
+from cryojax.ndimage import compute_binned_powerspectrum, irfftn
 from cryojax.simulator import CTF, EulerAnglePose
 
 
@@ -126,21 +126,22 @@ def test_compute_projection_with_cistem(
     theta,
     psi,
     sample_mrc_path,
-    pixel_size,
 ):
     if AnglesAndShifts is not None:
         # cryojax
-        real_voxel_grid, voxel_size = read_array_with_spacing_from_mrc(sample_mrc_path)
-        potential = cs.FourierVoxelGridPotential.from_real_voxel_grid(
+        real_voxel_grid, voxel_size = read_array_from_mrc(
+            sample_mrc_path, loads_spacing=True
+        )
+        potential = cxs.FourierVoxelGridPotential.from_real_voxel_grid(
             real_voxel_grid, voxel_size
         )
-        pose = cs.EulerAnglePose(phi_angle=-phi, theta_angle=-theta, psi_angle=-psi)
-        projection_method = cs.FourierSliceExtraction(pixel_size_rescaling_method=None)
+        pose = cxs.EulerAnglePose(phi_angle=-phi, theta_angle=-theta, psi_angle=-psi)
+        projection_method = cxs.FourierSliceExtraction()
         box_size = potential.shape[0]
-        config = cs.InstrumentConfig((box_size, box_size), voxel_size, 300.0)
+        config = cxs.BasicConfig((box_size, box_size), voxel_size, 300.0)
         cryojax_projection = irfftn(
             (
-                projection_method.compute_integrated_potential(
+                projection_method.integrate(
                     potential.rotate_to_pose(pose), config, outputs_real_space=False
                 )
                 / voxel_size

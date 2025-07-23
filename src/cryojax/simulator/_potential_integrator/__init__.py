@@ -1,14 +1,15 @@
-from .atom_potential_integrator import (
-    GaussianMixtureProjection as GaussianMixtureProjection,
-)
 from .base_potential_integrator import (
     AbstractPotentialIntegrator as AbstractPotentialIntegrator,
-    AbstractVoxelPotentialIntegrator as AbstractVoxelPotentialIntegrator,
 )
-from .fourier_voxel_extract import (
+from .direct_integrator import (
+    AbstractDirectIntegrator as AbstractDirectIntegrator,
+    AbstractDirectVoxelIntegrator as AbstractDirectVoxelIntegrator,
     EwaldSphereExtraction as EwaldSphereExtraction,
     FourierSliceExtraction as FourierSliceExtraction,
-)
-from .nufft_project import (
+    GaussianMixtureProjection as GaussianMixtureProjection,
     NufftProjection as NufftProjection,
+)
+from .multislice_integrator import (
+    AbstractMultisliceIntegrator as AbstractMultisliceIntegrator,
+    FFTMultisliceIntegrator as FFTMultisliceIntegrator,
 )

@@ -49,7 +49,7 @@ class AbstractRotation(Module, strict=True):
         raise NotImplementedError
 
     @abstractmethod
-    def compose(self, other: Self) -> Self:
+    def compose(self, other) -> Self:
         """Composes this transformation with another."""
         raise NotImplementedError
 

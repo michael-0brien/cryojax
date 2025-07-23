@@ -13,9 +13,9 @@ import numpy as np
 from equinox import AbstractVar, Module
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
-from ..image import irfftn, rfftn
 from ..internal import error_if_not_fractional
-from ._instrument_config import InstrumentConfig
+from ..ndimage import irfftn, rfftn
+from ._config import DoseConfig
 
 
 class AbstractDQE(eqx.Module, strict=True):
@@ -118,17 +118,15 @@ class AbstractDetector(Module, strict=True):
         self,
         fourier_squared_wavefunction_at_detector_plane: Complex[
             Array,
-            "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim//2+1}",
+            "{config.padded_y_dim} {config.padded_x_dim//2+1}",
         ],
-        instrument_config: InstrumentConfig,
-    ) -> Complex[
-        Array, "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim//2+1}"
-    ]:
+        config: DoseConfig,
+    ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim//2+1}"]:
         """Compute the expected electron events from the detector."""
         fourier_expected_electron_events = (
             self._compute_expected_events_or_detector_readout(
                 fourier_squared_wavefunction_at_detector_plane,
-                instrument_config,
+                config,
                 key=None,
             )
         )
@@ -140,16 +138,14 @@ class AbstractDetector(Module, strict=True):
         key: PRNGKeyArray,
         fourier_squared_wavefunction_at_detector_plane: Complex[
             Array,
-            "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim//2+1}",
+            "{config.padded_y_dim} {config.padded_x_dim//2+1}",
         ],
-        instrument_config: InstrumentConfig,
-    ) -> Complex[
-        Array, "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim//2+1}"
-    ]:
+        config: DoseConfig,
+    ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim//2+1}"]:
         """Measure the readout from the detector."""
         fourier_detector_readout = self._compute_expected_events_or_detector_readout(
             fourier_squared_wavefunction_at_detector_plane,
-            instrument_config,
+            config,
             key,
         )
 
@@ -159,21 +155,16 @@ class AbstractDetector(Module, strict=True):
         self,
         fourier_squared_wavefunction_at_detector_plane: Complex[
             Array,
-            "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim//2+1}",
+            "{config.padded_y_dim} {config.padded_x_dim//2+1}",
         ],
-        instrument_config: InstrumentConfig,
+        config: DoseConfig,
         key: Optional[PRNGKeyArray] = None,
-    ) -> Complex[
-        Array, "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim//2+1}"
-    ]:
+    ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim//2+1}"]:
         """Pass the image through the detector model."""
-        N_pix = np.prod(instrument_config.padded_shape)
-        frequency_grid = instrument_config.padded_frequency_grid_in_pixels
+        N_pix = np.prod(config.padded_shape)
+        frequency_grid = config.padded_frequency_grid_in_pixels
         # Compute the time-integrated electron flux in pixels
-        electrons_per_pixel = (
-            instrument_config.electrons_per_angstrom_squared
-            * instrument_config.pixel_size**2
-        )
+        electrons_per_pixel = config.electrons_per_angstrom_squared * config.pixel_size**2
         # ... now the total number of electrons over the entire image
         electrons_per_image = N_pix * electrons_per_pixel
         # Normalize the squared wavefunction to a set of probabilities
@@ -193,7 +184,7 @@ class AbstractDetector(Module, strict=True):
             # ... otherwise, go to real space, sample, go back to fourier,
             # and return.
             expected_electron_events = irfftn(
-                fourier_expected_electron_events, s=instrument_config.padded_shape
+                fourier_expected_electron_events, s=config.padded_shape
             )
             return rfftn(
                 self.sample_readout_from_expected_events(key, expected_electron_events)

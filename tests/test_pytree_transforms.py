@@ -2,9 +2,15 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
-from jaxtyping import Array
+from jaxtyping import Array, install_import_hook
 
-from cryojax.utils import CustomTransform, StopGradientTransform, resolve_transforms
+
+with install_import_hook("cryojax", "typeguard.typechecked"):
+    from cryojax.jax_util import (
+        CustomTransform,
+        StopGradientTransform,
+        resolve_transforms,
+    )
 
 
 class Exp(eqx.Module):

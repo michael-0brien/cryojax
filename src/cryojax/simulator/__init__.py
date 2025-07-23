@@ -1,3 +1,14 @@
+from ._api_utils import make_image_model as make_image_model
+from ._common_functions import (
+    apply_amplitude_contrast_ratio as apply_amplitude_contrast_ratio,
+    apply_interaction_constant as apply_interaction_constant,
+)
+from ._config import (
+    AbstractConfig as AbstractConfig,
+    BasicConfig as BasicConfig,
+    DoseConfig as DoseConfig,
+    GridHelper as GridHelper,
+)
 from ._detector import (
     AbstractDetector as AbstractDetector,
     AbstractDQE as AbstractDQE,
@@ -6,13 +17,21 @@ from ._detector import (
     NullDQE as NullDQE,
     PoissonDetector as PoissonDetector,
 )
+from ._distributions import (
+    AbstractDistribution as AbstractDistribution,
+    AbstractGaussianDistribution as AbstractGaussianDistribution,
+    IndependentGaussianFourierModes as IndependentGaussianFourierModes,
+    IndependentGaussianPixels as IndependentGaussianPixels,
+)
 from ._image_model import (
     AbstractImageModel as AbstractImageModel,
+    AbstractPhysicalImageModel as AbstractPhysicalImageModel,
     ContrastImageModel as ContrastImageModel,
     ElectronCountsImageModel as ElectronCountsImageModel,
     IntensityImageModel as IntensityImageModel,
+    LinearImageModel as LinearImageModel,
+    ProjectionImageModel as ProjectionImageModel,
 )
-from ._instrument_config import InstrumentConfig as InstrumentConfig
 from ._pose import (
     AbstractPose as AbstractPose,
     AxisAnglePose as AxisAnglePose,
@@ -20,8 +39,9 @@ from ._pose import (
     QuaternionPose as QuaternionPose,
 )
 from ._potential_integrator import (
+    AbstractDirectIntegrator as AbstractDirectIntegrator,
+    AbstractDirectVoxelIntegrator as AbstractDirectVoxelIntegrator,
     AbstractPotentialIntegrator as AbstractPotentialIntegrator,
-    AbstractVoxelPotentialIntegrator as AbstractVoxelPotentialIntegrator,
     FourierSliceExtraction as FourierSliceExtraction,
     GaussianMixtureProjection as GaussianMixtureProjection,
     NufftProjection as NufftProjection,
@@ -42,16 +62,13 @@ from ._scattering_theory import (
     AbstractScatteringTheory as AbstractScatteringTheory,
     AbstractWeakPhaseScatteringTheory as AbstractWeakPhaseScatteringTheory,
     WeakPhaseScatteringTheory as WeakPhaseScatteringTheory,
-    apply_amplitude_contrast_ratio as apply_amplitude_contrast_ratio,
-    apply_interaction_constant as apply_interaction_constant,
 )
-from ._solvent import AbstractSolvent as AbstractSolvent
-from ._structural_ensemble import (
-    AbstractConformationalVariable as AbstractConformationalVariable,
+from ._solvent import AbstractRandomSolvent as AbstractRandomSolvent
+from ._structure import (
     AbstractStructuralEnsemble as AbstractStructuralEnsemble,
-    DiscreteConformationalVariable as DiscreteConformationalVariable,
+    AbstractStructure as AbstractStructure,
+    BasicStructure as BasicStructure,
     DiscreteStructuralEnsemble as DiscreteStructuralEnsemble,
-    SingleStructureEnsemble as SingleStructureEnsemble,
 )
 from ._transfer_theory import (
     AberratedAstigmaticCTF as AberratedAstigmaticCTF,

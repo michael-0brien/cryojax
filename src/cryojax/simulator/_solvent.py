@@ -11,15 +11,15 @@ import jax.random as jr
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
 from ..constants import PARKHURST2024_POWER_CONSTANTS
-from ..image import ifftn, irfftn
-from ..image.operators import (
+from ..internal import error_if_negative
+from ..ndimage import ifftn, irfftn, rescale_image
+from ..ndimage.operators import (
     AbstractFourierOperator,
     FourierGaussian,
     FourierGaussianWithRadialOffset,
     FourierOperatorLike,
 )
-from ..internal import error_if_negative
-from ._instrument_config import InstrumentConfig
+from ._config import AbstractConfig
 
 
 class SolventMixturePower(AbstractFourierOperator, strict=True):
@@ -69,110 +69,106 @@ class SolventMixturePower(AbstractFourierOperator, strict=True):
         return mixture_function(frequency_grid_in_angstroms)
 
 
-class AbstractSolvent(eqx.Module, strict=True):
+class AbstractRandomSolvent(eqx.Module, strict=True):
     """Base class for a model of the solvent in cryo-EM."""
 
     thickness_in_angstroms: eqx.AbstractVar[Float[Array, ""]]
-    potential_scale: eqx.AbstractVar[float]
 
     @abstractmethod
-    def sample_solvent_integrated_potential(
+    def sample_solvent_in_plane_potential(
         self,
         rng_key: PRNGKeyArray,
-        instrument_config: InstrumentConfig,
+        config: AbstractConfig,
         outputs_rfft: bool = True,
         outputs_real_space: bool = False,
     ) -> (
         Complex[
             Array,
-            "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim//2+1}",
+            "{config.padded_y_dim} {config.padded_x_dim//2+1}",
         ]
         | Complex[
             Array,
-            "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim}",
+            "{config.padded_y_dim} {config.padded_x_dim}",
         ]
         | Float[
             Array,
-            "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim}",
+            "{config.padded_y_dim} {config.padded_x_dim}",
         ]
     ):
         """Sample a stochastic realization of scattering potential due to the ice
         at the exit plane."""
         raise NotImplementedError
 
-    def compute_integrated_potential_with_solvent(
+    def compute_in_plane_potential(
         self,
         rng_key: PRNGKeyArray,
-        fourier_integrated_potential_of_specimen: (
+        fourier_in_plane_potential: (
             Complex[
                 Array,
-                "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim//2+1}",
+                "{config.padded_y_dim} {config.padded_x_dim//2+1}",
             ]
             | Complex[
                 Array,
-                "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim}",
+                "{config.padded_y_dim} {config.padded_x_dim}",
             ]
         ),
-        instrument_config: InstrumentConfig,
+        config: AbstractConfig,
         input_is_rfft: bool = True,
         outputs_real_space: bool = False,
     ) -> (
         Complex[
             Array,
-            "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim//2+1}",
+            "{config.padded_y_dim} {config.padded_x_dim//2+1}",
         ]
         | Complex[
             Array,
-            "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim}",
+            "{config.padded_y_dim} {config.padded_x_dim}",
         ]
         | Float[
             Array,
-            "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim}",
+            "{config.padded_y_dim} {config.padded_x_dim}",
         ]
     ):
         """Compute the combined spectrum of the ice and the specimen."""
         # Sample the realization of the phase due to the ice.
         # TODO: this function will also handle masking from a model for the
         # solvent shell.
-        fourier_integrated_potential_of_solvent = (
-            self.sample_solvent_integrated_potential(
-                rng_key,
-                instrument_config,
-                outputs_rfft=input_is_rfft,
-                outputs_real_space=False,
-            )
+        fourier_in_plane_potential_of_solvent = self.sample_solvent_in_plane_potential(
+            rng_key,
+            config,
+            outputs_rfft=input_is_rfft,
+            outputs_real_space=False,
         )
-        fourier_integrated_potential = (
-            fourier_integrated_potential_of_solvent
-            + fourier_integrated_potential_of_specimen
+        fourier_in_plane_potential = (
+            fourier_in_plane_potential_of_solvent + fourier_in_plane_potential
         )
 
         if outputs_real_space:
             if input_is_rfft:
                 return irfftn(
-                    fourier_integrated_potential,
-                    s=instrument_config.padded_shape,
+                    fourier_in_plane_potential,
+                    s=config.padded_shape,
                 )
             else:
-                return ifftn(
-                    fourier_integrated_potential, s=instrument_config.padded_shape
-                )
+                return ifftn(fourier_in_plane_potential, s=config.padded_shape)
         else:
-            return fourier_integrated_potential
+            return fourier_in_plane_potential
 
 
-class GRFSolvent(AbstractSolvent, strict=True):
+class GRFSolvent(AbstractRandomSolvent, strict=True):
     r"""Solvent modeled as a gaussian random field (GRF)."""
 
     thickness_in_angstroms: Float[Array, ""]
-    potential_scale: float
+    molecules_per_angstrom_cubed: float
+    total_potential_per_molecule: float
     power_spectrum_function: FourierOperatorLike
     samples_power: bool
 
     def __init__(
         self,
         thickness_in_angstroms: Float[Array, ""] | float,
-        potential_scale: float = 1.0,  # TODO: default value?
+        molecules_per_angstrom_cubed: float = 0.0325,
+        total_potential_per_molecule: float = 38.214333,
         power_spectrum_function: FourierOperatorLike | None = None,
         samples_power: bool = False,
     ):
@@ -180,15 +176,20 @@ class GRFSolvent(AbstractSolvent, strict=True):
 
         - `thickness_in_angstroms`:
             The solvent thickness in angstroms.
-        - `potential_scale`:
-            A dimensional factor that quantifies the characteristic scale
-            of the potential. By default, this is calibrated from scattering
-            factors in `cryojax.constants`.
+        - `potential_per_molecule`:
+            A dimensional factor that quantifies the total electrostatic
+            potential per molecule. This has units of energy times volume,
+            which in `cryojax` conventions is measured in Angstroms.
+            By default, this is calibrated as the q = 0 component of
+            an electron scattering factor for water, computed from
+            `cryojax.constants`.
+        - `molecules_per_angstrom_cubed`:
+            A dimensional factor that quantifies the number of water molecules
+            per unit volume. By default, this is calibrated from MD simulations
+            of water.
         - `power_spectrum_function` :
-            A function that computes the power spectrum of the solvent.
-            This function is treated as dimensionless,
-            while `thickness_in_angstroms` and `potential_scale`
-            determine the dimensions of the final image.
+            A function that computes the power spectrum of the solvent, up to the
+            final mean and standard deviation of the gaussian random field.
         - `samples_power`:
             If `True`, the power spectrum of the sampled GRF is stochastic. If `False`,
             the power is deterministic (i.e. the GRF is generated by sampling
@@ -196,48 +197,45 @@ class GRFSolvent(AbstractSolvent, strict=True):
         """
         self.power_spectrum_function = power_spectrum_function or SolventMixturePower()
         self.samples_power = samples_power
-        self.potential_scale = potential_scale
         self.thickness_in_angstroms = error_if_negative(
             jnp.asarray(thickness_in_angstroms)
         )
+        self.molecules_per_angstrom_cubed = molecules_per_angstrom_cubed
+        self.total_potential_per_molecule = total_potential_per_molecule
 
     @override
-    def sample_solvent_integrated_potential(
+    def sample_solvent_in_plane_potential(
         self,
         rng_key: PRNGKeyArray,
-        instrument_config: InstrumentConfig,
+        config: AbstractConfig,
         outputs_rfft: bool = True,
         outputs_real_space: bool = False,
     ) -> (
         Complex[
             Array,
-            "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim//2+1}",
+            "{config.padded_y_dim} {config.padded_x_dim//2+1}",
         ]
         | Complex[
             Array,
-            "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim}",
+            "{config.padded_y_dim} {config.padded_x_dim}",
         ]
         | Float[
             Array,
-            "{instrument_config.padded_y_dim} {instrument_config.padded_x_dim}",
+            "{config.padded_y_dim} {config.padded_x_dim}",
         ]
     ):
-        """Sample a realization of the ice integrated potential as a gaussian
-        random field.
+        """Sample a realization of the ice integrated potential
+        as a gaussian random field.
         """
-        n_pixels = instrument_config.padded_n_pixels
+        n_pixels = config.padded_n_pixels
         if outputs_real_space:
-            frequency_grid_in_angstroms = (
-                instrument_config.padded_frequency_grid_in_angstroms
-            )
+            frequency_grid_in_angstroms = config.padded_frequency_grid_in_angstroms
         else:
             if outputs_rfft:
-                frequency_grid_in_angstroms = (
-                    instrument_config.padded_frequency_grid_in_angstroms
-                )
+                frequency_grid_in_angstroms = config.padded_frequency_grid_in_angstroms
             else:
                 frequency_grid_in_angstroms = (
-                    instrument_config.padded_full_frequency_grid_in_angstroms
+                    config.padded_full_frequency_grid_in_angstroms
                 )
         # Compute standard deviation, scaling up by the variance by the number
         # of pixels to make the realization independent pixel-independent in real-space.
@@ -249,14 +247,24 @@ class GRFSolvent(AbstractSolvent, strict=True):
             shape=frequency_grid_in_angstroms.shape[0:-1],
             dtype=complex,
         ).at[0, 0].set(0.0)
-        # Apply dimensionful scalings to get the potential
-        fourier_integrated_potential_of_solvent = (
-            self.potential_scale * self.thickness_in_angstroms
-        ) * solvent_grf
+        # Scale to desired mean and standard deviation
+        molecules_per_angstrom_squared = (
+            self.thickness_in_angstroms * self.molecules_per_angstrom_cubed
+        )
+        mean = self.total_potential_per_molecule * molecules_per_angstrom_squared
+        std = 1.0  # TODO: set standard deviation
+        fourier_in_plane_potential_of_solvent = rescale_image(
+            solvent_grf,
+            mean=mean,
+            std=std,
+            input_is_real_space=False,
+            input_is_rfft=outputs_rfft,
+            shape_in_real_space=config.padded_shape,
+        )
         if outputs_real_space:
             return irfftn(
-                fourier_integrated_potential_of_solvent,
-                s=instrument_config.padded_shape,
+                fourier_in_plane_potential_of_solvent,
+                s=config.padded_shape,
             )
         else:
-            return fourier_integrated_potential_of_solvent
+            return fourier_in_plane_potential_of_solvent

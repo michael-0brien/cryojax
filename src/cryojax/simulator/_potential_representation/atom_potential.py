@@ -67,12 +67,12 @@ class AbstractAtomicPotential(AbstractPotentialRepresentation, strict=True):
 
     atom_positions: eqx.AbstractVar[Float[Array, "n_atoms 3"]]
 
-    def rotate_to_pose(self, pose: AbstractPose) -> Self:
+    def rotate_to_pose(self, pose: AbstractPose, inverse: bool = False) -> Self:
         """Return a new potential with rotated `atom_positions`."""
         return eqx.tree_at(
             lambda d: d.atom_positions,
             self,
-            pose.rotate_coordinates(self.atom_positions),
+            pose.rotate_coordinates(self.atom_positions, inverse=inverse),
         )
 
     def translate_to_pose(self, pose: AbstractPose) -> Self:
@@ -171,7 +171,7 @@ class GaussianMixtureAtomicPotential(AbstractAtomicPotential, strict=True):
     ) -> Float[Array, "{shape[0]} {shape[1]} {shape[2]}"]:
         """Return a voxel grid of the potential in real space.
 
-        See [`PengAtomicPotential.as_real_voxel_grid`](scattering_potential.md#cryojax.simulator.PengAtomicPotential.as_real_voxel_grid)
+        See [`PengAtomicPotential.as_real_voxel_grid`](potential.md#cryojax.simulator.PengAtomicPotential.as_real_voxel_grid)
         for the numerical conventions used when computing the sum of gaussians.
 
         **Arguments:**

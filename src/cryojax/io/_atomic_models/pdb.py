@@ -29,10 +29,10 @@ _VALID_URLS.discard("")
 
 
 @overload
-def read_atoms_from_pdb(  # type: ignore
+def read_atoms_from_pdb(
     filename_or_url: str | pathlib.Path,
+    loads_b_factors: Literal[False],
     center: bool = True,
-    loads_b_factors: Literal[False] = False,
     *,
     selection_string: str = "all",
     model_index: Optional[int] = None,
@@ -44,8 +44,8 @@ def read_atoms_from_pdb(  # type: ignore
 @overload
 def read_atoms_from_pdb(
     filename_or_url: str | pathlib.Path,
+    loads_b_factors: Literal[True],
     center: bool = True,
-    loads_b_factors: Literal[True] = True,
     *,
     selection_string: str = "all",
     model_index: Optional[int] = None,
@@ -61,27 +61,20 @@ def read_atoms_from_pdb(
 @overload
 def read_atoms_from_pdb(
     filename_or_url: str | pathlib.Path,
-    center: bool = True,
     loads_b_factors: bool = False,
+    center: bool = True,
     *,
     selection_string: str,
     model_index: Optional[int] = None,
     standardizes_names: bool = True,
     topology: Optional[mdtraj.Topology] = None,
-) -> (
-    tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, " n_atoms"]]
-    | tuple[
-        Float[np.ndarray, "... n_atoms 3"],
-        Int[np.ndarray, " n_atoms"],
-        Float[np.ndarray, " n_atoms"],
-    ]
 ): ...
 
 
 def read_atoms_from_pdb(
     filename_or_url: str | pathlib.Path,
-    center: bool = True,
     loads_b_factors: bool = False,
+    center: bool = True,
     *,
     selection_string: str = "all",
     model_index: Optional[int] = None,
