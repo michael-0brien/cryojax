@@ -159,7 +159,7 @@ def test_multislice_with_pose(
         b_factors=b_factors,
     )
 
-    instrument_config = cxs.InstrumentConfig(
+    instrument_config = cxs.BasicConfig(
         shape=shape,
         pixel_size=pixel_size,
         voltage_in_kilovolts=voltage_in_kilovolts,
@@ -177,10 +177,8 @@ def test_multislice_with_pose(
         pose.rotation.inverse(), pose.offset_in_angstroms
     )
 
-    structural_ensemble_atom = cxs.SingleStructureEnsemble(atom_potential, pose)
-    structural_ensemble_voxel = cxs.SingleStructureEnsemble(voxel_potential, pose_inv)
-
-    # structural_ensemble = cxs.SingleStructureEnsemble(atom_potential, pose)
+    structural_ensemble_atom = cxs.BasicStructure(atom_potential, pose)
+    structural_ensemble_voxel = cxs.BasicStructure(voxel_potential, pose_inv)
 
     ctf = cxs.AberratedAstigmaticCTF(
         defocus_in_angstroms=defocus_in_angstroms,
@@ -189,46 +187,42 @@ def test_multislice_with_pose(
     )
 
     multislice_scattering_theory_atom = cxe.MultisliceScatteringTheory(
-        structural_ensemble_atom,
         multislice_integrator,
         cxe.WaveTransferTheory(ctf),
         amplitude_contrast_ratio=ac,
     )
     multislice_scattering_theory_voxel = cxe.MultisliceScatteringTheory(
-        structural_ensemble_voxel,
         multislice_integrator,
         cxe.WaveTransferTheory(ctf),
         amplitude_contrast_ratio=ac,
     )
     high_energy_scattering_theory = cxe.HighEnergyScatteringTheory(
-        structural_ensemble_atom,
         cxs.GaussianMixtureProjection(use_error_functions=True),
         cxe.WaveTransferTheory(ctf),
         amplitude_contrast_ratio=ac,
     )
     weak_phase_scattering_theory = cxs.WeakPhaseScatteringTheory(
-        structural_ensemble_atom,
         cxs.GaussianMixtureProjection(use_error_functions=True),
         cxs.ContrastTransferTheory(ctf, amplitude_contrast_ratio=ac, phase_shift=0.0),
     )
 
     multislice_image_model_atom = cxs.IntensityImageModel(
-        instrument_config, multislice_scattering_theory_atom
+        structural_ensemble_atom, instrument_config, multislice_scattering_theory_atom
     )
     multislice_image_model_voxel = cxs.IntensityImageModel(
-        instrument_config, multislice_scattering_theory_voxel
+        structural_ensemble_voxel, instrument_config, multislice_scattering_theory_voxel
     )
     high_energy_image_model = cxs.IntensityImageModel(
-        instrument_config, high_energy_scattering_theory
+        structural_ensemble_atom, instrument_config, high_energy_scattering_theory
     )
     weak_phase_image_model = cxs.IntensityImageModel(
-        instrument_config, weak_phase_scattering_theory
+        structural_ensemble_atom, instrument_config, weak_phase_scattering_theory
     )
 
-    ms_a = multislice_image_model_atom.render()
-    ms_v = multislice_image_model_voxel.render()
-    he = high_energy_image_model.render()
-    wp = weak_phase_image_model.render()
+    ms_a = irfftn(multislice_image_model_atom.compute_fourier_image())
+    ms_v = irfftn(multislice_image_model_voxel.compute_fourier_image())
+    he = irfftn(high_energy_image_model.compute_fourier_image())
+    wp = irfftn(weak_phase_image_model.compute_fourier_image())
 
     def _normalize_image(image):
         """Normalize the image to have zero mean and unit variance."""
