@@ -1870,7 +1870,7 @@
 
 
 <h1 id="welcome-to-cryojax">Welcome to cryoJAX!<a class="headerlink" href="#welcome-to-cryojax" title="Permanent link">¤</a></h1>
-<p>CryoJAX is a library that simulates cryo-electron microscopy (cryo-EM) images in <a href="https://jax.readthedocs.io/en/latest/">JAX</a>. Its purpose is to provide the tools for building downstream data analysis in external workflows and libraries that leverage the statistical inference and machine learning resources of the JAX scientific computing ecosystem. To achieve this, image simulation in cryoJAX is built for reliability and flexibility: it implements a variety of established models and algorithms as well as a framework for implementing new models and algorithms downstream. If your application uses cryo-EM image simulation and it cannot be built downstream, open a <a href="https://github.com/mjo22/cryojax/pulls">Pull Request</a>.</p>
+<p>CryoJAX is a library that simulates cryo-electron microscopy (cryo-EM) images in <a href="https://jax.readthedocs.io/en/latest/">JAX</a>. Its purpose is to provide the tools for building downstream data analysis in external workflows and libraries that leverage the statistical inference and machine learning resources of the JAX scientific computing ecosystem. To achieve this, image simulation in cryoJAX is built for reliability and flexibility: it implements a variety of established models and algorithms as well as a framework for implementing new models and algorithms downstream. If your application uses cryo-EM image simulation and it cannot be built downstream, open a <a href="https://github.com/mjo22/cryojax/pulls">pull request</a>.</p>
 <p>This documentation is currently a work-in-progress. Your patience while we get this project properly documented is much appreciated! Feel free to get in touch on github <a href="https://github.com/mjo22/cryojax/issues">issues</a> if you have any questions, bug reports, or feature requests.</p>
 <h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">¤</a></h2>
 <p>Installing <code>cryojax</code> is simple. To start, I recommend creating a new virtual environment. For example, you could do this with <code>conda</code>.</p>
@@ -1897,7 +1897,7 @@ python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </sp
 <span class="n">filename</span> <span class="o">=</span> <span class="s2">&quot;example_scattering_potential.mrc&quot;</span>
 <span class="n">real_voxel_grid</span><span class="p">,</span> <span class="n">voxel_size</span> <span class="o">=</span> <span class="n">read_array_from_mrc</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">loads_spacing</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="n">potential</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">FourierVoxelGridPotential</span><span class="o">.</span><span class="n">from_real_voxel_grid</span><span class="p">(</span><span class="n">real_voxel_grid</span><span class="p">,</span> <span class="n">voxel_size</span><span class="p">)</span>
-<span class="c1"># Now, the pose. Angles are given in degrees.</span>
+<span class="c1"># The pose. Angles are given in degrees.</span>
 <span class="n">pose</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">EulerAnglePose</span><span class="p">(</span>
     <span class="n">offset_x_in_angstroms</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span>
     <span class="n">offset_y_in_angstroms</span><span class="o">=-</span><span class="mf">3.0</span><span class="p">,</span>
@@ -1905,21 +1905,22 @@ python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </sp
     <span class="n">theta_angle</span><span class="o">=</span><span class="mf">80.0</span><span class="p">,</span>
     <span class="n">psi_angle</span><span class="o">=-</span><span class="mf">10.0</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="c1"># Next the model for the CTF</span>
-<span class="n">ctf</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">AberratedAstigmaticCTF</span><span class="p">(</span>
+<span class="c1"># The model for the CTF</span>
+<span class="n">ctf</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">CTF</span><span class="p">(</span>
     <span class="n">defocus_in_angstroms</span><span class="o">=</span><span class="mf">9800.0</span><span class="p">,</span> <span class="n">astigmatism_in_angstroms</span><span class="o">=</span><span class="mf">200.0</span><span class="p">,</span> <span class="n">astigmatism_angle</span><span class="o">=</span><span class="mf">10.0</span>
 <span class="p">)</span>
 <span class="n">transfer_theory</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">ContrastTransferTheory</span><span class="p">(</span><span class="n">ctf</span><span class="p">,</span> <span class="n">amplitude_contrast_ratio</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
-<span class="c1"># Finally, create the configuration and build the image model</span>
+<span class="c1"># The image configuration</span>
 <span class="n">config</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">BasicConfig</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">320</span><span class="p">,</span> <span class="mi">320</span><span class="p">),</span> <span class="n">pixel_size</span><span class="o">=</span><span class="n">voxel_size</span><span class="p">,</span> <span class="n">voltage_in_kilovolts</span><span class="o">=</span><span class="mf">300.0</span><span class="p">)</span>
 <span class="c1"># Instantiate a cryoJAX `image_model` using the `make_image_model` function</span>
-<span class="n">image_model</span> <span class="o">=</span> <span class="n">make_image_model</span><span class="p">(</span><span class="n">potential</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">pose</span><span class="p">,</span> <span class="n">transfer_theory</span><span class="p">)</span>
+<span class="n">image_model</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">make_image_model</span><span class="p">(</span><span class="n">potential</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">pose</span><span class="p">,</span> <span class="n">transfer_theory</span><span class="p">)</span>
 <span class="c1"># Simulate an image</span>
 <span class="n">image</span> <span class="o">=</span> <span class="n">image_model</span><span class="o">.</span><span class="n">simulate</span><span class="p">(</span><span class="n">outputs_real_space</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </code></pre></div>
 <p>For more advanced image simulation examples and to understand the many features in this library, see the <a href="https://mjo22.github.io/cryojax/">documentation</a>.</p>
 <h2 id="jax-transformations">JAX transformations<a class="headerlink" href="#jax-transformations" title="Permanent link">¤</a></h2>
-<p>CryoJAX is built on JAX to make use of JIT-compilation, automatic differentiation, and vectorization for cryo-EM data analysis. Below are examples of each in cryoJAX's recommended pattern of performing these transformations on image simulation. To learn more about how <code>equinox</code> assists with JAX transformations, see <a href="https://docs.kidger.site/equinox/all-of-equinox/#2-filtering">here</a>.</p>
+<p>CryoJAX is built on JAX to make use of JIT-compilation, automatic differentiation, and vectorization for cryo-EM data analysis. JAX implements these operations as <em>function transformations</em>. If you aren't familiar with this concept, see the <a href="https://docs.jax.dev/en/latest/key-concepts.html#transformations">JAX documentation</a>.</p>
+<p>Below are examples of implementing these transformations using <a href="https://docs.kidger.site/equinox/"><code>equinox</code></a>, a popular JAX library for PyTorch-like classes that smoothly integrate with JAX functional programming. To learn more about how <code>equinox</code> assists with JAX transformations, see <a href="https://docs.kidger.site/equinox/all-of-equinox/#2-filtering">here</a>.</p>
 <h3 id="your-first-jit-compiled-function">Your first JIT compiled function<a class="headerlink" href="#your-first-jit-compiled-function" title="Permanent link">¤</a></h3>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">equinox</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">eqx</span>
 
@@ -1992,7 +1993,7 @@ python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </sp
 <h2 id="acknowledgements">Acknowledgements<a class="headerlink" href="#acknowledgements" title="Permanent link">¤</a></h2>
 <ul>
 <li><code>cryojax</code> implementations of several models and algorithms, such as the CTF, fourier slice extraction, and electrostatic potential computations has been informed by the open-source cryo-EM software <a href="https://github.com/timothygrant80/cisTEM"><code>cisTEM</code></a>.</li>
-<li><code>cryojax</code> is built on <a href="https://github.com/patrick-kidger/equinox/"><code>equinox</code></a>, a popular JAX library for PyTorch-like classes that smoothly integrate with JAX functional programming. We highly recommend learning about <code>equinox</code> to fully make use of the power of <code>jax</code>.</li>
+<li><code>cryojax</code> is built using <code>equinox</code>, a popular JAX library for PyTorch-like classes that smoothly integrate with JAX functional programming. We highly recommend learning about <code>equinox</code> to fully make use of the power of <code>jax</code>.</li>
 </ul>
 
 

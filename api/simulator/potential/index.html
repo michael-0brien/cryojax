@@ -1993,7 +1993,7 @@ scatterer.</p>
 
 
 <h5 id="cryojax.simulator.AbstractPotentialRepresentation.rotate_to_pose" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractPotentialRepresentation</span><span class="o">.</span><span class="n">rotate_to_pose</span><span class="p">(</span><span class="n">pose</span><span class="p">:</span> <span class="n">AbstractPose</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractPotentialRepresentation</span><span class="o">.</span><span class="n">rotate_to_pose</span><span class="p">(</span><span class="n">pose</span><span class="p">:</span> <span class="n">AbstractPose</span><span class="p">,</span> <span class="n">inverse</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
@@ -2246,7 +2246,7 @@ scattering factors, use the <code>cryojax.constants</code> submodule.</p>
 
 
 <h5 id="cryojax.simulator.GaussianMixtureAtomicPotential.rotate_to_pose" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">GaussianMixtureAtomicPotential</span><span class="o">.</span><span class="n">rotate_to_pose</span><span class="p">(</span><span class="n">pose</span><span class="p">:</span> <span class="n">AbstractPose</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">GaussianMixtureAtomicPotential</span><span class="o">.</span><span class="n">rotate_to_pose</span><span class="p">(</span><span class="n">pose</span><span class="p">:</span> <span class="n">AbstractPose</span><span class="p">,</span> <span class="n">inverse</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
 
 <a href="#cryojax.simulator.GaussianMixtureAtomicPotential.rotate_to_pose" class="headerlink" title="Permanent link">¤</a></h5>
 
@@ -2449,7 +2449,7 @@ per atom, through work by Lian-Mao Peng.</p>
 
 
 <h5 id="cryojax.simulator.PengAtomicPotential.rotate_to_pose" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">PengAtomicPotential</span><span class="o">.</span><span class="n">rotate_to_pose</span><span class="p">(</span><span class="n">pose</span><span class="p">:</span> <span class="n">AbstractPose</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">PengAtomicPotential</span><span class="o">.</span><span class="n">rotate_to_pose</span><span class="p">(</span><span class="n">pose</span><span class="p">:</span> <span class="n">AbstractPose</span><span class="p">,</span> <span class="n">inverse</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
 
 <a href="#cryojax.simulator.PengAtomicPotential.rotate_to_pose" class="headerlink" title="Permanent link">¤</a></h5>
 
@@ -2819,7 +2819,7 @@ scattering potential voxel grid.</p>
 
 
 <h5 id="cryojax.simulator.FourierVoxelGridPotential.rotate_to_pose" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelGridPotential</span><span class="o">.</span><span class="n">rotate_to_pose</span><span class="p">(</span><span class="n">pose</span><span class="p">:</span> <span class="n">AbstractPose</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelGridPotential</span><span class="o">.</span><span class="n">rotate_to_pose</span><span class="p">(</span><span class="n">pose</span><span class="p">:</span> <span class="n">AbstractPose</span><span class="p">,</span> <span class="n">inverse</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
 
 <a href="#cryojax.simulator.FourierVoxelGridPotential.rotate_to_pose" class="headerlink" title="Permanent link">¤</a></h5>
 
@@ -3007,7 +3007,7 @@ scattering potential voxel grid.</p>
 
 
 <h5 id="cryojax.simulator.FourierVoxelSplinePotential.rotate_to_pose" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelSplinePotential</span><span class="o">.</span><span class="n">rotate_to_pose</span><span class="p">(</span><span class="n">pose</span><span class="p">:</span> <span class="n">AbstractPose</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelSplinePotential</span><span class="o">.</span><span class="n">rotate_to_pose</span><span class="p">(</span><span class="n">pose</span><span class="p">:</span> <span class="n">AbstractPose</span><span class="p">,</span> <span class="n">inverse</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
 
 <a href="#cryojax.simulator.FourierVoxelSplinePotential.rotate_to_pose" class="headerlink" title="Permanent link">¤</a></h5>
 
@@ -3187,7 +3187,7 @@ scattering potential voxel grid.</p>
 
 
 <h5 id="cryojax.simulator.RealVoxelGridPotential.rotate_to_pose" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">RealVoxelGridPotential</span><span class="o">.</span><span class="n">rotate_to_pose</span><span class="p">(</span><span class="n">pose</span><span class="p">:</span> <span class="n">AbstractPose</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">RealVoxelGridPotential</span><span class="o">.</span><span class="n">rotate_to_pose</span><span class="p">(</span><span class="n">pose</span><span class="p">:</span> <span class="n">AbstractPose</span><span class="p">,</span> <span class="n">inverse</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
 
 <a href="#cryojax.simulator.RealVoxelGridPotential.rotate_to_pose" class="headerlink" title="Permanent link">¤</a></h5>
 
@@ -3383,7 +3383,7 @@ scattering potential voxel grid.</p>
 
 
 <h5 id="cryojax.simulator.RealVoxelCloudPotential.rotate_to_pose" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">RealVoxelCloudPotential</span><span class="o">.</span><span class="n">rotate_to_pose</span><span class="p">(</span><span class="n">pose</span><span class="p">:</span> <span class="n">AbstractPose</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">RealVoxelCloudPotential</span><span class="o">.</span><span class="n">rotate_to_pose</span><span class="p">(</span><span class="n">pose</span><span class="p">:</span> <span class="n">AbstractPose</span><span class="p">,</span> <span class="n">inverse</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
 
 <a href="#cryojax.simulator.RealVoxelCloudPotential.rotate_to_pose" class="headerlink" title="Permanent link">¤</a></h5>
 

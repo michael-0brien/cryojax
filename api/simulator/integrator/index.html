@@ -798,9 +798,9 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#cryojax.simulator.AbstractPotentialIntegrator" class="md-nav__link">
+  <a href="#cryojax.simulator.AbstractDirectIntegrator" class="md-nav__link">
     <span class="md-ellipsis">
-      AbstractPotentialIntegrator
+      AbstractDirectIntegrator
     </span>
   </a>
   
@@ -815,15 +815,6 @@
   
     <nav class="md-nav" aria-label="Integration methods for voxel-based potentials">
       <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cryojax.simulator.AbstractVoxelPotentialIntegrator" class="md-nav__link">
-    <span class="md-ellipsis">
-      AbstractVoxelPotentialIntegrator
-    </span>
-  </a>
-  
-</li>
         
           <li class="md-nav__item">
   <a href="#cryojax.simulator.FourierSliceExtraction" class="md-nav__link">
@@ -1886,18 +1877,18 @@
 <h1 id="scattering-potential-integration-methods">Scattering potential integration methods<a class="headerlink" href="#scattering-potential-integration-methods" title="Permanent link">¤</a></h1>
 <p><code>cryojax</code> provides different methods for integrating <a href="../potential/#scattering-potential-representations">scattering potentials</a> onto a plane.</p>
 <details class="abstract" open="open">
-<summary><code>cryojax.simulator.AbstractPotentialIntegrator</code></summary>
+<summary><code>cryojax.simulator.AbstractDirectIntegrator</code></summary>
 
 
 <div class="doc doc-object doc-class">
 
 
 
-<h4 id="cryojax.simulator.AbstractPotentialIntegrator" class="doc doc-heading">
-            <code>cryojax.simulator.AbstractPotentialIntegrator</code>
+<h4 id="cryojax.simulator.AbstractDirectIntegrator" class="doc doc-heading">
+            <code>cryojax.simulator.AbstractDirectIntegrator</code>
 
 
-<a href="#cryojax.simulator.AbstractPotentialIntegrator" class="headerlink" title="Permanent link">¤</a></h4>
+<a href="#cryojax.simulator.AbstractDirectIntegrator" class="headerlink" title="Permanent link">¤</a></h4>
 
 
     <div class="doc doc-contents first">
@@ -1921,43 +1912,27 @@ the exit plane.</p>
 
 
 
-  </div>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.AbstractDirectIntegrator.integrate" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractDirectIntegrator</span><span class="o">.</span><span class="n">integrate</span><span class="p">(</span><span class="n">potential</span><span class="p">:</span> <span class="n">PotentialT</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">AbstractConfig</span><span class="p">,</span> <span class="n">outputs_real_space</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{config.padded_y_dim}</span><span class="s1"> {config.padded_x_dim//2+1}&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{config.padded_y_dim}</span><span class="s1"> </span><span class="si">{config.padded_x_dim}</span><span class="s1">&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{config.padded_y_dim}</span><span class="s1"> </span><span class="si">{config.padded_x_dim}</span><span class="s1">&#39;</span><span class="p">]</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
+  </span>
+
+<a href="#cryojax.simulator.AbstractDirectIntegrator.integrate" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
 
     </div>
 
-</div></details>
-<h2 id="integration-methods-for-voxel-based-potentials">Integration methods for voxel-based potentials<a class="headerlink" href="#integration-methods-for-voxel-based-potentials" title="Permanent link">¤</a></h2>
-<details class="abstract">
-<summary><code>cryojax.simulator.AbstractVoxelPotentialIntegrator</code></summary>
-
-
-<div class="doc doc-object doc-class">
-
-
-
-<h4 id="cryojax.simulator.AbstractVoxelPotentialIntegrator" class="doc doc-heading">
-            <code>cryojax.simulator.AbstractVoxelPotentialIntegrator</code>
-
-
-<a href="#cryojax.simulator.AbstractVoxelPotentialIntegrator" class="headerlink" title="Permanent link">¤</a></h4>
-
-
-    <div class="doc doc-contents first">
-
-
-        <p>Base class for a method of integrating a voxel-based potential.</p>
-
-
-
-
-
-
-
-
-
-
-  <div class="doc doc-children">
-
+</div>
 
 
 
@@ -1967,6 +1942,7 @@ the exit plane.</p>
     </div>
 
 </div></details>
+<h2 id="integration-methods-for-voxel-based-potentials">Integration methods for voxel-based potentials<a class="headerlink" href="#integration-methods-for-voxel-based-potentials" title="Permanent link">¤</a></h2>
 
 
 <div class="doc doc-object doc-class">
@@ -2032,6 +2008,38 @@ the exit plane.</p>
     Value for filling out-of-bounds indices. Used only when
     <code>out_of_bounds_mode = "fill"</code>.</li>
 </ul>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.FourierSliceExtraction.integrate" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierSliceExtraction</span><span class="o">.</span><span class="n">integrate</span><span class="p">(</span><span class="n">potential</span><span class="p">:</span> <span class="n">FourierVoxelGridPotential</span> <span class="o">|</span> <span class="n">FourierVoxelSplinePotential</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">AbstractConfig</span><span class="p">,</span> <span class="n">outputs_real_space</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{config.padded_y_dim}</span><span class="s1"> {config.padded_x_dim//2+1}&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{config.padded_y_dim}</span><span class="s1"> </span><span class="si">{config.padded_x_dim}</span><span class="s1">&#39;</span><span class="p">]</span></code>
+
+<a href="#cryojax.simulator.FourierSliceExtraction.integrate" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Compute the integrated scattering potential at the <code>AbstractConfig</code> settings
+of a voxel-based representation in fourier-space, using fourier slice extraction.</p>
+<p><strong>Arguments:</strong></p>
+<ul>
+<li><code>potential</code>: The scattering potential representation.</li>
+<li><code>config</code>: The configuration of the resulting image.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p>The extracted fourier voxels of the <code>potential</code>, at the
+<code>config.padded_shape</code> and the <code>config.pixel_size</code>.</p>
 
 
     </div>
@@ -2199,6 +2207,38 @@ the exit plane.</p>
 <div class="doc doc-object doc-function">
 
 
+<h5 id="cryojax.simulator.NufftProjection.integrate" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">NufftProjection</span><span class="o">.</span><span class="n">integrate</span><span class="p">(</span><span class="n">potential</span><span class="p">:</span> <span class="n">RealVoxelGridPotential</span> <span class="o">|</span> <span class="n">RealVoxelCloudPotential</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">AbstractConfig</span><span class="p">,</span> <span class="n">outputs_real_space</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{config.padded_y_dim}</span><span class="s1"> {config.padded_x_dim//2+1}&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{config.padded_y_dim}</span><span class="s1"> </span><span class="si">{config.padded_x_dim}</span><span class="s1">&#39;</span><span class="p">]</span></code>
+
+<a href="#cryojax.simulator.NufftProjection.integrate" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Compute the integrated scattering potential at the <code>AbstractConfig</code> settings
+of a voxel-based representation in real-space, using non-uniform FFTs.</p>
+<p><strong>Arguments:</strong></p>
+<ul>
+<li><code>potential</code>: The scattering potential representation.</li>
+<li><code>config</code>: The configuration of the resulting image.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p>The projection integral of the <code>potential</code> in fourier space, at the
+<code>config.padded_shape</code> and the <code>config.pixel_size</code>.</p>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
 <h5 id="cryojax.simulator.NufftProjection.project_voxel_cloud_with_nufft" class="doc doc-heading">
             <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">NufftProjection</span><span class="o">.</span><span class="n">project_voxel_cloud_with_nufft</span><span class="p">(</span><span class="n">weights</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39; size&#39;</span><span class="p">],</span> <span class="n">coordinate_list_in_angstroms</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;size 2&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;size 3&#39;</span><span class="p">],</span> <span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{shape[0]}</span><span class="s1"> {shape[1]//2+1}&#39;</span><span class="p">]</span></code>
 
@@ -2301,6 +2341,37 @@ onto imaging plane using a non-uniform FFT.</p>
     This is useful if GPU memory is exhausted. By default,
     <code>1</code>, which computes a projection for all atoms at once.</li>
 </ul>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.GaussianMixtureProjection.integrate" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">GaussianMixtureProjection</span><span class="o">.</span><span class="n">integrate</span><span class="p">(</span><span class="n">potential</span><span class="p">:</span> <span class="n">GaussianMixtureAtomicPotential</span> <span class="o">|</span> <span class="n">PengAtomicPotential</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">AbstractConfig</span><span class="p">,</span> <span class="n">outputs_real_space</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{config.padded_y_dim}</span><span class="s1"> {config.padded_x_dim//2+1}&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{config.padded_y_dim}</span><span class="s1"> </span><span class="si">{config.padded_x_dim}</span><span class="s1">&#39;</span><span class="p">]</span></code>
+
+<a href="#cryojax.simulator.GaussianMixtureProjection.integrate" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Compute a projection from the atomic potential and transform it to Fourier
+space.</p>
+<p><strong>Arguments:</strong></p>
+<ul>
+<li><code>potential</code>: The atomic potential to project.</li>
+<li><code>config</code>: The configuration of the imaging instrument.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p>The integrated potential in real or fourier space at the <code>AbstractConfig.padded_shape</code>.</p>
 
 
     </div>
