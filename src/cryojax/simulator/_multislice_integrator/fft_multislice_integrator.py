@@ -1,4 +1,3 @@
-from typing import ClassVar
 from typing_extensions import override
 
 import jax

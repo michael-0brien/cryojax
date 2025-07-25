@@ -4,6 +4,12 @@ from jaxtyping import Array, Bool
 
 from ._config import AbstractConfig, DoseConfig
 from ._detector import AbstractDetector
+from ._direct_integrator import (
+    AbstractDirectIntegrator,
+    FourierSliceExtraction,
+    GaussianMixtureProjection,
+    NufftProjection,
+)
 from ._image_model import (
     AbstractImageModel,
     ContrastImageModel,
@@ -13,12 +19,6 @@ from ._image_model import (
     ProjectionImageModel as ProjectionImageModel,
 )
 from ._pose import AbstractPose
-from ._direct_integrator import (
-    AbstractDirectIntegrator,
-    FourierSliceExtraction,
-    GaussianMixtureProjection,
-    NufftProjection,
-)
 from ._potential_representation import (
     AbstractPotentialRepresentation,
     FourierVoxelGridPotential,

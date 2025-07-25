@@ -17,6 +17,13 @@ from ._detector import (
     NullDQE as NullDQE,
     PoissonDetector as PoissonDetector,
 )
+from ._direct_integrator import (
+    AbstractDirectIntegrator as AbstractDirectIntegrator,
+    AbstractDirectVoxelIntegrator as AbstractDirectVoxelIntegrator,
+    FourierSliceExtraction as FourierSliceExtraction,
+    GaussianMixtureProjection as GaussianMixtureProjection,
+    NufftProjection as NufftProjection,
+)
 from ._distributions import (
     AbstractDistribution as AbstractDistribution,
     AbstractGaussianDistribution as AbstractGaussianDistribution,
@@ -37,13 +44,6 @@ from ._pose import (
     AxisAnglePose as AxisAnglePose,
     EulerAnglePose as EulerAnglePose,
     QuaternionPose as QuaternionPose,
-)
-from ._direct_integrator import (
-    AbstractDirectIntegrator as AbstractDirectIntegrator,
-    AbstractDirectVoxelIntegrator as AbstractDirectVoxelIntegrator,
-    FourierSliceExtraction as FourierSliceExtraction,
-    GaussianMixtureProjection as GaussianMixtureProjection,
-    NufftProjection as NufftProjection,
 )
 from ._potential_representation import (
     AbstractAtomicPotential as AbstractAtomicPotential,
