@@ -5,22 +5,20 @@ Methods for integrating the scattering potential directly onto the exit plane.
 from abc import abstractmethod
 from typing import Generic, TypeVar
 
+import equinox as eqx
 import jax.numpy as jnp
-from equinox import AbstractClassVar, error_if
+from equinox import AbstractClassVar, AbstractVar, error_if
 from jaxtyping import Array, Complex, Float
 
-from ..._config import AbstractConfig
-from ..._potential_representation import AbstractVoxelPotential
-from ..base_potential_integrator import AbstractPotentialIntegrator
+from .._config import AbstractConfig
+from .._potential_representation import AbstractVoxelPotential
 
 
 PotentialT = TypeVar("PotentialT")
 VoxelPotentialT = TypeVar("VoxelPotentialT", bound="AbstractVoxelPotential")
 
 
-class AbstractDirectIntegrator(
-    AbstractPotentialIntegrator, Generic[PotentialT], strict=True
-):
+class AbstractDirectIntegrator(eqx.Module, Generic[PotentialT], strict=True):
     """Base class for a method of integrating a potential onto
     the exit plane.
     """
@@ -49,7 +47,7 @@ class AbstractDirectVoxelIntegrator(
 ):
     """Base class for a method of integrating a voxel-based potential."""
 
-    checks_pixel_size: bool
+    checks_pixel_size: AbstractVar[bool]
 
     def _check_pixel_size(
         self,

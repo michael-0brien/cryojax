@@ -8,7 +8,7 @@ from typing_extensions import override
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
-from ....ndimage import (
+from ...ndimage import (
     convert_fftn_to_rfftn,
     fftn,
     ifftn,
@@ -17,9 +17,9 @@ from ....ndimage import (
     map_coordinates_with_cubic_spline,
     rfftn,
 )
-from ....ndimage.transforms import InverseSincMask
-from ..._config import AbstractConfig
-from ..._potential_representation import (
+from ...ndimage.transforms import InverseSincMask
+from .._config import AbstractConfig
+from .._potential_representation import (
     FourierVoxelGridPotential,
     FourierVoxelSplinePotential,
 )
@@ -39,7 +39,6 @@ class FourierSliceExtraction(AbstractDirectVoxelIntegrator, strict=True):
     fill_value: complex
 
     is_projection_approximation: ClassVar[bool] = True
-    requires_inverse_rotation: ClassVar[bool] = True
 
     def __init__(
         self,
@@ -229,12 +228,12 @@ class EwaldSphereExtraction(AbstractDirectVoxelIntegrator, strict=True):
     `cryojax.image.map_coordinates` and `cryojax.image.map_coordinates_with_cubic_spline`.
     """
 
+    checks_pixel_size: bool
     correction_mask: Optional[InverseSincMask]
     out_of_bounds_mode: str
     fill_value: complex
 
     is_projection_approximation: ClassVar[bool] = False
-    requires_inverse_rotation: ClassVar[bool] = True
 
     def __init__(
         self,

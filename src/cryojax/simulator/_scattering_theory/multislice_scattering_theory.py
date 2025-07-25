@@ -5,7 +5,7 @@ from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
 from ...internal import error_if_not_fractional
 from .._config import AbstractConfig
-from .._potential_integrator import AbstractMultisliceIntegrator
+from .._multislice_integrator import AbstractMultisliceIntegrator
 from .._potential_representation import AbstractPotentialRepresentation
 from .._transfer_theory import WaveTransferTheory
 from .base_scattering_theory import AbstractWaveScatteringTheory

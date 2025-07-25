@@ -13,7 +13,7 @@ from jaxtyping import Array, Bool, Complex, Float, PRNGKeyArray
 from ...ndimage import irfftn, rfftn
 from ...ndimage.transforms import FilterLike, MaskLike
 from .._config import AbstractConfig
-from .._potential_integrator import AbstractDirectIntegrator
+from .._direct_integrator import AbstractDirectIntegrator
 from .._structure import AbstractStructure
 from .._transfer_theory import ContrastTransferTheory
 
@@ -242,7 +242,6 @@ class LinearImageModel(AbstractImageModel, strict=True):
         # Get potential in the lab frame
         potential = self.structure.get_potential_in_transformed_frame(
             apply_translation=False,
-            apply_inverse_rotation=self.integrator.requires_inverse_rotation,
         )
         # Compute the projection image
         fourier_image = self.integrator.integrate(
@@ -310,7 +309,6 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
         # Get potential in the lab frame
         potential = self.structure.get_potential_in_transformed_frame(
             apply_translation=False,
-            apply_inverse_rotation=self.integrator.requires_inverse_rotation,
         )
         # Compute the projection image
         fourier_image = self.integrator.integrate(

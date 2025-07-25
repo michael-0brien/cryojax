@@ -1146,7 +1146,7 @@ def test_load_multiple_mrcs():
     parameters_file.append(particle_params)
 
     n_images = len(parameters_file)
-    print(f"Number of images: {n_images}")
+    # print(f"Number of images: {n_images}")
     shape = parameters_file[0]["config"].shape
     true_images = jax.random.normal(
         jax.random.key(0), shape=(n_images, *shape), dtype=jnp.float32

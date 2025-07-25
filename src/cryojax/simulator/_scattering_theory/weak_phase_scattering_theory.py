@@ -5,7 +5,7 @@ from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
 from .._common_functions import apply_interaction_constant
 from .._config import AbstractConfig
-from .._potential_integrator import AbstractDirectIntegrator
+from .._direct_integrator import AbstractDirectIntegrator
 from .._potential_representation import AbstractPotentialRepresentation
 from .._solvent import AbstractRandomSolvent
 from .._transfer_theory import ContrastTransferTheory
@@ -50,11 +50,13 @@ class WeakPhaseScatteringTheory(AbstractWeakPhaseScatteringTheory, strict=True):
         if rng_key is not None:
             # Get the potential of the specimen plus the ice
             if self.solvent is not None:
-                fourier_in_plane_potential = self.solvent.compute_in_plane_potential(  # noqa: E501
-                    rng_key,
-                    fourier_in_plane_potential,
-                    config,
-                    input_is_rfft=self.integrator.is_projection_approximation,
+                fourier_in_plane_potential = (
+                    self.solvent.compute_in_plane_potential(  # noqa: E501
+                        rng_key,
+                        fourier_in_plane_potential,
+                        config,
+                        input_is_rfft=self.integrator.is_projection_approximation,
+                    )
                 )
 
         object_spectrum = apply_interaction_constant(

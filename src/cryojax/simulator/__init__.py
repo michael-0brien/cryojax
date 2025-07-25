@@ -38,10 +38,9 @@ from ._pose import (
     EulerAnglePose as EulerAnglePose,
     QuaternionPose as QuaternionPose,
 )
-from ._potential_integrator import (
+from ._direct_integrator import (
     AbstractDirectIntegrator as AbstractDirectIntegrator,
     AbstractDirectVoxelIntegrator as AbstractDirectVoxelIntegrator,
-    AbstractPotentialIntegrator as AbstractPotentialIntegrator,
     FourierSliceExtraction as FourierSliceExtraction,
     GaussianMixtureProjection as GaussianMixtureProjection,
     NufftProjection as NufftProjection,

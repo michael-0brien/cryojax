@@ -6,13 +6,13 @@ import jax.numpy as jnp
 from equinox import error_if
 from jaxtyping import Array, Complex, Float
 
-from ....ndimage import fftn, ifftn, map_coordinates
-from ..._common_functions import (
+from ...ndimage import fftn, ifftn, map_coordinates
+from .._common_functions import (
     apply_amplitude_contrast_ratio,
     apply_interaction_constant,
 )
-from ..._config import AbstractConfig
-from ..._potential_representation import RealVoxelGridPotential
+from .._config import AbstractConfig
+from .._potential_representation import RealVoxelGridPotential
 from .base_multislice_integrator import AbstractMultisliceIntegrator
 
 
@@ -22,8 +22,6 @@ class FFTMultisliceIntegrator(
     """Multislice integrator that steps using successive FFT-based convolutions."""
 
     slice_thickness_in_voxels: int
-
-    requires_inverse_rotation: ClassVar[bool] = True
 
     def __init__(
         self,

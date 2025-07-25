@@ -13,7 +13,7 @@ from ._image_model import (
     ProjectionImageModel as ProjectionImageModel,
 )
 from ._pose import AbstractPose
-from ._potential_integrator import (
+from ._direct_integrator import (
     AbstractDirectIntegrator,
     FourierSliceExtraction,
     GaussianMixtureProjection,

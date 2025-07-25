@@ -1,18 +1,16 @@
 from abc import abstractmethod
 from typing import Generic, TypeVar
 
+import equinox as eqx
 from jaxtyping import Array, Complex, Float
 
-from ..._config import AbstractConfig
-from ..base_potential_integrator import AbstractPotentialIntegrator
+from .._config import AbstractConfig
 
 
 PotentialT = TypeVar("PotentialT")
 
 
-class AbstractMultisliceIntegrator(
-    AbstractPotentialIntegrator, Generic[PotentialT], strict=True
-):
+class AbstractMultisliceIntegrator(eqx.Module, Generic[PotentialT], strict=True):
     """Base class for a multi-slice integration scheme."""
 
     @abstractmethod

@@ -1,8 +1,8 @@
-from ..simulator._potential_integrator import (
+from ..simulator._multislice_integrator import (
     AbstractMultisliceIntegrator as AbstractMultisliceIntegrator,
-    EwaldSphereExtraction as EwaldSphereExtraction,
     FFTMultisliceIntegrator as FFTMultisliceIntegrator,
 )
+from ..simulator._direct_integrator import EwaldSphereExtraction as EwaldSphereExtraction
 from ..simulator._scattering_theory import (
     AbstractWaveScatteringTheory as AbstractWaveScatteringTheory,
     HighEnergyScatteringTheory as HighEnergyScatteringTheory,

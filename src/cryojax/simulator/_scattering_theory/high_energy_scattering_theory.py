@@ -8,7 +8,7 @@ from ...internal import error_if_not_fractional
 from ...ndimage import ifftn, irfftn
 from .._common_functions import apply_amplitude_contrast_ratio, apply_interaction_constant
 from .._config import AbstractConfig
-from .._potential_integrator import AbstractDirectIntegrator
+from .._direct_integrator import AbstractDirectIntegrator
 from .._potential_representation import AbstractPotentialRepresentation
 from .._solvent import AbstractRandomSolvent
 from .._transfer_theory import WaveTransferTheory

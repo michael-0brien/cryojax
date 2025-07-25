@@ -9,9 +9,9 @@ from typing_extensions import override
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
-from ....ndimage import convert_fftn_to_rfftn, irfftn
-from ..._config import AbstractConfig
-from ..._potential_representation import RealVoxelCloudPotential, RealVoxelGridPotential
+from ...ndimage import convert_fftn_to_rfftn, irfftn
+from .._config import AbstractConfig
+from .._potential_representation import RealVoxelCloudPotential, RealVoxelGridPotential
 from .base_direct_integrator import AbstractDirectVoxelIntegrator
 
 
@@ -25,7 +25,6 @@ class NufftProjection(
     checks_pixel_size: bool
 
     is_projection_approximation: ClassVar[bool] = True
-    requires_inverse_rotation: ClassVar[bool] = False
 
     def __init__(self, *, checks_pixel_size: bool = True, eps: float = 1e-6):
         """**Arguments:**
