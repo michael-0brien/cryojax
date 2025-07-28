@@ -15,7 +15,7 @@ from ...ndimage import (
     rfftn,
 )
 from .._config import AbstractConfig
-from .._structure_representation import GaussianMixtureStructure, PengTabulatedPotential
+from .._structure_modeling import GaussianMixtureStructure, PengTabulatedPotential
 from .base_direct_integrator import AbstractDirectIntegrator
 
 

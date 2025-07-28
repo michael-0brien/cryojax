@@ -6,7 +6,7 @@ from jaxtyping import Array, Complex, Float, PRNGKeyArray
 from ...internal import error_if_not_fractional
 from .._config import AbstractConfig
 from .._multislice_integrator import AbstractMultisliceIntegrator
-from .._potential_representation import AbstractPotentialRepresentation
+from .._structure_modeling import AbstractStructureRepresentation
 from .._transfer_theory import WaveTransferTheory
 from .base_scattering_theory import AbstractWaveScatteringTheory
 
@@ -37,13 +37,13 @@ class MultisliceScatteringTheory(AbstractWaveScatteringTheory, strict=True):
     @override
     def compute_exit_wave(
         self,
-        potential: AbstractPotentialRepresentation,
+        structure: AbstractStructureRepresentation,
         config: AbstractConfig,
         rng_key: Optional[PRNGKeyArray] = None,
     ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim}"]:
         # Compute the wavefunction in the exit plane
         wavefunction = self.integrator.integrate(
-            potential, config, self.amplitude_contrast_ratio
+            structure, config, self.amplitude_contrast_ratio
         )
 
         return wavefunction

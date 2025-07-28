@@ -3,7 +3,7 @@ Image formation models.
 """
 
 from abc import abstractmethod
-from typing import Optional, TypedDict
+from typing import Optional
 from typing_extensions import override
 
 import equinox as eqx
@@ -14,7 +14,8 @@ from ...ndimage import irfftn, rfftn
 from ...ndimage.transforms import FilterLike, MaskLike
 from .._config import AbstractConfig
 from .._direct_integrator import AbstractDirectIntegrator
-from .._structure import AbstractStructure
+from .._pose import AbstractPose
+from .._structure_modeling import AbstractStructureMapping
 from .._transfer_theory import ContrastTransferTheory
 
 
@@ -33,20 +34,17 @@ ImageArray = RealImageArray | FourierImageArray
 PaddedImageArray = PaddedRealImageArray | PaddedFourierImageArray
 
 
-class NormalizeOptions(TypedDict):
-    applies_mask: bool
-    use_mask: bool
-
-
 class AbstractImageModel(eqx.Module, strict=True):
     """Base class for an image formation model.
 
     Call an `AbstractImageModel`'s `render` routine.
     """
 
-    structure: eqx.AbstractVar[AbstractStructure]
+    structure_mapping: eqx.AbstractVar[AbstractStructureMapping]
+    pose: eqx.AbstractVar[AbstractPose]
     config: eqx.AbstractVar[AbstractConfig]
 
+    applies_translation: eqx.AbstractVar[bool]
     normalizes_signal: eqx.AbstractVar[bool]
     signal_region: eqx.AbstractVar[Optional[Bool[Array, "_ _"]]]
 
@@ -150,11 +148,10 @@ class AbstractImageModel(eqx.Module, strict=True):
     def _apply_translation(
         self, fourier_image: PaddedFourierImageArray
     ) -> PaddedFourierImageArray:
-        pose = self.structure.pose
-        phase_shifts = pose.compute_translation_operator(
+        phase_shifts = self.pose.compute_translation_operator(
             self.config.padded_frequency_grid_in_angstroms
         )
-        fourier_image = pose.translate_image(
+        fourier_image = self.pose.translate_image(
             fourier_image,
             phase_shifts,
             self.config.padded_shape,
@@ -192,46 +189,57 @@ class AbstractImageModel(eqx.Module, strict=True):
 class LinearImageModel(AbstractImageModel, strict=True):
     """An simple image model in linear image formation theory."""
 
-    structure: AbstractStructure
+    structure_mapping: AbstractStructureMapping
+    pose: AbstractPose
     integrator: AbstractDirectIntegrator
     transfer_theory: ContrastTransferTheory
     config: AbstractConfig
 
+    applies_translation: bool
     normalizes_signal: bool
     signal_region: Optional[Bool[Array, "_ _"]]
 
     def __init__(
         self,
-        structure: AbstractStructure,
+        structure_mapping: AbstractStructureMapping,
+        pose: AbstractPose,
         config: AbstractConfig,
         integrator: AbstractDirectIntegrator,
         transfer_theory: ContrastTransferTheory,
         *,
+        applies_translation: bool = True,
         normalizes_signal: bool = False,
         signal_region: Optional[Bool[Array, "_ _"]] = None,
     ):
         """**Arguments:**
 
-        - `structure`:
-            The biological structure.
+        - `structure_mapping`:
+            The map to a biological structure.
+        - `pose`:
+            The pose of a structure.
         - `config`:
             The configuration of the instrument, such as for the pixel size
             and the wavelength.
         - `integrator`: The method for integrating the scattering potential.
         - `transfer_theory`: The contrast transfer theory.
+        - `applies_translation`:
+            If `True`, apply the in-plane translation in the `AbstractPose`
+            via phase shifts in fourier space.
         - `normalizes_signal`:
             If `True`, normalizes_signal the image before returning.
         - `signal_region`:
             A boolean array that is 1 where there is signal,
             and 0 otherwise used to normalize the image.
-            Must have shape equal to `AbstractImageModel.shape`.
+            Must have shape equal to `AbstractConfig.shape`.
         """
         # Simulator components
+        self.structure_mapping = structure_mapping
+        self.pose = pose
         self.config = config
         self.integrator = integrator
-        self.structure = structure
         self.transfer_theory = transfer_theory
         # Options
+        self.applies_translation = applies_translation
         self.normalizes_signal = normalizes_signal
         self.signal_region = signal_region
 
@@ -239,23 +247,24 @@ class LinearImageModel(AbstractImageModel, strict=True):
     def compute_fourier_image(
         self, rng_key: Optional[PRNGKeyArray] = None
     ) -> ImageArray | PaddedImageArray:
-        # Get potential in the lab frame
-        potential = self.structure.get_potential_in_transformed_frame(
-            apply_translation=False,
-        )
+        # Get the structure
+        structure = self.structure_mapping.map_to_structure()
+        # Rotate it to the lab frame
+        structure = structure.rotate_to_pose(self.pose)
         # Compute the projection image
         fourier_image = self.integrator.integrate(
-            potential, self.config, outputs_real_space=False
+            structure, self.config, outputs_real_space=False
         )
         # Compute the image
         fourier_image = self.transfer_theory.propagate_object(  # noqa: E501
             fourier_image,
             self.config,
             is_projection_approximation=self.integrator.is_projection_approximation,
-            defocus_offset=self.structure.pose.offset_z_in_angstroms,
+            defocus_offset=self.pose.offset_z_in_angstroms,
         )
         # Now for the in-plane translation
-        fourier_image = self._apply_translation(fourier_image)
+        if self.applies_translation:
+            fourier_image = self._apply_translation(fourier_image)
 
         return fourier_image
 
@@ -263,42 +272,53 @@ class LinearImageModel(AbstractImageModel, strict=True):
 class ProjectionImageModel(AbstractImageModel, strict=True):
     """An simple image model for computing a projection."""
 
-    structure: AbstractStructure
+    structure_mapping: AbstractStructureMapping
+    pose: AbstractPose
     integrator: AbstractDirectIntegrator
     config: AbstractConfig
 
+    applies_translation: bool
     normalizes_signal: bool
     signal_region: Optional[Bool[Array, "_ _"]]
 
     def __init__(
         self,
-        structure: AbstractStructure,
+        structure_mapping: AbstractStructureMapping,
+        pose: AbstractPose,
         config: AbstractConfig,
         integrator: AbstractDirectIntegrator,
         *,
+        applies_translation: bool = True,
         normalizes_signal: bool = False,
         signal_region: Optional[Bool[Array, "_ _"]] = None,
     ):
         """**Arguments:**
 
-        - `structure`:
-            The biological structure.
+        - `structure_mapping`:
+            The map to a biological structure.
+        - `pose`:
+            The pose of a structure.
         - `config`:
             The configuration of the instrument, such as for the pixel size
             and the wavelength.
         - `integrator`: The method for integrating the scattering potential.
+        - `applies_translation`:
+            If `True`, apply the in-plane translation in the `AbstractPose`
+            via phase shifts in fourier space.
         - `normalizes_signal`:
             If `True`, normalizes_signal the image before returning.
         - `signal_region`:
             A boolean array that is 1 where there is signal,
             and 0 otherwise used to normalize the image.
-            Must have shape equal to `AbstractImageModel.shape`.
+            Must have shape equal to `AbstractConfig.shape`.
         """
         # Simulator components
+        self.structure_mapping = structure_mapping
+        self.pose = pose
         self.config = config
         self.integrator = integrator
-        self.structure = structure
         # Options
+        self.applies_translation = applies_translation
         self.normalizes_signal = normalizes_signal
         self.signal_region = signal_region
 
@@ -306,15 +326,16 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
     def compute_fourier_image(
         self, rng_key: Optional[PRNGKeyArray] = None
     ) -> ImageArray | PaddedImageArray:
-        # Get potential in the lab frame
-        potential = self.structure.get_potential_in_transformed_frame(
-            apply_translation=False,
-        )
+        # Get the structure
+        structure = self.structure_mapping.map_to_structure()
+        # Rotate it to the lab frame
+        structure = structure.rotate_to_pose(self.pose)
         # Compute the projection image
         fourier_image = self.integrator.integrate(
-            potential, self.config, outputs_real_space=False
+            structure, self.config, outputs_real_space=False
         )
         # Now for the in-plane translation
-        fourier_image = self._apply_translation(fourier_image)
+        if self.applies_translation:
+            fourier_image = self._apply_translation(fourier_image)
 
         return fourier_image

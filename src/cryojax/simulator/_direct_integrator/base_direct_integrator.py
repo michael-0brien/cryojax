@@ -10,7 +10,7 @@ from equinox import AbstractClassVar
 from jaxtyping import Array, Complex, Float
 
 from .._config import AbstractConfig
-from .._structure_representation import AbstractVoxelStructure
+from .._structure_modeling import AbstractVoxelStructure
 
 
 StructureT = TypeVar("StructureT")

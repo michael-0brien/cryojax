@@ -11,8 +11,9 @@ from jaxtyping import Array, Bool, PRNGKeyArray
 
 from .._config import AbstractConfig, DoseConfig
 from .._detector import AbstractDetector
+from .._pose import AbstractPose
 from .._scattering_theory import AbstractScatteringTheory
-from .._structure import AbstractStructure
+from .._structure_modeling import AbstractStructureMapping
 from .base_image_model import AbstractImageModel, ImageArray, PaddedImageArray
 
 
@@ -29,41 +30,52 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
     scattering theory.
     """
 
-    structure: AbstractStructure
+    structure_mapping: AbstractStructureMapping
+    pose: AbstractPose
     config: AbstractConfig
     scattering_theory: AbstractScatteringTheory
 
+    applies_translation: bool
     normalizes_signal: bool
     signal_region: Optional[Bool[Array, "_ _"]]
 
     def __init__(
         self,
-        structure: AbstractStructure,
+        structure_mapping: AbstractStructureMapping,
+        pose: AbstractPose,
         config: AbstractConfig,
         scattering_theory: AbstractScatteringTheory,
         *,
+        applies_translation: bool = True,
         normalizes_signal: bool = False,
         signal_region: Optional[Bool[Array, "_ _"]] = None,
     ):
         """**Arguments:**
 
-        - `structure`:
-            The biological structure.
+        - `structure_mapping`:
+            The map to a biological structure.
+        - `pose`:
+            The pose of a structure.
         - `config`:
             The configuration of the instrument, such as for the pixel size
             and the wavelength.
         - `scattering_theory`:
             The scattering theory.
+        - `applies_translation`:
+            If `True`, apply the in-plane translation in the `AbstractPose`
+            via phase shifts in fourier space.
         - `normalizes_signal`:
             If `True`, normalize the image before returning.
         - `signal_region`:
             A boolean array that is 1 where there is signal,
             and 0 otherwise used to normalize the image.
-            Must have shape equal to `AbstractImageModel.shape`.
+            Must have shape equal to `AbstractConfig.shape`.
         """
-        self.structure = structure
+        self.structure_mapping = structure_mapping
+        self.pose = pose
         self.config = config
         self.scattering_theory = scattering_theory
+        self.applies_translation = applies_translation
         self.normalizes_signal = normalizes_signal
         self.signal_region = signal_region
 
@@ -71,17 +83,21 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
     def compute_fourier_image(
         self, rng_key: Optional[PRNGKeyArray] = None
     ) -> ImageArray | PaddedImageArray:
-        # Get the potential
-        potential = self.structure.get_potential_in_transformed_frame()
-        # Compute the squared wavefunction
+        # Get the structure. Its data should be a scattering potential
+        # to simulate in physical units
+        structure = self.structure_mapping.map_to_structure()
+        # Rotate it to the lab frame
+        structure = structure.rotate_to_pose(self.pose)
+        # Compute the contrast
         contrast_spectrum = self.scattering_theory.compute_contrast_spectrum(
-            potential,
+            structure,
             self.config,
             rng_key,
-            defocus_offset=self.structure.pose.offset_z_in_angstroms,
+            defocus_offset=self.pose.offset_z_in_angstroms,
         )
         # Apply the translation
-        contrast_spectrum = self._apply_translation(contrast_spectrum)
+        if self.applies_translation:
+            contrast_spectrum = self._apply_translation(contrast_spectrum)
 
         return contrast_spectrum
 
@@ -91,41 +107,52 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
     words a squared wavefunction.
     """
 
-    structure: AbstractStructure
+    structure_mapping: AbstractStructureMapping
+    pose: AbstractPose
     config: AbstractConfig
     scattering_theory: AbstractScatteringTheory
 
+    applies_translation: bool
     normalizes_signal: bool
     signal_region: Optional[Bool[Array, "_ _"]]
 
     def __init__(
         self,
-        structure: AbstractStructure,
+        structure_mapping: AbstractStructureMapping,
+        pose: AbstractPose,
         config: AbstractConfig,
         scattering_theory: AbstractScatteringTheory,
         *,
+        applies_translation: bool = True,
         normalizes_signal: bool = False,
         signal_region: Optional[Bool[Array, "_ _"]] = None,
     ):
         """**Arguments:**
 
-        - `structure`:
-            The biological structure.
+        - `structure_mapping`:
+            The map to a biological structure.
+        - `pose`:
+            The pose of a structure.
         - `config`:
             The configuration of the instrument, such as for the pixel size
             and the wavelength.
         - `scattering_theory`:
             The scattering theory.
+        - `applies_translation`:
+            If `True`, apply the in-plane translation in the `AbstractPose`
+            via phase shifts in fourier space.
         - `normalizes_signal`:
             If `True`, normalize the image before returning.
         - `signal_region`:
             A boolean array that is 1 where there is signal,
             and 0 otherwise used to normalize the image.
-            Must have shape equal to `AbstractImageModel.shape`.
+            Must have shape equal to `AbstractConfig.shape`.
         """
-        self.structure = structure
+        self.structure_mapping = structure_mapping
+        self.pose = pose
         self.config = config
         self.scattering_theory = scattering_theory
+        self.applies_translation = applies_translation
         self.normalizes_signal = normalizes_signal
         self.signal_region = signal_region
 
@@ -133,17 +160,22 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
     def compute_fourier_image(
         self, rng_key: Optional[PRNGKeyArray] = None
     ) -> ImageArray | PaddedImageArray:
-        potential = self.structure.get_potential_in_transformed_frame()
-        scattering_theory = self.scattering_theory
-        fourier_intensity = scattering_theory.compute_intensity_spectrum(
-            potential,
+        # Get the structure. Its data should be a scattering potential
+        # to simulate in physical units
+        structure = self.structure_mapping.map_to_structure()
+        # Rotate it to the lab frame
+        structure = structure.rotate_to_pose(self.pose)
+        # Compute the intensity spectrum
+        intensity_spectrum = self.scattering_theory.compute_intensity_spectrum(
+            structure,
             self.config,
             rng_key,
-            defocus_offset=self.structure.pose.offset_z_in_angstroms,
+            defocus_offset=self.pose.offset_z_in_angstroms,
         )
-        fourier_intensity = self._apply_translation(fourier_intensity)
+        if self.applies_translation:
+            intensity_spectrum = self._apply_translation(intensity_spectrum)
 
-        return fourier_intensity
+        return intensity_spectrum
 
 
 class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
@@ -151,44 +183,55 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
     model for the detector.
     """
 
-    structure: AbstractStructure
+    structure_mapping: AbstractStructureMapping
+    pose: AbstractPose
     config: DoseConfig
     scattering_theory: AbstractScatteringTheory
     detector: AbstractDetector
 
+    applies_translation: bool
     normalizes_signal: bool
     signal_region: Optional[Bool[Array, "_ _"]]
 
     def __init__(
         self,
-        structure: AbstractStructure,
+        structure_mapping: AbstractStructureMapping,
+        pose: AbstractPose,
         config: DoseConfig,
         scattering_theory: AbstractScatteringTheory,
         detector: AbstractDetector,
         *,
+        applies_translation: bool = True,
         normalizes_signal: bool = False,
         signal_region: Optional[Bool[Array, "_ _"]] = None,
     ):
         """**Arguments:**
 
-        - `structure`:
-            The biological structure.
+        - `structure_mapping`:
+            The map to a biological structure.
+        - `pose`:
+            The pose of a structure.
         - `config`:
             The configuration of the instrument, such as for the pixel size
             and the wavelength.
         - `scattering_theory`:
             The scattering theory.
+        - `applies_translation`:
+            If `True`, apply the in-plane translation in the `AbstractPose`
+            via phase shifts in fourier space.
         - `normalizes_signal`:
             If `True`, normalize the image before returning.
         - `signal_region`:
             A boolean array that is 1 where there is signal,
             and 0 otherwise used to normalize the image.
-            Must have shape equal to `AbstractImageModel.shape`.
+            Must have shape equal to `AbstractConfig.shape`.
         """
-        self.structure = structure
+        self.structure_mapping = structure_mapping
+        self.pose = pose
         self.config = config
         self.scattering_theory = scattering_theory
         self.detector = detector
+        self.applies_translation = applies_translation
         self.normalizes_signal = normalizes_signal
         self.signal_region = signal_region
 
@@ -196,16 +239,20 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
     def compute_fourier_image(
         self, rng_key: Optional[PRNGKeyArray] = None
     ) -> ImageArray | PaddedImageArray:
-        potential = self.structure.get_potential_in_transformed_frame()
+        # Get the structure. Its data should be a scattering potential
+        # to simulate in physical units
+        structure = self.structure_mapping.map_to_structure()
+        # Rotate it to the lab frame
+        structure = structure.rotate_to_pose(self.pose)
         if rng_key is None:
-            # Compute the squared wavefunction
-            scattering_theory = self.scattering_theory
-            fourier_intensity = scattering_theory.compute_intensity_spectrum(
-                potential,
+            # Compute the intensity
+            fourier_intensity = self.scattering_theory.compute_intensity_spectrum(
+                structure,
                 self.config,
-                defocus_offset=self.structure.pose.offset_z_in_angstroms,
+                defocus_offset=self.pose.offset_z_in_angstroms,
             )
-            fourier_intensity = self._apply_translation(fourier_intensity)
+            if self.applies_translation:
+                fourier_intensity = self._apply_translation(fourier_intensity)
             # ... now measure the expected electron events at the detector
             fourier_expected_electron_events = (
                 self.detector.compute_expected_electron_events(
@@ -217,14 +264,14 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
         else:
             keys = jax.random.split(rng_key)
             # Compute the squared wavefunction
-            scattering_theory = self.scattering_theory
-            fourier_intensity = scattering_theory.compute_intensity_spectrum(
-                potential,
+            fourier_intensity = self.scattering_theory.compute_intensity_spectrum(
+                structure,
                 self.config,
                 keys[0],
-                defocus_offset=self.structure.pose.offset_z_in_angstroms,
+                defocus_offset=self.pose.offset_z_in_angstroms,
             )
-            fourier_intensity = self._apply_translation(fourier_intensity)
+            if self.applies_translation:
+                fourier_intensity = self._apply_translation(fourier_intensity)
             # ... now measure the detector readout
             fourier_detector_readout = self.detector.compute_detector_readout(
                 keys[1],

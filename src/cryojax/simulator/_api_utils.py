@@ -1,6 +1,4 @@
-from typing import Literal, Optional
-
-from jaxtyping import Array, Bool
+from typing import Any, Literal, Optional
 
 from ._config import AbstractConfig, DoseConfig
 from ._detector import AbstractDetector
@@ -19,31 +17,32 @@ from ._image_model import (
     ProjectionImageModel as ProjectionImageModel,
 )
 from ._pose import AbstractPose
-from ._potential_representation import (
-    AbstractPotentialRepresentation,
-    FourierVoxelGridPotential,
-    FourierVoxelSplinePotential,
-    GaussianMixtureAtomicPotential,
-    PengAtomicPotential,
-    RealVoxelCloudPotential,
-    RealVoxelGridPotential,
-)
 from ._scattering_theory import WeakPhaseScatteringTheory
-from ._structure import BasicStructure
+from ._structure_modeling import (
+    AbstractStructureMapping,
+    FourierVoxelGridStructure,
+    FourierVoxelSplineStructure,
+    GaussianMixtureStructure,
+    PengTabulatedPotential,
+    RealVoxelGridStructure,
+)
 from ._transfer_theory import ContrastTransferTheory
 
 
 def make_image_model(
-    potential: AbstractPotentialRepresentation,
+    structure_mapping: AbstractStructureMapping,
     config: AbstractConfig,
     pose: AbstractPose,
     transfer_theory: Optional[ContrastTransferTheory] = None,
     integrator: Optional[AbstractDirectIntegrator] = None,
     detector: Optional[AbstractDetector] = None,
     *,
-    normalizes_signal: bool = False,
-    signal_region: Optional[Bool[Array, "{config.y_dim} {config.x_dim}"]] = None,
-    physical_units: bool = True,
+    options: dict[str, Any] = {
+        "normalizes_signal": False,
+        "signal_region": None,
+        "applies_translation": True,
+    },
+    physical_units: bool = False,
     mode: Literal["contrast", "intensity", "counts"] = "contrast",
 ) -> AbstractImageModel:
     """Construct an `AbstractImageModel` for most common use-cases.
@@ -52,8 +51,8 @@ def make_image_model(
 
     - `potential`:
         The representation of the protein electrostatic potential.
-        Common choices are the `FourierVoxelGridPotential`
-        for fourier-space voxel grids or the `PengAtomicPotential`
+        Common choices are the `FourierVoxelGridStructure`
+        for fourier-space voxel grids or the `PengAtomicStructure`
         for gaussian mixtures of atoms parameterized by electron scattering factors.
     - `config`:
         The configuration for the image and imagining instrument. Unless using
@@ -72,11 +71,17 @@ def make_image_model(
     - `detector`:
         If `mode = 'counts'` is chosen, then an `AbstractDetector` class must be
         chosen to simulate electron counts.
-    - `normalizes_signal`:
-        Whether or not to normalize the image.
-    - `signal_region`:
-        If `normalizes_signal = True`, this is a boolean array that is 1 where
-        there is signal and 0 otherwise.
+    - `options`:
+        A dictionary of options to be passed to the image model. This has keys
+        - "applies_translation":
+            If `True`, apply the in-plane translation in the `AbstractPose`
+            via phase shifts in fourier space.
+        - "normalizes_signal":
+            If `True`, normalizes_signal the image before returning.
+        - "signal_region":
+            A boolean array that is 1 where there is signal,
+            and 0 otherwise used to normalize the image.
+            Must have shape equal to `AbstractConfig.shape`.
     - `physical_units`:
         If `True`, the image simulated is a physical quantity, which is
         chosen with the `mode` argument. Otherwise, simulate an image without
@@ -103,15 +108,14 @@ def make_image_model(
     ```
     """
     # Build the image model
-    integrator = _select_default_integrator(potential)
-    structure = BasicStructure(potential, pose)
+    integrator = _select_default_integrator(structure_mapping)
     if transfer_theory is None:
         image_model = ProjectionImageModel(
-            structure,
+            structure_mapping,
+            pose,
             config,
             integrator,
-            normalizes_signal=normalizes_signal,
-            signal_region=signal_region,
+            **options,
         )
     else:
         if physical_units:
@@ -129,28 +133,28 @@ def make_image_model(
                         "an `AbstractDetector` must be passed."
                     )
                 image_model = ElectronCountsImageModel(
-                    structure,
+                    structure_mapping,
+                    pose,
                     config,
                     scattering_theory,
                     detector,
-                    normalizes_signal=normalizes_signal,
-                    signal_region=signal_region,
+                    **options,
                 )
             elif mode == "contrast":
                 image_model = ContrastImageModel(
-                    structure,
+                    structure_mapping,
+                    pose,
                     config,
                     scattering_theory,
-                    normalizes_signal=normalizes_signal,
-                    signal_region=signal_region,
+                    **options,
                 )
             elif mode == "intensity":
                 image_model = IntensityImageModel(
-                    structure,
+                    structure_mapping,
+                    pose,
                     config,
                     scattering_theory,
-                    normalizes_signal=normalizes_signal,
-                    signal_region=signal_region,
+                    **options,
                 )
             else:
                 raise ValueError(
@@ -159,30 +163,28 @@ def make_image_model(
                 )
         else:
             image_model = LinearImageModel(
-                structure,
+                structure_mapping,
+                pose,
                 config,
                 integrator,
                 transfer_theory,
-                normalizes_signal=normalizes_signal,
-                signal_region=signal_region,
+                **options,
             )
 
     return image_model
 
 
-def _select_default_integrator(
-    potential: AbstractPotentialRepresentation,
-) -> AbstractDirectIntegrator:
-    if isinstance(potential, (FourierVoxelGridPotential, FourierVoxelSplinePotential)):
+def _select_default_integrator(structure):
+    if isinstance(structure, (FourierVoxelGridStructure, FourierVoxelSplineStructure)):
         integrator = FourierSliceExtraction()
-    elif isinstance(potential, (PengAtomicPotential, GaussianMixtureAtomicPotential)):
+    elif isinstance(structure, (PengTabulatedPotential, GaussianMixtureStructure)):
         integrator = GaussianMixtureProjection(use_error_functions=True)
-    elif isinstance(potential, (RealVoxelCloudPotential, RealVoxelGridPotential)):
+    elif isinstance(structure, RealVoxelGridStructure):
         integrator = NufftProjection()
     else:
         raise ValueError(
             "Could not select default integrator for potential of "
-            f"type {type(potential).__name__}. If using a custom potential "
+            f"type {type(structure).__name__}. If using a custom potential "
             "please directly pass an integrator."
         )
     return integrator

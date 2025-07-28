@@ -8,9 +8,9 @@ from ...internal import error_if_not_fractional
 from ...ndimage import ifftn, irfftn
 from .._common_functions import apply_amplitude_contrast_ratio, apply_interaction_constant
 from .._config import AbstractConfig
-from .._direct_integrator import AbstractDirectIntegrator
-from .._potential_representation import AbstractPotentialRepresentation
+from .._direct_integrator import AbstractDirectIntegrator, AbstractDirectVoxelIntegrator
 from .._solvent import AbstractRandomSolvent
+from .._structure_modeling import AbstractStructureRepresentation
 from .._transfer_theory import WaveTransferTheory
 from .base_scattering_theory import AbstractWaveScatteringTheory
 
@@ -51,16 +51,25 @@ class HighEnergyScatteringTheory(AbstractWaveScatteringTheory, strict=True):
         self.solvent = solvent
         self.amplitude_contrast_ratio = error_if_not_fractional(amplitude_contrast_ratio)
 
+    def __check_init__(self):
+        if isinstance(self.integrator, AbstractDirectVoxelIntegrator):
+            if not self.integrator.outputs_integral:
+                raise AttributeError(
+                    "If the `integrator` is voxel-based, "
+                    "it must have `integrator.outputs_integral = True` "
+                    "to be passed to a `HighEnergyScatteringTheory`."
+                )
+
     @override
     def compute_exit_wave(
         self,
-        potential: AbstractPotentialRepresentation,
+        structure: AbstractStructureRepresentation,
         config: AbstractConfig,
         rng_key: Optional[PRNGKeyArray] = None,
     ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim}"]:
         # Compute the integrated potential in the exit plane
         fourier_in_plane_potential = self.integrator.integrate(
-            potential, config, outputs_real_space=False
+            structure, config, outputs_real_space=False
         )
         # The integrated potential may not be from an rfft; this depends on
         # if it is a projection approx
