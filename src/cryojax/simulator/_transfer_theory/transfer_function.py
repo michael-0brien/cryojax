@@ -1,6 +1,5 @@
 from abc import abstractmethod
 from typing import Optional
-from typing_extensions import override
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -165,18 +164,3 @@ class AberratedAstigmaticCTF(AbstractCTF, strict=True):
             spherical_aberration_in_angstroms,
         )
         return phase_shifts
-
-
-class NullCTF(AbstractCTF, strict=True):
-    """A perfect transfer function, useful for imaging
-    cryo-EM densities."""
-
-    @override
-    def compute_aberration_phase_shifts(
-        self,
-        frequency_grid_in_angstroms: Float[Array, "y_dim x_dim 2"],
-        voltage_in_kilovolts: Float[Array, ""] | float,
-        defocus_offset: Optional[Float[Array, ""] | float] = None,
-    ) -> Float[Array, "y_dim x_dim"]:
-        shape = frequency_grid_in_angstroms.shape[:2]
-        return jnp.full(shape, jnp.pi / 2)

@@ -45,11 +45,11 @@ import jax.numpy as jnp
 import cryojax.simulator as cxs
 from cryojax.io import read_array_from_mrc
 
-# Instantiate the scattering potential from a voxel grid. See the documentation
+# Instantiate the voxel grid representation of a structure. See the documentation
 # for how to generate voxel grids from a PDB
-filename = "example_scattering_potential.mrc"
+filename = "example_volume.mrc"
 real_voxel_grid, voxel_size = read_array_from_mrc(filename, loads_spacing=True)
-potential = cxs.FourierVoxelGridPotential.from_real_voxel_grid(real_voxel_grid, voxel_size)
+structure = cxs.FourierVoxelGridStructure.from_real_voxel_grid(real_voxel_grid, voxel_size)
 # The pose. Angles are given in degrees.
 pose = cxs.EulerAnglePose(
     offset_x_in_angstroms=5.0,
@@ -59,14 +59,14 @@ pose = cxs.EulerAnglePose(
     psi_angle=-10.0,
 )
 # The model for the CTF
-ctf = cxs.CTF(
+ctf = cxs.AberratedAstigmaticCTF(
     defocus_in_angstroms=9800.0, astigmatism_in_angstroms=200.0, astigmatism_angle=10.0
 )
 transfer_theory = cxs.ContrastTransferTheory(ctf, amplitude_contrast_ratio=0.1)
 # The image configuration
 config = cxs.BasicConfig(shape=(320, 320), pixel_size=voxel_size, voltage_in_kilovolts=300.0)
 # Instantiate a cryoJAX `image_model` using the `make_image_model` function
-image_model = cxs.make_image_model(potential, config, pose, transfer_theory)
+image_model = cxs.make_image_model(structure, config, pose, transfer_theory)
 # Simulate an image
 image = image_model.simulate(outputs_real_space=True)
 ```
@@ -132,10 +132,10 @@ from cryojax.jax_util import get_filter_spec
 # Vectorize model instantiation
 @eqx.filter_jit
 @eqx.filter_vmap(in_axes=(0, None, None, None), out_axes=(eqx.if_array(0), None))
-def make_image_model_vmap(wxyz, potential, config, transfer_theory):
+def make_image_model_vmap(wxyz, structure, config, transfer_theory):
     pose = cxs.QuaternionPose(wxyz=wxyz)
     image_model = cxs.make_image_model(
-        potential, config, pose, transfer_theory, normalizes_signal=True
+        structure, config, pose, transfer_theory, normalizes_signal=True
     )
     where_pose = lambda model: model.structure.pose
     filter_spec = get_filter_spec(image_model, where_pose)
@@ -153,7 +153,7 @@ def simulate_fn_vmap(model_vmap, model_novmap):
 
 # Simulate batch of images
 wxyz = ...  # ... load quaternions
-model_vmap, model_novmap = make_image_model_vmap(wxyz, potential, config, transfer_theory)
+model_vmap, model_novmap = make_image_model_vmap(wxyz, structure, config, transfer_theory)
 images = simulate_fn_vmap(model_vmap, model_novmap)
 ```
 

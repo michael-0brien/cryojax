@@ -23,6 +23,8 @@ from .scattering_potential import (
     PengTabulatedPotential as PengTabulatedPotential,
 )
 from .voxel_structure import (
+    AbstractFourierVoxelStructure as AbstractFourierVoxelStructure,
+    AbstractRealVoxelStructure as AbstractRealVoxelStructure,
     AbstractVoxelStructure as AbstractVoxelStructure,
     FourierVoxelGridStructure as FourierVoxelGridStructure,
     FourierVoxelSplineStructure as FourierVoxelSplineStructure,
