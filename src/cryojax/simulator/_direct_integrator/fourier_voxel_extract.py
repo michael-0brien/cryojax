@@ -5,6 +5,7 @@ Using the fourier slice theorem for computing volume projections.
 from typing import ClassVar, Optional
 from typing_extensions import override
 
+import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
@@ -19,21 +20,31 @@ from ...ndimage import (
 )
 from ...ndimage.transforms import InverseSincMask
 from .._config import AbstractConfig
-from .._potential_representation import (
-    FourierVoxelGridPotential,
-    FourierVoxelSplinePotential,
+from .._structure_representation import (
+    FourierVoxelGridStructure,
+    FourierVoxelSplineStructure,
 )
 from .base_direct_integrator import AbstractDirectVoxelIntegrator
 
 
-class FourierSliceExtraction(AbstractDirectVoxelIntegrator, strict=True):
+class AbstractFourierSurfaceExtraction(
+    AbstractDirectVoxelIntegrator[
+        FourierVoxelGridStructure | FourierVoxelSplineStructure
+    ],
+    strict=True,
+):
+    correction_mask: eqx.AbstractVar[Optional[InverseSincMask]]
+
+
+class FourierSliceExtraction(AbstractFourierSurfaceExtraction, strict=True):
     """Integrate points to the exit plane using the Fourier projection-slice theorem.
 
     This extracts slices using interpolation methods housed in
-    `cryojax.image.map_coordinates` and `cryojax.image.map_coordinates_with_cubic_spline`.
+    `cryojax.image.map_coordinates` and
+    `cryojax.image.map_coordinates_with_cubic_spline`.
     """
 
-    checks_pixel_size: bool
+    outputs_integral: bool
     correction_mask: Optional[InverseSincMask]
     out_of_bounds_mode: str
     fill_value: complex
@@ -43,23 +54,22 @@ class FourierSliceExtraction(AbstractDirectVoxelIntegrator, strict=True):
     def __init__(
         self,
         *,
-        checks_pixel_size: bool = True,
+        outputs_integral: bool = True,
         correction_mask: Optional[InverseSincMask] = None,
         out_of_bounds_mode: str = "fill",
         fill_value: complex = 0.0 + 0.0j,
     ):
         """**Arguments:**
 
-        - `checks_pixel_size`:
-            If `True`, check at run-time if the `config.pixel_size`
-            matches the `potential.voxel_size`. If `False`, this is
-            not checked and will return incorrect results if they
-            do not match.
+        - `outputs_integral`:
+            If `False`, returns a projection. If `True`, return the
+            projection multiplied by the voxel size. This is necessary
+            for simulating in physical units.
         - `correction_mask`:
             A `cryojax.image.operators.SincCorrectionMask` for performing
             sinc-correction on the linear-interpolated projections. This
             should be computed on a coordinate grid with shape matching
-            the `FourierVoxelGridPotential.shape`.
+            the `FourierVoxelGridStructure.shape`.
         - `out_of_bounds_mode`:
             Specify how to handle out of bounds indexing. See
             `cryojax.image.map_coordinates` for documentation.
@@ -67,7 +77,7 @@ class FourierSliceExtraction(AbstractDirectVoxelIntegrator, strict=True):
             Value for filling out-of-bounds indices. Used only when
             `out_of_bounds_mode = "fill"`.
         """
-        self.checks_pixel_size = checks_pixel_size
+        self.outputs_integral = outputs_integral
         self.correction_mask = correction_mask
         self.out_of_bounds_mode = out_of_bounds_mode
         self.fill_value = fill_value
@@ -75,7 +85,7 @@ class FourierSliceExtraction(AbstractDirectVoxelIntegrator, strict=True):
     @override
     def integrate(
         self,
-        potential: FourierVoxelGridPotential | FourierVoxelSplinePotential,
+        structure: FourierVoxelGridStructure | FourierVoxelSplineStructure,
         config: AbstractConfig,
         outputs_real_space: bool = False,
     ) -> (
@@ -85,65 +95,58 @@ class FourierSliceExtraction(AbstractDirectVoxelIntegrator, strict=True):
         ]
         | Float[Array, "{config.padded_y_dim} {config.padded_x_dim}"]
     ):
-        """Compute the integrated scattering potential at the `AbstractConfig` settings
-        of a voxel-based representation in fourier-space, using fourier slice extraction.
+        """Integrate the structure at the `AbstractConfig` settings
+        of a voxel-based representation in fourier-space,
+        using fourier slice extraction.
 
         **Arguments:**
 
-        - `potential`: The scattering potential representation.
+        - `structure`: The structure representation.
         - `config`: The configuration of the resulting image.
 
         **Returns:**
 
-        The extracted fourier voxels of the `potential`, at the
+        The extracted fourier voxels of the `structure`, at the
         `config.padded_shape` and the `config.pixel_size`.
         """
-        frequency_slice = potential.frequency_slice_in_pixels
+        frequency_slice = structure.frequency_slice_in_pixels
         N = frequency_slice.shape[1]
-        if potential.shape != (N, N, N):
+        if structure.shape != (N, N, N):
             raise AttributeError(
                 "Only cubic boxes are supported for fourier slice extraction."
             )
         # Compute the fourier projection
-        if isinstance(potential, FourierVoxelSplinePotential):
-            fourier_in_plane_potential = (
-                self.extract_fourier_slice_from_spline_coefficients(
-                    potential.spline_coefficients,
-                    frequency_slice,
-                )
+        if isinstance(structure, FourierVoxelSplineStructure):
+            fourier_projection = self.extract_fourier_slice_from_spline(
+                structure.spline_coefficients,
+                frequency_slice,
             )
-        elif isinstance(potential, FourierVoxelGridPotential):
-            fourier_in_plane_potential = self.extract_fourier_slice_from_grid_points(
-                potential.fourier_voxel_grid,
+        elif isinstance(structure, FourierVoxelGridStructure):
+            fourier_projection = self.extract_fourier_slice_from_grid(
+                structure.fourier_voxel_grid,
                 frequency_slice,
             )
         else:
             raise ValueError(
-                "Supported types for `potential` are `FourierVoxelGridPotential` and "
-                "`FourierVoxelSplinePotential`."
+                "Supported types for `structure` are `FourierVoxelGridStructure` and "
+                "`FourierVoxelSplineStructure`."
             )
 
         # Resize the image to match the AbstractConfig.padded_shape
         if config.padded_shape != (N, N):
-            fourier_in_plane_potential = rfftn(
-                config.crop_or_pad_to_padded_shape(
-                    irfftn(fourier_in_plane_potential, s=(N, N))
-                )
+            fourier_projection = rfftn(
+                config.crop_or_pad_to_padded_shape(irfftn(fourier_projection, s=(N, N)))
             )
         # Scale by voxel size to convert from projection to integral
-        fourier_in_plane_potential *= potential.voxel_size
-        # Re-scale to correct pixel size if its different
-        if self.checks_pixel_size:
-            fourier_in_plane_potential = self._check_pixel_size(
-                fourier_in_plane_potential, potential, config
-            )
+        if self.outputs_integral:
+            fourier_projection *= config.pixel_size
         return (
-            irfftn(fourier_in_plane_potential, s=config.padded_shape)
+            irfftn(fourier_projection, s=config.padded_shape)
             if outputs_real_space
-            else fourier_in_plane_potential
+            else fourier_projection
         )
 
-    def extract_fourier_slice_from_spline_coefficients(
+    def extract_fourier_slice_from_spline(
         self,
         spline_coefficients: Complex[Array, "coeff_dim coeff_dim coeff_dim"],
         frequency_slice_in_pixels: Float[Array, "1 dim dim 3"],
@@ -180,7 +183,7 @@ class FourierSliceExtraction(AbstractDirectVoxelIntegrator, strict=True):
             cval=self.fill_value,
         )
 
-    def extract_fourier_slice_from_grid_points(
+    def extract_fourier_slice_from_grid(
         self,
         fourier_voxel_grid: Complex[Array, "dim dim dim"],
         frequency_slice_in_pixels: Float[Array, "1 dim dim 3"],
@@ -220,15 +223,16 @@ class FourierSliceExtraction(AbstractDirectVoxelIntegrator, strict=True):
         return fourier_slice
 
 
-class EwaldSphereExtraction(AbstractDirectVoxelIntegrator, strict=True):
+class EwaldSphereExtraction(AbstractFourierSurfaceExtraction, strict=True):
     """Integrate points to the exit plane by extracting a surface of the ewald
     sphere in fourier space.
 
     This extracts surfaces using interpolation methods housed in
-    `cryojax.image.map_coordinates` and `cryojax.image.map_coordinates_with_cubic_spline`.
+    `cryojax.image.map_coordinates`
+    and `cryojax.image.map_coordinates_with_cubic_spline`.
     """
 
-    checks_pixel_size: bool
+    outputs_integral: bool
     correction_mask: Optional[InverseSincMask]
     out_of_bounds_mode: str
     fill_value: complex
@@ -238,23 +242,22 @@ class EwaldSphereExtraction(AbstractDirectVoxelIntegrator, strict=True):
     def __init__(
         self,
         *,
-        checks_pixel_size: bool = True,
+        outputs_integral: bool = True,
         correction_mask: Optional[InverseSincMask] = None,
         out_of_bounds_mode: str = "fill",
         fill_value: complex = 0.0 + 0.0j,
     ):
         """**Arguments:**
 
-        - `checks_pixel_size`:
-            If `True`, check at run-time if the `config.pixel_size`
-            matches the `potential.voxel_size`. If `False`, this is
-            not checked and will return incorrect results if they
-            do not match.
+        - `outputs_integral`:
+            If `False`, returns a projection. If `True`, return the
+            projection multiplied by the voxel size. This is necessary
+            for simulating in physical units.
         - `correction_mask`:
-            A `cryojax.image.operators.SincCorrectionMask` for performing
+            A `cryojax.ndimage.transforms.SincCorrectionMask` for performing
             sinc-correction on the linear-interpolated projections. This
             should be computed on a coordinate grid with shape matching
-            the `FourierVoxelGridPotential.shape`.
+            the `FourierVoxelGridStructure.shape`.
         - `out_of_bounds_mode`:
             Specify how to handle out of bounds indexing. See
             `cryojax.image.map_coordinates` for documentation.
@@ -262,7 +265,7 @@ class EwaldSphereExtraction(AbstractDirectVoxelIntegrator, strict=True):
             Value for filling out-of-bounds indices. Used only when
             `out_of_bounds_mode = "fill"`.
         """
-        self.checks_pixel_size = checks_pixel_size
+        self.outputs_integral = outputs_integral
         self.correction_mask = correction_mask
         self.out_of_bounds_mode = out_of_bounds_mode
         self.fill_value = fill_value
@@ -270,51 +273,51 @@ class EwaldSphereExtraction(AbstractDirectVoxelIntegrator, strict=True):
     @override
     def integrate(
         self,
-        potential: FourierVoxelGridPotential | FourierVoxelSplinePotential,
+        structure: FourierVoxelGridStructure | FourierVoxelSplineStructure,
         config: AbstractConfig,
         outputs_real_space: bool = False,
     ) -> (
         Complex[Array, "{config.padded_y_dim} {config.padded_x_dim}"]
         | Float[Array, "{config.padded_y_dim} {config.padded_x_dim}"]
     ):
-        """Compute the integrated scattering potential at the `AbstractConfig` settings
+        """Integrate the structure at the `AbstractConfig` settings
         of a voxel-based representation in fourier-space, using fourier slice extraction.
 
         **Arguments:**
 
-        - `potential`: The scattering potential representation.
+        - `structure`: The structure representation.
         - `config`: The configuration of the resulting image.
 
         **Returns:**
 
-        The extracted fourier voxels of the `potential`, at the
+        The extracted fourier voxels of the `structure`, at the
         `config.padded_shape` and the `config.pixel_size`.
         """
-        frequency_slice = potential.frequency_slice_in_pixels
+        frequency_slice = structure.frequency_slice_in_pixels
         N = frequency_slice.shape[1]
-        if potential.shape != (N, N, N):
+        if structure.shape != (N, N, N):
             raise AttributeError(
                 "Only cubic boxes are supported for fourier slice extraction."
             )
         # Compute the fourier projection
-        if isinstance(potential, FourierVoxelSplinePotential):
+        if isinstance(structure, FourierVoxelSplineStructure):
             ewald_sphere_surface = self.extract_ewald_sphere_from_spline_coefficients(
-                potential.spline_coefficients,
+                structure.spline_coefficients,
                 frequency_slice,
-                potential.voxel_size,
+                config.pixel_size,
                 config.wavelength_in_angstroms,
             )
-        elif isinstance(potential, FourierVoxelGridPotential):
+        elif isinstance(structure, FourierVoxelGridStructure):
             ewald_sphere_surface = self.extract_ewald_sphere_from_grid_points(
-                potential.fourier_voxel_grid,
+                structure.fourier_voxel_grid,
                 frequency_slice,
-                potential.voxel_size,
+                config.pixel_size,
                 config.wavelength_in_angstroms,
             )
         else:
             raise ValueError(
-                "Supported types for `potential` are `FourierVoxelGridPotential` and "
-                "`FourierVoxelSplinePotential`."
+                "Supported types for `structure` are `FourierVoxelGridStructure` and "
+                "`FourierVoxelSplineStructure`."
             )
 
         # Resize the image to match the AbstractConfig.padded_shape
@@ -323,12 +326,8 @@ class EwaldSphereExtraction(AbstractDirectVoxelIntegrator, strict=True):
                 config.crop_or_pad_to_padded_shape(ifftn(ewald_sphere_surface, s=(N, N)))
             )
         # Scale by voxel size to convert from projection to integral
-        ewald_sphere_surface *= potential.voxel_size
-        # Re-scale to correct pixel size if its different
-        if self.checks_pixel_size:
-            ewald_sphere_surface = self._check_pixel_size(
-                ewald_sphere_surface, potential, config
-            )
+        if self.outputs_integral:
+            ewald_sphere_surface *= config.pixel_size
         return (
             irfftn(ewald_sphere_surface, s=config.padded_shape)
             if outputs_real_space

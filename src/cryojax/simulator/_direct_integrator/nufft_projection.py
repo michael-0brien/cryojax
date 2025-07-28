@@ -11,34 +11,33 @@ from jaxtyping import Array, Complex, Float
 
 from ...ndimage import convert_fftn_to_rfftn, irfftn
 from .._config import AbstractConfig
-from .._potential_representation import RealVoxelCloudPotential, RealVoxelGridPotential
+from .._structure_representation import RealVoxelGridStructure
 from .base_direct_integrator import AbstractDirectVoxelIntegrator
 
 
 class NufftProjection(
-    AbstractDirectVoxelIntegrator[RealVoxelGridPotential | RealVoxelCloudPotential],
+    AbstractDirectVoxelIntegrator[RealVoxelGridStructure],
     strict=True,
 ):
     """Integrate points onto the exit plane using non-uniform FFTs."""
 
     eps: float
-    checks_pixel_size: bool
+    outputs_integral: bool
 
     is_projection_approximation: ClassVar[bool] = True
 
-    def __init__(self, *, checks_pixel_size: bool = True, eps: float = 1e-6):
+    def __init__(self, *, outputs_integral: bool = True, eps: float = 1e-6):
         """**Arguments:**
 
-        - `checks_pixel_size`:
-            If `True`, check at run-time if the `config.pixel_size`
-            matches the `potential.voxel_size`. If `False`, this is
-            not checked and will return incorrect results if they
-            do not match.
+        - `outputs_integral`:
+            If `False`, returns a projection. If `True`, return the
+            projection multiplied by the voxel size. This is necessary
+            for simulating in physical units.
         - `eps`:
             See [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft)
             for documentation.
         """
-        self.checks_pixel_size = checks_pixel_size
+        self.outputs_integral = outputs_integral
         self.eps = eps
 
     def project_voxel_cloud_with_nufft(
@@ -69,7 +68,7 @@ class NufftProjection(
     @override
     def integrate(
         self,
-        potential: RealVoxelGridPotential | RealVoxelCloudPotential,
+        structure: RealVoxelGridStructure,
         config: AbstractConfig,
         outputs_real_space: bool = False,
     ) -> (
@@ -79,50 +78,35 @@ class NufftProjection(
         ]
         | Float[Array, "{config.padded_y_dim} {config.padded_x_dim}"]
     ):
-        """Compute the integrated scattering potential at the `AbstractConfig` settings
+        """Integrate the structure at the `AbstractConfig` settings
         of a voxel-based representation in real-space, using non-uniform FFTs.
 
         **Arguments:**
 
-        - `potential`: The scattering potential representation.
+        - `structure`: The structure representation.
         - `config`: The configuration of the resulting image.
 
         **Returns:**
 
-        The projection integral of the `potential` in fourier space, at the
+        The projection integral of the `structure` in fourier space, at the
         `config.padded_shape` and the `config.pixel_size`.
         """
-        if isinstance(potential, RealVoxelGridPotential):
-            shape = potential.shape
-            fourier_in_plane_potential = self.project_voxel_cloud_with_nufft(
-                potential.real_voxel_grid.ravel(),
-                potential.coordinate_grid_in_pixels.reshape((math.prod(shape), 3)),
-                config.padded_shape,
-            )
-        elif isinstance(potential, RealVoxelCloudPotential):
-            fourier_in_plane_potential = self.project_voxel_cloud_with_nufft(
-                potential.voxel_weights,
-                potential.coordinate_list_in_pixels,
+        if isinstance(structure, RealVoxelGridStructure):
+            shape = structure.shape
+            fourier_projection = self.project_voxel_cloud_with_nufft(
+                structure.real_voxel_grid.ravel(),
+                structure.coordinate_grid_in_pixels.reshape((math.prod(shape), 3)),
                 config.padded_shape,
             )
         else:
-            raise ValueError(
-                "Supported type for `potential` is `RealVoxelGridPotential` and "
-                "`RealVoxelCloudPotential`."
-            )
-        # Scale by voxel size to convert from projection to integral
-        fourier_in_plane_potential *= potential.voxel_size
-        # Re-scale to correct pixel size if its different
-        if self.checks_pixel_size:
-            fourier_in_plane_potential = self._check_pixel_size(
-                fourier_in_plane_potential,
-                potential,
-                config,
-            )
+            raise ValueError("Supported type for `structure` is `RealVoxelGridStructure`")
+        if self.outputs_integral:
+            # Scale by voxel size to convert from projection to integral
+            fourier_projection *= config.pixel_size
         return (
-            irfftn(fourier_in_plane_potential, s=config.padded_shape)
+            irfftn(fourier_projection, s=config.padded_shape)
             if outputs_real_space
-            else fourier_in_plane_potential
+            else fourier_projection
         )
 
 

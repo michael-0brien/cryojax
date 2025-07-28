@@ -10,7 +10,7 @@ from ....constants import (
 )
 from ....internal import NDArrayLike, error_if_negative
 from ..atomic_structure import AbstractIndependentAtomStructure
-from ..base_structure import AbstractRealVoxelRendering
+from ..base_structure import AbstractFixedStructure, AbstractRealVoxelRendering
 from ..common_functions import gaussians_to_real_voxels
 from .base_potential import AbstractScatteringPotential
 
@@ -46,6 +46,7 @@ class AbstractTabulatedPotential(AbstractScatteringPotential, strict=True):
 
 class PengTabulatedPotential(
     AbstractTabulatedPotential,
+    AbstractFixedStructure,
     AbstractIndependentAtomStructure,
     AbstractRealVoxelRendering,
     strict=True,

@@ -45,10 +45,20 @@ class AbstractVoxelStructure(AbstractFixedStructure, strict=True):
 
 
 class AbstractFourierVoxelStructure(AbstractVoxelStructure, strict=True):
-    """Abstract class for a fourier voxel-based structure"""
+    """Abstract interface for a voxel-based structure."""
+
+    frequency_slice_in_pixels: eqx.AbstractVar[Float[Array, "1 dim dim 3"]]
+
+    def rotate_to_pose(self, pose: AbstractPose, inverse: bool = False) -> Self:
+        """Return a new structure with a rotated `frequency_slice_in_pixels`."""
+        return eqx.tree_at(
+            lambda d: d.frequency_slice_in_pixels,
+            self,
+            pose.rotate_coordinates(self.frequency_slice_in_pixels, inverse=inverse),
+        )
 
 
-class FourierVoxelGridStructure(AbstractFourierVoxelStructure, strict=True):
+class FourierVoxelGridStructure(AbstractVoxelStructure, strict=True):
     """A 3D voxel grid in fourier-space."""
 
     fourier_voxel_grid: Complex[Array, "dim dim dim"]
@@ -74,14 +84,6 @@ class FourierVoxelGridStructure(AbstractFourierVoxelStructure, strict=True):
     def shape(self) -> tuple[int, int, int]:
         """The shape of the `fourier_voxel_grid`."""
         return cast(tuple[int, int, int], self.fourier_voxel_grid.shape)
-
-    def rotate_to_pose(self, pose: AbstractPose, inverse: bool = False) -> Self:
-        """Return a new structure with a rotated `frequency_slice_in_pixels`."""
-        return eqx.tree_at(
-            lambda d: d.frequency_slice_in_pixels,
-            self,
-            pose.rotate_coordinates(self.frequency_slice_in_pixels, inverse=inverse),
-        )
 
     @classmethod
     def from_real_voxel_grid(
@@ -173,14 +175,6 @@ class FourierVoxelSplineStructure(AbstractFourierVoxelStructure, strict=True):
             tuple[int, int, int], tuple([s - 2 for s in self.spline_coefficients.shape])
         )
 
-    def rotate_to_pose(self, pose: AbstractPose, inverse: bool = False) -> Self:
-        """Return a new structure with a rotated `frequency_slice_in_pixels`."""
-        return eqx.tree_at(
-            lambda d: d.frequency_slice_in_pixels,
-            self,
-            pose.rotate_coordinates(self.frequency_slice_in_pixels, inverse=inverse),
-        )
-
     @classmethod
     def from_real_voxel_grid(
         cls,
@@ -238,7 +232,19 @@ class FourierVoxelSplineStructure(AbstractFourierVoxelStructure, strict=True):
 
 
 class AbstractRealVoxelStructure(AbstractVoxelStructure, strict=True):
-    """Abstract class for a real-space voxel-based structure"""
+    """Abstract interface for a voxel-based structure."""
+
+    coordinate_grid_in_pixels: eqx.AbstractVar[Float[Array, "dim dim dim 3"]]
+
+    def rotate_to_pose(self, pose: AbstractPose, inverse: bool = False) -> Self:
+        """Return a new structure with a rotated
+        `coordinate_grid_in_pixels`.
+        """
+        return eqx.tree_at(
+            lambda d: d.coordinate_grid_in_pixels,
+            self,
+            pose.rotate_coordinates(self.coordinate_grid_in_pixels, inverse=inverse),
+        )
 
 
 class RealVoxelGridStructure(AbstractRealVoxelStructure, strict=True):
@@ -266,16 +272,6 @@ class RealVoxelGridStructure(AbstractRealVoxelStructure, strict=True):
     def shape(self) -> tuple[int, int, int]:
         """The shape of the `real_voxel_grid`."""
         return cast(tuple[int, int, int], self.real_voxel_grid.shape)
-
-    def rotate_to_pose(self, pose: AbstractPose, inverse: bool = False) -> Self:
-        """Return a new structure with a rotated
-        `coordinate_grid_in_pixels`.
-        """
-        return eqx.tree_at(
-            lambda d: d.coordinate_grid_in_pixels,
-            self,
-            pose.rotate_coordinates(self.coordinate_grid_in_pixels, inverse=inverse),
-        )
 
     @classmethod
     def from_real_voxel_grid(

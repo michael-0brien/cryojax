@@ -2,7 +2,6 @@ from typing_extensions import override
 
 import jax
 import jax.numpy as jnp
-from equinox import error_if
 from jaxtyping import Array, Complex, Float
 
 from ...ndimage import fftn, ifftn, map_coordinates
@@ -11,12 +10,12 @@ from .._common_functions import (
     apply_interaction_constant,
 )
 from .._config import AbstractConfig
-from .._potential_representation import RealVoxelGridPotential
+from .._structure_representation import RealVoxelGridStructure
 from .base_multislice_integrator import AbstractMultisliceIntegrator
 
 
 class FFTMultisliceIntegrator(
-    AbstractMultisliceIntegrator[RealVoxelGridPotential], strict=True
+    AbstractMultisliceIntegrator[RealVoxelGridStructure], strict=True
 ):
     """Multislice integrator that steps using successive FFT-based convolutions."""
 
@@ -44,7 +43,7 @@ class FFTMultisliceIntegrator(
     @override
     def integrate(
         self,
-        potential: RealVoxelGridPotential,
+        potential: RealVoxelGridStructure,
         config: AbstractConfig,
         amplitude_contrast_ratio: Float[Array, ""] | float,
     ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim}"]:
@@ -53,8 +52,13 @@ class FFTMultisliceIntegrator(
 
         **Arguments:**
 
-        - `potential`: The atomic potential to project.
-        - `config`: The configuration of the imaging instrument.
+        - `potential`:
+            The structure to integrate to the exit plane. This is
+            a real-valued voxel grid, which must be in physical units
+            of a scattering potential. See rendering method
+            `PengTabulatedPotential.as_real_voxel_grid` for an example.
+        - `config`:
+            The configuration of the imaging instrument.
 
         **Returns:**
 
@@ -62,7 +66,7 @@ class FFTMultisliceIntegrator(
         """  # noqa: E501
         # Interpolate volume to new pose at given coordinate system
         z_dim, y_dim, x_dim = potential.real_voxel_grid.shape
-        voxel_size = potential.voxel_size
+        voxel_size = config.pixel_size
         potential_voxel_grid = _interpolate_voxel_grid(
             potential.real_voxel_grid,
             potential.coordinate_grid_in_pixels,
@@ -121,13 +125,6 @@ class FFTMultisliceIntegrator(
         )
         # Compute exit wave
         exit_wave = jax.lax.fori_loop(0, n_slices, make_step, plane_wave)
-        # Check exit wave is at correct pixel size
-        exit_wave = error_if(
-            exit_wave,
-            ~jnp.isclose(potential.voxel_size, config.pixel_size),
-            f"Tried to use {type(self).__name__} with `{type(potential).__name__}."
-            "voxel_size != AbstractConfig.pixel_size`.",
-        )
         # Resize the image to match the AbstractConfig.padded_shape
         if config.padded_shape != exit_wave.shape:
             exit_wave = config.crop_or_pad_to_padded_shape(

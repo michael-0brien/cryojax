@@ -1,25 +1,24 @@
 """
-Methods for integrating the scattering potential directly onto the exit plane.
+Methods for integrating the structure directly onto the exit plane.
 """
 
 from abc import abstractmethod
 from typing import Generic, TypeVar
 
 import equinox as eqx
-import jax.numpy as jnp
-from equinox import AbstractClassVar, AbstractVar, error_if
+from equinox import AbstractClassVar
 from jaxtyping import Array, Complex, Float
 
 from .._config import AbstractConfig
-from .._potential_representation import AbstractVoxelPotential
+from .._structure_representation import AbstractVoxelStructure
 
 
-PotentialT = TypeVar("PotentialT")
-VoxelPotentialT = TypeVar("VoxelPotentialT", bound="AbstractVoxelPotential")
+StructureT = TypeVar("StructureT")
+VoxelStructureT = TypeVar("VoxelStructureT", bound="AbstractVoxelStructure")
 
 
-class AbstractDirectIntegrator(eqx.Module, Generic[PotentialT], strict=True):
-    """Base class for a method of integrating a potential onto
+class AbstractDirectIntegrator(eqx.Module, Generic[StructureT], strict=True):
+    """Base class for a method of integrating a structure onto
     the exit plane.
     """
 
@@ -28,7 +27,7 @@ class AbstractDirectIntegrator(eqx.Module, Generic[PotentialT], strict=True):
     @abstractmethod
     def integrate(
         self,
-        potential: PotentialT,
+        structure: StructureT,
         config: AbstractConfig,
         outputs_real_space: bool = False,
     ) -> (
@@ -43,23 +42,6 @@ class AbstractDirectIntegrator(eqx.Module, Generic[PotentialT], strict=True):
 
 
 class AbstractDirectVoxelIntegrator(
-    AbstractDirectIntegrator[VoxelPotentialT], strict=True
+    AbstractDirectIntegrator[StructureT], Generic[StructureT], strict=True
 ):
-    """Base class for a method of integrating a voxel-based potential."""
-
-    checks_pixel_size: AbstractVar[bool]
-
-    def _check_pixel_size(
-        self,
-        fourier_in_plane_potential: Array,
-        potential: AbstractVoxelPotential,
-        config: AbstractConfig,
-    ) -> Array:
-        """Check to make sure the voxel and pixel sizes are the same."""
-        fourier_in_plane_potential = error_if(
-            fourier_in_plane_potential,
-            ~jnp.isclose(potential.voxel_size, config.pixel_size),
-            f"Tried to use {type(self).__name__} with `{type(potential).__name__}."
-            f"voxel_size != {type(config).__name__}.pixel_size`.",
-        )
-        return fourier_in_plane_potential
+    outputs_integral: eqx.AbstractVar[bool]

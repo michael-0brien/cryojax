@@ -8,8 +8,8 @@ from .._pose import AbstractPose
 from .base_structure import AbstractPointCloudStructure
 
 
-class AbstractMolecularStructure(AbstractPointCloudStructure, strict=True):
-    """A molecular structure representation."""
+class AbstractIndependentAtomStructure(AbstractPointCloudStructure, strict=True):
+    """A molecular structure representation as independent atoms."""
 
     atom_positions: eqx.AbstractVar[Float[Array, "n_atoms 3"]]
 
@@ -33,7 +33,3 @@ class AbstractMolecularStructure(AbstractPointCloudStructure, strict=True):
         return eqx.tree_at(
             lambda d: d.atom_positions, self, self.atom_positions + offset_in_angstroms
         )
-
-
-class AbstractIndependentAtomStructure(eqx.Module, strict=True):
-    """A structure representation in the independent atom approximation."""

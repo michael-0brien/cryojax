@@ -7,12 +7,17 @@ from jaxtyping import Array, Float
 from ...constants import convert_variance_to_b_factor
 from ...internal import NDArrayLike, error_if_not_positive
 from .._pose import AbstractPose
-from .base_structure import AbstractPointCloudStructure, AbstractRealVoxelRendering
+from .base_structure import (
+    AbstractFixedStructure,
+    AbstractPointCloudStructure,
+    AbstractRealVoxelRendering,
+)
 from .common_functions import gaussians_to_real_voxels
 
 
-class GaussianMixturePotential(
+class GaussianMixtureStructure(
     AbstractPointCloudStructure,
+    AbstractFixedStructure,
     AbstractRealVoxelRendering,
     strict=True,
 ):
@@ -20,15 +25,15 @@ class GaussianMixturePotential(
     gaussians.
     """
 
-    positions: Float[Array, "n_atoms 3"]
-    amplitudes: Float[Array, " n_atoms"]
-    variances: Float[Array, " n_atoms"]
+    positions: Float[Array, "n_gaussians 3"]
+    amplitudes: Float[Array, " n_gaussians"]
+    variances: Float[Array, " n_gaussians"]
 
     def __init__(
         self,
-        positions: Float[NDArrayLike, "n_atoms 3"],
-        amplitudes: Float[NDArrayLike, " n_atoms"],
-        variances: Float[NDArrayLike, " n_atoms"],
+        positions: Float[NDArrayLike, "n_gaussians 3"],
+        amplitudes: Float[NDArrayLike, " n_gaussians"],
+        variances: Float[NDArrayLike, " n_gaussians"],
     ):
         """**Arguments:**
 

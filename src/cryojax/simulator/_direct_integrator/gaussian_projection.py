@@ -15,15 +15,12 @@ from ...ndimage import (
     rfftn,
 )
 from .._config import AbstractConfig
-from .._potential_representation import (
-    GaussianMixtureAtomicPotential,
-    PengAtomicPotential,
-)
+from .._structure_representation import GaussianMixtureStructure, PengTabulatedPotential
 from .base_direct_integrator import AbstractDirectIntegrator
 
 
 class GaussianMixtureProjection(
-    AbstractDirectIntegrator[GaussianMixtureAtomicPotential | PengAtomicPotential],
+    AbstractDirectIntegrator[GaussianMixtureStructure | PengTabulatedPotential],
     strict=True,
 ):
     upsampling_factor: Optional[int]
@@ -38,7 +35,7 @@ class GaussianMixtureProjection(
         *,
         upsampling_factor: Optional[int] = None,
         shape: Optional[tuple[int, int]] = None,
-        use_error_functions: bool = False,
+        use_error_functions: bool = True,
         n_batches: int = 1,
     ):
         """**Arguments:**
@@ -58,10 +55,10 @@ class GaussianMixtureProjection(
             integrals. If `False`, the potential at a pixel will simply be evaluated
             as a gaussian.
         - `n_batches`:
-            The number of batches over groups of atoms
+            The number of batches over groups of positions
             used to evaluate the projection.
             This is useful if GPU memory is exhausted. By default,
-            `1`, which computes a projection for all atoms at once.
+            `1`, which computes a projection for all positions at once.
         """  # noqa: E501
         self.upsampling_factor = upsampling_factor
         self.shape = shape
@@ -78,7 +75,7 @@ class GaussianMixtureProjection(
     @override
     def integrate(
         self,
-        potential: GaussianMixtureAtomicPotential | PengAtomicPotential,
+        structure: GaussianMixtureStructure | PengTabulatedPotential,
         config: AbstractConfig,
         outputs_real_space: bool = False,
     ) -> (
@@ -88,12 +85,12 @@ class GaussianMixtureProjection(
         ]
         | Float[Array, "{config.padded_y_dim} {config.padded_x_dim}"]
     ):
-        """Compute a projection from the atomic potential and transform it to Fourier
+        """Compute a projection from gaussians and transform it to Fourier
         space.
 
         **Arguments:**
 
-        - `potential`: The atomic potential to project.
+        - `structure`: The structure representation to project.
         - `config`: The configuration of the imaging instrument.
 
         **Returns:**
@@ -115,28 +112,28 @@ class GaussianMixtureProjection(
         else:
             upsampled_pixel_size, upsampled_shape = pixel_size, shape
         # Grab the gaussian amplitudes and widths
-        if isinstance(potential, PengAtomicPotential):
-            gaussian_amplitudes = potential.scattering_factor_a
-            gaussian_widths = potential.scattering_factor_b
-            if potential.b_factors is not None:
-                gaussian_widths += potential.b_factors[:, None]
-        elif isinstance(potential, GaussianMixtureAtomicPotential):
-            gaussian_amplitudes = potential.gaussian_amplitudes
-            gaussian_widths = jnp.asarray(
-                convert_variance_to_b_factor(potential.gaussian_variances)
-            )
+        if isinstance(structure, PengTabulatedPotential):
+            positions = structure.atom_positions
+            amplitudes = structure.scattering_factor_parameters.a
+            b_factors = structure.scattering_factor_parameters.b
+            if structure.b_factors is not None:
+                b_factors += structure.b_factors[:, None]
+        elif isinstance(structure, GaussianMixtureStructure):
+            positions = structure.positions
+            amplitudes = structure.amplitudes
+            b_factors = jnp.asarray(convert_variance_to_b_factor(structure.variances))
         else:
             raise ValueError(
-                "Supported types for `potential` are `PengAtomicPotential` and "
-                "`GaussianMixtureAtomicPotential`."
+                "Supported types for `structure` are `PengTabulatedPotential` and "
+                "`GaussianMixtureStructure`."
             )
         # Compute the projection
-        in_plane_potential = _compute_projected_potential_from_atoms(
+        projection_integral = _gaussians_to_projection(
             upsampled_shape,
             upsampled_pixel_size,
-            potential.atom_positions,
-            gaussian_amplitudes,
-            gaussian_widths,
+            positions,
+            amplitudes,
+            b_factors,
             self.use_error_functions,
             self.n_batches,
         )
@@ -146,142 +143,141 @@ class GaussianMixtureProjection(
             n_pixels, upsampled_n_pixels = math.prod(shape), math.prod(upsampled_shape)
             if self.shape is None:
                 return downsample_to_shape_with_fourier_cropping(
-                    in_plane_potential * (n_pixels / upsampled_n_pixels),
+                    projection_integral * (n_pixels / upsampled_n_pixels),
                     downsampled_shape=shape,
                     outputs_real_space=outputs_real_space,
                 )
             else:
-                in_plane_potential = downsample_to_shape_with_fourier_cropping(
-                    in_plane_potential * (n_pixels / upsampled_n_pixels),
+                projection_integral = downsample_to_shape_with_fourier_cropping(
+                    projection_integral * (n_pixels / upsampled_n_pixels),
                     downsampled_shape=shape,
                     outputs_real_space=True,
                 )
-                in_plane_potential = resize_with_crop_or_pad(
-                    in_plane_potential, config.padded_shape
+                projection_integral = resize_with_crop_or_pad(
+                    projection_integral, config.padded_shape
                 )
                 return (
-                    in_plane_potential
+                    projection_integral
                     if outputs_real_space
-                    else rfftn(in_plane_potential)
+                    else rfftn(projection_integral)
                 )
         else:
             if self.shape is None:
                 return (
-                    in_plane_potential
+                    projection_integral
                     if outputs_real_space
-                    else rfftn(in_plane_potential)
+                    else rfftn(projection_integral)
                 )
             else:
-                in_plane_potential = resize_with_crop_or_pad(
-                    in_plane_potential, config.padded_shape
+                projection_integral = resize_with_crop_or_pad(
+                    projection_integral, config.padded_shape
                 )
                 return (
-                    in_plane_potential
+                    projection_integral
                     if outputs_real_space
-                    else rfftn(in_plane_potential)
+                    else rfftn(projection_integral)
                 )
 
 
-def _compute_projected_potential_from_atoms(
+def _gaussians_to_projection(
     shape: tuple[int, int],
     pixel_size: Float[Array, ""],
-    atom_positions: Float[Array, "n_atoms 3"],
-    a: Float[Array, "n_atoms n_gaussians_per_atom"],
-    b: Float[Array, "n_atoms n_gaussians_per_atom"],
+    positions: Float[Array, "n_positions 3"],
+    a: Float[Array, "n_positions n_gaussians_per_position"],
+    b: Float[Array, "n_positions n_gaussians_per_position"],
     use_error_functions: bool,
     n_batches: int,
 ) -> Float[Array, "dim_y dim_x"]:
     # Make the grid on which to evaluate the result
     grid_x = make_1d_coordinate_grid(shape[1], pixel_size)
     grid_y = make_1d_coordinate_grid(shape[0], pixel_size)
-    # Get function and pytree to compute potential over a batch of atoms
-    xs = (atom_positions, a, b)
-    compute_potential_for_atom_group = (
-        lambda xs: _compute_projected_potential_from_atom_group(
-            grid_x,
-            grid_y,
-            pixel_size,
-            xs[0],
-            xs[1],
-            xs[2],
-            use_error_functions,
-        )
+    # Get function and pytree to compute potential over a batch of positions
+    xs = (positions, a, b)
+    kernel_fn = lambda xs: _gaussians_to_projection_kernel(
+        grid_x,
+        grid_y,
+        pixel_size,
+        xs[0],
+        xs[1],
+        xs[2],
+        use_error_functions,
     )
     # Compute projection with a call to `jax.lax.map` in batches
-    if n_batches > atom_positions.shape[0]:
+    if n_batches > positions.shape[0]:
         raise ValueError(
             "The `n_batches` when computing a projection must "
-            "be an integer less than or equal to the number of atoms, "
-            f"which is equal to {atom_positions.shape[0]}. Got "
+            "be an integer less than or equal to the number of positions, "
+            f"which is equal to {positions.shape[0]}. Got "
             f"`n_batches = {n_batches}`."
         )
     elif n_batches == 1:
-        projection = compute_potential_for_atom_group(xs)
+        projection = kernel_fn(xs)
     elif n_batches > 1:
         projection = jnp.sum(
-            _batched_map_with_contraction(
-                compute_potential_for_atom_group, xs, n_batches
-            ),
+            _batched_map_with_contraction(kernel_fn, xs, n_batches),
             axis=0,
         )
     else:
         raise ValueError(
-            "The `n_batches` when building a voxel grid must be an "
+            "The `n_batches` argument for `GaussianMixtureProjection` must be an "
             "integer greater than or equal to 1."
         )
     return projection
 
 
-def _compute_projected_potential_from_atom_group(
+def _gaussians_to_projection_kernel(
     grid_x: Float[Array, " dim_x"],
     grid_y: Float[Array, " dim_y"],
     pixel_size: Float[Array, ""],
-    atom_positions: Float[Array, "n_atoms 3"],
-    a: Float[Array, "n_atoms n_gaussians_per_atom"],
-    b: Float[Array, "n_atoms n_gaussians_per_atom"],
+    positions: Float[Array, "n_positions 3"],
+    a: Float[Array, "n_positions n_gaussians_per_position"],
+    b: Float[Array, "n_positions n_gaussians_per_position"],
     use_error_functions: bool,
 ) -> Float[Array, "dim_y dim_x"]:
     # Evaluate 1D gaussian integrals for each of x, y, and z dimensions
 
     if use_error_functions:
-        result = _compute_gaussian_integrals_for_all_atoms(
-            grid_x, grid_y, atom_positions, a, b, pixel_size
+        gaussians_times_prefactor_x, gaussians_y = _evaluate_gaussian_integrals(
+            grid_x, grid_y, positions, a, b, pixel_size
         )
     else:
-        result = _compute_gaussians_for_all_atoms(grid_x, grid_y, atom_positions, a, b)
-    gaussians_times_prefactor_x, gaussians_y = result
-    projection = _compute_projected_potential_from_gaussians(
-        gaussians_times_prefactor_x, gaussians_y
-    )
+        gaussians_times_prefactor_x, gaussians_y = _evaluate_gaussians(
+            grid_x, grid_y, positions, a, b
+        )
+    projection = _evaluate_multivariate_gaussian(gaussians_times_prefactor_x, gaussians_y)
 
     return projection
 
 
-def _compute_projected_potential_from_gaussians(
-    gaussians_per_interval_per_atom_x: Float[Array, "dim_x n_atoms n_gaussians_per_atom"],
-    gaussians_per_interval_per_atom_y: Float[Array, "dim_y n_atoms n_gaussians_per_atom"],
+def _evaluate_multivariate_gaussian(
+    gaussians_per_interval_per_position_x: Float[
+        Array, "dim_x n_positions n_gaussians_per_position"
+    ],
+    gaussians_per_interval_per_position_y: Float[
+        Array, "dim_y n_positions n_gaussians_per_position"
+    ],
 ) -> Float[Array, "dim_y dim_x"]:
-    # Prepare matrices with dimensions of the number of atoms and the number of grid
-    # points. There are as many matrices as number of gaussians per atom
-    gauss_x = jnp.transpose(gaussians_per_interval_per_atom_x, (2, 1, 0))
-    gauss_y = jnp.transpose(gaussians_per_interval_per_atom_y, (2, 0, 1))
-    # Compute matrix multiplication then sum over the number of gaussians per atom
+    # Prepare matrices with dimensions of the number of positions and the number of grid
+    # points. There are as many matrices as number of gaussians per position
+    gauss_x = jnp.transpose(gaussians_per_interval_per_position_x, (2, 1, 0))
+    gauss_y = jnp.transpose(gaussians_per_interval_per_position_y, (2, 0, 1))
+    # Compute matrix multiplication then sum over the number of gaussians per position
     return jnp.sum(jnp.matmul(gauss_y, gauss_x), axis=0)
 
 
-def _compute_gaussian_integrals_for_all_atoms(
+def _evaluate_gaussian_integrals(
     grid_x: Float[Array, " dim_x"],
     grid_y: Float[Array, " dim_y"],
-    atom_positions: Float[Array, "n_atoms 3"],
-    a: Float[Array, "n_atoms n_gaussians_per_atom"],
-    b: Float[Array, "n_atoms n_gaussians_per_atom"],
+    positions: Float[Array, "n_positions 3"],
+    a: Float[Array, "n_positions n_gaussians_per_position"],
+    b: Float[Array, "n_positions n_gaussians_per_position"],
     pixel_size: Float[Array, ""],
 ) -> tuple[
-    Float[Array, "dim_x n_atoms n_gaussians_per_atom"],
-    Float[Array, "dim_y n_atoms n_gaussians_per_atom"],
+    Float[Array, "dim_x n_positions n_gaussians_per_position"],
+    Float[Array, "dim_y n_positions n_gaussians_per_position"],
 ]:
     """Evaluate 1D averaged gaussians in x, y, and z dimensions
-    for each atom and each gaussian per atom.
+    for each position and each gaussian per position.
     """
     # Define function to compute integrals for each dimension
     scaling = 2 * jnp.pi / jnp.sqrt(b)
@@ -289,45 +285,45 @@ def _compute_gaussian_integrals_for_all_atoms(
         jsp.special.erf(scaling[None, :, :] * (delta + pixel_size)[:, :, None])
         - jsp.special.erf(scaling[None, :, :] * delta[:, :, None])
     )
-    # Compute outer product of left edge of grid points minus atomic positions
+    # Compute outer product of left edge of grid points minus positions
     left_edge_grid_x, left_edge_grid_y = (
         grid_x - pixel_size / 2,
         grid_y - pixel_size / 2,
     )
     delta_x, delta_y = (
-        left_edge_grid_x[:, None] - atom_positions[:, 0],
-        left_edge_grid_y[:, None] - atom_positions[:, 1],
+        left_edge_grid_x[:, None] - positions[:, 0],
+        left_edge_grid_y[:, None] - positions[:, 1],
     )
-    # Compute gaussian integrals for each grid point, each atom, and
-    # each gaussian per atom
+    # Compute gaussian integrals for each grid point, each position, and
+    # each gaussian per position
     gauss_x, gauss_y = (integration_kernel(delta_x), integration_kernel(delta_y))
-    # Compute the prefactors for each atom and each gaussian per atom
+    # Compute the prefactors for each position and each gaussian per position
     # for the potential
     prefactor = (4 * jnp.pi * a) / (2 * pixel_size) ** 2
     # Multiply the prefactor onto one of the gaussians for efficiency
     return prefactor * gauss_x, gauss_y
 
 
-def _compute_gaussians_for_all_atoms(
+def _evaluate_gaussians(
     grid_x: Float[Array, " x_dim"],
     grid_y: Float[Array, " y_dim"],
-    atom_positions: Float[Array, "n_atoms 3"],
-    a: Float[Array, "n_atoms n_gaussians_per_atom"],
-    b: Float[Array, "n_atoms n_gaussians_per_atom"],
+    positions: Float[Array, "n_positions 3"],
+    a: Float[Array, "n_positions n_gaussians_per_position"],
+    b: Float[Array, "n_positions n_gaussians_per_position"],
 ) -> tuple[
-    Float[Array, "dim_x n_atoms n_gaussians_per_atom"],
-    Float[Array, "dim_y n_atoms n_gaussians_per_atom"],
+    Float[Array, "dim_x n_positions n_gaussians_per_position"],
+    Float[Array, "dim_y n_positions n_gaussians_per_position"],
 ]:
     b_inverse = 4.0 * jnp.pi / b
     gauss_x = jnp.exp(
         -jnp.pi
         * b_inverse[None, :, :]
-        * ((grid_x[:, None] - atom_positions.T[0, :]) ** 2)[:, :, None]
+        * ((grid_x[:, None] - positions.T[0, :]) ** 2)[:, :, None]
     )
     gauss_y = jnp.exp(
         -jnp.pi
         * b_inverse[None, :, :]
-        * ((grid_y[:, None] - atom_positions.T[1, :]) ** 2)[:, :, None]
+        * ((grid_y[:, None] - positions.T[1, :]) ** 2)[:, :, None]
     )
     prefactor = 4 * jnp.pi * a[None, :, :] * b_inverse[None, :, :]
 

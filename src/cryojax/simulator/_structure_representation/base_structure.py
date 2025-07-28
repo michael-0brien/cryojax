@@ -18,6 +18,16 @@ T = TypeVar("T")
 #
 # Structures and maps to structures
 #
+class AbstractStructureMapping(eqx.Module, strict=True):
+    """Abstract interface for a data representation of a protein
+    structure.
+    """
+
+    @abc.abstractmethod
+    def map_to_structure(self) -> "AbstractStructureRepresentation":
+        raise NotImplementedError
+
+
 class AbstractStructureRepresentation(eqx.Module, strict=True):
     """Abstract interface for a structure with a coordinate system."""
 
@@ -26,28 +36,18 @@ class AbstractStructureRepresentation(eqx.Module, strict=True):
         raise NotImplementedError
 
 
-class AbstractStructureMapping(eqx.Module, strict=True):
-    """Abstract interface for a data representation of a protein
-    structure.
-    """
-
-    @abc.abstractmethod
-    def map_to_structure(self) -> AbstractStructureRepresentation:
-        raise NotImplementedError
-
-
 #
 # With and without conformational heterogeneity
 #
 class AbstractFixedStructure(
-    AbstractStructureRepresentation, AbstractStructureMapping, strict=True
+    AbstractStructureMapping, AbstractStructureRepresentation, strict=True
 ):
     """Abstract interface for a structure with no conformational
     heterogeneity.
     """
 
     @override
-    def map_to_structure(self) -> AbstractStructureRepresentation:
+    def map_to_structure(self) -> "AbstractStructureRepresentation":
         return self
 
 
@@ -62,7 +62,7 @@ class AbstractStructuralEnsemble(AbstractStructureMapping, strict=True):
 #
 # Common representations
 #
-class AbstractPointCloudStructure(AbstractFixedStructure, strict=True):
+class AbstractPointCloudStructure(AbstractStructureRepresentation, strict=True):
     """Abstract interface for a structure represented as a point-cloud."""
 
     @abc.abstractmethod
@@ -83,17 +83,5 @@ class AbstractRealVoxelRendering(eqx.Module, strict=True):
         voxel_size: Float[Array, ""] | float,
         *,
         options: dict = {},
-    ) -> Float[Array, "{shape[0]} {shape[1]} {shape[2]}"]:
-        raise NotImplementedError
-
-
-class AbstractFourierVoxelRendering(eqx.Module, strict=True):
-    """Abstract interface for fourier-space voxel rendering."""
-
-    @abc.abstractmethod
-    def as_fourier_voxel_grid(
-        self,
-        shape: tuple[int, int, int],
-        voxel_size: Float[Array, ""] | float,
     ) -> Float[Array, "{shape[0]} {shape[1]} {shape[2]}"]:
         raise NotImplementedError

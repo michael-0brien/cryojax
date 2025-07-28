@@ -1,7 +1,9 @@
+from .atomic_structure import (
+    AbstractIndependentAtomStructure as AbstractIndependentAtomStructure,
+)
 from .base_structure import (
     # With and without conformations
     AbstractFixedStructure as AbstractFixedStructure,
-    AbstractFourierVoxelRendering as AbstractFourierVoxelRendering,
     # Common interfaces
     AbstractPointCloudStructure as AbstractPointCloudStructure,
     # Converting structures to data
@@ -12,6 +14,7 @@ from .base_structure import (
     AbstractStructureRepresentation as AbstractStructureRepresentation,
 )
 from .discrete_ensemble import DiscreteStructuralEnsemble as DiscreteStructuralEnsemble
+from .gmm_structure import GaussianMixtureStructure as GaussianMixtureStructure
 from .scattering_potential import (
     AbstractScatteringFactorParameters as AbstractScatteringFactorParameters,
     AbstractScatteringPotential as AbstractScatteringPotential,
@@ -20,9 +23,8 @@ from .scattering_potential import (
     PengTabulatedPotential as PengTabulatedPotential,
 )
 from .voxel_structure import (
-    AbstractFourierVoxelStructure as AbstractFourierVoxelStructure,
-    AbstractRealVoxelStructure as AbstractRealVoxelStructure,
     AbstractVoxelStructure as AbstractVoxelStructure,
     FourierVoxelGridStructure as FourierVoxelGridStructure,
+    FourierVoxelSplineStructure as FourierVoxelSplineStructure,
     RealVoxelGridStructure as RealVoxelGridStructure,
 )
