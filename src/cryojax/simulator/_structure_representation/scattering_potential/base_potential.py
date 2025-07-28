@@ -45,7 +45,3 @@ class AbstractScatteringPotential(eqx.Module, strict=True):
         "Image formation modeling in cryo-electron microscopy." Journal of structural
         biology 183.1 (2013): 19-32.*
     """  # noqa: E501
-
-
-class AbstractIndependentAtomPotential(eqx.Module, strict=True):
-    """A scattering potential in the independent atom approximation."""

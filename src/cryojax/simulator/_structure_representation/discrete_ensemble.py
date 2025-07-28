@@ -9,20 +9,20 @@ import jax.numpy as jnp
 from jaxtyping import Array, Int
 
 from ...internal import error_if_negative
-from .base_structure import AbstractHeterogeneousStructure, AbstractHomogeneousStructure
+from .base_structure import AbstractStructuralEnsemble, AbstractStructureRepresentation
 
 
-class DiscreteStructuralEnsemble(AbstractHeterogeneousStructure, strict=True):
+class DiscreteStructuralEnsemble(AbstractStructuralEnsemble, strict=True):
     """Abstraction of an ensemble with discrete conformational
     heterogeneity.
     """
 
-    conformational_space: tuple[AbstractHomogeneousStructure, ...]
+    conformational_space: tuple[AbstractStructureRepresentation, ...]
     conformation: Int[Array, ""]
 
     def __init__(
         self,
-        conformational_space: tuple[AbstractHomogeneousStructure, ...],
+        conformational_space: tuple[AbstractStructureRepresentation, ...],
         conformation: int | Int[Array, ""],
     ):
         """**Arguments:**
@@ -35,7 +35,7 @@ class DiscreteStructuralEnsemble(AbstractHeterogeneousStructure, strict=True):
         self.conformation = jnp.asarray(error_if_negative(conformation))
 
     @override
-    def map_to_structure(self) -> AbstractHomogeneousStructure:
+    def map_to_structure(self) -> AbstractStructureRepresentation:
         """Get the scattering potential at configured conformation."""
         funcs = [
             lambda i=i: self.conformational_space[i]
