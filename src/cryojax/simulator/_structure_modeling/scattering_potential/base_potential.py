@@ -1,7 +1,9 @@
 import equinox as eqx
 
 
-class AbstractScatteringPotential(eqx.Module, strict=True):
+class AbstractScatteringPotential(
+    eqx.Module, strict=eqx.StrictConfig(force_abstract=True)
+):
     """Abstract interface for the spatial potential energy distribution of a
     scatterer.
 

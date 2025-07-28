@@ -15,12 +15,20 @@ from ...ndimage import (
     rfftn,
 )
 from .._config import AbstractConfig
-from .._structure_modeling import GaussianMixtureStructure, PengTabulatedPotential
+from .._structure_modeling import (
+    GaussianMixtureAtomicPotential,
+    GaussianMixtureStructure,
+    PengTabulatedAtomicPotential,
+)
 from .base_direct_integrator import AbstractDirectIntegrator
 
 
 class GaussianMixtureProjection(
-    AbstractDirectIntegrator[GaussianMixtureStructure | PengTabulatedPotential],
+    AbstractDirectIntegrator[
+        GaussianMixtureStructure
+        | GaussianMixtureAtomicPotential
+        | PengTabulatedAtomicPotential
+    ],
     strict=True,
 ):
     upsampling_factor: Optional[int]
@@ -75,7 +83,11 @@ class GaussianMixtureProjection(
     @override
     def integrate(
         self,
-        structure: GaussianMixtureStructure | PengTabulatedPotential,
+        structure: (
+            GaussianMixtureStructure
+            | GaussianMixtureAtomicPotential
+            | PengTabulatedAtomicPotential
+        ),
         config: AbstractConfig,
         outputs_real_space: bool = False,
     ) -> (
@@ -112,7 +124,7 @@ class GaussianMixtureProjection(
         else:
             upsampled_pixel_size, upsampled_shape = pixel_size, shape
         # Grab the gaussian amplitudes and widths
-        if isinstance(structure, PengTabulatedPotential):
+        if isinstance(structure, PengTabulatedAtomicPotential):
             positions = structure.atom_positions
             amplitudes = structure.scattering_factor_parameters.a
             b_factors = structure.scattering_factor_parameters.b
@@ -122,6 +134,10 @@ class GaussianMixtureProjection(
             positions = structure.positions
             amplitudes = structure.amplitudes
             b_factors = jnp.asarray(convert_variance_to_b_factor(structure.variances))
+        elif isinstance(structure, GaussianMixtureAtomicPotential):
+            positions = structure.atom_positions
+            amplitudes = structure.amplitudes
+            b_factors = jnp.asarray(structure.b_factors)
         else:
             raise ValueError(
                 "Supported types for `structure` are `PengTabulatedPotential` and "

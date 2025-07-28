@@ -2,7 +2,6 @@
 Voxel-based representations of a structure.
 """
 
-import abc
 from typing import Optional, cast
 from typing_extensions import Self, override
 
@@ -20,28 +19,7 @@ from ...ndimage import (
 )
 from ...ndimage.transforms import AbstractFilter
 from .._pose import AbstractPose
-from .base_structure import AbstractFixedStructure
-
-
-class AbstractVoxelStructure(AbstractFixedStructure, strict=True):
-    """Abstract interface for a voxel-based structure."""
-
-    @property
-    @abc.abstractmethod
-    def shape(self) -> tuple[int, ...]:
-        """The shape of the voxel array."""
-        raise NotImplementedError
-
-    @classmethod
-    @abc.abstractmethod
-    def from_real_voxel_grid(
-        cls,
-        real_voxel_grid: Float[NDArrayLike, "dim dim dim"],
-    ) -> Self:
-        """Load an `AbstractVoxelStructure` from a 3D grid in
-        real-space.
-        """
-        raise NotImplementedError
+from .base_structure import AbstractVoxelStructure
 
 
 class AbstractFourierVoxelStructure(AbstractVoxelStructure, strict=True):
@@ -58,7 +36,7 @@ class AbstractFourierVoxelStructure(AbstractVoxelStructure, strict=True):
         )
 
 
-class FourierVoxelGridStructure(AbstractVoxelStructure, strict=True):
+class FourierVoxelGridStructure(AbstractFourierVoxelStructure, strict=True):
     """A 3D voxel grid in fourier-space."""
 
     fourier_voxel_grid: Complex[Array, "dim dim dim"]

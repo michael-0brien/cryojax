@@ -3,50 +3,88 @@ from typing_extensions import override
 
 import equinox as eqx
 import jax.numpy as jnp
-from jaxtyping import Array, Float, Int
+import numpy as np
+from jaxtyping import Array, Float, Int, PyTree
 
 from ....constants import (
+    get_tabulated_scattering_factor_parameters,
     read_peng_element_scattering_factor_parameter_table,
 )
 from ....internal import NDArrayLike, error_if_negative
 from ..atomic_structure import AbstractIndependentAtomStructure
-from ..base_structure import AbstractFixedStructure, AbstractRealVoxelRendering
+from ..base_structure import AbstractRealVoxelRendering
 from ..common_functions import gaussians_to_real_voxels
 from .base_potential import AbstractScatteringPotential
 
 
-class AbstractScatteringFactorParameters(eqx.Module, strict=True):
-    """"""
-
-
 class PengScatteringFactorParameters(eqx.Module, strict=True):
-    """"""
+    """Scattering factor parameters from Peng et al. (1996)."""
 
     a: Float[Array, " n_atoms 5"]
     b: Float[Array, " n_atoms 5"]
 
-    def __init__(self, atomic_numbers: Int[NDArrayLike, " n_atoms"]):
+    def __init__(self, atomic_numbers: Int[np.ndarray, " n_atoms"]):
         scattering_factor_parameter_table = (
             read_peng_element_scattering_factor_parameter_table()
         )
-        self.a = jnp.asarray(
-            scattering_factor_parameter_table["a"].data[atomic_numbers, ...], dtype=float
+        scattering_factor_parameter_dict = get_tabulated_scattering_factor_parameters(
+            atomic_numbers, scattering_factor_parameter_table
         )
-        self.b = jnp.asarray(
-            scattering_factor_parameter_table["b"].data[atomic_numbers, ...], dtype=float
-        )
+        self.a = jnp.asarray(scattering_factor_parameter_dict["a"], dtype=float)
+        self.b = jnp.asarray(scattering_factor_parameter_dict["b"], dtype=float)
 
 
-class AbstractTabulatedPotential(AbstractScatteringPotential, strict=True):
-    """"""
+class AbstractTabulatedScatteringPotential(AbstractScatteringPotential, strict=True):
+    """Abstract interface for the spatial potential energy distribution of a
+    scatterer.
 
-    scattering_factor_parameters: eqx.AbstractVar[AbstractScatteringFactorParameters]
+    !!! info
+        In, `cryojax`, potentials should be built in units of *inverse length squared*,
+        $[L]^{-2}$. This rescaled potential is defined to be
+
+        $$U(\\mathbf{r}) = \\frac{2 m e}{\\hbar^2} V(\\mathbf{r}),$$
+
+        where $V$ is the electrostatic potential energy, $\\mathbf{r}$ is a positional
+        coordinate, $m$ is the electron mass, and $e$ is the electron charge.
+
+        For a single atom, this rescaled potential has the advantage that under usual
+        scattering approximations (i.e. the first-born approximation), the
+        fourier transform of this quantity is closely related to tabulated electron scattering
+        factors. In particular, for a single atom with scattering factor $f^{(e)}(\\mathbf{q})$
+        and scattering vector $\\mathbf{q}$, its rescaled potential is equal to
+
+        $$U(\\mathbf{r}) = 4 \\pi \\mathcal{F}^{-1}[f^{(e)}(\\boldsymbol{\\xi} / 2)](\\mathbf{r}),$$
+
+        where $\\boldsymbol{\\xi} = 2 \\mathbf{q}$ is the wave vector coordinate and
+        $\\mathcal{F}^{-1}$ is the inverse fourier transform operator in the convention
+
+        $$\\mathcal{F}[f](\\boldsymbol{\\xi}) = \\int d^3\\mathbf{r} \\ \\exp(2\\pi i \\boldsymbol{\\xi}\\cdot\\mathbf{r}) f(\\mathbf{r}).$$
+
+        The rescaled potential $U$ gives the following time-independent schrodinger equation
+        for the scattering problem,
+
+        $$(\\nabla^2 + k^2) \\psi(\\mathbf{r}) = - U(\\mathbf{r}) \\psi(\\mathbf{r}),$$
+
+        where $k$ is the incident wavenumber of the electron beam.
+
+        **References**:
+
+        - For the definition of the rescaled potential, see
+        Chapter 69, Page 2003, Equation 69.6 from *Hawkes, Peter W., and Erwin Kasper.
+        Principles of Electron Optics, Volume 4: Advanced Wave Optics. Academic Press,
+        2022.*
+        - To work out the correspondence between the rescaled potential and the electron
+        scattering factors, see the supplementary information from *Vulović, Miloš, et al.
+        "Image formation modeling in cryo-electron microscopy." Journal of structural
+        biology 183.1 (2013): 19-32.*
+    """  # noqa: E501
+
+    scattering_factor_parameters: eqx.AbstractVar[PyTree]
     b_factors: eqx.AbstractVar[Optional[Float[Array, " n_atoms"]]]
 
 
-class PengTabulatedPotential(
-    AbstractTabulatedPotential,
-    AbstractFixedStructure,
+class PengTabulatedAtomicPotential(
+    AbstractTabulatedScatteringPotential,
     AbstractIndependentAtomStructure,
     AbstractRealVoxelRendering,
     strict=True,
@@ -84,7 +122,7 @@ class PengTabulatedPotential(
     def as_real_voxel_grid(
         self,
         shape: tuple[int, int, int],
-        voxel_size: Float[Array, ""] | float,
+        voxel_size: Float[NDArrayLike, ""] | float,
         *,
         options: dict = {"batch_size": 1, "n_batches": 1},
     ) -> Float[Array, "{shape[0]} {shape[1]} {shape[2]}"]:

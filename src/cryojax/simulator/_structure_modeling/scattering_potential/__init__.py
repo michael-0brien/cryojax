@@ -1,7 +1,9 @@
 from .base_potential import AbstractScatteringPotential as AbstractScatteringPotential
+from .gmm_potential import (
+    GaussianMixtureAtomicPotential as GaussianMixtureAtomicPotential,
+)
 from .tabulated_potential import (
-    AbstractScatteringFactorParameters as AbstractScatteringFactorParameters,
-    AbstractTabulatedPotential as AbstractTabulatedPotential,
+    AbstractTabulatedScatteringPotential as AbstractTabulatedScatteringPotential,
     PengScatteringFactorParameters as PengScatteringFactorParameters,
-    PengTabulatedPotential as PengTabulatedPotential,
+    PengTabulatedAtomicPotential as PengTabulatedAtomicPotential,
 )

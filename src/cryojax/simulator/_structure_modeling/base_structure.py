@@ -9,6 +9,7 @@ from typing_extensions import Self, override
 import equinox as eqx
 from jaxtyping import Array, Float
 
+from ...internal import NDArrayLike
 from .._pose import AbstractPose
 
 
@@ -28,7 +29,7 @@ class AbstractStructureMapping(eqx.Module, strict=True):
         raise NotImplementedError
 
 
-class AbstractStructureRepresentation(eqx.Module, strict=True):
+class AbstractStructureRepresentation(AbstractStructureMapping, strict=True):
     """Abstract interface for a structure with a coordinate system."""
 
     @abc.abstractmethod
@@ -39,9 +40,7 @@ class AbstractStructureRepresentation(eqx.Module, strict=True):
 #
 # With and without conformational heterogeneity
 #
-class AbstractFixedStructure(
-    AbstractStructureMapping, AbstractStructureRepresentation, strict=True
-):
+class AbstractFixedStructure(AbstractStructureRepresentation, strict=True):
     """Abstract interface for a structure with no conformational
     heterogeneity.
     """
@@ -62,11 +61,32 @@ class AbstractStructuralEnsemble(AbstractStructureMapping, strict=True):
 #
 # Common representations
 #
-class AbstractPointCloudStructure(AbstractStructureRepresentation, strict=True):
+class AbstractPointCloudStructure(AbstractFixedStructure, strict=True):
     """Abstract interface for a structure represented as a point-cloud."""
 
     @abc.abstractmethod
     def translate_to_pose(self, pose: AbstractPose) -> Self:
+        raise NotImplementedError
+
+
+class AbstractVoxelStructure(AbstractFixedStructure, strict=True):
+    """Abstract interface for a voxel-based structure."""
+
+    @property
+    @abc.abstractmethod
+    def shape(self) -> tuple[int, ...]:
+        """The shape of the voxel array."""
+        raise NotImplementedError
+
+    @classmethod
+    @abc.abstractmethod
+    def from_real_voxel_grid(
+        cls,
+        real_voxel_grid: Float[NDArrayLike, "dim dim dim"],
+    ) -> Self:
+        """Load an `AbstractVoxelStructure` from a 3D grid in
+        real-space.
+        """
         raise NotImplementedError
 
 
@@ -80,7 +100,7 @@ class AbstractRealVoxelRendering(eqx.Module, strict=True):
     def as_real_voxel_grid(
         self,
         shape: tuple[int, int, int],
-        voxel_size: Float[Array, ""] | float,
+        voxel_size: Float[NDArrayLike, ""] | float,
         *,
         options: dict = {},
     ) -> Float[Array, "{shape[0]} {shape[1]} {shape[2]}"]:

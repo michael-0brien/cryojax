@@ -22,8 +22,9 @@ from ._structure_modeling import (
     AbstractStructureMapping,
     FourierVoxelGridStructure,
     FourierVoxelSplineStructure,
+    GaussianMixtureAtomicPotential,
     GaussianMixtureStructure,
-    PengTabulatedPotential,
+    PengTabulatedAtomicPotential,
     RealVoxelGridStructure,
 )
 from ._transfer_theory import ContrastTransferTheory
@@ -177,7 +178,14 @@ def make_image_model(
 def _select_default_integrator(structure):
     if isinstance(structure, (FourierVoxelGridStructure, FourierVoxelSplineStructure)):
         integrator = FourierSliceExtraction()
-    elif isinstance(structure, (PengTabulatedPotential, GaussianMixtureStructure)):
+    elif isinstance(
+        structure,
+        (
+            PengTabulatedAtomicPotential,
+            GaussianMixtureAtomicPotential,
+            GaussianMixtureStructure,
+        ),
+    ):
         integrator = GaussianMixtureProjection(use_error_functions=True)
     elif isinstance(structure, RealVoxelGridStructure):
         integrator = NufftProjection()
