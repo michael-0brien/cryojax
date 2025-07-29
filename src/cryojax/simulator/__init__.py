@@ -67,7 +67,6 @@ from ._structure import (
     DiscreteStructuralEnsemble as DiscreteStructuralEnsemble,
     FourierVoxelGridStructure as FourierVoxelGridStructure,
     FourierVoxelSplineStructure as FourierVoxelSplineStructure,
-    GaussianIndependentAtomPotential as GaussianIndependentAtomPotential,
     GaussianMixtureStructure as GaussianMixtureStructure,
     PengIndependentAtomPotential as PengIndependentAtomPotential,
     PengScatteringFactorParameters as PengScatteringFactorParameters,

@@ -22,7 +22,6 @@ from ._structure import (
     AbstractStructureMapping,
     FourierVoxelGridStructure,
     FourierVoxelSplineStructure,
-    GaussianIndependentAtomPotential,
     GaussianMixtureStructure,
     PengIndependentAtomPotential,
     RealVoxelGridStructure,
@@ -157,11 +156,7 @@ def _select_default_integrator(
         integrator = FourierSliceExtraction(outputs_integral=physical_units)
     elif isinstance(
         structure,
-        (
-            PengIndependentAtomPotential,
-            GaussianIndependentAtomPotential,
-            GaussianMixtureStructure,
-        ),
+        (PengIndependentAtomPotential, GaussianMixtureStructure),
     ):
         integrator = GaussianMixtureProjection(use_error_functions=True)
     elif isinstance(structure, RealVoxelGridStructure):

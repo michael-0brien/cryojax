@@ -1,5 +1,6 @@
+import abc
 from typing import Any, Optional
-from typing_extensions import override
+from typing_extensions import Self, override
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -21,13 +22,48 @@ from ..structure_conversion import (
 from .base_potential import AbstractScatteringPotential
 
 
+class AbstractTabulatedScatteringPotential(AbstractScatteringPotential, strict=True):
+    """Abstract class for a tabulated scattering potential."""
+
+    @classmethod
+    @abc.abstractmethod
+    def from_scattering_factor_parameters(
+        cls,
+        atom_positions: Float[NDArrayLike, "n_atoms 3"],
+        parameters: PyTree[Any],
+        extra_b_factors: Optional[Float[NDArrayLike, " n_atoms"]] = None,
+    ) -> Self:
+        raise NotImplementedError
+
+
 class PengScatteringFactorParameters(eqx.Module, strict=True):
-    """Scattering factor parameters from Peng et al. (1996)."""
+    """A convenience wrapper for instantiating the
+    scattering factor parameters from Peng et al. (1996).
+
+    To access scattering factors $a_i$ and $b_i$ given in
+    the citation,
+
+    ```python
+    from cryojax.io import read_atoms_from_pdb
+    from cryojax.simulator import PengScatteringFactorParameters
+
+    # Load positions of atoms and one-hot encoded atom names
+    atom_positions, atom_identities = read_atoms_from_pdb(...)
+    parameters = PengScatteringFactorParameters(atom_identities)
+    print(parameters.a)  # a_i
+    print(parameters.b)  # b_i
+    ```
+    """
 
     a: Float[Array, " n_atoms 5"]
     b: Float[Array, " n_atoms 5"]
 
     def __init__(self, atom_identities: Int[np.ndarray, " n_atoms"]):
+        """**Arguments:**
+
+        - `atom_types`:
+            The atom types as an integer array.
+        """
         scattering_factor_parameter_table = (
             read_peng_element_scattering_factor_parameter_table()
         )
@@ -38,46 +74,96 @@ class PengScatteringFactorParameters(eqx.Module, strict=True):
         self.b = jnp.asarray(scattering_factor_parameter_dict["b"], dtype=float)
 
 
-class AbstractTabulatedScatteringPotential(AbstractScatteringPotential, strict=True):
-    """Abstract class for a tabulated scattering potential."""
-
-    scattering_parameters: eqx.AbstractVar[PyTree]
-
-
 class PengIndependentAtomPotential(
     AbstractTabulatedScatteringPotential,
     AbstractIndependentAtomStructure,
     AbstractDiscretizesToRealVoxels,
     strict=True,
 ):
-    """The scattering potential parameterized as a mixture of five gaussians
-    per atom, through work by Lian-Mao Peng.
+    """The scattering potential parameterized as a mixture of five
+    gaussians per atom (Peng et al. 1996).
+
+    !!! info
+        Use the following to load a `PengIndependentAtomPotential`
+        from tabulated electron scattering factors
+
+        ```python
+        from cryojax.io import read_atoms_from_pdb
+        from cryojax.simulator import (
+            PengIndependentAtomPotential, PengScatteringFactorParameters
+        )
+
+        # Load positions of atoms and one-hot encoded atom names
+        atom_positions, atom_identities = read_atoms_from_pdb(...)
+        parameters = PengScatteringFactorParameters(atom_identities)
+        potential = PengIndependentAtomPotential.from_scattering_factor_parameters(
+            atom_positions, parameters
+        )
+        ```
 
     **References:**
 
     - Peng, L-M. "Electron atomic scattering factors and scattering potentials of crystals."
-      Micron 30.6 (1999): 625-648.
+        Micron 30.6 (1999): 625-648.
     - Peng, L-M., et al. "Robust parameterization of elastic and absorptive electron atomic
-      scattering factors." Acta Crystallographica Section A: Foundations of Crystallography
-      52.2 (1996): 257-276.
+        scattering factors." Acta Crystallographica Section A: Foundations of Crystallography
+        52.2 (1996): 257-276.
     """  # noqa: E501
 
     atom_positions: Float[Array, "n_atoms 3"]
-    scattering_parameters: PengScatteringFactorParameters
-    b_factors: Optional[Float[Array, " n_atoms"]]
+    amplitudes: Float[Array, "n_atoms n_gaussians"]
+    b_factors: Float[Array, "n_atoms n_gaussians"]
 
     def __init__(
         self,
         atom_positions: Float[NDArrayLike, "n_atoms 3"],
-        scattering_parameters: PengScatteringFactorParameters,
-        b_factors: Optional[Float[NDArrayLike, " n_atoms"]] = None,
+        amplitudes: Float[Array, "n_atoms n_gaussians"],
+        b_factors: Float[Array, "n_atoms n_gaussians"],
     ):
+        """**Arguments:**
+
+        - `atom_positions`:
+            The coordinates of the atoms in units of angstroms.
+        - `amplitudes`:
+            The strength for each atom and gaussian per atom.
+            This are $a_i$ from Peng et al. (1996) and
+            has units of angstroms.
+        - `b_factors`:
+            The B-factors for each atom and gaussian per atom.
+            This are $b_i$ from Peng et al. (1996) and
+            has units of angstroms squared.
+        """
         self.atom_positions = jnp.asarray(atom_positions, dtype=float)
-        self.scattering_parameters = scattering_parameters
-        if b_factors is None:
-            self.b_factors = None
-        else:
-            self.b_factors = error_if_negative(jnp.asarray(b_factors, dtype=float))
+        self.amplitudes = jnp.asarray(amplitudes, dtype=float)
+        self.b_factors = error_if_negative(jnp.asarray(b_factors, dtype=float))
+
+    @classmethod
+    @override
+    def from_scattering_factor_parameters(
+        cls,
+        atom_positions: Float[NDArrayLike, "n_atoms 3"],
+        parameters: PengScatteringFactorParameters,
+        extra_b_factors: Optional[Float[NDArrayLike, " n_atoms"]] = None,
+    ) -> Self:
+        """Initialize a `PengIndependentAtomPotential` with a
+        convenience wrapper for the scattering factor parameters.
+
+        **Arguments:**
+
+        - `atom_positions`:
+            The coordinates of the atoms in units of angstroms.
+        - `parameters`:
+            A pytree for the scattering factor parameters from
+            Peng et al. (1996).
+        - `extra_b_factors`:
+            Additional per-atom B-factors that are added to
+            the values in `scattering_parameters.b`.
+        """
+        amplitudes = parameters.a
+        b_factors = parameters.b
+        if extra_b_factors is not None:
+            b_factors += jnp.asarray(extra_b_factors[:, None], dtype=float)
+        return cls(atom_positions, amplitudes, b_factors)
 
     @override
     def to_real_voxel_grid(
@@ -104,7 +190,7 @@ class PengIndependentAtomPotential(
         $$U(\\mathbf{r}) = 4 \\pi \\sum\\limits_{i = 1}^5 \\frac{a_i}{(2\\pi (b_i / 8 \\pi^2))^{3/2}} \\exp(- \\frac{|\\mathbf{r} - \\mathbf{r}'|^2}{2 (b_i / 8 \\pi^2)}),$$
 
         where $\\mathbf{r}'$ is the position of the atom. Including an additional B-factor (denoted by
-        $B$ and stored as `PengAtomicPotential.b_factors`) gives the expression for the potential
+        $B$) gives the expression for the potential
         $U(\\mathbf{r})$ of a single atom type and its fourier transform pair $\\tilde{U}(\\boldsymbol{\\xi}) \\equiv \\mathcal{F}[U](\\boldsymbol{\\xi})$,
 
         $$U(\\mathbf{r}) = 4 \\pi \\sum\\limits_{i = 1}^5 \\frac{a_i}{(2\\pi ((b_i + B) / 8 \\pi^2))^{3/2}} \\exp(- \\frac{|\\mathbf{r} - \\mathbf{r}'|^2}{2 ((b_i + B) / 8 \\pi^2)}),$$
@@ -138,7 +224,7 @@ class PengIndependentAtomPotential(
             - "n_batches":
                 The number of iterations used to evaluate the volume,
                 where the iteration is taken over groups of atoms.
-                This is useful if `batch_size_for_z_planes = 1`
+                This is useful if `batch_size = 1`
                 and GPU memory is exhausted. By default, `1`.
 
         **Returns:**
@@ -146,16 +232,11 @@ class PengIndependentAtomPotential(
         The rescaled potential $U_{\\ell}$ as a voxel grid of shape `shape`
         and voxel size `voxel_size`.
         """  # noqa: E501
-        gaussian_amplitudes = self.scattering_parameters.a
-        if self.b_factors is None:
-            gaussian_widths = self.scattering_parameters.b
-        else:
-            gaussian_widths = self.scattering_parameters.b + self.b_factors[:, None]
         return gaussians_to_real_voxels(
             shape,
             jnp.asarray(voxel_size, dtype=float),
             self.atom_positions,
-            gaussian_amplitudes,
-            gaussian_widths,
+            self.amplitudes,
+            self.b_factors,
             **options,
         )

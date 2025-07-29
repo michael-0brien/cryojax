@@ -20,7 +20,6 @@ from .representations import (
 from .scattering_potential import (
     AbstractScatteringPotential as AbstractScatteringPotential,
     AbstractTabulatedScatteringPotential as AbstractTabulatedScatteringPotential,
-    GaussianIndependentAtomPotential as GaussianIndependentAtomPotential,
     PengIndependentAtomPotential as PengIndependentAtomPotential,
     PengScatteringFactorParameters as PengScatteringFactorParameters,
 )

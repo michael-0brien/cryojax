@@ -13,9 +13,9 @@ from cryojax.coordinates import make_1d_coordinate_grid
 def gaussians_to_real_voxels(
     shape: tuple[int, int, int],
     voxel_size: Float[Array, ""],
-    positions: Float[Array, "n_atoms 3"],
-    amplitudes: Float[Array, "n_atoms n_gaussians_per_atom"],
-    b_factors: Float[Array, "n_atoms n_gaussians_per_atom"],
+    positions: Float[Array, "n_positions 3"],
+    amplitudes: Float[Array, "n_positions n_gaussians_per_position"],
+    b_factors: Float[Array, "n_positions n_gaussians_per_position"],
     *,
     batch_size: int = 1,
     n_batches: int = 1,
@@ -25,7 +25,7 @@ def gaussians_to_real_voxels(
     grid_x, grid_y, grid_z = [
         make_1d_coordinate_grid(dim, voxel_size) for dim in [x_dim, y_dim, z_dim]
     ]
-    # Get function to compute potential over a batch of atoms
+    # Get function to compute potential over a batch of positions
     render_fn = lambda xs: _gaussians_to_real_voxels_kernel(
         grid_x,
         grid_y,
@@ -39,7 +39,7 @@ def gaussians_to_real_voxels(
     if n_batches > positions.shape[0]:
         raise ValueError(
             "The `n_batches` when building a voxel grid must "
-            "be an integer less than or equal to the number of atoms, "
+            "be an integer less than or equal to the number of positions, "
             f"which is equal to {positions.shape[0]}. Got "
             f"`n_batches = {n_batches}`."
         )
@@ -69,25 +69,25 @@ def _gaussians_to_real_voxels_kernel(
     grid_y: Float[Array, " dim_y"],
     grid_z: Float[Array, " dim_z"],
     voxel_size: Float[Array, ""],
-    positions: Float[Array, "n_atoms_in_batch 3"],
-    amplitudes: Float[Array, "n_atoms_in_batch n_gaussians_per_atom"],
-    b_factors: Float[Array, "n_atoms_in_batch n_gaussians_per_atom"],
+    positions: Float[Array, "n_positions_in_batch 3"],
+    amplitudes: Float[Array, "n_positions_in_batch n_gaussians_per_position"],
+    b_factors: Float[Array, "n_positions_in_batch n_gaussians_per_position"],
     batch_size: int,
 ) -> Float[Array, "dim_z dim_y dim_x"]:
     # Evaluate 1D gaussian integrals for each of x, y, and z dimensions
     (
-        gaussian_integrals_times_prefactor_per_interval_per_atom_x,
-        gaussian_integrals_per_interval_per_atom_y,
-        gaussian_integrals_per_interval_per_atom_z,
+        gaussian_integrals_times_prefactor_per_interval_per_position_x,
+        gaussian_integrals_per_interval_per_position_y,
+        gaussian_integrals_per_interval_per_position_z,
     ) = _evaluate_gaussian_integrals(
         grid_x, grid_y, grid_z, positions, amplitudes, b_factors, voxel_size
     )
     # Get function to compute voxel grid at a single z-plane
     render_at_z_plane = (
-        lambda gaussian_integrals_per_atom_z: _evaluate_multivariate_gaussian(
-            gaussian_integrals_times_prefactor_per_interval_per_atom_x,
-            gaussian_integrals_per_interval_per_atom_y,
-            gaussian_integrals_per_atom_z,
+        lambda gaussian_integrals_per_position_z: _evaluate_multivariate_gaussian(
+            gaussian_integrals_times_prefactor_per_interval_per_position_x,
+            gaussian_integrals_per_interval_per_position_y,
+            gaussian_integrals_per_position_z,
         )
     )
     # Map over z-planes
@@ -100,14 +100,14 @@ def _gaussians_to_real_voxels_kernel(
     elif batch_size == 1:
         # ... compute the volume iteratively
         real_voxel_grid = jax.lax.map(
-            render_at_z_plane, gaussian_integrals_per_interval_per_atom_z
+            render_at_z_plane, gaussian_integrals_per_interval_per_position_z
         )
     elif batch_size > 1:
         # ... compute the volume by tuning how many z-planes to batch over
         render_at_z_planes = jax.vmap(render_at_z_plane, in_axes=0)
         real_voxel_grid = _batched_map_with_batch_size(
             render_at_z_planes,
-            gaussian_integrals_per_interval_per_atom_z,
+            gaussian_integrals_per_interval_per_position_z,
             batch_size=batch_size,
             is_batch_axis_contracted=False,
         )
@@ -124,17 +124,17 @@ def _evaluate_gaussian_integrals(
     grid_x: Float[Array, " dim_x"],
     grid_y: Float[Array, " dim_y"],
     grid_z: Float[Array, " dim_z"],
-    positions: Float[Array, "n_atoms 3"],
-    amplitudes: Float[Array, "n_atoms n_gaussians_per_atom"],
-    b_factors: Float[Array, "n_atoms n_gaussians_per_atom"],
+    positions: Float[Array, "n_positions 3"],
+    amplitudes: Float[Array, "n_positions n_gaussians_per_position"],
+    b_factors: Float[Array, "n_positions n_gaussians_per_position"],
     voxel_size: Float[Array, ""],
 ) -> tuple[
-    Float[Array, "dim_x n_atoms n_gaussians_per_atom"],
-    Float[Array, "dim_y n_atoms n_gaussians_per_atom"],
-    Float[Array, "dim_z n_atoms n_gaussians_per_atom"],
+    Float[Array, "dim_x n_positions n_gaussians_per_position"],
+    Float[Array, "dim_y n_positions n_gaussians_per_position"],
+    Float[Array, "dim_z n_positions n_gaussians_per_position"],
 ]:
     """Evaluate 1D averaged gaussians in x, y, and z dimensions
-    for each atom and each gaussian per atom.
+    for each position and each gaussian per position.
     """
     # Define function to compute integrals for each dimension
     scaling = 2 * jnp.pi / jnp.sqrt(b_factors)
@@ -142,7 +142,7 @@ def _evaluate_gaussian_integrals(
         jsp.special.erf(scaling[None, :, :] * (delta + voxel_size)[:, :, None])
         - jsp.special.erf(scaling[None, :, :] * delta[:, :, None])
     )
-    # Compute outer product of left edge of grid points minus atomic positions
+    # Compute outer product of left edge of grid points minus positions
     left_edge_grid_x, left_edge_grid_y, left_edge_grid_z = (
         grid_x - voxel_size / 2,
         grid_y - voxel_size / 2,
@@ -153,14 +153,14 @@ def _evaluate_gaussian_integrals(
         left_edge_grid_y[:, None] - positions[:, 1],
         left_edge_grid_z[:, None] - positions[:, 2],
     )
-    # Compute gaussian integrals for each grid point, each atom, and
-    # each gaussian per atom
+    # Compute gaussian integrals for each grid point, each position, and
+    # each gaussian per position
     gauss_x, gauss_y, gauss_z = (
         integration_kernel(delta_x),
         integration_kernel(delta_y),
         integration_kernel(delta_z),
     )
-    # Compute the prefactors for each atom and each gaussian per atom
+    # Compute the prefactors for each position and each gaussian per position
     # for the potential
     prefactor = (4 * jnp.pi * amplitudes) / (2 * voxel_size) ** 3
     # Multiply the prefactor onto one of the gaussians for efficiency
@@ -168,23 +168,25 @@ def _evaluate_gaussian_integrals(
 
 
 def _evaluate_multivariate_gaussian(
-    gaussian_integrals_per_interval_per_atom_x: Float[
-        Array, "dim_x n_atoms n_gaussians_per_atom"
+    gaussian_integrals_per_interval_per_position_x: Float[
+        Array, "dim_x n_positions n_gaussians_per_position"
     ],
-    gaussian_integrals_per_interval_per_atom_y: Float[
-        Array, "dim_y n_atoms n_gaussians_per_atom"
+    gaussian_integrals_per_interval_per_position_y: Float[
+        Array, "dim_y n_positions n_gaussians_per_position"
     ],
-    gaussian_integrals_per_atom_z: Float[Array, "n_atoms n_gaussians_per_atom"],
+    gaussian_integrals_per_position_z: Float[
+        Array, "n_positions n_gaussians_per_position"
+    ],
 ) -> Float[Array, "dim_y dim_x"]:
-    # Prepare matrices with dimensions of the number of atoms and the number of grid
-    # points. There are as many matrices as number of gaussians per atom
-    gauss_x = jnp.transpose(gaussian_integrals_per_interval_per_atom_x, (2, 1, 0))
+    # Prepare matrices with dimensions of the number of positions and the number of grid
+    # points. There are as many matrices as number of gaussians per position
+    gauss_x = jnp.transpose(gaussian_integrals_per_interval_per_position_x, (2, 1, 0))
     gauss_yz = jnp.transpose(
-        gaussian_integrals_per_interval_per_atom_y
-        * gaussian_integrals_per_atom_z[None, :, :],
+        gaussian_integrals_per_interval_per_position_y
+        * gaussian_integrals_per_position_z[None, :, :],
         (2, 0, 1),
     )
-    # Compute matrix multiplication then sum over the number of gaussians per atom
+    # Compute matrix multiplication then sum over the number of gaussians per position
     return jnp.sum(jnp.matmul(gauss_yz, gauss_x), axis=0)
 
 

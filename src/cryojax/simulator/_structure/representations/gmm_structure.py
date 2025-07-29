@@ -19,29 +19,37 @@ class GaussianMixtureStructure(
     strict=True,
 ):
     r"""A representation of a structure as a mixture of
-    gaussians.
+    gaussians, with multiple gaussians used per position.
+
+    The convention of allowing multiple gaussians per position
+    follows "Robust Parameterization of Elastic and Absorptive
+    Electron Atomic Scattering Factors" by Peng et al. (1996), where
+    `amplitudes` follows $a_i$ and $b_i$ follows `variances`
+    (multiplied by $8\pi^2$ to convert to a variance).
+
+    The
     """
 
-    positions: Float[Array, "n_gaussians 3"]
-    amplitudes: Float[Array, " n_gaussians"]
-    variances: Float[Array, " n_gaussians"]
+    positions: Float[Array, "n_positions 3"]
+    amplitudes: Float[Array, "n_positions n_gaussians_per_position"]
+    variances: Float[Array, " n_positions n_gaussians_per_position"]
 
     def __init__(
         self,
         positions: Float[NDArrayLike, "n_gaussians 3"],
-        amplitudes: Float[NDArrayLike, " n_gaussians"],
-        variances: Float[NDArrayLike, " n_gaussians"],
+        amplitudes: Float[NDArrayLike, "n_positions n_gaussians_per_position"],
+        variances: Float[NDArrayLike, "n_positions n_gaussians_per_position"],
     ):
         """**Arguments:**
 
-        - `positions`: The coordinates of the atoms in units of angstroms.
+        - `positions`:
+            The coordinates of the gaussians in units of angstroms.
         - `amplitudes`:
-            The strength for each atom and for each gaussian per atom.
+            The amplitude for each gaussian.
             To simulate in physical units of a scattering potential,
-            this has units of angstroms.
+            this should have units of angstroms.
         - `variances`:
-            The variance (up to numerical constants) for each atom and
-            for each gaussian per atom. This has units of angstroms
+            The variance for each gaussian. This has units of angstroms
             squared.
         """
         self.positions = jnp.asarray(positions, dtype=float)
@@ -50,7 +58,7 @@ class GaussianMixtureStructure(
 
     @override
     def rotate_to_pose(self, pose: AbstractPose, inverse: bool = False) -> Self:
-        """Return a new potential with rotated `atom_positions`."""
+        """Return a new potential with rotated `positions`."""
         return eqx.tree_at(
             lambda d: d.positions,
             self,
@@ -59,7 +67,7 @@ class GaussianMixtureStructure(
 
     @override
     def translate_to_pose(self, pose: AbstractPose) -> Self:
-        """Return a new potential with rotated `atom_positions`."""
+        """Return a new potential with rotated `positions`."""
         offset_in_angstroms = pose.offset_in_angstroms
         if pose.offset_z_in_angstroms is None:
             offset_in_angstroms = jnp.concatenate(
@@ -91,8 +99,8 @@ class GaussianMixtureStructure(
                 `jax.vmap`. By default, `1`.
             - "n_batches":
                 The number of iterations used to evaluate the volume,
-                where the iteration is taken over groups of atoms.
-                This is useful if `batch_size_for_z_planes = 1`
+                where the iteration is taken over groups of gaussians.
+                This is useful if `batch_size = 1`
                 and GPU memory is exhausted. By default, `1`.
 
         **Returns:**
@@ -103,7 +111,7 @@ class GaussianMixtureStructure(
             shape,
             jnp.asarray(voxel_size, dtype=float),
             self.positions,
-            self.amplitudes[:, None],
-            convert_variance_to_b_factor(self.variances[:, None]),
+            self.amplitudes,
+            convert_variance_to_b_factor(self.variances),
             **options,
         )

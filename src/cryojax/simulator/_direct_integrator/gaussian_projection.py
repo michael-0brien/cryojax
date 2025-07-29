@@ -16,7 +16,6 @@ from ...ndimage import (
 )
 from .._config import AbstractConfig
 from .._structure import (
-    GaussianIndependentAtomPotential as GaussianIndependentAtomPotential,
     GaussianMixtureStructure,
     PengIndependentAtomPotential as PengIndependentAtomPotential,
 )
@@ -24,11 +23,7 @@ from .base_direct_integrator import AbstractDirectIntegrator
 
 
 class GaussianMixtureProjection(
-    AbstractDirectIntegrator[
-        GaussianMixtureStructure
-        | GaussianIndependentAtomPotential
-        | PengIndependentAtomPotential
-    ],
+    AbstractDirectIntegrator[GaussianMixtureStructure | PengIndependentAtomPotential],
     strict=True,
 ):
     upsampling_factor: Optional[int]
@@ -83,11 +78,7 @@ class GaussianMixtureProjection(
     @override
     def integrate(
         self,
-        structure: (
-            GaussianMixtureStructure
-            | GaussianIndependentAtomPotential
-            | PengIndependentAtomPotential
-        ),
+        structure: GaussianMixtureStructure | PengIndependentAtomPotential,
         config: AbstractConfig,
         outputs_real_space: bool = False,
     ) -> (
@@ -97,8 +88,7 @@ class GaussianMixtureProjection(
         ]
         | Float[Array, "{config.padded_y_dim} {config.padded_x_dim}"]
     ):
-        """Compute a projection from gaussians and transform it to Fourier
-        space.
+        """Compute a projection from gaussians.
 
         **Arguments:**
 
@@ -107,7 +97,8 @@ class GaussianMixtureProjection(
 
         **Returns:**
 
-        The integrated potential in real or fourier space at the `AbstractConfig.padded_shape`.
+        The integrated potential in real or fourier space at the
+        `AbstractConfig.padded_shape`.
         """  # noqa: E501
         # Grab the image configuration
         shape = config.padded_shape if self.shape is None else self.shape
@@ -126,22 +117,16 @@ class GaussianMixtureProjection(
         # Grab the gaussian amplitudes and widths
         if isinstance(structure, PengIndependentAtomPotential):
             positions = structure.atom_positions
-            amplitudes = structure.scattering_parameters.a
-            b_factors = structure.scattering_parameters.b
-            if structure.b_factors is not None:
-                b_factors += structure.b_factors[:, None]
+            amplitudes = structure.amplitudes
+            b_factors = structure.b_factors
         elif isinstance(structure, GaussianMixtureStructure):
             positions = structure.positions
             amplitudes = structure.amplitudes
-            b_factors = jnp.asarray(convert_variance_to_b_factor(structure.variances))
-        elif isinstance(structure, GaussianIndependentAtomPotential):
-            positions = structure.atom_positions
-            amplitudes = structure.amplitudes
-            b_factors = jnp.asarray(structure.b_factors)
+            b_factors = convert_variance_to_b_factor(structure.variances)
         else:
             raise ValueError(
-                "Supported types for `structure` are `PengIndependentAtomPotential`, "
-                "`GaussianIndependentAtomPotential`, and `GaussianMixtureStructure`."
+                "Supported types for `structure` are `PengIndependentAtomPotential` "
+                "and `GaussianMixtureStructure`."
             )
         # Compute the projection
         projection_integral = _gaussians_to_projection(

@@ -8,10 +8,6 @@ import pytest
 from jaxtyping import Array
 
 import cryojax.simulator as cxs
-from cryojax.constants import (
-    get_tabulated_scattering_factor_parameters,
-    read_peng_element_scattering_factor_parameter_table,
-)
 from cryojax.io import read_atoms_from_pdb
 from cryojax.ndimage import crop_to_shape, irfftn
 
@@ -29,7 +25,8 @@ jax.config.update("jax_enable_x64", True)
     ),
 )
 def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
-    """Test that computing a projection in real
+    """
+    Test that computing a projection in real
     space agrees with real-space, with no rotation. This mostly
     makes sure there are no numerical artifacts in fourier space
     interpolation and that volumes are read in real vs. fourier
@@ -41,52 +38,45 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
         pixel_size,
         voltage_in_kilovolts=300.0,
     )
-    # Real vs fourier potentials
+    # Real vs fourier structures
     dim = max(*shape)  # Make sure to use `padded_shape` here
     atom_positions, atom_identities, b_factors = read_atoms_from_pdb(
         sample_pdb_path, center=True, loads_b_factors=True
     )
-    scattering_factor_parameters = get_tabulated_scattering_factor_parameters(
-        atom_identities, read_peng_element_scattering_factor_parameter_table()
-    )
-    base_potential = cxs.PengAtomicPotential(
+    scattering_factor_parameters = cxs.PengScatteringFactorParameters(atom_identities)
+    base_structure = cxs.PengIndependentAtomPotential.from_scattering_factor_parameters(
         atom_positions,
-        scattering_factor_a=scattering_factor_parameters["a"],
-        scattering_factor_b=scattering_factor_parameters["b"],
-        b_factors=b_factors,
+        scattering_factor_parameters,
+        extra_b_factors=b_factors,
     )
     base_method = cxs.GaussianMixtureProjection(use_error_functions=True)
 
-    real_voxel_grid = base_potential.as_real_voxel_grid((dim, dim, dim), pixel_size)
-    other_potentials = [
-        cxs.FourierVoxelGridPotential.from_real_voxel_grid(real_voxel_grid, pixel_size),
-        make_spline_potential(real_voxel_grid, pixel_size),
-        cxs.GaussianMixtureAtomicPotential(
+    real_voxel_grid = base_structure.to_real_voxel_grid((dim, dim, dim), pixel_size)
+    other_structures = [
+        cxs.FourierVoxelGridStructure.from_real_voxel_grid(real_voxel_grid),
+        make_spline(real_voxel_grid),
+        cxs.GaussianMixtureStructure(
             atom_positions,
-            scattering_factor_parameters["a"],
-            (scattering_factor_parameters["b"] + b_factors[:, None]) / (8 * jnp.pi**2),
+            scattering_factor_parameters.a,
+            (scattering_factor_parameters.b + b_factors[:, None]) / (8 * jnp.pi**2),
         ),
-        cxs.RealVoxelGridPotential.from_real_voxel_grid(real_voxel_grid, pixel_size),
-        cxs.RealVoxelCloudPotential.from_real_voxel_grid(
-            real_voxel_grid, pixel_size, rtol=0.0, atol=1e-16
-        ),
+        cxs.RealVoxelGridStructure.from_real_voxel_grid(real_voxel_grid),
     ]
     other_projection_methods = [
         cxs.FourierSliceExtraction(),
         cxs.FourierSliceExtraction(),
         base_method,
         cxs.NufftProjection(eps=1e-16),
-        cxs.NufftProjection(eps=1e-16),
     ]
 
     projection_by_gaussian_integration = compute_projection(
-        base_potential, base_method, config
+        base_structure, base_method, config
     )
-    for potential, projection_method in zip(other_potentials, other_projection_methods):
+    for structure, projection_method in zip(other_structures, other_projection_methods):
         if isinstance(projection_method, cxs.NufftProjection):
             try:
                 projection_by_other_method = compute_projection(
-                    potential, projection_method, config
+                    structure, projection_method, config
                 )
             except Exception as err:
                 warnings.warn(
@@ -97,7 +87,7 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
                 continue
         else:
             projection_by_other_method = compute_projection(
-                potential, projection_method, config
+                structure, projection_method, config
             )
         np.testing.assert_allclose(
             projection_by_gaussian_integration, projection_by_other_method, atol=1e-12
@@ -197,11 +187,11 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
 
 @eqx.filter_jit
 def compute_projection(
-    potential: cxs.AbstractPotentialRepresentation,
+    structure: cxs.AbstractStructureRepresentation,
     integrator: cxs.AbstractDirectIntegrator,
     config: cxs.BasicConfig,
 ) -> Array:
-    fourier_projection = integrator.integrate(potential, config, outputs_real_space=False)
+    fourier_projection = integrator.integrate(structure, config, outputs_real_space=False)
     return crop_to_shape(
         irfftn(
             fourier_projection,
@@ -213,14 +203,14 @@ def compute_projection(
 
 @eqx.filter_jit
 def compute_projection_at_pose(
-    potential: cxs.AbstractPotentialRepresentation,
+    structure: cxs.AbstractStructureRepresentation,
     integrator: cxs.AbstractDirectIntegrator,
     pose: cxs.AbstractPose,
     config: cxs.BasicConfig,
 ) -> Array:
-    rotated_potential = potential.rotate_to_pose(pose)
+    rotated_structure = structure.rotate_to_pose(pose)
     fourier_projection = integrator.integrate(
-        rotated_potential, config, outputs_real_space=False
+        rotated_structure, config, outputs_real_space=False
     )
     translation_operator = pose.compute_translation_operator(
         config.padded_frequency_grid_in_angstroms
@@ -239,7 +229,7 @@ def compute_projection_at_pose(
 
 
 @eqx.filter_jit
-def make_spline_potential(real_voxel_grid, voxel_size):
-    return cxs.FourierVoxelSplinePotential.from_real_voxel_grid(
-        real_voxel_grid, voxel_size
+def make_spline(real_voxel_grid):
+    return cxs.FourierVoxelSplineStructure.from_real_voxel_grid(
+        real_voxel_grid,
     )

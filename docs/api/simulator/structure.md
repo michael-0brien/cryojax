@@ -47,27 +47,16 @@ There are many different data representations of biological structures for cryo-
 
 ??? abstract "`cryojax.simulator.AbstractTabulatedScatteringPotential`"
 
-    ::: cryojax.simulator.AbstractIndependentAtomStructure
+    ::: cryojax.simulator.AbstractTabulatedScatteringPotential
         options:
             members:
-                - scattering_parameters
-                - b_factors
-
-::: cryojax.simulator.GaussianIndependentAtomPotential
-        options:
-            members:
-                - __init__
-                - map_to_structure
-                - rotate_to_pose
-                - translate_to_pose
-                - to_real_voxel_grid
-
----
+                - from_scattering_factor_parameters
 
 ::: cryojax.simulator.PengIndependentAtomPotential
         options:
             members:
                 - __init__
+                - from_scattering_factor_parameters
                 - map_to_structure
                 - rotate_to_pose
                 - translate_to_pose
