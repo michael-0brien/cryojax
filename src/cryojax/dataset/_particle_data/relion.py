@@ -329,9 +329,9 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
             metadata = particle_data_at_index.drop(remove_columns, axis="columns")
         else:
             metadata = None
-
+        # Invert the rotation if desired
         if self.inverts_rotation:
-            pose = pose.to_inverse_rotation()
+            pose = _invert_rotation(pose)
 
         return ParticleParameterInfo(
             config=config,
@@ -357,7 +357,8 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
         _validate_parameters(value, force_keys=False)
         # Invert the pose if desired
         if "pose" in value:
-            value["pose"] = value["pose"].to_inverse_rotation()
+            if self.inverts_rotation:
+                value["pose"] = _invert_rotation(value["pose"])
         # Grab the current and new optics and particle data
         if self.updates_optics_group:
             optics_group_index = _make_optics_group_index(self.starfile_data["optics"])
@@ -400,7 +401,8 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
         _validate_parameters(value, force_keys=True)
         # Invert the pose if desired
         if "pose" in value:
-            value["pose"] = value["pose"].to_inverse_rotation()
+            if self.inverts_rotation:
+                value["pose"] = _invert_rotation(value["pose"])
         # Make new optics group
         optics_group_index = _make_optics_group_index(self.starfile_data["optics"])
         optics_data, optics_data_to_append = (
@@ -1207,6 +1209,14 @@ def _make_transfer_theory(defocus, astig, angle, sph, ac, ps, env=None):
             if defocus.ndim == 0
             else _make_wo_env_vmap(defocus, astig, angle, sph, ac, ps)
         )
+
+
+def _invert_rotation(pose: EulerAnglePose) -> EulerAnglePose:
+    if pose.offset_x_in_angstroms.ndim == 0:
+        return pose.to_inverse_rotation()
+    else:
+        invert_vmap = eqx.filter_vmap(lambda pose: pose.to_inverse_rotation())
+        return invert_vmap(pose)
 
 
 def _load_image_stack_from_mrc(

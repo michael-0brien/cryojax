@@ -39,6 +39,16 @@ def test_pose_conversion():
     np.testing.assert_allclose(quat.rotation.as_matrix(), axis_angle.rotation.as_matrix())
 
 
+def test_invert_pose():
+    wxyz = jnp.asarray((1.0, 2.0, 3.0, 0.5))
+    offset = jnp.asarray((-1.0, 1.0))
+    rotation = SO3(wxyz).normalize()
+    quat = cs.QuaternionPose.from_rotation_and_translation(rotation, offset)
+    quat_inverse = quat.to_inverse_rotation()
+    np.testing.assert_allclose(quat.wxyz, quat_inverse.wxyz.at[1:].mul(-1))
+    np.testing.assert_allclose(quat.offset_in_angstroms, quat_inverse.offset_in_angstroms)
+
+
 def test_axis_angle_euler_agreement():
     angle = 2.0
     angle_in_radians = jnp.deg2rad(angle)

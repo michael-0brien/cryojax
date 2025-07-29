@@ -307,13 +307,14 @@ def test_load_starfile_pose_params(sample_starfile_path):
         path_to_starfile=sample_starfile_path,
         loads_envelope=False,
         loads_metadata=True,
+        inverts_rotation=False,
     )
 
     parameters = parameter_file[:]
     pose = parameters["pose"]
 
     particle_data = parameter_file.starfile_data["particles"]
-    # check pose parameters
+    # Check pose parameters
     for i in range(len(parameter_file)):
         # offset x
         np.testing.assert_allclose(
@@ -349,6 +350,45 @@ def test_load_starfile_pose_params(sample_starfile_path):
             -particle_data["rlnAnglePsi"][i],
             rtol=1e-5,
         )
+
+
+def test_load_starfile_pose_inverse(sample_starfile_path):
+    parameter_file = RelionParticleParameterFile(
+        path_to_starfile=sample_starfile_path,
+        loads_envelope=False,
+        loads_metadata=True,
+        inverts_rotation=False,
+    )
+    parameter_file_inverse = RelionParticleParameterFile(
+        path_to_starfile=sample_starfile_path,
+        loads_envelope=False,
+        loads_metadata=True,
+        inverts_rotation=True,
+    )
+
+    # Without batch dim
+    parameters = parameter_file[0]
+    pose = parameters["pose"]
+    parameters_inverse = parameter_file_inverse[0]
+    pose_inverse = parameters_inverse["pose"]
+
+    get_rotation = lambda p: p.rotation
+    rotation = get_rotation(pose)
+    rotation_inverse = get_rotation(pose_inverse)
+
+    np.testing.assert_allclose(rotation.wxyz, rotation_inverse.wxyz.at[1:].mul(-1))
+
+    # With batch dim
+    parameters = parameter_file[:]
+    pose = parameters["pose"]
+    parameters_inverse = parameter_file_inverse[:]
+    pose_inverse = parameters_inverse["pose"]
+
+    get_rotation = eqx.filter_vmap(lambda p: p.rotation)
+    rotation = get_rotation(pose)
+    rotation_inverse = get_rotation(pose_inverse)
+
+    np.testing.assert_allclose(rotation.wxyz, rotation_inverse.wxyz.at[:, 1:].mul(-1))
 
 
 def test_load_starfile_wo_metadata(sample_starfile_path):
@@ -654,8 +694,7 @@ def test_file_not_found_error():
 def test_set_wrong_parameters_error():
     # Wrong parameters
     wrong_pose = cxs.QuaternionPose()
-    wrong_transfer_theory_1 = cxs.ContrastTransferTheory(ctf=cxs.NullCTF())
-    wrong_transfer_theory_2 = cxs.ContrastTransferTheory(
+    wrong_transfer_theory = cxs.ContrastTransferTheory(
         ctf=cxs.CTF(), envelope=op.ZeroMode()
     )
     # Right parameters
@@ -666,19 +705,14 @@ def test_set_wrong_parameters_error():
     wrong_parameters_1 = dict(
         config=config,
         pose=right_pose,
-        transfer_theory=wrong_transfer_theory_1,
-    )
-    wrong_parameters_2 = dict(
-        config=config,
-        pose=right_pose,
-        transfer_theory=wrong_transfer_theory_2,
+        transfer_theory=wrong_transfer_theory,
     )
     temp = dict(
         config=config,
         pose=right_pose,
         transfer_theory=right_transfer_theory,
     )
-    wrong_parameters_3 = eqx.tree_at(lambda x: x["pose"], temp, wrong_pose)
+    wrong_parameters_2 = eqx.tree_at(lambda x: x["pose"], temp, wrong_pose)
     # Now the parameter dataset
     # Add to dataset
     path_to_starfile = "path/to/dummy/project/and/starfile.star"
@@ -691,11 +725,8 @@ def test_set_wrong_parameters_error():
     with pytest.raises(ValueError):
         parameter_file.append(wrong_parameters_1)
 
-    with pytest.raises(ValueError):
-        parameter_file.append(wrong_parameters_2)
-
     with pytest.raises(TypeError):
-        parameter_file.append(wrong_parameters_3)
+        parameter_file.append(wrong_parameters_2)
 
 
 def test_bad_pytree_error():
