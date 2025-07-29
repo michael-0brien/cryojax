@@ -9,17 +9,17 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
-from ...coordinates import make_coordinate_grid, make_frequency_slice
-from ...internal import NDArrayLike
-from ...ndimage import (
+from ....coordinates import make_coordinate_grid, make_frequency_slice
+from ....internal import NDArrayLike
+from ....ndimage import (
     compute_spline_coefficients,
     crop_to_shape,
     fftn,
     pad_to_shape,
 )
-from ...ndimage.transforms import AbstractFilter
-from .._pose import AbstractPose
-from .base_structure import AbstractVoxelStructure
+from ....ndimage.transforms import AbstractFilter
+from ..._pose import AbstractPose
+from ..base_structure import AbstractVoxelStructure
 
 
 class AbstractFourierVoxelStructure(AbstractVoxelStructure, strict=True):

@@ -6,19 +6,29 @@ import abc
 from typing import TypeVar
 from typing_extensions import Self, override
 
+import equinox as eqx
 from jaxtyping import Float
 
 from ...internal import NDArrayLike
 from .._pose import AbstractPose
-from .._structure_mapping import AbstractStructureMapping
 
 
 T = TypeVar("T")
 
 
 #
-# Base structure
+# Base classes for structures
 #
+class AbstractStructureMapping(eqx.Module, strict=True):
+    """Abstract interface for a data representation of a protein
+    structure.
+    """
+
+    @abc.abstractmethod
+    def map_to_structure(self) -> "AbstractStructureRepresentation":
+        raise NotImplementedError
+
+
 class AbstractStructureRepresentation(AbstractStructureMapping, strict=True):
     """Abstract interface for a structure with a coordinate system."""
 
@@ -27,7 +37,7 @@ class AbstractStructureRepresentation(AbstractStructureMapping, strict=True):
         raise NotImplementedError
 
     @override
-    def map_to_structure(self) -> "AbstractStructureRepresentation":
+    def map_to_structure(self) -> Self:
         """Return the structure."""
         return self
 

@@ -1,9 +1,8 @@
-from ..base_structure import AbstractStructureRepresentation
+from ..base_structure import AbstractStructureMapping
 
 
-class AbstractScatteringPotential(AbstractStructureRepresentation, strict=True):
-    """Abstract interface for the spatial potential energy distribution of a
-    scatterer.
+class AbstractScatteringPotential(AbstractStructureMapping, strict=True):
+    """Abstract interface for generating a spatial potential energy distribution.
 
     !!! info
         In, `cryojax`, potentials should be built in units of *inverse length squared*,

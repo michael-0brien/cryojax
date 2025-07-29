@@ -4,8 +4,8 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
-from .._pose import AbstractPose
-from .base_structure import AbstractPointCloudStructure
+from ..._pose import AbstractPose
+from ..base_structure import AbstractPointCloudStructure
 
 
 class AbstractIndependentAtomStructure(AbstractPointCloudStructure, strict=True):

@@ -15,12 +15,12 @@ from ...ndimage import (
     ifftn,
     irfftn,
     map_coordinates,
-    map_coordinates_with_cubic_spline,
+    map_coordinates_spline,
     rfftn,
 )
 from ...ndimage.transforms import InverseSincMask
 from .._config import AbstractConfig
-from .._structure_representation import (
+from .._structure import (
     FourierVoxelGridStructure,
     FourierVoxelSplineStructure,
 )
@@ -41,7 +41,7 @@ class FourierSliceExtraction(AbstractFourierSurfaceExtraction, strict=True):
 
     This extracts slices using interpolation methods housed in
     `cryojax.image.map_coordinates` and
-    `cryojax.image.map_coordinates_with_cubic_spline`.
+    `cryojax.image.map_coordinates_spline`.
     """
 
     outputs_integral: bool
@@ -229,7 +229,7 @@ class EwaldSphereExtraction(AbstractFourierSurfaceExtraction, strict=True):
 
     This extracts surfaces using interpolation methods housed in
     `cryojax.image.map_coordinates`
-    and `cryojax.image.map_coordinates_with_cubic_spline`.
+    and `cryojax.image.map_coordinates_spline`.
     """
 
     outputs_integral: bool
@@ -524,9 +524,9 @@ def _extract_surface_from_voxel_grid(
     k_z, k_y, k_x = jnp.transpose(logical_frequency_coordinates, axes=[3, 0, 1, 2])
     if is_spline_coefficients:
         spline_coefficients = voxel_grid
-        surface = map_coordinates_with_cubic_spline(
-            spline_coefficients, (k_x, k_y, k_z), **kwargs
-        )[0, :, :]
+        surface = map_coordinates_spline(spline_coefficients, (k_x, k_y, k_z), **kwargs)[
+            0, :, :
+        ]
     else:
         fourier_voxel_grid = voxel_grid
         surface = map_coordinates(

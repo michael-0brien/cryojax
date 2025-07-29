@@ -13,7 +13,7 @@ from .._config import AbstractConfig, DoseConfig
 from .._detector import AbstractDetector
 from .._pose import AbstractPose
 from .._scattering_theory import AbstractScatteringTheory
-from .._structure_mapping import AbstractStructureMapping
+from .._structure import AbstractStructureMapping
 from .base_image_model import AbstractImageModel, ImageArray, PaddedImageArray
 
 

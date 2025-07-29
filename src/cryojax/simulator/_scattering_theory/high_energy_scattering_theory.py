@@ -10,7 +10,7 @@ from .._common_functions import apply_amplitude_contrast_ratio, apply_interactio
 from .._config import AbstractConfig
 from .._direct_integrator import AbstractDirectIntegrator, AbstractDirectVoxelIntegrator
 from .._solvent import AbstractRandomSolvent
-from .._structure_representation import AbstractStructureRepresentation
+from .._structure import AbstractStructureRepresentation
 from .._transfer_theory import WaveTransferTheory
 from .base_scattering_theory import AbstractWaveScatteringTheory
 

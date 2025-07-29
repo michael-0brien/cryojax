@@ -10,7 +10,7 @@ from .._common_functions import (
     apply_interaction_constant,
 )
 from .._config import AbstractConfig
-from .._structure_modeling import RealVoxelGridStructure
+from .._structure import RealVoxelGridStructure
 from .base_multislice_integrator import AbstractMultisliceIntegrator
 
 

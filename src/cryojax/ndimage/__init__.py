@@ -31,7 +31,7 @@ from ._fourier_utils import (
 from ._map_coordinates import (
     compute_spline_coefficients as compute_spline_coefficients,
     map_coordinates as map_coordinates,
-    map_coordinates_with_cubic_spline as map_coordinates_with_cubic_spline,
+    map_coordinates_spline as map_coordinates_spline,
 )
 from ._normalize import normalize_image as normalize_image, rescale_image as rescale_image
 from ._rescale_pixel_size import (

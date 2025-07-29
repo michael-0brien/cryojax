@@ -4,17 +4,17 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
-from ...constants import convert_variance_to_b_factor
-from ...internal import NDArrayLike, error_if_not_positive
-from .._pose import AbstractPose
-from .._structure_conversion import AbstractRealVoxelRendering
-from .base_structure import AbstractPointCloudStructure
-from .common_functions import gaussians_to_real_voxels
+from ....constants import convert_variance_to_b_factor
+from ....internal import NDArrayLike, error_if_not_positive
+from ..._pose import AbstractPose
+from ..base_structure import AbstractPointCloudStructure
+from ..common_functions import gaussians_to_real_voxels
+from ..structure_conversion import AbstractDiscretizeRealVoxels
 
 
 class GaussianMixtureStructure(
     AbstractPointCloudStructure,
-    AbstractRealVoxelRendering,
+    AbstractDiscretizeRealVoxels,
     strict=True,
 ):
     r"""A representation of a structure as a mixture of
@@ -69,7 +69,7 @@ class GaussianMixtureStructure(
         )
 
     @override
-    def as_real_voxel_grid(
+    def to_real_voxel_grid(
         self,
         shape: tuple[int, int, int],
         voxel_size: Float[NDArrayLike, ""] | float,

@@ -1,4 +1,3 @@
-import abc
 from typing import Any
 from typing_extensions import override
 
@@ -7,18 +6,8 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Int
 
-from ..internal import error_if_negative
-from ._structure_representation import AbstractStructureRepresentation
-
-
-class AbstractStructureMapping(eqx.Module, strict=True):
-    """Abstract interface for a data representation of a protein
-    structure.
-    """
-
-    @abc.abstractmethod
-    def map_to_structure(self) -> AbstractStructureRepresentation:
-        raise NotImplementedError
+from ....internal import error_if_negative
+from ..base_structure import AbstractStructureMapping, AbstractStructureRepresentation
 
 
 class AbstractStructuralEnsemble(AbstractStructureMapping, strict=True):

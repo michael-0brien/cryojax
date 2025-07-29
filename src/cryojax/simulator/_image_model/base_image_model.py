@@ -15,7 +15,7 @@ from ...ndimage.transforms import FilterLike, MaskLike
 from .._config import AbstractConfig
 from .._direct_integrator import AbstractDirectIntegrator
 from .._pose import AbstractPose
-from .._structure_mapping import AbstractStructureMapping
+from .._structure import AbstractStructureMapping
 from .._transfer_theory import ContrastTransferTheory
 
 

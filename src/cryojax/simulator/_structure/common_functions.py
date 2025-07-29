@@ -4,10 +4,9 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
-import jax.tree_util as jtu
 from jaxtyping import Array, Float, PyTree
 
-from ...coordinates import make_1d_coordinate_grid
+from cryojax.coordinates import make_1d_coordinate_grid
 
 
 @eqx.filter_jit
@@ -195,7 +194,7 @@ def _batched_map_with_n_batches(
     n_batches: int,
     is_batch_axis_contracted: bool = False,
 ):
-    batch_dim = jtu.tree_leaves(xs)[0].shape[0]
+    batch_dim = jax.tree.leaves(xs)[0].shape[0]
     batch_size = batch_dim // n_batches
     return _batched_map(
         fun, xs, batch_dim, n_batches, batch_size, is_batch_axis_contracted
@@ -208,7 +207,7 @@ def _batched_map_with_batch_size(
     batch_size: int,
     is_batch_axis_contracted: bool = False,
 ):
-    batch_dim = jtu.tree_leaves(xs)[0].shape[0]
+    batch_dim = jax.tree.leaves(xs)[0].shape[0]
     n_batches = batch_dim // batch_size
     return _batched_map(
         fun, xs, batch_dim, n_batches, batch_size, is_batch_axis_contracted
@@ -228,7 +227,7 @@ def _batched_map(
     parallel over this leading axis.
     """
     # ... reshape into an iterative dimension and a batching dimension
-    xs_per_batch = jtu.tree_map(
+    xs_per_batch = jax.tree.map(
         lambda x: x[: batch_dim - batch_dim % batch_size, ...].reshape(
             (n_batches, batch_size, *x.shape[1:])
         ),
@@ -246,7 +245,7 @@ def _batched_map(
     # to take care of the remainder
     if batch_dim % batch_size != 0:
         remainder = fun(
-            jtu.tree_map(lambda x: x[batch_dim - batch_dim % batch_size :, ...], xs)
+            jax.tree.map(lambda x: x[batch_dim - batch_dim % batch_size :, ...], xs)
         )
         if is_batch_axis_contracted:
             remainder = remainder[None, ...]

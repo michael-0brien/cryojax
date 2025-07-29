@@ -8,7 +8,7 @@ from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
 from ...ndimage import fftn, ifftn, rfftn
 from .._config import AbstractConfig
-from .._structure_representation import AbstractStructureRepresentation
+from .._structure import AbstractStructureRepresentation
 from .._transfer_theory import (
     ContrastTransferTheory,
     WaveTransferTheory,

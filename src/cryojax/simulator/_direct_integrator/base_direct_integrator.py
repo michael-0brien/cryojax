@@ -10,7 +10,7 @@ from equinox import AbstractClassVar
 from jaxtyping import Array, Complex, Float
 
 from .._config import AbstractConfig
-from .._structure_representation import AbstractVoxelStructure
+from .._structure import AbstractVoxelStructure
 
 
 StructureT = TypeVar("StructureT")
@@ -42,6 +42,6 @@ class AbstractDirectIntegrator(eqx.Module, Generic[StructureT], strict=True):
 
 
 class AbstractDirectVoxelIntegrator(
-    AbstractDirectIntegrator[StructureT], Generic[StructureT], strict=True
+    AbstractDirectIntegrator[VoxelStructureT], Generic[VoxelStructureT], strict=True
 ):
     outputs_integral: eqx.AbstractVar[bool]

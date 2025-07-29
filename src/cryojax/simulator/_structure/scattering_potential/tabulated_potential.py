@@ -11,9 +11,13 @@ from ....constants import (
     read_peng_element_scattering_factor_parameter_table,
 )
 from ....internal import NDArrayLike, error_if_negative
-from ..._structure_conversion import AbstractRealVoxelRendering
-from ..atomic_structure import AbstractIndependentAtomStructure
 from ..common_functions import gaussians_to_real_voxels
+from ..representations import (
+    AbstractIndependentAtomStructure,
+)
+from ..structure_conversion import (
+    AbstractDiscretizeRealVoxels as AbstractDiscretizeRealVoxels,
+)
 from .base_potential import AbstractScatteringPotential
 
 
@@ -35,58 +39,15 @@ class PengScatteringFactorParameters(eqx.Module, strict=True):
 
 
 class AbstractTabulatedScatteringPotential(AbstractScatteringPotential, strict=True):
-    """Abstract interface for the spatial potential energy distribution of a
-    scatterer.
+    """Abstract class for a tabulated scattering potential."""
 
-    !!! info
-        In, `cryojax`, potentials should be built in units of *inverse length squared*,
-        $[L]^{-2}$. This rescaled potential is defined to be
-
-        $$U(\\mathbf{r}) = \\frac{2 m e}{\\hbar^2} V(\\mathbf{r}),$$
-
-        where $V$ is the electrostatic potential energy, $\\mathbf{r}$ is a positional
-        coordinate, $m$ is the electron mass, and $e$ is the electron charge.
-
-        For a single atom, this rescaled potential has the advantage that under usual
-        scattering approximations (i.e. the first-born approximation), the
-        fourier transform of this quantity is closely related to tabulated electron scattering
-        factors. In particular, for a single atom with scattering factor $f^{(e)}(\\mathbf{q})$
-        and scattering vector $\\mathbf{q}$, its rescaled potential is equal to
-
-        $$U(\\mathbf{r}) = 4 \\pi \\mathcal{F}^{-1}[f^{(e)}(\\boldsymbol{\\xi} / 2)](\\mathbf{r}),$$
-
-        where $\\boldsymbol{\\xi} = 2 \\mathbf{q}$ is the wave vector coordinate and
-        $\\mathcal{F}^{-1}$ is the inverse fourier transform operator in the convention
-
-        $$\\mathcal{F}[f](\\boldsymbol{\\xi}) = \\int d^3\\mathbf{r} \\ \\exp(2\\pi i \\boldsymbol{\\xi}\\cdot\\mathbf{r}) f(\\mathbf{r}).$$
-
-        The rescaled potential $U$ gives the following time-independent schrodinger equation
-        for the scattering problem,
-
-        $$(\\nabla^2 + k^2) \\psi(\\mathbf{r}) = - U(\\mathbf{r}) \\psi(\\mathbf{r}),$$
-
-        where $k$ is the incident wavenumber of the electron beam.
-
-        **References**:
-
-        - For the definition of the rescaled potential, see
-        Chapter 69, Page 2003, Equation 69.6 from *Hawkes, Peter W., and Erwin Kasper.
-        Principles of Electron Optics, Volume 4: Advanced Wave Optics. Academic Press,
-        2022.*
-        - To work out the correspondence between the rescaled potential and the electron
-        scattering factors, see the supplementary information from *Vulović, Miloš, et al.
-        "Image formation modeling in cryo-electron microscopy." Journal of structural
-        biology 183.1 (2013): 19-32.*
-    """  # noqa: E501
-
-    scattering_factor_parameters: eqx.AbstractVar[PyTree]
-    b_factors: eqx.AbstractVar[Optional[Float[Array, " n_atoms"]]]
+    scattering_parameters: eqx.AbstractVar[PyTree]
 
 
-class PengTabulatedAtomicPotential(
+class PengIndependentAtomPotential(
     AbstractTabulatedScatteringPotential,
     AbstractIndependentAtomStructure,
-    AbstractRealVoxelRendering,
+    AbstractDiscretizeRealVoxels,
     strict=True,
 ):
     """The scattering potential parameterized as a mixture of five gaussians
@@ -102,24 +63,24 @@ class PengTabulatedAtomicPotential(
     """  # noqa: E501
 
     atom_positions: Float[Array, "n_atoms 3"]
-    scattering_factor_parameters: PengScatteringFactorParameters
+    scattering_parameters: PengScatteringFactorParameters
     b_factors: Optional[Float[Array, " n_atoms"]]
 
     def __init__(
         self,
         atom_positions: Float[NDArrayLike, "n_atoms 3"],
-        scattering_factor_parameters: PengScatteringFactorParameters,
+        scattering_parameters: PengScatteringFactorParameters,
         b_factors: Optional[Float[NDArrayLike, " n_atoms"]] = None,
     ):
         self.atom_positions = jnp.asarray(atom_positions, dtype=float)
-        self.scattering_factor_parameters = scattering_factor_parameters
+        self.scattering_parameters = scattering_parameters
         if b_factors is None:
             self.b_factors = None
         else:
             self.b_factors = error_if_negative(jnp.asarray(b_factors, dtype=float))
 
     @override
-    def as_real_voxel_grid(
+    def to_real_voxel_grid(
         self,
         shape: tuple[int, int, int],
         voxel_size: Float[NDArrayLike, ""] | float,
@@ -185,13 +146,11 @@ class PengTabulatedAtomicPotential(
         The rescaled potential $U_{\\ell}$ as a voxel grid of shape `shape`
         and voxel size `voxel_size`.
         """  # noqa: E501
-        gaussian_amplitudes = self.scattering_factor_parameters.a
+        gaussian_amplitudes = self.scattering_parameters.a
         if self.b_factors is None:
-            gaussian_widths = self.scattering_factor_parameters.b
+            gaussian_widths = self.scattering_parameters.b
         else:
-            gaussian_widths = (
-                self.scattering_factor_parameters.b + self.b_factors[:, None]
-            )
+            gaussian_widths = self.scattering_parameters.b + self.b_factors[:, None]
         return gaussians_to_real_voxels(
             shape,
             jnp.asarray(voxel_size, dtype=float),

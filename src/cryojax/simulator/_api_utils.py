@@ -18,13 +18,13 @@ from ._image_model import (
 )
 from ._pose import AbstractPose
 from ._scattering_theory import WeakPhaseScatteringTheory
-from ._structure_mapping import AbstractStructureMapping
-from ._structure_representation import (
+from ._structure import (
+    AbstractStructureMapping,
     FourierVoxelGridStructure,
     FourierVoxelSplineStructure,
-    GaussianMixtureAtomicPotential,
+    GaussianIndependentAtomPotential,
     GaussianMixtureStructure,
-    PengTabulatedAtomicPotential,
+    PengIndependentAtomPotential,
     RealVoxelGridStructure,
 )
 from ._transfer_theory import ContrastTransferTheory
@@ -38,11 +38,7 @@ def make_image_model(
     integrator: Optional[AbstractDirectIntegrator] = None,
     detector: Optional[AbstractDetector] = None,
     *,
-    options: dict[str, Any] = {
-        "normalizes_signal": False,
-        "signal_region": None,
-        "applies_translation": True,
-    },
+    options: dict[str, Any] = {},
     physical_units: bool = False,
     mode: Literal["contrast", "intensity", "counts"] = "contrast",
 ) -> AbstractImageModel:
@@ -53,7 +49,7 @@ def make_image_model(
     - `structure`:
         The representation of the protein structure.
         Common choices are the `FourierVoxelGridStructure`
-        for fourier-space voxel grids or the `PengTabulatedAtomicPotential`
+        for fourier-space voxel grids or the `PengIndependentAtomPotential`
         for gaussian mixtures of atoms parameterized by electron scattering factors.
     - `config`:
         The configuration for the image and imagining instrument. Unless using
@@ -162,8 +158,8 @@ def _select_default_integrator(
     elif isinstance(
         structure,
         (
-            PengTabulatedAtomicPotential,
-            GaussianMixtureAtomicPotential,
+            PengIndependentAtomPotential,
+            GaussianIndependentAtomPotential,
             GaussianMixtureStructure,
         ),
     ):

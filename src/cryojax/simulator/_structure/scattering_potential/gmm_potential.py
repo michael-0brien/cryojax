@@ -4,16 +4,20 @@ import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from ....internal import NDArrayLike, error_if_negative
-from ..._structure_conversion import AbstractRealVoxelRendering
-from ..atomic_structure import AbstractIndependentAtomStructure
 from ..common_functions import gaussians_to_real_voxels
+from ..representations import (
+    AbstractIndependentAtomStructure,
+)
+from ..structure_conversion import (
+    AbstractDiscretizeRealVoxels as AbstractDiscretizeRealVoxels,
+)
 from .base_potential import AbstractScatteringPotential
 
 
-class GaussianMixtureAtomicPotential(
+class GaussianIndependentAtomPotential(
     AbstractScatteringPotential,
     AbstractIndependentAtomStructure,
-    AbstractRealVoxelRendering,
+    AbstractDiscretizeRealVoxels,
     strict=True,
 ):
     r"""An atomistic representation of scattering potential as a mixture of
@@ -70,7 +74,7 @@ class GaussianMixtureAtomicPotential(
         self.b_factors = error_if_negative(jnp.asarray(b_factors, dtype=float))
 
     @override
-    def as_real_voxel_grid(
+    def to_real_voxel_grid(
         self,
         shape: tuple[int, int, int],
         voxel_size: Float[NDArrayLike, ""] | float,

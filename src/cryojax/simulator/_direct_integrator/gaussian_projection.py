@@ -15,10 +15,10 @@ from ...ndimage import (
     rfftn,
 )
 from .._config import AbstractConfig
-from .._structure_representation import (
-    GaussianMixtureAtomicPotential,
+from .._structure import (
+    GaussianIndependentAtomPotential as GaussianIndependentAtomPotential,
     GaussianMixtureStructure,
-    PengTabulatedAtomicPotential,
+    PengIndependentAtomPotential as PengIndependentAtomPotential,
 )
 from .base_direct_integrator import AbstractDirectIntegrator
 
@@ -26,8 +26,8 @@ from .base_direct_integrator import AbstractDirectIntegrator
 class GaussianMixtureProjection(
     AbstractDirectIntegrator[
         GaussianMixtureStructure
-        | GaussianMixtureAtomicPotential
-        | PengTabulatedAtomicPotential
+        | GaussianIndependentAtomPotential
+        | PengIndependentAtomPotential
     ],
     strict=True,
 ):
@@ -85,8 +85,8 @@ class GaussianMixtureProjection(
         self,
         structure: (
             GaussianMixtureStructure
-            | GaussianMixtureAtomicPotential
-            | PengTabulatedAtomicPotential
+            | GaussianIndependentAtomPotential
+            | PengIndependentAtomPotential
         ),
         config: AbstractConfig,
         outputs_real_space: bool = False,
@@ -124,24 +124,24 @@ class GaussianMixtureProjection(
         else:
             upsampled_pixel_size, upsampled_shape = pixel_size, shape
         # Grab the gaussian amplitudes and widths
-        if isinstance(structure, PengTabulatedAtomicPotential):
+        if isinstance(structure, PengIndependentAtomPotential):
             positions = structure.atom_positions
-            amplitudes = structure.scattering_factor_parameters.a
-            b_factors = structure.scattering_factor_parameters.b
+            amplitudes = structure.scattering_parameters.a
+            b_factors = structure.scattering_parameters.b
             if structure.b_factors is not None:
                 b_factors += structure.b_factors[:, None]
         elif isinstance(structure, GaussianMixtureStructure):
             positions = structure.positions
             amplitudes = structure.amplitudes
             b_factors = jnp.asarray(convert_variance_to_b_factor(structure.variances))
-        elif isinstance(structure, GaussianMixtureAtomicPotential):
+        elif isinstance(structure, GaussianIndependentAtomPotential):
             positions = structure.atom_positions
             amplitudes = structure.amplitudes
             b_factors = jnp.asarray(structure.b_factors)
         else:
             raise ValueError(
-                "Supported types for `structure` are `PengTabulatedPotential` and "
-                "`GaussianMixtureStructure`."
+                "Supported types for `structure` are `PengIndependentAtomPotential`, "
+                "`GaussianIndependentAtomPotential`, and `GaussianMixtureStructure`."
             )
         # Compute the projection
         projection_integral = _gaussians_to_projection(
