@@ -1,3 +1,4 @@
+from typing import Any
 from typing_extensions import override
 
 import jax.numpy as jnp
@@ -9,7 +10,7 @@ from ..representations import (
     AbstractIndependentAtomStructure,
 )
 from ..structure_conversion import (
-    AbstractDiscretizeRealVoxels as AbstractDiscretizeRealVoxels,
+    AbstractDiscretizesToRealVoxels as AbstractDiscretizesToRealVoxels,
 )
 from .base_potential import AbstractScatteringPotential
 
@@ -17,7 +18,7 @@ from .base_potential import AbstractScatteringPotential
 class GaussianIndependentAtomPotential(
     AbstractScatteringPotential,
     AbstractIndependentAtomStructure,
-    AbstractDiscretizeRealVoxels,
+    AbstractDiscretizesToRealVoxels,
     strict=True,
 ):
     r"""An atomistic representation of scattering potential as a mixture of
@@ -79,11 +80,11 @@ class GaussianIndependentAtomPotential(
         shape: tuple[int, int, int],
         voxel_size: Float[NDArrayLike, ""] | float,
         *,
-        options: dict = {"batch_size": 1, "n_batches": 1},
+        options: dict[str, Any] = {},
     ) -> Float[Array, "{shape[0]} {shape[1]} {shape[2]}"]:
         """Return a voxel grid of the potential in real space.
 
-        See [`PengAtomicPotential.as_real_voxel_grid`](potential.md#cryojax.simulator.PengAtomicPotential.as_real_voxel_grid)
+        See [`PengIndependentAtomPotential.to_real_voxel_grid`](structure.md#cryojax.simulator.PengIndependentAtomPotential.to_real_voxel_grid)
         for the numerical conventions used when computing the sum of gaussians.
 
         **Arguments:**

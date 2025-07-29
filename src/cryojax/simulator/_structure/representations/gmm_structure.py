@@ -1,3 +1,4 @@
+from typing import Any
 from typing_extensions import Self, override
 
 import equinox as eqx
@@ -9,12 +10,12 @@ from ....internal import NDArrayLike, error_if_not_positive
 from ..._pose import AbstractPose
 from ..base_structure import AbstractPointCloudStructure
 from ..common_functions import gaussians_to_real_voxels
-from ..structure_conversion import AbstractDiscretizeRealVoxels
+from ..structure_conversion import AbstractDiscretizesToRealVoxels
 
 
 class GaussianMixtureStructure(
     AbstractPointCloudStructure,
-    AbstractDiscretizeRealVoxels,
+    AbstractDiscretizesToRealVoxels,
     strict=True,
 ):
     r"""A representation of a structure as a mixture of
@@ -74,7 +75,7 @@ class GaussianMixtureStructure(
         shape: tuple[int, int, int],
         voxel_size: Float[NDArrayLike, ""] | float,
         *,
-        options: dict = {"batch_size": 1, "n_batches": 1},
+        options: dict[str, Any] = {},
     ) -> Float[Array, "{shape[0]} {shape[1]} {shape[2]}"]:
         """Return a voxel grid of the potential in real space.
 

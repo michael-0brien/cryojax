@@ -71,7 +71,6 @@ nav:
         - cryojax.simulator:
             - 'api/simulator/api.md'
             - Representing volumes:
-                - 'api/simulator/potential.md'
                 - 'api/simulator/pose.md'
                 - 'api/simulator/structure.md'
             - Image formation:
@@ -102,6 +101,7 @@ nav:
         - cryojax.constants:
             - 'api/constants/units.md'
             - 'api/constants/scattering_factor_parameters.md'
+            - 'api/constants/conventions.md'
         - cryojax.jax_util:
             - 'api/jax_util/filter_specs.md'
             - 'api/jax_util/grid_search.md'

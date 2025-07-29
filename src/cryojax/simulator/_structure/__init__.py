@@ -25,6 +25,6 @@ from .scattering_potential import (
     PengScatteringFactorParameters as PengScatteringFactorParameters,
 )
 from .structure_conversion import (
-    AbstractDiscretizeFourierVoxels as AbstractDiscretizeFourierVoxels,
-    AbstractDiscretizeRealVoxels as AbstractDiscretizeRealVoxels,
+    AbstractDiscretizesToFourierVoxels as AbstractDiscretizesToFourierVoxels,
+    AbstractDiscretizesToRealVoxels as AbstractDiscretizesToRealVoxels,
 )

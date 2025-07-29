@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Any, Optional
 from typing_extensions import override
 
 import equinox as eqx
@@ -16,7 +16,7 @@ from ..representations import (
     AbstractIndependentAtomStructure,
 )
 from ..structure_conversion import (
-    AbstractDiscretizeRealVoxels as AbstractDiscretizeRealVoxels,
+    AbstractDiscretizesToRealVoxels as AbstractDiscretizesToRealVoxels,
 )
 from .base_potential import AbstractScatteringPotential
 
@@ -27,12 +27,12 @@ class PengScatteringFactorParameters(eqx.Module, strict=True):
     a: Float[Array, " n_atoms 5"]
     b: Float[Array, " n_atoms 5"]
 
-    def __init__(self, atomic_numbers: Int[np.ndarray, " n_atoms"]):
+    def __init__(self, atom_identities: Int[np.ndarray, " n_atoms"]):
         scattering_factor_parameter_table = (
             read_peng_element_scattering_factor_parameter_table()
         )
         scattering_factor_parameter_dict = get_tabulated_scattering_factor_parameters(
-            atomic_numbers, scattering_factor_parameter_table
+            atom_identities, scattering_factor_parameter_table
         )
         self.a = jnp.asarray(scattering_factor_parameter_dict["a"], dtype=float)
         self.b = jnp.asarray(scattering_factor_parameter_dict["b"], dtype=float)
@@ -47,7 +47,7 @@ class AbstractTabulatedScatteringPotential(AbstractScatteringPotential, strict=T
 class PengIndependentAtomPotential(
     AbstractTabulatedScatteringPotential,
     AbstractIndependentAtomStructure,
-    AbstractDiscretizeRealVoxels,
+    AbstractDiscretizesToRealVoxels,
     strict=True,
 ):
     """The scattering potential parameterized as a mixture of five gaussians
@@ -85,7 +85,7 @@ class PengIndependentAtomPotential(
         shape: tuple[int, int, int],
         voxel_size: Float[NDArrayLike, ""] | float,
         *,
-        options: dict = {"batch_size": 1, "n_batches": 1},
+        options: dict[str, Any] = {},
     ) -> Float[Array, "{shape[0]} {shape[1]} {shape[2]}"]:
         """Return a voxel grid of the potential in real space.
 

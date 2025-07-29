@@ -52,8 +52,8 @@ from ._scattering_theory import (
 )
 from ._solvent import AbstractRandomSolvent as AbstractRandomSolvent
 from ._structure import (
-    AbstractDiscretizeFourierVoxels as AbstractDiscretizeFourierVoxels,
-    AbstractDiscretizeRealVoxels as AbstractDiscretizeRealVoxels,
+    AbstractDiscretizesToFourierVoxels as AbstractDiscretizesToFourierVoxels,
+    AbstractDiscretizesToRealVoxels as AbstractDiscretizesToRealVoxels,
     AbstractFourierVoxelStructure as AbstractFourierVoxelStructure,
     AbstractIndependentAtomStructure as AbstractIndependentAtomStructure,
     AbstractPointCloudStructure as AbstractPointCloudStructure,
