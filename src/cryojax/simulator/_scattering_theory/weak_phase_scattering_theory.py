@@ -7,7 +7,7 @@ from .._common_functions import apply_interaction_constant
 from .._config import AbstractConfig
 from .._direct_integrator import AbstractDirectIntegrator, AbstractDirectVoxelIntegrator
 from .._solvent import AbstractRandomSolvent
-from .._structure_modeling import AbstractStructureRepresentation
+from .._structure_representation import AbstractStructureRepresentation
 from .._transfer_theory import ContrastTransferTheory
 from .base_scattering_theory import AbstractWeakPhaseScatteringTheory
 

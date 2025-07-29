@@ -18,8 +18,8 @@ from ._image_model import (
 )
 from ._pose import AbstractPose
 from ._scattering_theory import WeakPhaseScatteringTheory
-from ._structure_modeling import (
-    AbstractStructureMapping,
+from ._structure_mapping import AbstractStructureMapping
+from ._structure_representation import (
     FourierVoxelGridStructure,
     FourierVoxelSplineStructure,
     GaussianMixtureAtomicPotential,
@@ -31,7 +31,7 @@ from ._transfer_theory import ContrastTransferTheory
 
 
 def make_image_model(
-    structure_mapping: AbstractStructureMapping,
+    structure: AbstractStructureMapping,
     config: AbstractConfig,
     pose: AbstractPose,
     transfer_theory: Optional[ContrastTransferTheory] = None,
@@ -50,10 +50,10 @@ def make_image_model(
 
     **Arguments:**
 
-    - `potential`:
-        The representation of the protein electrostatic potential.
+    - `structure`:
+        The representation of the protein structure.
         Common choices are the `FourierVoxelGridStructure`
-        for fourier-space voxel grids or the `PengAtomicStructure`
+        for fourier-space voxel grids or the `PengTabulatedAtomicPotential`
         for gaussian mixtures of atoms parameterized by electron scattering factors.
     - `config`:
         The configuration for the image and imagining instrument. Unless using
@@ -108,17 +108,13 @@ def make_image_model(
     image = image_model.simulate()
     ```
     """
-    # Build the image model
-    integrator = _select_default_integrator(structure_mapping)
+    # Select default integrator
+    integrator = _select_default_integrator(structure, physical_units)
     if transfer_theory is None:
-        image_model = ProjectionImageModel(
-            structure_mapping,
-            pose,
-            config,
-            integrator,
-            **options,
-        )
+        # Image model for projections
+        image_model = ProjectionImageModel(structure, pose, config, integrator, **options)
     else:
+        # Simulate physical observables
         if physical_units:
             scattering_theory = WeakPhaseScatteringTheory(integrator, transfer_theory)
             if mode == "counts":
@@ -134,28 +130,15 @@ def make_image_model(
                         "an `AbstractDetector` must be passed."
                     )
                 image_model = ElectronCountsImageModel(
-                    structure_mapping,
-                    pose,
-                    config,
-                    scattering_theory,
-                    detector,
-                    **options,
+                    structure, pose, config, scattering_theory, detector, **options
                 )
             elif mode == "contrast":
                 image_model = ContrastImageModel(
-                    structure_mapping,
-                    pose,
-                    config,
-                    scattering_theory,
-                    **options,
+                    structure, pose, config, scattering_theory, **options
                 )
             elif mode == "intensity":
                 image_model = IntensityImageModel(
-                    structure_mapping,
-                    pose,
-                    config,
-                    scattering_theory,
-                    **options,
+                    structure, pose, config, scattering_theory, **options
                 )
             else:
                 raise ValueError(
@@ -163,21 +146,19 @@ def make_image_model(
                     "physical quantities are 'contrast', 'intensity', and 'counts'."
                 )
         else:
+            # Linear image model
             image_model = LinearImageModel(
-                structure_mapping,
-                pose,
-                config,
-                integrator,
-                transfer_theory,
-                **options,
+                structure, pose, config, integrator, transfer_theory, **options
             )
 
     return image_model
 
 
-def _select_default_integrator(structure):
+def _select_default_integrator(
+    structure: AbstractStructureMapping, physical_units: bool
+) -> AbstractDirectIntegrator:
     if isinstance(structure, (FourierVoxelGridStructure, FourierVoxelSplineStructure)):
-        integrator = FourierSliceExtraction()
+        integrator = FourierSliceExtraction(outputs_integral=physical_units)
     elif isinstance(
         structure,
         (
@@ -188,10 +169,10 @@ def _select_default_integrator(structure):
     ):
         integrator = GaussianMixtureProjection(use_error_functions=True)
     elif isinstance(structure, RealVoxelGridStructure):
-        integrator = NufftProjection()
+        integrator = NufftProjection(outputs_integral=physical_units)
     else:
         raise ValueError(
-            "Could not select default integrator for potential of "
+            "Could not select default integrator for structure of "
             f"type {type(structure).__name__}. If using a custom potential "
             "please directly pass an integrator."
         )

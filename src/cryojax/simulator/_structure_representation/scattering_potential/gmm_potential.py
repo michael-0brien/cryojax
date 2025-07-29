@@ -4,8 +4,8 @@ import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from ....internal import NDArrayLike, error_if_negative
+from ..._structure_conversion import AbstractRealVoxelRendering
 from ..atomic_structure import AbstractIndependentAtomStructure
-from ..base_structure import AbstractRealVoxelRendering
 from ..common_functions import gaussians_to_real_voxels
 from .base_potential import AbstractScatteringPotential
 

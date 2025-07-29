@@ -13,7 +13,7 @@ from .._config import AbstractConfig, DoseConfig
 from .._detector import AbstractDetector
 from .._pose import AbstractPose
 from .._scattering_theory import AbstractScatteringTheory
-from .._structure_modeling import AbstractStructureMapping
+from .._structure_mapping import AbstractStructureMapping
 from .base_image_model import AbstractImageModel, ImageArray, PaddedImageArray
 
 
@@ -30,7 +30,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
     scattering theory.
     """
 
-    structure_mapping: AbstractStructureMapping
+    structure: AbstractStructureMapping
     pose: AbstractPose
     config: AbstractConfig
     scattering_theory: AbstractScatteringTheory
@@ -41,7 +41,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
 
     def __init__(
         self,
-        structure_mapping: AbstractStructureMapping,
+        structure: AbstractStructureMapping,
         pose: AbstractPose,
         config: AbstractConfig,
         scattering_theory: AbstractScatteringTheory,
@@ -52,7 +52,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
     ):
         """**Arguments:**
 
-        - `structure_mapping`:
+        - `structure`:
             The map to a biological structure.
         - `pose`:
             The pose of a structure.
@@ -71,7 +71,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
             and 0 otherwise used to normalize the image.
             Must have shape equal to `AbstractConfig.shape`.
         """
-        self.structure_mapping = structure_mapping
+        self.structure = structure
         self.pose = pose
         self.config = config
         self.scattering_theory = scattering_theory
@@ -85,7 +85,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
     ) -> ImageArray | PaddedImageArray:
         # Get the structure. Its data should be a scattering potential
         # to simulate in physical units
-        structure = self.structure_mapping.map_to_structure()
+        structure = self.structure.map_to_structure()
         # Rotate it to the lab frame
         structure = structure.rotate_to_pose(self.pose)
         # Compute the contrast
@@ -107,7 +107,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
     words a squared wavefunction.
     """
 
-    structure_mapping: AbstractStructureMapping
+    structure: AbstractStructureMapping
     pose: AbstractPose
     config: AbstractConfig
     scattering_theory: AbstractScatteringTheory
@@ -118,7 +118,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
 
     def __init__(
         self,
-        structure_mapping: AbstractStructureMapping,
+        structure: AbstractStructureMapping,
         pose: AbstractPose,
         config: AbstractConfig,
         scattering_theory: AbstractScatteringTheory,
@@ -129,7 +129,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
     ):
         """**Arguments:**
 
-        - `structure_mapping`:
+        - `structure`:
             The map to a biological structure.
         - `pose`:
             The pose of a structure.
@@ -148,7 +148,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
             and 0 otherwise used to normalize the image.
             Must have shape equal to `AbstractConfig.shape`.
         """
-        self.structure_mapping = structure_mapping
+        self.structure = structure
         self.pose = pose
         self.config = config
         self.scattering_theory = scattering_theory
@@ -162,7 +162,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
     ) -> ImageArray | PaddedImageArray:
         # Get the structure. Its data should be a scattering potential
         # to simulate in physical units
-        structure = self.structure_mapping.map_to_structure()
+        structure = self.structure.map_to_structure()
         # Rotate it to the lab frame
         structure = structure.rotate_to_pose(self.pose)
         # Compute the intensity spectrum
@@ -183,7 +183,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
     model for the detector.
     """
 
-    structure_mapping: AbstractStructureMapping
+    structure: AbstractStructureMapping
     pose: AbstractPose
     config: DoseConfig
     scattering_theory: AbstractScatteringTheory
@@ -195,7 +195,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
 
     def __init__(
         self,
-        structure_mapping: AbstractStructureMapping,
+        structure: AbstractStructureMapping,
         pose: AbstractPose,
         config: DoseConfig,
         scattering_theory: AbstractScatteringTheory,
@@ -207,7 +207,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
     ):
         """**Arguments:**
 
-        - `structure_mapping`:
+        - `structure`:
             The map to a biological structure.
         - `pose`:
             The pose of a structure.
@@ -226,7 +226,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
             and 0 otherwise used to normalize the image.
             Must have shape equal to `AbstractConfig.shape`.
         """
-        self.structure_mapping = structure_mapping
+        self.structure = structure
         self.pose = pose
         self.config = config
         self.scattering_theory = scattering_theory
@@ -241,7 +241,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
     ) -> ImageArray | PaddedImageArray:
         # Get the structure. Its data should be a scattering potential
         # to simulate in physical units
-        structure = self.structure_mapping.map_to_structure()
+        structure = self.structure.map_to_structure()
         # Rotate it to the lab frame
         structure = structure.rotate_to_pose(self.pose)
         if rng_key is None:

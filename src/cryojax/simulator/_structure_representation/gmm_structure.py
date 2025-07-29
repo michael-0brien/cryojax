@@ -7,17 +7,13 @@ from jaxtyping import Array, Float
 from ...constants import convert_variance_to_b_factor
 from ...internal import NDArrayLike, error_if_not_positive
 from .._pose import AbstractPose
-from .base_structure import (
-    AbstractFixedStructure,
-    AbstractPointCloudStructure,
-    AbstractRealVoxelRendering,
-)
+from .._structure_conversion import AbstractRealVoxelRendering
+from .base_structure import AbstractPointCloudStructure
 from .common_functions import gaussians_to_real_voxels
 
 
 class GaussianMixtureStructure(
     AbstractPointCloudStructure,
-    AbstractFixedStructure,
     AbstractRealVoxelRendering,
     strict=True,
 ):
@@ -76,7 +72,7 @@ class GaussianMixtureStructure(
     def as_real_voxel_grid(
         self,
         shape: tuple[int, int, int],
-        voxel_size: Float[Array, ""] | float,
+        voxel_size: Float[NDArrayLike, ""] | float,
         *,
         options: dict = {"batch_size": 1, "n_batches": 1},
     ) -> Float[Array, "{shape[0]} {shape[1]} {shape[2]}"]:

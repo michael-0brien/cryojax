@@ -2,15 +2,10 @@ from .atomic_structure import (
     AbstractIndependentAtomStructure as AbstractIndependentAtomStructure,
 )
 from .base_structure import (
-    AbstractFixedStructure as AbstractFixedStructure,
     AbstractPointCloudStructure as AbstractPointCloudStructure,
-    AbstractRealVoxelRendering as AbstractRealVoxelRendering,
-    AbstractStructuralEnsemble as AbstractStructuralEnsemble,
-    AbstractStructureMapping as AbstractStructureMapping,
     AbstractStructureRepresentation as AbstractStructureRepresentation,
     AbstractVoxelStructure as AbstractVoxelStructure,
 )
-from .discrete_ensemble import DiscreteStructuralEnsemble as DiscreteStructuralEnsemble
 from .gmm_structure import GaussianMixtureStructure as GaussianMixtureStructure
 from .scattering_potential import (
     AbstractScatteringPotential as AbstractScatteringPotential,

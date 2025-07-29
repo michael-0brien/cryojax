@@ -15,7 +15,7 @@ from ...ndimage.transforms import FilterLike, MaskLike
 from .._config import AbstractConfig
 from .._direct_integrator import AbstractDirectIntegrator
 from .._pose import AbstractPose
-from .._structure_modeling import AbstractStructureMapping
+from .._structure_mapping import AbstractStructureMapping
 from .._transfer_theory import ContrastTransferTheory
 
 
@@ -40,7 +40,7 @@ class AbstractImageModel(eqx.Module, strict=True):
     Call an `AbstractImageModel`'s `render` routine.
     """
 
-    structure_mapping: eqx.AbstractVar[AbstractStructureMapping]
+    structure: eqx.AbstractVar[AbstractStructureMapping]
     pose: eqx.AbstractVar[AbstractPose]
     config: eqx.AbstractVar[AbstractConfig]
 
@@ -189,7 +189,7 @@ class AbstractImageModel(eqx.Module, strict=True):
 class LinearImageModel(AbstractImageModel, strict=True):
     """An simple image model in linear image formation theory."""
 
-    structure_mapping: AbstractStructureMapping
+    structure: AbstractStructureMapping
     pose: AbstractPose
     integrator: AbstractDirectIntegrator
     transfer_theory: ContrastTransferTheory
@@ -201,7 +201,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
 
     def __init__(
         self,
-        structure_mapping: AbstractStructureMapping,
+        structure: AbstractStructureMapping,
         pose: AbstractPose,
         config: AbstractConfig,
         integrator: AbstractDirectIntegrator,
@@ -213,7 +213,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
     ):
         """**Arguments:**
 
-        - `structure_mapping`:
+        - `structure`:
             The map to a biological structure.
         - `pose`:
             The pose of a structure.
@@ -233,7 +233,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
             Must have shape equal to `AbstractConfig.shape`.
         """
         # Simulator components
-        self.structure_mapping = structure_mapping
+        self.structure = structure
         self.pose = pose
         self.config = config
         self.integrator = integrator
@@ -248,7 +248,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
         self, rng_key: Optional[PRNGKeyArray] = None
     ) -> ImageArray | PaddedImageArray:
         # Get the structure
-        structure = self.structure_mapping.map_to_structure()
+        structure = self.structure.map_to_structure()
         # Rotate it to the lab frame
         structure = structure.rotate_to_pose(self.pose)
         # Compute the projection image
@@ -272,7 +272,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
 class ProjectionImageModel(AbstractImageModel, strict=True):
     """An simple image model for computing a projection."""
 
-    structure_mapping: AbstractStructureMapping
+    structure: AbstractStructureMapping
     pose: AbstractPose
     integrator: AbstractDirectIntegrator
     config: AbstractConfig
@@ -283,7 +283,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
 
     def __init__(
         self,
-        structure_mapping: AbstractStructureMapping,
+        structure: AbstractStructureMapping,
         pose: AbstractPose,
         config: AbstractConfig,
         integrator: AbstractDirectIntegrator,
@@ -294,7 +294,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
     ):
         """**Arguments:**
 
-        - `structure_mapping`:
+        - `structure`:
             The map to a biological structure.
         - `pose`:
             The pose of a structure.
@@ -313,7 +313,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
             Must have shape equal to `AbstractConfig.shape`.
         """
         # Simulator components
-        self.structure_mapping = structure_mapping
+        self.structure = structure
         self.pose = pose
         self.config = config
         self.integrator = integrator
@@ -327,7 +327,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
         self, rng_key: Optional[PRNGKeyArray] = None
     ) -> ImageArray | PaddedImageArray:
         # Get the structure
-        structure = self.structure_mapping.map_to_structure()
+        structure = self.structure.map_to_structure()
         # Rotate it to the lab frame
         structure = structure.rotate_to_pose(self.pose)
         # Compute the projection image

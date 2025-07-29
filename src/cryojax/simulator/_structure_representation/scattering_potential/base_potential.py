@@ -1,9 +1,7 @@
-import equinox as eqx
+from ..base_structure import AbstractStructureRepresentation
 
 
-class AbstractScatteringPotential(
-    eqx.Module, strict=eqx.StrictConfig(force_abstract=True)
-):
+class AbstractScatteringPotential(AbstractStructureRepresentation, strict=True):
     """Abstract interface for the spatial potential energy distribution of a
     scatterer.
 

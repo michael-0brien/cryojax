@@ -11,7 +11,7 @@ from jaxtyping import Array, Complex, Float
 
 from ...ndimage import convert_fftn_to_rfftn, irfftn
 from .._config import AbstractConfig
-from .._structure_modeling import RealVoxelGridStructure
+from .._structure_representation import RealVoxelGridStructure
 from .base_direct_integrator import AbstractDirectVoxelIntegrator
 
 

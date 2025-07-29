@@ -1,15 +1,32 @@
-"""
-Abstractions of ensembles on discrete conformational variables.
-"""
-
+import abc
+from typing import Any
 from typing_extensions import override
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Int
 
-from ...internal import error_if_negative
-from .base_structure import AbstractStructuralEnsemble, AbstractStructureRepresentation
+from ..internal import error_if_negative
+from ._structure_representation import AbstractStructureRepresentation
+
+
+class AbstractStructureMapping(eqx.Module, strict=True):
+    """Abstract interface for a data representation of a protein
+    structure.
+    """
+
+    @abc.abstractmethod
+    def map_to_structure(self) -> AbstractStructureRepresentation:
+        raise NotImplementedError
+
+
+class AbstractStructuralEnsemble(AbstractStructureMapping, strict=True):
+    """Abstract interface for a structure with conformational
+    heterogeneity.
+    """
+
+    conformation: eqx.AbstractVar[Any]
 
 
 class DiscreteStructuralEnsemble(AbstractStructuralEnsemble, strict=True):
@@ -36,11 +53,11 @@ class DiscreteStructuralEnsemble(AbstractStructuralEnsemble, strict=True):
 
     @override
     def map_to_structure(self) -> AbstractStructureRepresentation:
-        """Get the scattering potential at configured conformation."""
+        """Map to the structure at `conformation`."""
         funcs = [
             lambda i=i: self.conformational_space[i]
             for i in range(len(self.conformational_space))
         ]
-        potential = jax.lax.switch(self.conformation, funcs)
+        structure = jax.lax.switch(self.conformation, funcs)
 
-        return potential
+        return structure

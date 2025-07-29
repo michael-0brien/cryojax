@@ -15,7 +15,7 @@ from ...ndimage import (
     rfftn,
 )
 from .._config import AbstractConfig
-from .._structure_modeling import (
+from .._structure_representation import (
     GaussianMixtureAtomicPotential,
     GaussianMixtureStructure,
     PengTabulatedAtomicPotential,

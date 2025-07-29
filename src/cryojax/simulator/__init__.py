@@ -51,20 +51,23 @@ from ._scattering_theory import (
     WeakPhaseScatteringTheory as WeakPhaseScatteringTheory,
 )
 from ._solvent import AbstractRandomSolvent as AbstractRandomSolvent
-from ._structure_modeling import (
-    AbstractFixedStructure as AbstractFixedStructure,
+from ._structure_conversion import (
+    AbstractRealVoxelRendering as AbstractRealVoxelRendering,
+)
+from ._structure_mapping import (
+    AbstractStructuralEnsemble as AbstractStructuralEnsemble,
+    AbstractStructureMapping as AbstractStructureMapping,
+    DiscreteStructuralEnsemble as DiscreteStructuralEnsemble,
+)
+from ._structure_representation import (
     AbstractFourierVoxelStructure as AbstractFourierVoxelStructure,
     AbstractIndependentAtomStructure as AbstractIndependentAtomStructure,
     AbstractPointCloudStructure as AbstractPointCloudStructure,
-    AbstractRealVoxelRendering as AbstractRealVoxelRendering,
     AbstractRealVoxelStructure as AbstractRealVoxelStructure,
     AbstractScatteringPotential as AbstractScatteringPotential,
-    AbstractStructuralEnsemble as AbstractStructuralEnsemble,
-    AbstractStructureMapping as AbstractStructureMapping,
     AbstractStructureRepresentation as AbstractStructureRepresentation,
     AbstractTabulatedScatteringPotential as AbstractTabulatedScatteringPotential,
     AbstractVoxelStructure as AbstractVoxelStructure,
-    DiscreteStructuralEnsemble as DiscreteStructuralEnsemble,
     FourierVoxelGridStructure as FourierVoxelGridStructure,
     FourierVoxelSplineStructure as FourierVoxelSplineStructure,
     GaussianMixtureAtomicPotential as GaussianMixtureAtomicPotential,

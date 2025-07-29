@@ -1,5 +1,6 @@
 from typing import Callable
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
@@ -9,6 +10,7 @@ from jaxtyping import Array, Float, PyTree
 from ...coordinates import make_1d_coordinate_grid
 
 
+@eqx.filter_jit
 def gaussians_to_real_voxels(
     shape: tuple[int, int, int],
     voxel_size: Float[Array, ""],

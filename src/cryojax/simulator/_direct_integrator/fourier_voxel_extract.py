@@ -20,7 +20,7 @@ from ...ndimage import (
 )
 from ...ndimage.transforms import InverseSincMask
 from .._config import AbstractConfig
-from .._structure_modeling import (
+from .._structure_representation import (
     FourierVoxelGridStructure,
     FourierVoxelSplineStructure,
 )
