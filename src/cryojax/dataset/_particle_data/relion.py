@@ -190,6 +190,16 @@ class AbstractParticleStarFile(
     def updates_optics_group(self, value: bool):
         raise NotImplementedError
 
+    @property
+    @abc.abstractmethod
+    def inverts_rotation(self) -> bool:
+        raise NotImplementedError
+
+    @inverts_rotation.setter
+    @abc.abstractmethod
+    def inverts_rotation(self, value: bool):
+        raise NotImplementedError
+
     def copy(self) -> Self:
         return deepcopy(self)
 
@@ -211,6 +221,7 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
         broadcasts_optics_group: bool = True,
         loads_envelope: bool = False,
         updates_optics_group: bool = False,
+        inverts_rotation: bool = False,
         make_config_fn: Callable[
             [tuple[int, int], Float[Array, "..."], Float[Array, "..."]],
             BasicConfig,
@@ -255,6 +266,11 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
         - `updates_optics_group`:
             If `True`, when re-writing STAR file entries via
             `dataset[idx] = parameters` syntax, creates a new optics group entry.
+        - `inverts_rotation`:
+            If `True`, invert the pose representation upon return. Depending on
+            the image formation process used in `cryojax`, this may be necessary
+            for matching to RELION convention. For example, set to `True` when
+            using the fourier slice extraction and other voxel representations.
         - `make_config_fn`:
             A function used for `BasicConfig` initialization that returns
             an `BasicConfig`. This is used to customize the metadata of the
@@ -274,6 +290,8 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
         self._loads_envelope = loads_envelope
         # Properties for writing
         self._updates_optics_group = updates_optics_group
+        # Shared
+        self._inverts_rotation = inverts_rotation
 
     @override
     def __getitem__(
@@ -312,6 +330,9 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
         else:
             metadata = None
 
+        if self.inverts_rotation:
+            pose = pose.to_inverse_rotation()
+
         return ParticleParameterInfo(
             config=config,
             pose=pose,
@@ -334,6 +355,9 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
         _validate_dataset_index(type(self), index, n_rows)
         # ... also, the parameters too
         _validate_parameters(value, force_keys=False)
+        # Invert the pose if desired
+        if "pose" in value:
+            value["pose"] = value["pose"].to_inverse_rotation()
         # Grab the current and new optics and particle data
         if self.updates_optics_group:
             optics_group_index = _make_optics_group_index(self.starfile_data["optics"])
@@ -374,6 +398,9 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
         """
         # Make sure parameters are valid
         _validate_parameters(value, force_keys=True)
+        # Invert the pose if desired
+        if "pose" in value:
+            value["pose"] = value["pose"].to_inverse_rotation()
         # Make new optics group
         optics_group_index = _make_optics_group_index(self.starfile_data["optics"])
         optics_data, optics_data_to_append = (
@@ -504,6 +531,14 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
     @override
     def updates_optics_group(self, value: bool):
         self._updates_optics_group = value
+
+    @property
+    def inverts_rotation(self) -> bool:
+        return self._inverts_rotation
+
+    @inverts_rotation.setter
+    def inverts_rotation(self, value: bool):
+        self._inverts_rotation = value
 
 
 class RelionParticleStackDataset(

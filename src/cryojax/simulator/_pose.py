@@ -193,6 +193,14 @@ class AbstractPose(Module, strict=True):
                 f"`{offset_in_angstroms.shape}`"
             )
 
+    def to_inverse_rotation(self) -> Self:
+        """Convert an `AbstractPose` to the inverse of its rotation
+        representation.
+        """
+        return self.from_rotation_and_translation(
+            self.rotation.inverse(), self.offset_in_angstroms
+        )
+
 
 class EulerAnglePose(AbstractPose, strict=True):
     r"""An `AbstractPose` represented by Euler angles.
