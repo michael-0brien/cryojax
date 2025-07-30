@@ -4,7 +4,7 @@ from typing import Generic, TypeVar
 import equinox as eqx
 from jaxtyping import Array, Complex, Float
 
-from .._config import AbstractConfig
+from .._image_config import AbstractImageConfig
 
 
 VolumeT = TypeVar("VolumeT")
@@ -17,7 +17,7 @@ class AbstractMultisliceIntegrator(eqx.Module, Generic[VolumeT], strict=True):
     def integrate(
         self,
         volume: VolumeT,
-        config: AbstractConfig,
+        config: AbstractImageConfig,
         amplitude_contrast_ratio: Float[Array, ""] | float,
     ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim}"]:
         raise NotImplementedError

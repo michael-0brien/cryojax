@@ -52,12 +52,12 @@ pose = cxs.EulerAnglePose(
     psi_angle=-10.0,
 )
 # The model for the CTF
-ctf = cxs.CTF(
+ctf = cxs.AberratedAstigmaticCTF(
     defocus_in_angstroms=9800.0, astigmatism_in_angstroms=200.0, astigmatism_angle=10.0
 )
 transfer_theory = cxs.ContrastTransferTheory(ctf, amplitude_contrast_ratio=0.1)
 # The image configuration
-config = cxs.BasicConfig(shape=(320, 320), pixel_size=voxel_size, voltage_in_kilovolts=300.0)
+config = cxs.BasicImageConfig(shape=(320, 320), pixel_size=voxel_size, voltage_in_kilovolts=300.0)
 # Instantiate a cryoJAX `image_model` using the `make_image_model` function
 image_model = cxs.make_image_model(volume, config, pose, transfer_theory)
 # Simulate an image
@@ -99,7 +99,7 @@ observed_image = ...
 
 # Split the `image_model` by differentiated and non-differentiated
 # arguments
-where_pose = lambda model: model.structure.pose
+where_pose = lambda model: model.pose
 filter_spec = get_filter_spec(image_model, where_pose)
 model_grad, model_nograd = eqx.partition(image_model, filter_spec)
 

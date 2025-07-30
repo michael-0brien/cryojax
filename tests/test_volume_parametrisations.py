@@ -11,7 +11,7 @@ with install_import_hook("cryojax", "typeguard.typechecked"):
     from cryojax.io import read_atoms_from_pdb
     from cryojax.ndimage import downsample_with_fourier_cropping, ifftn, irfftn
     from cryojax.simulator import (
-        BasicConfig,
+        BasicImageConfig,
         FourierVoxelGridVolume,
         GaussianMixtureProjection,
         GaussianMixtureVolume,
@@ -71,7 +71,7 @@ def test_atom_integrator_shape(sample_pdb_path, shape):
 
     integrator = GaussianMixtureProjection(upsampling_factor=2)
     # # ... and the configuration of the imaging instrument
-    config = BasicConfig(
+    config = BasicImageConfig(
         shape=shape,
         pixel_size=pixel_size,
         voltage_in_kilovolts=300.0,
@@ -212,7 +212,7 @@ def test_downsampled_gmm_potential_agreement(sample_pdb_path):
     )
     integrator_int_lowres = GaussianMixtureProjection(upsampling_factor=1)
     # ... and the configuration of the imaging instrument
-    config = BasicConfig(
+    config = BasicImageConfig(
         shape=downsampled_shape,
         pixel_size=downsampled_pixel_size,
         voltage_in_kilovolts=300.0,
@@ -252,7 +252,7 @@ def test_peng_vs_gmm_agreement(sample_pdb_path):
     # Create instrument configuration
     shape = (64, 64)
     pixel_size = 0.5
-    config = BasicConfig(
+    config = BasicImageConfig(
         shape=shape,
         pixel_size=pixel_size,
         voltage_in_kilovolts=300.0,
@@ -341,7 +341,7 @@ class TestIntegrateGMMToPixels:
         atomic_potential = GaussianMixtureVolume(
             atom_positions, ff_a, ff_b / (8.0 * jnp.pi**2)
         )
-        config = BasicConfig(
+        config = BasicImageConfig(
             shape=n_pixels_per_side,
             pixel_size=voxel_size,
             voltage_in_kilovolts=300.0,
@@ -376,7 +376,7 @@ class TestIntegrateGMMToPixels:
         atomic_potential = GaussianMixtureVolume(
             atom_positions, ff_a, ff_b / (8.0 * jnp.pi**2)
         )
-        config = BasicConfig(
+        config = BasicImageConfig(
             shape=n_pixels_per_side,
             pixel_size=voxel_size,
             voltage_in_kilovolts=300.0,

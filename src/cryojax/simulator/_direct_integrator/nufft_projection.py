@@ -10,7 +10,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
 from ...ndimage import convert_fftn_to_rfftn, irfftn
-from .._config import AbstractConfig
+from .._image_config import AbstractImageConfig
 from .._structure_parametrisation import RealVoxelGridVolume
 from .base_direct_integrator import AbstractDirectVoxelIntegrator
 
@@ -69,7 +69,7 @@ class NufftProjection(
     def integrate(
         self,
         volume: RealVoxelGridVolume,
-        config: AbstractConfig,
+        config: AbstractImageConfig,
         outputs_real_space: bool = False,
     ) -> (
         Complex[
@@ -78,7 +78,7 @@ class NufftProjection(
         ]
         | Float[Array, "{config.padded_y_dim} {config.padded_x_dim}"]
     ):
-        """Integrate the volume at the `AbstractConfig` settings
+        """Integrate the volume at the `AbstractImageConfig` settings
         of a voxel-based representation in real-space, using non-uniform FFTs.
 
         **Arguments:**

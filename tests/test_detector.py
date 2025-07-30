@@ -8,8 +8,8 @@ from cryojax.ndimage import irfftn, rfftn
 
 def test_constant_wavefunction_gives_constant_expected_events():
     # Pick a large integrated electron flux to test
-    # Create DoseConfig, picking a large electron flux to test
-    config = cs.DoseConfig(
+    # Create DoseImageConfig, picking a large electron flux to test
+    config = cs.DoseImageConfig(
         (25, 25),
         1.0,
         voltage_in_kilovolts=300.0,
@@ -37,8 +37,8 @@ def test_constant_wavefunction_gives_constant_expected_events():
 
 def test_gaussian_limit():
     # Pick a large integrated electron flux to test
-    # Create DoseConfig, picking a large electron flux to test
-    config = cs.DoseConfig(
+    # Create DoseImageConfig, picking a large electron flux to test
+    config = cs.DoseImageConfig(
         (25, 25),
         1.0,
         voltage_in_kilovolts=300.0,

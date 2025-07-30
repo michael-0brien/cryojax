@@ -19,7 +19,7 @@ from ...ndimage import (
     rfftn,
 )
 from ...ndimage.transforms import InverseSincMask
-from .._config import AbstractConfig
+from .._image_config import AbstractImageConfig
 from .._structure_parametrisation import FourierVoxelGridVolume, FourierVoxelSplineVolume
 from .base_direct_integrator import AbstractDirectVoxelIntegrator
 
@@ -81,7 +81,7 @@ class FourierSliceExtraction(AbstractFourierSurfaceExtraction, strict=True):
     def integrate(
         self,
         volume: FourierVoxelGridVolume | FourierVoxelSplineVolume,
-        config: AbstractConfig,
+        config: AbstractImageConfig,
         outputs_real_space: bool = False,
     ) -> (
         Complex[
@@ -90,7 +90,7 @@ class FourierSliceExtraction(AbstractFourierSurfaceExtraction, strict=True):
         ]
         | Float[Array, "{config.padded_y_dim} {config.padded_x_dim}"]
     ):
-        """Integrate the volume at the `AbstractConfig` settings
+        """Integrate the volume at the `AbstractImageConfig` settings
         of a voxel-based representation in fourier-space,
         using fourier slice extraction.
 
@@ -127,7 +127,7 @@ class FourierSliceExtraction(AbstractFourierSurfaceExtraction, strict=True):
                 "`FourierVoxelSplineVolume`."
             )
 
-        # Resize the image to match the AbstractConfig.padded_shape
+        # Resize the image to match the AbstractImageConfig.padded_shape
         if config.padded_shape != (N, N):
             fourier_projection = rfftn(
                 config.crop_or_pad_to_padded_shape(irfftn(fourier_projection, s=(N, N)))
@@ -269,13 +269,13 @@ class EwaldSphereExtraction(AbstractFourierSurfaceExtraction, strict=True):
     def integrate(
         self,
         volume: FourierVoxelGridVolume | FourierVoxelSplineVolume,
-        config: AbstractConfig,
+        config: AbstractImageConfig,
         outputs_real_space: bool = False,
     ) -> (
         Complex[Array, "{config.padded_y_dim} {config.padded_x_dim}"]
         | Float[Array, "{config.padded_y_dim} {config.padded_x_dim}"]
     ):
-        """Integrate the volume at the `AbstractConfig` settings
+        """Integrate the volume at the `AbstractImageConfig` settings
         of a voxel-based representation in fourier-space, using fourier slice extraction.
 
         **Arguments:**
@@ -315,7 +315,7 @@ class EwaldSphereExtraction(AbstractFourierSurfaceExtraction, strict=True):
                 "`FourierVoxelSplineVolume`."
             )
 
-        # Resize the image to match the AbstractConfig.padded_shape
+        # Resize the image to match the AbstractImageConfig.padded_shape
         if config.padded_shape != (N, N):
             ewald_sphere_surface = fftn(
                 config.crop_or_pad_to_padded_shape(ifftn(ewald_sphere_surface, s=(N, N)))

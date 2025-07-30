@@ -136,7 +136,7 @@ def test_compute_projection_with_cistem(
         pose = cxs.EulerAnglePose(phi_angle=-phi, theta_angle=-theta, psi_angle=-psi)
         projection_method = cxs.FourierSliceExtraction()
         box_size = structure.shape[0]
-        config = cxs.BasicConfig((box_size, box_size), voxel_size, 300.0)
+        config = cxs.BasicImageConfig((box_size, box_size), voxel_size, 300.0)
         cryojax_projection = irfftn(
             (
                 projection_method.integrate(

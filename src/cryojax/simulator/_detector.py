@@ -15,7 +15,7 @@ from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
 from ..internal import error_if_not_fractional
 from ..ndimage import irfftn, rfftn
-from ._config import DoseConfig
+from ._image_config import DoseImageConfig
 
 
 class AbstractDQE(eqx.Module, strict=True):
@@ -120,7 +120,7 @@ class AbstractDetector(Module, strict=True):
             Array,
             "{config.padded_y_dim} {config.padded_x_dim//2+1}",
         ],
-        config: DoseConfig,
+        config: DoseImageConfig,
     ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim//2+1}"]:
         """Compute the expected electron events from the detector."""
         fourier_expected_electron_events = (
@@ -140,7 +140,7 @@ class AbstractDetector(Module, strict=True):
             Array,
             "{config.padded_y_dim} {config.padded_x_dim//2+1}",
         ],
-        config: DoseConfig,
+        config: DoseImageConfig,
     ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim//2+1}"]:
         """Measure the readout from the detector."""
         fourier_detector_readout = self._compute_expected_events_or_detector_readout(
@@ -157,7 +157,7 @@ class AbstractDetector(Module, strict=True):
             Array,
             "{config.padded_y_dim} {config.padded_x_dim//2+1}",
         ],
-        config: DoseConfig,
+        config: DoseImageConfig,
         key: Optional[PRNGKeyArray] = None,
     ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim//2+1}"]:
         """Pass the image through the detector model."""

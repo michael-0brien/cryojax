@@ -7,7 +7,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
 from ...ndimage import fftn, ifftn, rfftn
-from .._config import AbstractConfig
+from .._image_config import AbstractImageConfig
 from .._structure_parametrisation import AbstractVolumeParametrisation
 from .._transfer_theory import (
     ContrastTransferTheory,
@@ -22,7 +22,7 @@ class AbstractScatteringTheory(eqx.Module, strict=True):
     def compute_contrast_spectrum(
         self,
         volume: AbstractVolumeParametrisation,
-        config: AbstractConfig,
+        config: AbstractImageConfig,
         rng_key: Optional[PRNGKeyArray] = None,
         defocus_offset: Optional[float | Float[Array, ""]] = None,
     ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim//2+1}"]:
@@ -32,7 +32,7 @@ class AbstractScatteringTheory(eqx.Module, strict=True):
     def compute_intensity_spectrum(
         self,
         volume: AbstractVolumeParametrisation,
-        config: AbstractConfig,
+        config: AbstractImageConfig,
         rng_key: Optional[PRNGKeyArray] = None,
         defocus_offset: Optional[float | Float[Array, ""]] = None,
     ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim//2+1}"]:
@@ -49,7 +49,7 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
     def compute_exit_wave(
         self,
         volume: AbstractVolumeParametrisation,
-        config: AbstractConfig,
+        config: AbstractImageConfig,
         rng_key: Optional[PRNGKeyArray] = None,
     ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim}"]:
         raise NotImplementedError
@@ -58,7 +58,7 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
     def compute_intensity_spectrum(
         self,
         volume: AbstractVolumeParametrisation,
-        config: AbstractConfig,
+        config: AbstractImageConfig,
         rng_key: Optional[PRNGKeyArray] = None,
         defocus_offset: Optional[float | Float[Array, ""]] = None,
     ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim//2+1}"]:
@@ -80,7 +80,7 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
     def compute_contrast_spectrum(
         self,
         volume: AbstractVolumeParametrisation,
-        config: AbstractConfig,
+        config: AbstractImageConfig,
         rng_key: Optional[PRNGKeyArray] = None,
         defocus_offset: Optional[float | Float[Array, ""]] = None,
     ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim//2+1}"]:
@@ -116,7 +116,7 @@ class AbstractWeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
     def compute_object_spectrum(
         self,
         volume: AbstractVolumeParametrisation,
-        config: AbstractConfig,
+        config: AbstractImageConfig,
         rng_key: Optional[PRNGKeyArray] = None,
     ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim//2+1}"]:
         raise NotImplementedError
@@ -125,7 +125,7 @@ class AbstractWeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
     def compute_intensity_spectrum(
         self,
         volume: AbstractVolumeParametrisation,
-        config: AbstractConfig,
+        config: AbstractImageConfig,
         rng_key: Optional[PRNGKeyArray] = None,
         defocus_offset: Optional[float | Float[Array, ""]] = None,
     ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim//2+1}"]:

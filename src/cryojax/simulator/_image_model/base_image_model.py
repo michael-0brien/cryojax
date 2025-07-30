@@ -14,8 +14,8 @@ from jaxtyping import Array, Bool, Complex, Float, PRNGKeyArray
 from ...internal import NDArrayLike
 from ...ndimage import irfftn, rfftn
 from ...ndimage.transforms import FilterLike, MaskLike
-from .._config import AbstractConfig
 from .._direct_integrator import AbstractDirectIntegrator
+from .._image_config import AbstractImageConfig
 from .._pose import AbstractPose
 from .._structure_parametrisation import AbstractStructureParameterisation
 from .._transfer_theory import ContrastTransferTheory
@@ -44,7 +44,7 @@ class AbstractImageModel(eqx.Module, strict=True):
 
     structure: eqx.AbstractVar[AbstractStructureParameterisation]
     pose: eqx.AbstractVar[AbstractPose]
-    config: eqx.AbstractVar[AbstractConfig]
+    config: eqx.AbstractVar[AbstractImageConfig]
 
     applies_translation: eqx.AbstractVar[bool]
     normalizes_signal: eqx.AbstractVar[bool]
@@ -74,8 +74,8 @@ class AbstractImageModel(eqx.Module, strict=True):
             The random number generator key. If not passed, render an image
             with no stochasticity.
         - `removes_padding`:
-            If `True`, return an image cropped to `BasicConfig.shape`.
-            Otherwise, return an image at the `BasicConfig.padded_shape`.
+            If `True`, return an image cropped to `BasicImageConfig.shape`.
+            Otherwise, return an image at the `BasicImageConfig.padded_shape`.
             If `removes_padding = False`, the `AbstractImageModel.filter`
             and `AbstractImageModel.mask` are not applied, overriding
             the booleans `applies_mask` and `applies_filter`.
@@ -195,7 +195,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
     pose: AbstractPose
     integrator: AbstractDirectIntegrator
     transfer_theory: ContrastTransferTheory
-    config: AbstractConfig
+    config: AbstractImageConfig
 
     applies_translation: bool
     normalizes_signal: bool
@@ -205,7 +205,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
         self,
         structure: AbstractStructureParameterisation,
         pose: AbstractPose,
-        config: AbstractConfig,
+        config: AbstractImageConfig,
         integrator: AbstractDirectIntegrator,
         transfer_theory: ContrastTransferTheory,
         *,
@@ -232,7 +232,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
         - `signal_region`:
             A boolean array that is 1 where there is signal,
             and 0 otherwise used to normalize the image.
-            Must have shape equal to `AbstractConfig.shape`.
+            Must have shape equal to `AbstractImageConfig.shape`.
         """
         # Simulator components
         self.structure = structure
@@ -284,7 +284,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
     structure: AbstractStructureParameterisation
     pose: AbstractPose
     integrator: AbstractDirectIntegrator
-    config: AbstractConfig
+    config: AbstractImageConfig
 
     applies_translation: bool
     normalizes_signal: bool
@@ -294,7 +294,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
         self,
         structure: AbstractStructureParameterisation,
         pose: AbstractPose,
-        config: AbstractConfig,
+        config: AbstractImageConfig,
         integrator: AbstractDirectIntegrator,
         *,
         applies_translation: bool = True,
@@ -319,7 +319,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
         - `signal_region`:
             A boolean array that is 1 where there is signal,
             and 0 otherwise used to normalize the image.
-            Must have shape equal to `AbstractConfig.shape`.
+            Must have shape equal to `AbstractImageConfig.shape`.
         """
         # Simulator components
         self.structure = structure

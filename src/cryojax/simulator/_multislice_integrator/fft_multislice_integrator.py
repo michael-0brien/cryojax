@@ -9,7 +9,7 @@ from .._common_functions import (
     apply_amplitude_contrast_ratio,
     apply_interaction_constant,
 )
-from .._config import AbstractConfig
+from .._image_config import AbstractImageConfig
 from .._structure_parametrisation import RealVoxelGridVolume
 from .base_multislice_integrator import AbstractMultisliceIntegrator
 
@@ -44,7 +44,7 @@ class FFTMultisliceIntegrator(
     def integrate(
         self,
         volume: RealVoxelGridVolume,
-        config: AbstractConfig,
+        config: AbstractImageConfig,
         amplitude_contrast_ratio: Float[Array, ""] | float,
     ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim}"]:
         """Compute the exit wave from an atomic potential using the multislice
@@ -125,7 +125,7 @@ class FFTMultisliceIntegrator(
         )
         # Compute exit wave
         exit_wave = jax.lax.fori_loop(0, n_slices, make_step, plane_wave)
-        # Resize the image to match the AbstractConfig.padded_shape
+        # Resize the image to match the AbstractImageConfig.padded_shape
         if config.padded_shape != exit_wave.shape:
             exit_wave = config.crop_or_pad_to_padded_shape(
                 exit_wave, constant_values=1.0 + 0.0j

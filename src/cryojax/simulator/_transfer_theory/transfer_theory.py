@@ -6,7 +6,7 @@ from jaxtyping import Array, Complex, Float
 
 from ...internal import error_if_not_fractional
 from ...ndimage.operators import FourierOperatorLike
-from .._config import AbstractConfig
+from .._image_config import AbstractImageConfig
 from .transfer_function import AbstractCTF
 
 
@@ -64,7 +64,7 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
                 "{config.padded_y_dim} {config.padded_x_dim}",
             ]
         ),
-        config: AbstractConfig,
+        config: AbstractImageConfig,
         *,
         defocus_offset: Optional[Float[Array, ""] | float] = None,
         is_projection_approximation: bool = True,
@@ -144,7 +144,7 @@ class WaveTransferTheory(AbstractTransferTheory, strict=True):
             Array,
             "{config.padded_y_dim} {config.padded_x_dim}",
         ],
-        config: AbstractConfig,
+        config: AbstractImageConfig,
         *,
         defocus_offset: Optional[Float[Array, ""] | float] = None,
     ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim}"]:

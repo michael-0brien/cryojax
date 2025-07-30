@@ -38,7 +38,7 @@ class PadOptions(TypedDict):
     mode: str | Callable
 
 
-class AbstractConfig(eqx.Module, strict=True):
+class AbstractImageConfig(eqx.Module, strict=True):
     """Configuration and utilities for an electron microscopy image."""
 
     shape: eqx.AbstractVar[tuple[int, int]]
@@ -51,8 +51,7 @@ class AbstractConfig(eqx.Module, strict=True):
     def __check_init__(self):
         if self.padded_shape[0] < self.shape[0] or self.padded_shape[1] < self.shape[1]:
             raise AttributeError(
-                "ImageConfig.padded_shape is less than ImageConfig.shape in one or "
-                "more dimensions."
+                "`padded_shape` is less than `shape` in one or " "more dimensions."
             )
 
     @property
@@ -263,7 +262,7 @@ class AbstractConfig(eqx.Module, strict=True):
         return math.prod(self.padded_shape)
 
 
-class BasicConfig(AbstractConfig, strict=True):
+class BasicImageConfig(AbstractImageConfig, strict=True):
     """Configuration and utilities for a basic electron microscopy
     image.
 
@@ -280,7 +279,7 @@ class BasicConfig(AbstractConfig, strict=True):
         real_voxel_grid, voxel_size = read_array_from_mrc("example.mrc")
         structure = cxs.FourierVoxelGridStructure.from_real_voxel_grid(real_voxel_grid)
         ...
-        config = cxs.BasicConfig(shape, pixel_size=voxel_size, ...)
+        config = cxs.BasicImageConfig(shape, pixel_size=voxel_size, ...)
         ```
 
         If this is not done, the resulting
@@ -344,7 +343,7 @@ class BasicConfig(AbstractConfig, strict=True):
         self.grid_helper = grid_helper
 
 
-class DoseConfig(AbstractConfig, strict=True):
+class DoseImageConfig(AbstractImageConfig, strict=True):
     """Configuration and utilities for an electron microscopy image,
     including the electron dose."""
 

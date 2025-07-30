@@ -9,7 +9,7 @@ import equinox as eqx
 from equinox import AbstractClassVar
 from jaxtyping import Array, Complex, Float
 
-from .._config import AbstractConfig
+from .._image_config import AbstractImageConfig
 
 
 VolumeT = TypeVar("VolumeT")
@@ -27,7 +27,7 @@ class AbstractDirectIntegrator(eqx.Module, Generic[VolumeT], strict=True):
     def integrate(
         self,
         volume: VolumeT,
-        config: AbstractConfig,
+        config: AbstractImageConfig,
         outputs_real_space: bool = False,
     ) -> (
         Complex[

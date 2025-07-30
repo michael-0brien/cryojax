@@ -7,8 +7,8 @@ from jaxtyping import Array, Complex, Float, PRNGKeyArray
 from ...internal import error_if_not_fractional
 from ...ndimage import ifftn, irfftn
 from .._common_functions import apply_amplitude_contrast_ratio, apply_interaction_constant
-from .._config import AbstractConfig
 from .._direct_integrator import AbstractDirectIntegrator, AbstractDirectVoxelIntegrator
+from .._image_config import AbstractImageConfig
 from .._solvent import AbstractRandomSolvent
 from .._structure_parametrisation import AbstractVolumeParametrisation
 from .._transfer_theory import WaveTransferTheory
@@ -64,7 +64,7 @@ class HighEnergyScatteringTheory(AbstractWaveScatteringTheory, strict=True):
     def compute_exit_wave(
         self,
         volume: AbstractVolumeParametrisation,
-        config: AbstractConfig,
+        config: AbstractImageConfig,
         rng_key: Optional[PRNGKeyArray] = None,
     ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim}"]:
         # Compute the integrated potential in the exit plane

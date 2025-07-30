@@ -11,8 +11,8 @@ import jax.random as jr
 from jaxtyping import Array, Bool, PRNGKeyArray
 
 from ...internal import NDArrayLike
-from .._config import AbstractConfig, DoseConfig
 from .._detector import AbstractDetector
+from .._image_config import AbstractImageConfig, DoseImageConfig
 from .._pose import AbstractPose
 from .._scattering_theory import AbstractScatteringTheory
 from .._structure_parametrisation import AbstractStructureParameterisation
@@ -34,7 +34,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
 
     structure: AbstractStructureParameterisation
     pose: AbstractPose
-    config: AbstractConfig
+    config: AbstractImageConfig
     scattering_theory: AbstractScatteringTheory
 
     applies_translation: bool
@@ -45,7 +45,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
         self,
         structure: AbstractStructureParameterisation,
         pose: AbstractPose,
-        config: AbstractConfig,
+        config: AbstractImageConfig,
         scattering_theory: AbstractScatteringTheory,
         *,
         applies_translation: bool = True,
@@ -71,7 +71,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
         - `signal_region`:
             A boolean array that is 1 where there is signal,
             and 0 otherwise used to normalize the image.
-            Must have shape equal to `AbstractConfig.shape`.
+            Must have shape equal to `AbstractImageConfig.shape`.
         """
         self.structure = structure
         self.pose = pose
@@ -118,7 +118,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
 
     structure: AbstractStructureParameterisation
     pose: AbstractPose
-    config: AbstractConfig
+    config: AbstractImageConfig
     scattering_theory: AbstractScatteringTheory
 
     applies_translation: bool
@@ -129,7 +129,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
         self,
         structure: AbstractStructureParameterisation,
         pose: AbstractPose,
-        config: AbstractConfig,
+        config: AbstractImageConfig,
         scattering_theory: AbstractScatteringTheory,
         *,
         applies_translation: bool = True,
@@ -155,7 +155,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
         - `signal_region`:
             A boolean array that is 1 where there is signal,
             and 0 otherwise used to normalize the image.
-            Must have shape equal to `AbstractConfig.shape`.
+            Must have shape equal to `AbstractImageConfig.shape`.
         """
         self.structure = structure
         self.pose = pose
@@ -201,7 +201,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
 
     structure: AbstractStructureParameterisation
     pose: AbstractPose
-    config: DoseConfig
+    config: DoseImageConfig
     scattering_theory: AbstractScatteringTheory
     detector: AbstractDetector
 
@@ -213,7 +213,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
         self,
         structure: AbstractStructureParameterisation,
         pose: AbstractPose,
-        config: DoseConfig,
+        config: DoseImageConfig,
         scattering_theory: AbstractScatteringTheory,
         detector: AbstractDetector,
         *,
@@ -240,7 +240,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
         - `signal_region`:
             A boolean array that is 1 where there is signal,
             and 0 otherwise used to normalize the image.
-            Must have shape equal to `AbstractConfig.shape`.
+            Must have shape equal to `AbstractImageConfig.shape`.
         """
         self.structure = structure
         self.pose = pose

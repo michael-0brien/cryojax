@@ -3,7 +3,6 @@ from typing import Literal, Optional
 from jaxtyping import Bool
 
 from ..internal import NDArrayLike
-from ._config import AbstractConfig, DoseConfig
 from ._detector import AbstractDetector
 from ._direct_integrator import (
     AbstractDirectIntegrator,
@@ -11,6 +10,7 @@ from ._direct_integrator import (
     GaussianMixtureProjection,
     NufftProjection,
 )
+from ._image_config import AbstractImageConfig, DoseImageConfig
 from ._image_model import (
     AbstractImageModel,
     ContrastImageModel,
@@ -34,7 +34,7 @@ from ._transfer_theory import ContrastTransferTheory
 
 def make_image_model(
     structure: AbstractStructureParameterisation,
-    config: AbstractConfig,
+    config: AbstractImageConfig,
     pose: AbstractPose,
     transfer_theory: Optional[ContrastTransferTheory] = None,
     integrator: Optional[AbstractDirectIntegrator] = None,
@@ -58,7 +58,7 @@ def make_image_model(
     - `config`:
         The configuration for the image and imagining instrument. Unless using
         a model that uses the electron dose as a parameter, choose the
-        `InstrumentConfig`. Otherwise, choose the `DoseConfig`.
+        `BasicImageConfig`. Otherwise, choose the `DoseImageConfig`.
     - `pose`:
         The pose in a particular parameterization convention. Common options
         are the `EulerAnglePose`, `QuaternionPose`, or `AxisAnglePose`.
@@ -80,7 +80,7 @@ def make_image_model(
     - `signal_region`:
         A boolean array that is 1 where there is signal,
         and 0 otherwise used to normalize the image.
-        Must have shape equal to `AbstractConfig.shape`.
+        Must have shape equal to `AbstractImageConfig.shape`.
     - `simulates_quantity`:
         If `True`, the image simulated is a physical quantity, which is
         chosen with the `quantity_mode` argument. Otherwise, simulate an image without
@@ -124,10 +124,10 @@ def make_image_model(
         if simulates_quantity:
             scattering_theory = WeakPhaseScatteringTheory(integrator, transfer_theory)
             if quantity_mode == "counts":
-                if not isinstance(config, DoseConfig):
+                if not isinstance(config, DoseImageConfig):
                     raise ValueError(
                         "If using `quantity_mode = 'counts'` to simulate electron "
-                        "counts, pass `config = DoseConfig(...)`. Got config "
+                        "counts, pass `config = DoseImageConfig(...)`. Got config "
                         f"{type(config).__name__}."
                     )
                 if detector is None:

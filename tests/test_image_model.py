@@ -28,7 +28,7 @@ def structure(structure_and_pixel_size):
 def basic_config(structure_and_pixel_size):
     structure, pixel_size = structure_and_pixel_size
     shape = structure.shape[0:2]
-    return cxs.BasicConfig(
+    return cxs.BasicImageConfig(
         shape=(int(0.9 * shape[0]), int(0.9 * shape[1])),
         pixel_size=pixel_size,
         voltage_in_kilovolts=300.0,
@@ -72,10 +72,10 @@ def test_even_vs_odd_image_shape(extra_dim_y, extra_dim_x, structure_and_pixel_s
     structure, pixel_size = structure_and_pixel_size
     control_shape = structure.shape[0:2]
     test_shape = (control_shape[0] + extra_dim_y, control_shape[1] + extra_dim_x)
-    config_control = cxs.BasicConfig(
+    config_control = cxs.BasicImageConfig(
         control_shape, pixel_size=pixel_size, voltage_in_kilovolts=300.0
     )
-    config_test = cxs.BasicConfig(
+    config_test = cxs.BasicImageConfig(
         test_shape, pixel_size=pixel_size, voltage_in_kilovolts=300.0
     )
     pose = cxs.EulerAnglePose()

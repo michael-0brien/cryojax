@@ -14,7 +14,7 @@ from ...ndimage import (
     resize_with_crop_or_pad,
     rfftn,
 )
-from .._config import AbstractConfig
+from .._image_config import AbstractImageConfig
 from .._structure_parametrisation import (
     GaussianMixtureVolume,
     PengIndependentAtomPotential as PengIndependentAtomPotential,
@@ -50,8 +50,8 @@ class GaussianMixtureProjection(
             This can be useful for reducing aliasing artifacts in the images.
         - `shape`:
             The shape of the plane on which projections are computed before padding or
-            cropping to the `AbstractConfig.padded_shape`. This argument is particularly
-            useful if the `AbstractConfig.padded_shape` is much larger than the protein.
+            cropping to the `AbstractImageConfig.padded_shape`. This argument is particularly
+            useful if the `AbstractImageConfig.padded_shape` is much larger than the protein.
         - `use_error_functions`:
             If `True`, use error functions to evaluate the projected volume at
             a pixel to be the average value within the pixel using gaussian
@@ -79,7 +79,7 @@ class GaussianMixtureProjection(
     def integrate(
         self,
         volume: GaussianMixtureVolume | PengIndependentAtomPotential,
-        config: AbstractConfig,
+        config: AbstractImageConfig,
         outputs_real_space: bool = False,
     ) -> (
         Complex[
@@ -98,7 +98,7 @@ class GaussianMixtureProjection(
         **Returns:**
 
         The integrated volume in real or fourier space at the
-        `AbstractConfig.padded_shape`.
+        `AbstractImageConfig.padded_shape`.
         """  # noqa: E501
         # Grab the image configuration
         shape = config.padded_shape if self.shape is None else self.shape

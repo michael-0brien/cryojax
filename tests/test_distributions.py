@@ -22,7 +22,7 @@ def structure(structure_and_pixel_size):
 @pytest.fixture
 def basic_config(structure_and_pixel_size):
     structure, pixel_size = structure_and_pixel_size
-    return cxs.BasicConfig(
+    return cxs.BasicImageConfig(
         shape=structure.shape[0:2],
         pixel_size=pixel_size,
         voltage_in_kilovolts=300.0,

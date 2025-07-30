@@ -4,7 +4,7 @@ from typing_extensions import override
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
 from ...internal import error_if_not_fractional
-from .._config import AbstractConfig
+from .._image_config import AbstractImageConfig
 from .._multislice_integrator import AbstractMultisliceIntegrator
 from .._structure_parametrisation import AbstractVolumeParametrisation
 from .._transfer_theory import WaveTransferTheory
@@ -38,7 +38,7 @@ class MultisliceScatteringTheory(AbstractWaveScatteringTheory, strict=True):
     def compute_exit_wave(
         self,
         volume: AbstractVolumeParametrisation,
-        config: AbstractConfig,
+        config: AbstractImageConfig,
         rng_key: Optional[PRNGKeyArray] = None,
     ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim}"]:
         # Compute the wavefunction in the exit plane

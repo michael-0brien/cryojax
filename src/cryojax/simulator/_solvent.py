@@ -19,7 +19,7 @@ from ..ndimage.operators import (
     FourierGaussianWithRadialOffset,
     FourierOperatorLike,
 )
-from ._config import AbstractConfig
+from ._image_config import AbstractImageConfig
 
 
 class SolventMixturePower(AbstractFourierOperator, strict=True):
@@ -78,7 +78,7 @@ class AbstractRandomSolvent(eqx.Module, strict=True):
     def sample_solvent_in_plane_potential(
         self,
         rng_key: PRNGKeyArray,
-        config: AbstractConfig,
+        config: AbstractImageConfig,
         outputs_rfft: bool = True,
         outputs_real_space: bool = False,
     ) -> (
@@ -112,7 +112,7 @@ class AbstractRandomSolvent(eqx.Module, strict=True):
                 "{config.padded_y_dim} {config.padded_x_dim}",
             ]
         ),
-        config: AbstractConfig,
+        config: AbstractImageConfig,
         input_is_rfft: bool = True,
         outputs_real_space: bool = False,
     ) -> (
@@ -207,7 +207,7 @@ class GRFSolvent(AbstractRandomSolvent, strict=True):
     def sample_solvent_in_plane_potential(
         self,
         rng_key: PRNGKeyArray,
-        config: AbstractConfig,
+        config: AbstractImageConfig,
         outputs_rfft: bool = True,
         outputs_real_space: bool = False,
     ) -> (

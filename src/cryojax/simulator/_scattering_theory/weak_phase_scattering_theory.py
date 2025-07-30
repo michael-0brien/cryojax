@@ -4,8 +4,8 @@ from typing_extensions import override
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
 from .._common_functions import apply_interaction_constant
-from .._config import AbstractConfig
 from .._direct_integrator import AbstractDirectIntegrator, AbstractDirectVoxelIntegrator
+from .._image_config import AbstractImageConfig
 from .._solvent import AbstractRandomSolvent
 from .._structure_parametrisation import AbstractVolumeParametrisation
 from .._transfer_theory import ContrastTransferTheory
@@ -48,7 +48,7 @@ class WeakPhaseScatteringTheory(AbstractWeakPhaseScatteringTheory, strict=True):
     def compute_object_spectrum(
         self,
         volume: AbstractVolumeParametrisation,
-        config: AbstractConfig,
+        config: AbstractImageConfig,
         rng_key: Optional[PRNGKeyArray] = None,
     ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim//2+1}"]:
         # Compute the integrated potential
@@ -76,7 +76,7 @@ class WeakPhaseScatteringTheory(AbstractWeakPhaseScatteringTheory, strict=True):
     def compute_contrast_spectrum(
         self,
         volume: AbstractVolumeParametrisation,
-        config: AbstractConfig,
+        config: AbstractImageConfig,
         rng_key: Optional[PRNGKeyArray] = None,
         defocus_offset: Optional[float | Float[Array, ""]] = None,
     ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim//2+1}"]:

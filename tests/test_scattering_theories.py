@@ -53,7 +53,7 @@
 #         extra_b_factors=b_factors,
 #     )
 
-#     instrument_config = cxs.BasicConfig(
+#     instrument_config = cxs.BasicImageConfig(
 #         shape=shape,
 #         pixel_size=pixel_size,
 #         voltage_in_kilovolts=voltage_in_kilovolts,
@@ -174,7 +174,7 @@
 #         extra_b_factors=b_factors,
 #     )
 
-#     instrument_config = cxs.BasicConfig(
+#     instrument_config = cxs.BasicImageConfig(
 #         shape=shape,
 #         pixel_size=pixel_size,
 #         voltage_in_kilovolts=voltage_in_kilovolts,
