@@ -11,12 +11,12 @@ from jaxtyping import Array, Complex, Float
 
 from ...ndimage import convert_fftn_to_rfftn, irfftn
 from .._config import AbstractConfig
-from .._structure import RealVoxelGridStructure
+from .._structure_parametrisation import RealVoxelGridVolume
 from .base_direct_integrator import AbstractDirectVoxelIntegrator
 
 
 class NufftProjection(
-    AbstractDirectVoxelIntegrator[RealVoxelGridStructure],
+    AbstractDirectVoxelIntegrator[RealVoxelGridVolume],
     strict=True,
 ):
     """Integrate points onto the exit plane using non-uniform FFTs."""
@@ -68,7 +68,7 @@ class NufftProjection(
     @override
     def integrate(
         self,
-        structure: RealVoxelGridStructure,
+        volume: RealVoxelGridVolume,
         config: AbstractConfig,
         outputs_real_space: bool = False,
     ) -> (
@@ -78,28 +78,28 @@ class NufftProjection(
         ]
         | Float[Array, "{config.padded_y_dim} {config.padded_x_dim}"]
     ):
-        """Integrate the structure at the `AbstractConfig` settings
+        """Integrate the volume at the `AbstractConfig` settings
         of a voxel-based representation in real-space, using non-uniform FFTs.
 
         **Arguments:**
 
-        - `structure`: The structure representation.
+        - `volume`: The volume representation.
         - `config`: The configuration of the resulting image.
 
         **Returns:**
 
-        The projection integral of the `structure` in fourier space, at the
+        The projection integral of the `volume` in fourier space, at the
         `config.padded_shape` and the `config.pixel_size`.
         """
-        if isinstance(structure, RealVoxelGridStructure):
-            shape = structure.shape
+        if isinstance(volume, RealVoxelGridVolume):
+            shape = volume.shape
             fourier_projection = self.project_voxel_cloud_with_nufft(
-                structure.real_voxel_grid.ravel(),
-                structure.coordinate_grid_in_pixels.reshape((math.prod(shape), 3)),
+                volume.real_voxel_grid.ravel(),
+                volume.coordinate_grid_in_pixels.reshape((math.prod(shape), 3)),
                 config.padded_shape,
             )
         else:
-            raise ValueError("Supported type for `structure` is `RealVoxelGridStructure`")
+            raise ValueError("Supported type for `volume` is `RealVoxelGridVolume`")
         if self.outputs_integral:
             # Scale by voxel size to convert from projection to integral
             fourier_projection *= config.pixel_size

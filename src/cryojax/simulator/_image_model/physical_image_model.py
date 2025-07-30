@@ -6,14 +6,14 @@ from typing import Optional
 from typing_extensions import override
 
 import equinox as eqx
-import jax
+import jax.random as jr
 from jaxtyping import Array, Bool, PRNGKeyArray
 
 from .._config import AbstractConfig, DoseConfig
 from .._detector import AbstractDetector
 from .._pose import AbstractPose
 from .._scattering_theory import AbstractScatteringTheory
-from .._structure import AbstractStructureParameterisation
+from .._structure_parametrisation import AbstractStructureParameterisation
 from .base_image_model import AbstractImageModel, ImageArray, PaddedImageArray
 
 
@@ -83,14 +83,18 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
     def compute_fourier_image(
         self, rng_key: Optional[PRNGKeyArray] = None
     ) -> ImageArray | PaddedImageArray:
-        # Get the structure. Its data should be a scattering potential
+        # Get the volume. Its data should be a scattering potential
         # to simulate in physical units
-        structure = self.structure.to_representation()
+        if rng_key is None:
+            volume = self.structure.to_volume_parametrisation()
+        else:
+            this_key, rng_key = jr.split(rng_key)
+            volume = self.structure.to_volume_parametrisation(this_key)
         # Rotate it to the lab frame
-        structure = structure.rotate_to_pose(self.pose)
+        volume = volume.rotate_to_pose(self.pose)
         # Compute the contrast
         contrast_spectrum = self.scattering_theory.compute_contrast_spectrum(
-            structure,
+            volume,
             self.config,
             rng_key,
             defocus_offset=self.pose.offset_z_in_angstroms,
@@ -160,14 +164,18 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
     def compute_fourier_image(
         self, rng_key: Optional[PRNGKeyArray] = None
     ) -> ImageArray | PaddedImageArray:
-        # Get the structure. Its data should be a scattering potential
+        # Get the volume. Its data should be a scattering potential
         # to simulate in physical units
-        structure = self.structure.to_representation()
+        if rng_key is None:
+            volume = self.structure.to_volume_parametrisation()
+        else:
+            this_key, rng_key = jr.split(rng_key)
+            volume = self.structure.to_volume_parametrisation(this_key)
         # Rotate it to the lab frame
-        structure = structure.rotate_to_pose(self.pose)
+        volume = volume.rotate_to_pose(self.pose)
         # Compute the intensity spectrum
         intensity_spectrum = self.scattering_theory.compute_intensity_spectrum(
-            structure,
+            volume,
             self.config,
             rng_key,
             defocus_offset=self.pose.offset_z_in_angstroms,
@@ -239,15 +247,15 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
     def compute_fourier_image(
         self, rng_key: Optional[PRNGKeyArray] = None
     ) -> ImageArray | PaddedImageArray:
-        # Get the structure. Its data should be a scattering potential
-        # to simulate in physical units
-        structure = self.structure.to_representation()
-        # Rotate it to the lab frame
-        structure = structure.rotate_to_pose(self.pose)
         if rng_key is None:
+            # Get the volume. Its data should be a scattering potential
+            # to simulate in physical units
+            volume = self.structure.to_volume_parametrisation()
+            # Rotate it to the lab frame
+            volume = volume.rotate_to_pose(self.pose)
             # Compute the intensity
             fourier_intensity = self.scattering_theory.compute_intensity_spectrum(
-                structure,
+                volume,
                 self.config,
                 defocus_offset=self.pose.offset_z_in_angstroms,
             )
@@ -262,19 +270,24 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
 
             return fourier_expected_electron_events
         else:
-            keys = jax.random.split(rng_key)
+            keys = jr.split(rng_key, 3)
+            # Get the volume. Its data should be a scattering potential
+            # to simulate in physical units
+            volume = self.structure.to_volume_parametrisation(keys[0])
+            # Rotate it to the lab frame
+            volume = volume.rotate_to_pose(self.pose)
             # Compute the squared wavefunction
             fourier_intensity = self.scattering_theory.compute_intensity_spectrum(
-                structure,
+                volume,
                 self.config,
-                keys[0],
+                keys[1],
                 defocus_offset=self.pose.offset_z_in_angstroms,
             )
             if self.applies_translation:
                 fourier_intensity = self._apply_translation(fourier_intensity)
             # ... now measure the detector readout
             fourier_detector_readout = self.detector.compute_detector_readout(
-                keys[1],
+                keys[2],
                 fourier_intensity,
                 self.config,
             )

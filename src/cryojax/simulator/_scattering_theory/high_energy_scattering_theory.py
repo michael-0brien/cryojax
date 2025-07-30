@@ -10,7 +10,7 @@ from .._common_functions import apply_amplitude_contrast_ratio, apply_interactio
 from .._config import AbstractConfig
 from .._direct_integrator import AbstractDirectIntegrator, AbstractDirectVoxelIntegrator
 from .._solvent import AbstractRandomSolvent
-from .._structure import AbstractStructureRepresentation
+from .._structure_parametrisation import AbstractVolumeParametrisation
 from .._transfer_theory import WaveTransferTheory
 from .base_scattering_theory import AbstractWaveScatteringTheory
 
@@ -63,13 +63,13 @@ class HighEnergyScatteringTheory(AbstractWaveScatteringTheory, strict=True):
     @override
     def compute_exit_wave(
         self,
-        structure: AbstractStructureRepresentation,
+        volume: AbstractVolumeParametrisation,
         config: AbstractConfig,
         rng_key: Optional[PRNGKeyArray] = None,
     ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim}"]:
         # Compute the integrated potential in the exit plane
         fourier_in_plane_potential = self.integrator.integrate(
-            structure, config, outputs_real_space=False
+            volume, config, outputs_real_space=False
         )
         # The integrated potential may not be from an rfft; this depends on
         # if it is a projection approx

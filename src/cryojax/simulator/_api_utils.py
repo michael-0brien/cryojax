@@ -18,13 +18,13 @@ from ._image_model import (
 )
 from ._pose import AbstractPose
 from ._scattering_theory import WeakPhaseScatteringTheory
-from ._structure import (
+from ._structure_parametrisation import (
     AbstractStructureParameterisation,
-    FourierVoxelGridStructure,
-    FourierVoxelSplineStructure,
-    GaussianMixtureStructure,
-    PengIndependentAtomPotential,
-    RealVoxelGridStructure,
+    FourierVoxelGridVolume,
+    FourierVoxelSplineVolume,
+    GaussianMixtureVolume,
+    PengIndependentAtomVolume,
+    RealVoxelGridVolume,
 )
 from ._transfer_theory import ContrastTransferTheory
 
@@ -47,8 +47,8 @@ def make_image_model(
 
     - `structure`:
         The representation of the protein structure.
-        Common choices are the `FourierVoxelGridStructure`
-        for fourier-space voxel grids or the `PengIndependentAtomPotential`
+        Common choices are the `FourierVoxelGridVolume`
+        for fourier-space voxel grids or the `PengIndependentAtomVolume`
         for gaussian mixtures of atoms parameterized by electron scattering factors.
     - `config`:
         The configuration for the image and imagining instrument. Unless using
@@ -152,14 +152,14 @@ def make_image_model(
 def _select_default_integrator(
     structure: AbstractStructureParameterisation, physical_units: bool
 ) -> AbstractDirectIntegrator:
-    if isinstance(structure, (FourierVoxelGridStructure, FourierVoxelSplineStructure)):
+    if isinstance(structure, (FourierVoxelGridVolume, FourierVoxelSplineVolume)):
         integrator = FourierSliceExtraction(outputs_integral=physical_units)
     elif isinstance(
         structure,
-        (PengIndependentAtomPotential, GaussianMixtureStructure),
+        (PengIndependentAtomVolume, GaussianMixtureVolume),
     ):
         integrator = GaussianMixtureProjection(use_error_functions=True)
-    elif isinstance(structure, RealVoxelGridStructure):
+    elif isinstance(structure, RealVoxelGridVolume):
         integrator = NufftProjection(outputs_integral=physical_units)
     else:
         raise ValueError(

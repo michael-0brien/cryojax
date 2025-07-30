@@ -51,26 +51,18 @@ from ._scattering_theory import (
     WeakPhaseScatteringTheory as WeakPhaseScatteringTheory,
 )
 from ._solvent import AbstractRandomSolvent as AbstractRandomSolvent
-from ._structure import (
-    AbstractDiscretizesToFourierVoxels as AbstractDiscretizesToFourierVoxels,
-    AbstractDiscretizesToRealVoxels as AbstractDiscretizesToRealVoxels,
-    AbstractFourierVoxelStructure as AbstractFourierVoxelStructure,
-    AbstractIndependentAtomStructure as AbstractIndependentAtomStructure,
-    AbstractPointCloudStructure as AbstractPointCloudStructure,
-    AbstractRealVoxelStructure as AbstractRealVoxelStructure,
-    AbstractScatteringPotential as AbstractScatteringPotential,
-    AbstractStructuralEnsemble as AbstractStructuralEnsemble,
+from ._structure_parametrisation import (
+    AbstractEnsembleParametrisation as AbstractEnsembleParametrisation,
+    AbstractPotentialParametrisation as AbstractPotentialParametrisation,
     AbstractStructureParameterisation as AbstractStructureParameterisation,
-    AbstractStructureRepresentation as AbstractStructureRepresentation,
-    AbstractTabulatedScatteringPotential as AbstractTabulatedScatteringPotential,
-    AbstractVoxelStructure as AbstractVoxelStructure,
+    AbstractVolumeParametrisation as AbstractVolumeParametrisation,
     DiscreteStructuralEnsemble as DiscreteStructuralEnsemble,
-    FourierVoxelGridStructure as FourierVoxelGridStructure,
-    FourierVoxelSplineStructure as FourierVoxelSplineStructure,
-    GaussianMixtureStructure as GaussianMixtureStructure,
-    PengIndependentAtomPotential as PengIndependentAtomPotential,
+    FourierVoxelGridVolume as FourierVoxelGridVolume,
+    FourierVoxelSplineVolume as FourierVoxelSplineVolume,
+    GaussianMixtureVolume as GaussianMixtureVolume,
+    PengIndependentAtomVolume as PengIndependentAtomVolume,
     PengScatteringFactorParameters as PengScatteringFactorParameters,
-    RealVoxelGridStructure as RealVoxelGridStructure,
+    RealVoxelGridVolume as RealVoxelGridVolume,
 )
 from ._transfer_theory import (
     AberratedAstigmaticCTF as AberratedAstigmaticCTF,

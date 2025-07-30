@@ -10,12 +10,12 @@ from .._common_functions import (
     apply_interaction_constant,
 )
 from .._config import AbstractConfig
-from .._structure import RealVoxelGridStructure
+from .._structure_parametrisation import RealVoxelGridVolume
 from .base_multislice_integrator import AbstractMultisliceIntegrator
 
 
 class FFTMultisliceIntegrator(
-    AbstractMultisliceIntegrator[RealVoxelGridStructure], strict=True
+    AbstractMultisliceIntegrator[RealVoxelGridVolume], strict=True
 ):
     """Multislice integrator that steps using successive FFT-based convolutions."""
 
@@ -43,7 +43,7 @@ class FFTMultisliceIntegrator(
     @override
     def integrate(
         self,
-        potential: RealVoxelGridStructure,
+        volume: RealVoxelGridVolume,
         config: AbstractConfig,
         amplitude_contrast_ratio: Float[Array, ""] | float,
     ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim}"]:
@@ -56,7 +56,7 @@ class FFTMultisliceIntegrator(
             The structure to integrate to the exit plane. This is
             a real-valued voxel grid, which must be in physical units
             of a scattering potential. See rendering method
-            `PengTabulatedPotential.as_real_voxel_grid` for an example.
+            `PengIndependentAtomVolume.to_real_voxel_grid` for an example.
         - `config`:
             The configuration of the imaging instrument.
 
@@ -65,11 +65,11 @@ class FFTMultisliceIntegrator(
         The wavefunction in the exit plane of the specimen.
         """  # noqa: E501
         # Interpolate volume to new pose at given coordinate system
-        z_dim, y_dim, x_dim = potential.real_voxel_grid.shape
+        z_dim, y_dim, x_dim = volume.real_voxel_grid.shape
         voxel_size = config.pixel_size
         potential_voxel_grid = _interpolate_voxel_grid(
-            potential.real_voxel_grid,
-            potential.coordinate_grid_in_pixels,
+            volume.real_voxel_grid,
+            volume.coordinate_grid_in_pixels,
         )
         # Initialize multislice geometry
         n_slices = z_dim // self.slice_thickness_in_voxels

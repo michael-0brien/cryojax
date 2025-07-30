@@ -8,6 +8,7 @@ from typing_extensions import override
 
 import equinox as eqx
 import jax.numpy as jnp
+import jax.random as jr
 from jaxtyping import Array, Bool, Complex, Float, PRNGKeyArray
 
 from ...ndimage import irfftn, rfftn
@@ -15,7 +16,7 @@ from ...ndimage.transforms import FilterLike, MaskLike
 from .._config import AbstractConfig
 from .._direct_integrator import AbstractDirectIntegrator
 from .._pose import AbstractPose
-from .._structure import AbstractStructureParameterisation
+from .._structure_parametrisation import AbstractStructureParameterisation
 from .._transfer_theory import ContrastTransferTheory
 
 
@@ -247,13 +248,17 @@ class LinearImageModel(AbstractImageModel, strict=True):
     def compute_fourier_image(
         self, rng_key: Optional[PRNGKeyArray] = None
     ) -> ImageArray | PaddedImageArray:
-        # Get the structure
-        structure = self.structure.to_representation()
+        # Get the volume
+        if rng_key is None:
+            volume = self.structure.to_volume_parametrisation()
+        else:
+            this_key, rng_key = jr.split(rng_key)
+            volume = self.structure.to_volume_parametrisation(this_key)
         # Rotate it to the lab frame
-        structure = structure.rotate_to_pose(self.pose)
+        volume = volume.rotate_to_pose(self.pose)
         # Compute the projection image
         fourier_image = self.integrator.integrate(
-            structure, self.config, outputs_real_space=False
+            volume, self.config, outputs_real_space=False
         )
         # Compute the image
         fourier_image = self.transfer_theory.propagate_object(  # noqa: E501
@@ -326,13 +331,17 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
     def compute_fourier_image(
         self, rng_key: Optional[PRNGKeyArray] = None
     ) -> ImageArray | PaddedImageArray:
-        # Get the structure
-        structure = self.structure.to_representation()
+        # Get the volume
+        if rng_key is None:
+            volume = self.structure.to_volume_parametrisation()
+        else:
+            this_key, rng_key = jr.split(rng_key)
+            volume = self.structure.to_volume_parametrisation(this_key)
         # Rotate it to the lab frame
-        structure = structure.rotate_to_pose(self.pose)
+        volume = volume.rotate_to_pose(self.pose)
         # Compute the projection image
         fourier_image = self.integrator.integrate(
-            structure, self.config, outputs_real_space=False
+            volume, self.config, outputs_real_space=False
         )
         # Now for the in-plane translation
         if self.applies_translation:

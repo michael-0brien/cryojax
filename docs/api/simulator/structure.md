@@ -1,6 +1,6 @@
 # Modeling cryo-EM structures
 
-There are many different data representations of biological structures for cryo-EM, including atomic models, voxel maps, and neural network representations. The optimal representation to use depends on the user's needs. Therefore, CryoJAX supports a variety of structure representations as well as a modeling interface for creating new representations downstream. More generally, cryoJAX implements *functions* of structures via the core `AbstractStructureParameterisation` class. This page discusses how to use this interface and documents the structures included in the library.
+There are many different data representations of biological structures for cryo-EM, including atomic models, voxel maps, and neural network representations. Further, there are many ways to generate these structures, such as from protein generative modeling and molecular dynamics, and there are also different ways of parametrising an electrostatic potential once a structure is generated. The optimal implementation to use depends on the user's needs. Therefore, CryoJAX supports a variety of these structure representations as well as a modeling interface for creating new representations downstream. This page discusses how to use this interface and documents the structures included in the library.
 
 ## Core base classes
 
@@ -8,59 +8,50 @@ There are many different data representations of biological structures for cryo-
     ::: cryojax.simulator.AbstractStructureParameterisation
         options:
             members:
-                - to_representation
+                - to_volume_parametrisation
 
 
-???+ abstract "`cryojax.simulator.AbstractStructureRepresentation`"
-    ::: cryojax.simulator.AbstractStructureRepresentation
+???+ abstract "`cryojax.simulator.AbstractVolumeParametrisation`"
+    ::: cryojax.simulator.AbstractVolumeParametrisation
         options:
             members:
                 - rotate_to_pose
 
-## Structure representations
+???+ abstract "`cryojax.simulator.AbstractEnsembleParametrisation`"
+    ::: cryojax.simulator.AbstractEnsembleParametrisation
+        options:
+            members:
+                - rotate_to_pose
+
+???+ abstract "`cryojax.simulator.AbstractPotentialParametrisation`"
+    ::: cryojax.simulator.AbstractPotentialParametrisation
+        options:
+            members:
+
+## Volume parametrisations
 
 ### Point clouds
 
-??? abstract "`cryojax.simulator.AbstractPointCloudStructure`"
-
-    ::: cryojax.simulator.AbstractPointCloudStructure
-        options:
-            members:
-                - translate_to_pose
-
-::: cryojax.simulator.GaussianMixtureStructure
+::: cryojax.simulator.GaussianMixtureVolume
     options:
         members:
             - __init__
-            - to_representation
+            - to_volume_parametrisation
             - rotate_to_pose
             - translate_to_pose
+            - to_real_voxel_grid
 
-#### Atom-based
+---
 
-??? abstract "`cryojax.simulator.AbstractIndependentAtomStructure`"
-
-    ::: cryojax.simulator.AbstractIndependentAtomStructure
-        options:
-            members:
-                - atom_positions
-
-??? abstract "`cryojax.simulator.AbstractTabulatedScatteringPotential`"
-
-    ::: cryojax.simulator.AbstractTabulatedScatteringPotential
-        options:
-            members:
-                - from_scattering_factor_parameters
-
-::: cryojax.simulator.PengIndependentAtomPotential
-        options:
-            members:
-                - __init__
-                - from_scattering_factor_parameters
-                - to_representation
-                - rotate_to_pose
-                - translate_to_pose
-                - to_real_voxel_grid
+::: cryojax.simulator.PengIndependentAtomVolume
+    options:
+        members:
+            - __init__
+            - from_scattering_factor_parameters
+            - to_volume_parametrisation
+            - rotate_to_pose
+            - translate_to_pose
+            - to_real_voxel_grid
 
 ---
 
@@ -69,17 +60,8 @@ There are many different data representations of biological structures for cryo-
             members:
                 - __init__
 
-
 ### Voxel-based
 
-??? abstract "`cryojax.simulator.AbstractVoxelStructure`"
-
-    ::: cryojax.simulator.AbstractVoxelStructure
-        options:
-            members:
-                - rotate_to_pose
-                - shape
-                - from_real_voxel_grid
 
 
 #### Fourier-space
@@ -90,15 +72,6 @@ There are many different data representations of biological structures for cryo-
     component in the center of the box. This is returned by the
     - The parameters in an `AbstractPose` represent a rotation in real-space. This means that when calling `FourierVoxelGridStructure.rotate_to_pose`,
     frequencies are rotated by the inverse rotation as stored in the pose.
-
-??? abstract "`cryojax.simulator.AbstractFourierVoxelStructure`"
-
-    ::: cryojax.simulator.AbstractFourierVoxelStructure
-        options:
-            members:
-                - from_real_voxel_grid
-                - frequency_slice_in_pixels
-                - shape
 
 ::: cryojax.simulator.FourierVoxelGridStructure
         options:
@@ -125,15 +98,6 @@ There are many different data representations of biological structures for cryo-
 
 #### Real-space
 
-??? abstract "`cryojax.simulator.AbstractRealVoxelStructure`"
-
-    ::: cryojax.simulator.AbstractRealVoxelStructure
-        options:
-            members:
-                - from_real_voxel_grid
-                - coordinate_grid_in_pixels
-                - shape
-
 
 ::: cryojax.simulator.RealVoxelGridStructure
         options:
@@ -146,18 +110,10 @@ There are many different data representations of biological structures for cryo-
                 - shape
 
 
-## Mappings to structures
-
-??? abstract "`cryojax.simulator.AbstractStructuralEnsemble`"
-
-    ::: cryojax.simulator.AbstractStructuralEnsemble
-        options:
-            members:
-                - conformation
-                - to_representation
+## Ensemble parametrisations
 
 ::: cryojax.simulator.DiscreteStructuralEnsemble
         options:
             members:
                 - __init__
-                - to_representation
+                - to_volume_parametrisation

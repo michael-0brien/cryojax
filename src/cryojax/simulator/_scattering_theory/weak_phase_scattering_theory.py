@@ -7,7 +7,7 @@ from .._common_functions import apply_interaction_constant
 from .._config import AbstractConfig
 from .._direct_integrator import AbstractDirectIntegrator, AbstractDirectVoxelIntegrator
 from .._solvent import AbstractRandomSolvent
-from .._structure import AbstractStructureRepresentation
+from .._structure_parametrisation import AbstractVolumeParametrisation
 from .._transfer_theory import ContrastTransferTheory
 from .base_scattering_theory import AbstractWeakPhaseScatteringTheory
 
@@ -47,13 +47,13 @@ class WeakPhaseScatteringTheory(AbstractWeakPhaseScatteringTheory, strict=True):
     @override
     def compute_object_spectrum(
         self,
-        structure: AbstractStructureRepresentation,
+        volume: AbstractVolumeParametrisation,
         config: AbstractConfig,
         rng_key: Optional[PRNGKeyArray] = None,
     ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim//2+1}"]:
         # Compute the integrated potential
         fourier_in_plane_potential = self.integrator.integrate(
-            structure, config, outputs_real_space=False
+            volume, config, outputs_real_space=False
         )
 
         if rng_key is not None:
@@ -75,12 +75,12 @@ class WeakPhaseScatteringTheory(AbstractWeakPhaseScatteringTheory, strict=True):
     @override
     def compute_contrast_spectrum(
         self,
-        structure: AbstractStructureRepresentation,
+        volume: AbstractVolumeParametrisation,
         config: AbstractConfig,
         rng_key: Optional[PRNGKeyArray] = None,
         defocus_offset: Optional[float | Float[Array, ""]] = None,
     ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim//2+1}"]:
-        object_spectrum = self.compute_object_spectrum(structure, config, rng_key)
+        object_spectrum = self.compute_object_spectrum(volume, config, rng_key)
         contrast_spectrum = self.transfer_theory.propagate_object(  # noqa: E501
             object_spectrum,
             config,

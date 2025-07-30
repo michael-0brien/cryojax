@@ -15,15 +15,15 @@ from ...ndimage import (
     rfftn,
 )
 from .._config import AbstractConfig
-from .._structure import (
-    GaussianMixtureStructure,
-    PengIndependentAtomPotential as PengIndependentAtomPotential,
+from .._structure_parametrisation import (
+    GaussianMixtureVolume,
+    PengIndependentAtomVolume as PengIndependentAtomVolume,
 )
 from .base_direct_integrator import AbstractDirectIntegrator
 
 
 class GaussianMixtureProjection(
-    AbstractDirectIntegrator[GaussianMixtureStructure | PengIndependentAtomPotential],
+    AbstractDirectIntegrator[GaussianMixtureVolume | PengIndependentAtomVolume],
     strict=True,
 ):
     upsampling_factor: Optional[int]
@@ -53,9 +53,9 @@ class GaussianMixtureProjection(
             cropping to the `AbstractConfig.padded_shape`. This argument is particularly
             useful if the `AbstractConfig.padded_shape` is much larger than the protein.
         - `use_error_functions`:
-            If `True`, use error functions to evaluate the projected potential at
+            If `True`, use error functions to evaluate the projected volume at
             a pixel to be the average value within the pixel using gaussian
-            integrals. If `False`, the potential at a pixel will simply be evaluated
+            integrals. If `False`, the volume at a pixel will simply be evaluated
             as a gaussian.
         - `n_batches`:
             The number of batches over groups of positions
@@ -78,7 +78,7 @@ class GaussianMixtureProjection(
     @override
     def integrate(
         self,
-        structure: GaussianMixtureStructure | PengIndependentAtomPotential,
+        volume: GaussianMixtureVolume | PengIndependentAtomVolume,
         config: AbstractConfig,
         outputs_real_space: bool = False,
     ) -> (
@@ -92,12 +92,12 @@ class GaussianMixtureProjection(
 
         **Arguments:**
 
-        - `structure`: The structure representation to project.
+        - `volume`: The volume representation to project.
         - `config`: The configuration of the imaging instrument.
 
         **Returns:**
 
-        The integrated potential in real or fourier space at the
+        The integrated volume in real or fourier space at the
         `AbstractConfig.padded_shape`.
         """  # noqa: E501
         # Grab the image configuration
@@ -115,18 +115,18 @@ class GaussianMixtureProjection(
         else:
             upsampled_pixel_size, upsampled_shape = pixel_size, shape
         # Grab the gaussian amplitudes and widths
-        if isinstance(structure, PengIndependentAtomPotential):
-            positions = structure.atom_positions
-            amplitudes = structure.amplitudes
-            b_factors = structure.b_factors
-        elif isinstance(structure, GaussianMixtureStructure):
-            positions = structure.positions
-            amplitudes = structure.amplitudes
-            b_factors = convert_variance_to_b_factor(structure.variances)
+        if isinstance(volume, PengIndependentAtomVolume):
+            positions = volume.atom_positions
+            amplitudes = volume.amplitudes
+            b_factors = volume.b_factors
+        elif isinstance(volume, GaussianMixtureVolume):
+            positions = volume.positions
+            amplitudes = volume.amplitudes
+            b_factors = convert_variance_to_b_factor(volume.variances)
         else:
             raise ValueError(
-                "Supported types for `structure` are `PengIndependentAtomPotential` "
-                "and `GaussianMixtureStructure`."
+                "Supported types for `volume` are `PengIndependentAtomVolume` "
+                "and `GaussianMixtureVolume`."
             )
         # Compute the projection
         projection_integral = _gaussians_to_projection(
@@ -192,7 +192,7 @@ def _gaussians_to_projection(
     # Make the grid on which to evaluate the result
     grid_x = make_1d_coordinate_grid(shape[1], pixel_size)
     grid_y = make_1d_coordinate_grid(shape[0], pixel_size)
-    # Get function and pytree to compute potential over a batch of positions
+    # Get function and pytree to compute volume over a batch of positions
     xs = (positions, a, b)
     kernel_fn = lambda xs: _gaussians_to_projection_kernel(
         grid_x,
@@ -299,7 +299,7 @@ def _evaluate_gaussian_integrals(
     # each gaussian per position
     gauss_x, gauss_y = (integration_kernel(delta_x), integration_kernel(delta_y))
     # Compute the prefactors for each position and each gaussian per position
-    # for the potential
+    # for the volume
     prefactor = (4 * jnp.pi * a) / (2 * pixel_size) ** 2
     # Multiply the prefactor onto one of the gaussians for efficiency
     return prefactor * gauss_x, gauss_y

@@ -8,7 +8,7 @@ from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
 from ...ndimage import fftn, ifftn, rfftn
 from .._config import AbstractConfig
-from .._structure import AbstractStructureRepresentation
+from .._structure_parametrisation import AbstractVolumeParametrisation
 from .._transfer_theory import (
     ContrastTransferTheory,
     WaveTransferTheory,
@@ -21,7 +21,7 @@ class AbstractScatteringTheory(eqx.Module, strict=True):
     @abstractmethod
     def compute_contrast_spectrum(
         self,
-        structure: AbstractStructureRepresentation,
+        volume: AbstractVolumeParametrisation,
         config: AbstractConfig,
         rng_key: Optional[PRNGKeyArray] = None,
         defocus_offset: Optional[float | Float[Array, ""]] = None,
@@ -31,7 +31,7 @@ class AbstractScatteringTheory(eqx.Module, strict=True):
     @abstractmethod
     def compute_intensity_spectrum(
         self,
-        structure: AbstractStructureRepresentation,
+        volume: AbstractVolumeParametrisation,
         config: AbstractConfig,
         rng_key: Optional[PRNGKeyArray] = None,
         defocus_offset: Optional[float | Float[Array, ""]] = None,
@@ -48,7 +48,7 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
     @abstractmethod
     def compute_exit_wave(
         self,
-        structure: AbstractStructureRepresentation,
+        volume: AbstractVolumeParametrisation,
         config: AbstractConfig,
         rng_key: Optional[PRNGKeyArray] = None,
     ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim}"]:
@@ -57,13 +57,13 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
     @override
     def compute_intensity_spectrum(
         self,
-        structure: AbstractStructureRepresentation,
+        volume: AbstractVolumeParametrisation,
         config: AbstractConfig,
         rng_key: Optional[PRNGKeyArray] = None,
         defocus_offset: Optional[float | Float[Array, ""]] = None,
     ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim//2+1}"]:
         # ... compute the exit wave
-        fourier_wavefunction = fftn(self.compute_exit_wave(structure, config, rng_key))
+        fourier_wavefunction = fftn(self.compute_exit_wave(volume, config, rng_key))
         # ... propagate to the detector plane
         fourier_wavefunction = self.transfer_theory.propagate_exit_wave(
             fourier_wavefunction,
@@ -79,14 +79,14 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
     @override
     def compute_contrast_spectrum(
         self,
-        structure: AbstractStructureRepresentation,
+        volume: AbstractVolumeParametrisation,
         config: AbstractConfig,
         rng_key: Optional[PRNGKeyArray] = None,
         defocus_offset: Optional[float | Float[Array, ""]] = None,
     ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim//2+1}"]:
         """Compute the contrast at the detector plane, given the squared wavefunction."""
         # ... compute the exit wave
-        fourier_wavefunction = fftn(self.compute_exit_wave(structure, config, rng_key))
+        fourier_wavefunction = fftn(self.compute_exit_wave(volume, config, rng_key))
         # ... propagate to the detector plane
         fourier_wavefunction = self.transfer_theory.propagate_exit_wave(
             fourier_wavefunction,
@@ -115,7 +115,7 @@ class AbstractWeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
     @abstractmethod
     def compute_object_spectrum(
         self,
-        structure: AbstractStructureRepresentation,
+        volume: AbstractVolumeParametrisation,
         config: AbstractConfig,
         rng_key: Optional[PRNGKeyArray] = None,
     ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim//2+1}"]:
@@ -124,7 +124,7 @@ class AbstractWeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
     @override
     def compute_intensity_spectrum(
         self,
-        structure: AbstractStructureRepresentation,
+        volume: AbstractVolumeParametrisation,
         config: AbstractConfig,
         rng_key: Optional[PRNGKeyArray] = None,
         defocus_offset: Optional[float | Float[Array, ""]] = None,
@@ -136,7 +136,7 @@ class AbstractWeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
         # ... compute the squared wavefunction directly from the image contrast
         # as |psi|^2 = 1 + 2C.
         contrast_spectrum = self.compute_contrast_spectrum(
-            structure, config, rng_key, defocus_offset=defocus_offset
+            volume, config, rng_key, defocus_offset=defocus_offset
         )
         intensity_spectrum = (2 * contrast_spectrum).at[0, 0].add(1.0 * N1 * N2)
         return intensity_spectrum

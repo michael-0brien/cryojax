@@ -10,9 +10,7 @@ from cryojax.simulator import DiscreteStructuralEnsemble
 def voxel_structure(sample_mrc_path):
     real_voxel_grid = read_array_from_mrc(sample_mrc_path)
     return (
-        cxs.FourierVoxelGridStructure.from_real_voxel_grid(
-            real_voxel_grid, pad_scale=1.3
-        ),
+        cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid, pad_scale=1.3),
     )
 
 
@@ -25,7 +23,7 @@ def gmm_structure(sample_pdb_path):
         loads_b_factors=True,
     )
     scattering_factor_parameters = cxs.PengScatteringFactorParameters(atom_identities)
-    return cxs.GaussianMixtureStructure(
+    return cxs.GaussianMixtureVolume(
         positions=atom_positions,
         amplitudes=scattering_factor_parameters.a,
         variances=convert_b_factor_to_variance(
@@ -42,4 +40,4 @@ def test_conformation(structure, request):
     structure = request.getfixturevalue(structure)
     conformational_space = tuple([structure for _ in range(3)])
     structure = DiscreteStructuralEnsemble(conformational_space, conformation=0)
-    _ = structure.to_representation()
+    _ = structure.to_volume_parametrisation()

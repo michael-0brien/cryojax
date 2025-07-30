@@ -20,17 +20,12 @@ from ...ndimage import (
 )
 from ...ndimage.transforms import InverseSincMask
 from .._config import AbstractConfig
-from .._structure import (
-    FourierVoxelGridStructure,
-    FourierVoxelSplineStructure,
-)
+from .._structure_parametrisation import FourierVoxelGridVolume, FourierVoxelSplineVolume
 from .base_direct_integrator import AbstractDirectVoxelIntegrator
 
 
 class AbstractFourierSurfaceExtraction(
-    AbstractDirectVoxelIntegrator[
-        FourierVoxelGridStructure | FourierVoxelSplineStructure
-    ],
+    AbstractDirectVoxelIntegrator[FourierVoxelGridVolume | FourierVoxelSplineVolume],
     strict=True,
 ):
     correction_mask: eqx.AbstractVar[Optional[InverseSincMask]]
@@ -69,7 +64,7 @@ class FourierSliceExtraction(AbstractFourierSurfaceExtraction, strict=True):
             A `cryojax.image.operators.SincCorrectionMask` for performing
             sinc-correction on the linear-interpolated projections. This
             should be computed on a coordinate grid with shape matching
-            the `FourierVoxelGridStructure.shape`.
+            the `FourierVoxelGridVolume.shape`.
         - `out_of_bounds_mode`:
             Specify how to handle out of bounds indexing. See
             `cryojax.image.map_coordinates` for documentation.
@@ -85,7 +80,7 @@ class FourierSliceExtraction(AbstractFourierSurfaceExtraction, strict=True):
     @override
     def integrate(
         self,
-        structure: FourierVoxelGridStructure | FourierVoxelSplineStructure,
+        volume: FourierVoxelGridVolume | FourierVoxelSplineVolume,
         config: AbstractConfig,
         outputs_real_space: bool = False,
     ) -> (
@@ -95,41 +90,41 @@ class FourierSliceExtraction(AbstractFourierSurfaceExtraction, strict=True):
         ]
         | Float[Array, "{config.padded_y_dim} {config.padded_x_dim}"]
     ):
-        """Integrate the structure at the `AbstractConfig` settings
+        """Integrate the volume at the `AbstractConfig` settings
         of a voxel-based representation in fourier-space,
         using fourier slice extraction.
 
         **Arguments:**
 
-        - `structure`: The structure representation.
+        - `volume`: The volume representation.
         - `config`: The configuration of the resulting image.
 
         **Returns:**
 
-        The extracted fourier voxels of the `structure`, at the
+        The extracted fourier voxels of the `volume`, at the
         `config.padded_shape` and the `config.pixel_size`.
         """
-        frequency_slice = structure.frequency_slice_in_pixels
+        frequency_slice = volume.frequency_slice_in_pixels
         N = frequency_slice.shape[1]
-        if structure.shape != (N, N, N):
+        if volume.shape != (N, N, N):
             raise AttributeError(
                 "Only cubic boxes are supported for fourier slice extraction."
             )
         # Compute the fourier projection
-        if isinstance(structure, FourierVoxelSplineStructure):
+        if isinstance(volume, FourierVoxelSplineVolume):
             fourier_projection = self.extract_fourier_slice_from_spline(
-                structure.spline_coefficients,
+                volume.spline_coefficients,
                 frequency_slice,
             )
-        elif isinstance(structure, FourierVoxelGridStructure):
+        elif isinstance(volume, FourierVoxelGridVolume):
             fourier_projection = self.extract_fourier_slice_from_grid(
-                structure.fourier_voxel_grid,
+                volume.fourier_voxel_grid,
                 frequency_slice,
             )
         else:
             raise ValueError(
-                "Supported types for `structure` are `FourierVoxelGridStructure` and "
-                "`FourierVoxelSplineStructure`."
+                "Supported types for `volume` are `FourierVoxelGridVolume` and "
+                "`FourierVoxelSplineVolume`."
             )
 
         # Resize the image to match the AbstractConfig.padded_shape
@@ -257,7 +252,7 @@ class EwaldSphereExtraction(AbstractFourierSurfaceExtraction, strict=True):
             A `cryojax.ndimage.transforms.SincCorrectionMask` for performing
             sinc-correction on the linear-interpolated projections. This
             should be computed on a coordinate grid with shape matching
-            the `FourierVoxelGridStructure.shape`.
+            the `FourierVoxelGridVolume.shape`.
         - `out_of_bounds_mode`:
             Specify how to handle out of bounds indexing. See
             `cryojax.image.map_coordinates` for documentation.
@@ -273,51 +268,51 @@ class EwaldSphereExtraction(AbstractFourierSurfaceExtraction, strict=True):
     @override
     def integrate(
         self,
-        structure: FourierVoxelGridStructure | FourierVoxelSplineStructure,
+        volume: FourierVoxelGridVolume | FourierVoxelSplineVolume,
         config: AbstractConfig,
         outputs_real_space: bool = False,
     ) -> (
         Complex[Array, "{config.padded_y_dim} {config.padded_x_dim}"]
         | Float[Array, "{config.padded_y_dim} {config.padded_x_dim}"]
     ):
-        """Integrate the structure at the `AbstractConfig` settings
+        """Integrate the volume at the `AbstractConfig` settings
         of a voxel-based representation in fourier-space, using fourier slice extraction.
 
         **Arguments:**
 
-        - `structure`: The structure representation.
+        - `volume`: The volume representation.
         - `config`: The configuration of the resulting image.
 
         **Returns:**
 
-        The extracted fourier voxels of the `structure`, at the
+        The extracted fourier voxels of the `volume`, at the
         `config.padded_shape` and the `config.pixel_size`.
         """
-        frequency_slice = structure.frequency_slice_in_pixels
+        frequency_slice = volume.frequency_slice_in_pixels
         N = frequency_slice.shape[1]
-        if structure.shape != (N, N, N):
+        if volume.shape != (N, N, N):
             raise AttributeError(
                 "Only cubic boxes are supported for fourier slice extraction."
             )
         # Compute the fourier projection
-        if isinstance(structure, FourierVoxelSplineStructure):
+        if isinstance(volume, FourierVoxelSplineVolume):
             ewald_sphere_surface = self.extract_ewald_sphere_from_spline_coefficients(
-                structure.spline_coefficients,
+                volume.spline_coefficients,
                 frequency_slice,
                 config.pixel_size,
                 config.wavelength_in_angstroms,
             )
-        elif isinstance(structure, FourierVoxelGridStructure):
+        elif isinstance(volume, FourierVoxelGridVolume):
             ewald_sphere_surface = self.extract_ewald_sphere_from_grid_points(
-                structure.fourier_voxel_grid,
+                volume.fourier_voxel_grid,
                 frequency_slice,
                 config.pixel_size,
                 config.wavelength_in_angstroms,
             )
         else:
             raise ValueError(
-                "Supported types for `structure` are `FourierVoxelGridStructure` and "
-                "`FourierVoxelSplineStructure`."
+                "Supported types for `volume` are `FourierVoxelGridVolume` and "
+                "`FourierVoxelSplineVolume`."
             )
 
         # Resize the image to match the AbstractConfig.padded_shape

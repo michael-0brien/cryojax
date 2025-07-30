@@ -49,7 +49,7 @@ from cryojax.io import read_array_from_mrc
 # for how to generate voxel grids from a PDB
 filename = "example_volume.mrc"
 real_voxel_grid, voxel_size = read_array_from_mrc(filename, loads_spacing=True)
-structure = cxs.FourierVoxelGridStructure.from_real_voxel_grid(real_voxel_grid)
+structure = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
 # The pose. Angles are given in degrees.
 pose = cxs.EulerAnglePose(
     offset_x_in_angstroms=5.0,

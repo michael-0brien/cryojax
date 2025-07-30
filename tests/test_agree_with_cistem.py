@@ -132,7 +132,7 @@ def test_compute_projection_with_cistem(
         real_voxel_grid, voxel_size = read_array_from_mrc(
             sample_mrc_path, loads_spacing=True
         )
-        structure = cxs.FourierVoxelGridStructure.from_real_voxel_grid(real_voxel_grid)
+        structure = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
         pose = cxs.EulerAnglePose(phi_angle=-phi, theta_angle=-theta, psi_angle=-psi)
         projection_method = cxs.FourierSliceExtraction()
         box_size = structure.shape[0]

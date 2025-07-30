@@ -44,7 +44,7 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
         sample_pdb_path, center=True, loads_b_factors=True
     )
     scattering_factor_parameters = cxs.PengScatteringFactorParameters(atom_identities)
-    base_structure = cxs.PengIndependentAtomPotential.from_scattering_factor_parameters(
+    base_structure = cxs.PengIndependentAtomVolume.from_scattering_factor_parameters(
         atom_positions,
         scattering_factor_parameters,
         extra_b_factors=b_factors,
@@ -53,14 +53,14 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
 
     real_voxel_grid = base_structure.to_real_voxel_grid((dim, dim, dim), pixel_size)
     other_structures = [
-        cxs.FourierVoxelGridStructure.from_real_voxel_grid(real_voxel_grid),
+        cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid),
         make_spline(real_voxel_grid),
-        cxs.GaussianMixtureStructure(
+        cxs.GaussianMixtureVolume(
             atom_positions,
             scattering_factor_parameters.a,
             (scattering_factor_parameters.b + b_factors[:, None]) / (8 * jnp.pi**2),
         ),
-        cxs.RealVoxelGridStructure.from_real_voxel_grid(real_voxel_grid),
+        cxs.RealVoxelGridVolume.from_real_voxel_grid(real_voxel_grid),
     ]
     other_projection_methods = [
         cxs.FourierSliceExtraction(),
@@ -187,7 +187,7 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
 
 @eqx.filter_jit
 def compute_projection(
-    structure: cxs.AbstractStructureRepresentation,
+    structure: cxs.AbstractVolumeParametrisation,
     integrator: cxs.AbstractDirectIntegrator,
     config: cxs.BasicConfig,
 ) -> Array:
@@ -203,7 +203,7 @@ def compute_projection(
 
 @eqx.filter_jit
 def compute_projection_at_pose(
-    structure: cxs.AbstractStructureRepresentation,
+    structure: cxs.AbstractVolumeParametrisation,
     integrator: cxs.AbstractDirectIntegrator,
     pose: cxs.AbstractPose,
     config: cxs.BasicConfig,
@@ -230,6 +230,6 @@ def compute_projection_at_pose(
 
 @eqx.filter_jit
 def make_spline(real_voxel_grid):
-    return cxs.FourierVoxelSplineStructure.from_real_voxel_grid(
+    return cxs.FourierVoxelSplineVolume.from_real_voxel_grid(
         real_voxel_grid,
     )

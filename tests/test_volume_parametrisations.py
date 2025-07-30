@@ -12,12 +12,12 @@ with install_import_hook("cryojax", "typeguard.typechecked"):
     from cryojax.ndimage import downsample_with_fourier_cropping, ifftn, irfftn
     from cryojax.simulator import (
         BasicConfig,
-        FourierVoxelGridStructure,
+        FourierVoxelGridVolume,
         GaussianMixtureProjection,
-        GaussianMixtureStructure,
-        PengIndependentAtomPotential,
+        GaussianMixtureVolume,
+        PengIndependentAtomVolume,
         PengScatteringFactorParameters,
-        RealVoxelGridStructure,
+        RealVoxelGridVolume,
     )
 
 
@@ -62,7 +62,7 @@ def test_atom_integrator_shape(sample_pdb_path, shape):
         selection_string="not element H",
         loads_b_factors=True,
     )
-    atom_potential = PengIndependentAtomPotential.from_scattering_factor_parameters(
+    atom_potential = PengIndependentAtomVolume.from_scattering_factor_parameters(
         atom_positions,
         parameters=PengScatteringFactorParameters(atom_identities),
         extra_b_factors=b_factors,
@@ -89,8 +89,8 @@ def test_atom_integrator_shape(sample_pdb_path, shape):
 #
 def test_voxel_potential_loaders():
     real_voxel_grid = jnp.zeros((10, 10, 10), dtype=float)
-    fourier_potential = FourierVoxelGridStructure.from_real_voxel_grid(real_voxel_grid)
-    real_potential = RealVoxelGridStructure.from_real_voxel_grid(real_voxel_grid)
+    fourier_potential = FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
+    real_potential = RealVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
 
     assert isinstance(
         fourier_potential.frequency_slice_in_pixels,
@@ -118,7 +118,7 @@ def test_fourier_vs_real_voxel_potential_agreement(sample_pdb_path):
         selection_string="not element H",
     )
     # Load atomistic potential
-    atom_potential = PengIndependentAtomPotential.from_scattering_factor_parameters(
+    atom_potential = PengIndependentAtomVolume.from_scattering_factor_parameters(
         atom_positions,
         parameters=PengScatteringFactorParameters(atom_identities),
     )
@@ -126,14 +126,14 @@ def test_fourier_vs_real_voxel_potential_agreement(sample_pdb_path):
     potential_as_real_voxel_grid = atom_potential.to_real_voxel_grid(
         n_voxels_per_side, voxel_size
     )
-    fourier_potential = FourierVoxelGridStructure.from_real_voxel_grid(
+    fourier_potential = FourierVoxelGridVolume.from_real_voxel_grid(
         potential_as_real_voxel_grid
     )
     # Since Voxelgrid is in Frequency space by default, we have to first
     # transform back into real space.
     fvg_real = ifftn(jnp.fft.ifftshift(fourier_potential.fourier_voxel_grid)).real
 
-    vg = RealVoxelGridStructure.from_real_voxel_grid(potential_as_real_voxel_grid)
+    vg = RealVoxelGridVolume.from_real_voxel_grid(potential_as_real_voxel_grid)
 
     np.testing.assert_allclose(fvg_real, vg.real_voxel_grid, atol=1e-12)
 
@@ -161,7 +161,7 @@ def test_downsampled_voxel_potential_agreement(sample_pdb_path):
         selection_string="not element H",
     )
     # Load atomistic potential
-    atom_potential = PengIndependentAtomPotential.from_scattering_factor_parameters(
+    atom_potential = PengIndependentAtomVolume.from_scattering_factor_parameters(
         atom_positions,
         parameters=PengScatteringFactorParameters(atom_identities),
     )
@@ -190,7 +190,7 @@ def test_downsampled_gmm_potential_agreement(sample_pdb_path):
         center=True,
         selection_string="not element H",
     )
-    atom_potential = PengIndependentAtomPotential.from_scattering_factor_parameters(
+    atom_potential = PengIndependentAtomVolume.from_scattering_factor_parameters(
         atom_positions,
         parameters=PengScatteringFactorParameters(atom_identities),
     )
@@ -235,7 +235,7 @@ def test_peng_vs_gmm_agreement(sample_pdb_path):
         center=True,
         selection_string="not element H",
     )
-    atom_potential = PengIndependentAtomPotential.from_scattering_factor_parameters(
+    atom_potential = PengIndependentAtomVolume.from_scattering_factor_parameters(
         atom_positions,
         parameters=PengScatteringFactorParameters(atom_identities),
     )
@@ -243,7 +243,7 @@ def test_peng_vs_gmm_agreement(sample_pdb_path):
     b_factors = atom_potential.b_factors
     amplitudes = atom_potential.amplitudes
 
-    gmm_potential = GaussianMixtureStructure(
+    gmm_potential = GaussianMixtureVolume(
         atom_positions,
         amplitudes,
         convert_b_factor_to_variance(b_factors),
@@ -278,7 +278,7 @@ def test_compute_rectangular_voxel_grid(sample_pdb_path, shape):
         selection_string="not element H",
     )
     # Load atomistic potential
-    atom_potential = PengIndependentAtomPotential.from_scattering_factor_parameters(
+    atom_potential = PengIndependentAtomVolume.from_scattering_factor_parameters(
         atom_positions,
         parameters=PengScatteringFactorParameters(atom_identities),
     )
@@ -305,7 +305,7 @@ def test_z_plane_batched_vs_non_batched_loop_agreement(
         selection_string="not element H",
     )
     # Load atomistic potential
-    atom_potential = PengIndependentAtomPotential.from_scattering_factor_parameters(
+    atom_potential = PengIndependentAtomVolume.from_scattering_factor_parameters(
         atom_positions,
         parameters=PengScatteringFactorParameters(atom_identities),
     )
@@ -338,7 +338,7 @@ class TestIntegrateGMMToPixels:
         coordinate_grid = make_coordinate_grid(n_pixels_per_side, voxel_size)
 
         # Build the potential
-        atomic_potential = GaussianMixtureStructure(
+        atomic_potential = GaussianMixtureVolume(
             atom_positions, ff_a, ff_b / (8.0 * jnp.pi**2)
         )
         config = BasicConfig(
@@ -373,7 +373,7 @@ class TestIntegrateGMMToPixels:
 
         n_pixels_per_side = n_voxels_per_side[:2]
         # Build the potential
-        atomic_potential = GaussianMixtureStructure(
+        atomic_potential = GaussianMixtureVolume(
             atom_positions, ff_a, ff_b / (8.0 * jnp.pi**2)
         )
         config = BasicConfig(
@@ -407,7 +407,7 @@ class TestRenderGMMToVoxels:
         ff_a = ff_a.at[largest_atom].add(1.0)
 
         # Build the potential
-        gmm_structure = GaussianMixtureStructure(
+        gmm_structure = GaussianMixtureVolume(
             atom_positions, ff_a, ff_b / (8 * jnp.pi**2)
         )
         real_voxel_grid = gmm_structure.to_real_voxel_grid(n_voxels_per_side, voxel_size)
@@ -433,7 +433,7 @@ class TestRenderGMMToVoxels:
         ) = toy_gaussian_cloud
 
         # Build the potential
-        gmm_structure = GaussianMixtureStructure(
+        gmm_structure = GaussianMixtureVolume(
             atom_positions, ff_a, ff_b / (8 * jnp.pi**2)
         )
         real_voxel_grid = gmm_structure.to_real_voxel_grid(n_voxels_per_side, voxel_size)

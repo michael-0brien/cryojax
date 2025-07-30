@@ -1,5 +1,5 @@
 """
-Methods for integrating the structure directly onto the exit plane.
+Methods for integrating the volume directly onto the exit plane.
 """
 
 from abc import abstractmethod
@@ -10,15 +10,14 @@ from equinox import AbstractClassVar
 from jaxtyping import Array, Complex, Float
 
 from .._config import AbstractConfig
-from .._structure import AbstractVoxelStructure
 
 
-StructureT = TypeVar("StructureT")
-VoxelStructureT = TypeVar("VoxelStructureT", bound="AbstractVoxelStructure")
+VolumeT = TypeVar("VolumeT")
+VoxelVolumeT = TypeVar("VoxelVolumeT")
 
 
-class AbstractDirectIntegrator(eqx.Module, Generic[StructureT], strict=True):
-    """Base class for a method of integrating a structure onto
+class AbstractDirectIntegrator(eqx.Module, Generic[VolumeT], strict=True):
+    """Base class for a method of integrating a volume onto
     the exit plane.
     """
 
@@ -27,7 +26,7 @@ class AbstractDirectIntegrator(eqx.Module, Generic[StructureT], strict=True):
     @abstractmethod
     def integrate(
         self,
-        structure: StructureT,
+        volume: VolumeT,
         config: AbstractConfig,
         outputs_real_space: bool = False,
     ) -> (
@@ -42,6 +41,6 @@ class AbstractDirectIntegrator(eqx.Module, Generic[StructureT], strict=True):
 
 
 class AbstractDirectVoxelIntegrator(
-    AbstractDirectIntegrator[VoxelStructureT], Generic[VoxelStructureT], strict=True
+    AbstractDirectIntegrator[VoxelVolumeT], Generic[VoxelVolumeT], strict=True
 ):
     outputs_integral: eqx.AbstractVar[bool]
