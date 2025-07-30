@@ -6,9 +6,11 @@ from typing import Optional
 from typing_extensions import override
 
 import equinox as eqx
+import jax.numpy as jnp
 import jax.random as jr
 from jaxtyping import Array, Bool, PRNGKeyArray
 
+from ...internal import NDArrayLike
 from .._config import AbstractConfig, DoseConfig
 from .._detector import AbstractDetector
 from .._pose import AbstractPose
@@ -48,7 +50,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
         *,
         applies_translation: bool = True,
         normalizes_signal: bool = False,
-        signal_region: Optional[Bool[Array, "_ _"]] = None,
+        signal_region: Optional[Bool[NDArrayLike, "_ _"]] = None,
     ):
         """**Arguments:**
 
@@ -77,7 +79,10 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
         self.scattering_theory = scattering_theory
         self.applies_translation = applies_translation
         self.normalizes_signal = normalizes_signal
-        self.signal_region = signal_region
+        if signal_region is None:
+            self.signal_region = None
+        else:
+            self.signal_region = jnp.asarray(signal_region, dtype=bool)
 
     @override
     def compute_fourier_image(
@@ -129,7 +134,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
         *,
         applies_translation: bool = True,
         normalizes_signal: bool = False,
-        signal_region: Optional[Bool[Array, "_ _"]] = None,
+        signal_region: Optional[Bool[NDArrayLike, "_ _"]] = None,
     ):
         """**Arguments:**
 
@@ -158,7 +163,10 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
         self.scattering_theory = scattering_theory
         self.applies_translation = applies_translation
         self.normalizes_signal = normalizes_signal
-        self.signal_region = signal_region
+        if signal_region is None:
+            self.signal_region = None
+        else:
+            self.signal_region = jnp.asarray(signal_region, dtype=bool)
 
     @override
     def compute_fourier_image(
@@ -211,7 +219,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
         *,
         applies_translation: bool = True,
         normalizes_signal: bool = False,
-        signal_region: Optional[Bool[Array, "_ _"]] = None,
+        signal_region: Optional[Bool[NDArrayLike, "_ _"]] = None,
     ):
         """**Arguments:**
 
@@ -241,7 +249,10 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
         self.detector = detector
         self.applies_translation = applies_translation
         self.normalizes_signal = normalizes_signal
-        self.signal_region = signal_region
+        if signal_region is None:
+            self.signal_region = None
+        else:
+            self.signal_region = jnp.asarray(signal_region, dtype=bool)
 
     @override
     def compute_fourier_image(

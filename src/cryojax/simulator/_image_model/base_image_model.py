@@ -11,6 +11,7 @@ import jax.numpy as jnp
 import jax.random as jr
 from jaxtyping import Array, Bool, Complex, Float, PRNGKeyArray
 
+from ...internal import NDArrayLike
 from ...ndimage import irfftn, rfftn
 from ...ndimage.transforms import FilterLike, MaskLike
 from .._config import AbstractConfig
@@ -210,7 +211,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
         *,
         applies_translation: bool = True,
         normalizes_signal: bool = False,
-        signal_region: Optional[Bool[Array, "_ _"]] = None,
+        signal_region: Optional[Bool[NDArrayLike, "_ _"]] = None,
     ):
         """**Arguments:**
 
@@ -242,7 +243,10 @@ class LinearImageModel(AbstractImageModel, strict=True):
         # Options
         self.applies_translation = applies_translation
         self.normalizes_signal = normalizes_signal
-        self.signal_region = signal_region
+        if signal_region is None:
+            self.signal_region = None
+        else:
+            self.signal_region = jnp.asarray(signal_region, dtype=bool)
 
     @override
     def compute_fourier_image(
@@ -295,7 +299,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
         *,
         applies_translation: bool = True,
         normalizes_signal: bool = False,
-        signal_region: Optional[Bool[Array, "_ _"]] = None,
+        signal_region: Optional[Bool[NDArrayLike, "_ _"]] = None,
     ):
         """**Arguments:**
 
@@ -325,7 +329,10 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
         # Options
         self.applies_translation = applies_translation
         self.normalizes_signal = normalizes_signal
-        self.signal_region = signal_region
+        if signal_region is None:
+            self.signal_region = None
+        else:
+            self.signal_region = jnp.asarray(signal_region, dtype=bool)
 
     @override
     def compute_fourier_image(
