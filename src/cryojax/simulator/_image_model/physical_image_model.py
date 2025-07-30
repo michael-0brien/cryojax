@@ -85,7 +85,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
     ) -> ImageArray | PaddedImageArray:
         # Get the structure. Its data should be a scattering potential
         # to simulate in physical units
-        structure = self.structure.evaluate()
+        structure = self.structure.to_representation()
         # Rotate it to the lab frame
         structure = structure.rotate_to_pose(self.pose)
         # Compute the contrast
@@ -162,7 +162,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
     ) -> ImageArray | PaddedImageArray:
         # Get the structure. Its data should be a scattering potential
         # to simulate in physical units
-        structure = self.structure.evaluate()
+        structure = self.structure.to_representation()
         # Rotate it to the lab frame
         structure = structure.rotate_to_pose(self.pose)
         # Compute the intensity spectrum
@@ -241,7 +241,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
     ) -> ImageArray | PaddedImageArray:
         # Get the structure. Its data should be a scattering potential
         # to simulate in physical units
-        structure = self.structure.evaluate()
+        structure = self.structure.to_representation()
         # Rotate it to the lab frame
         structure = structure.rotate_to_pose(self.pose)
         if rng_key is None:

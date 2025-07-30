@@ -25,7 +25,7 @@ class AbstractStructureParameterisation(eqx.Module, strict=True):
     """
 
     @abc.abstractmethod
-    def evaluate(self) -> "AbstractStructureRepresentation":
+    def to_representation(self) -> "AbstractStructureRepresentation":
         raise NotImplementedError
 
 
@@ -37,7 +37,7 @@ class AbstractStructureRepresentation(AbstractStructureParameterisation, strict=
         raise NotImplementedError
 
     @override
-    def evaluate(self) -> Self:
+    def to_representation(self) -> Self:
         """Return the structure."""
         return self
 

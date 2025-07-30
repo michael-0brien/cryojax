@@ -44,7 +44,7 @@ class DiscreteStructuralEnsemble(AbstractStructuralEnsemble, strict=True):
         self.conformation = jnp.asarray(error_if_negative(conformation))
 
     @override
-    def evaluate(self) -> AbstractStructureRepresentation:
+    def to_representation(self) -> AbstractStructureRepresentation:
         """Map to the structure at `conformation`."""
         funcs = [
             lambda i=i: self.conformational_space[i]

@@ -8,7 +8,7 @@ There are many different data representations of biological structures for cryo-
     ::: cryojax.simulator.AbstractStructureParameterisation
         options:
             members:
-                - evaluate
+                - to_representation
 
 
 ???+ abstract "`cryojax.simulator.AbstractStructureRepresentation`"
@@ -32,7 +32,7 @@ There are many different data representations of biological structures for cryo-
     options:
         members:
             - __init__
-            - evaluate
+            - to_representation
             - rotate_to_pose
             - translate_to_pose
 
@@ -57,7 +57,7 @@ There are many different data representations of biological structures for cryo-
             members:
                 - __init__
                 - from_scattering_factor_parameters
-                - evaluate
+                - to_representation
                 - rotate_to_pose
                 - translate_to_pose
                 - to_real_voxel_grid
@@ -105,7 +105,7 @@ There are many different data representations of biological structures for cryo-
             members:
                 - __init__
                 - from_real_voxel_grid
-                - evaluate
+                - to_representation
                 - rotate_to_pose
                 - frequency_slice_in_pixels
                 - shape
@@ -117,7 +117,7 @@ There are many different data representations of biological structures for cryo-
             members:
                 - __init__
                 - from_real_voxel_grid
-                - evaluate
+                - to_representation
                 - rotate_to_pose
                 - frequency_slice_in_pixels
                 - shape
@@ -140,7 +140,7 @@ There are many different data representations of biological structures for cryo-
             members:
                 - __init__
                 - from_real_voxel_grid
-                - evaluate
+                - to_representation
                 - rotate_to_pose
                 - coordinate_grid_in_pixels
                 - shape
@@ -154,10 +154,10 @@ There are many different data representations of biological structures for cryo-
         options:
             members:
                 - conformation
-                - evaluate
+                - to_representation
 
 ::: cryojax.simulator.DiscreteStructuralEnsemble
         options:
             members:
                 - __init__
-                - evaluate
+                - to_representation

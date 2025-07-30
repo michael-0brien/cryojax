@@ -42,4 +42,4 @@ def test_conformation(structure, request):
     structure = request.getfixturevalue(structure)
     conformational_space = tuple([structure for _ in range(3)])
     structure = DiscreteStructuralEnsemble(conformational_space, conformation=0)
-    _ = structure.evaluate()
+    _ = structure.to_representation()

@@ -248,7 +248,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
         self, rng_key: Optional[PRNGKeyArray] = None
     ) -> ImageArray | PaddedImageArray:
         # Get the structure
-        structure = self.structure.evaluate()
+        structure = self.structure.to_representation()
         # Rotate it to the lab frame
         structure = structure.rotate_to_pose(self.pose)
         # Compute the projection image
@@ -327,7 +327,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
         self, rng_key: Optional[PRNGKeyArray] = None
     ) -> ImageArray | PaddedImageArray:
         # Get the structure
-        structure = self.structure.evaluate()
+        structure = self.structure.to_representation()
         # Rotate it to the lab frame
         structure = structure.rotate_to_pose(self.pose)
         # Compute the projection image
