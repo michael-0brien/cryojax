@@ -49,7 +49,7 @@ from cryojax.io import read_array_from_mrc
 # for how to generate voxel grids from a PDB
 filename = "example_volume.mrc"
 real_voxel_grid, voxel_size = read_array_from_mrc(filename, loads_spacing=True)
-structure = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
+volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
 # The pose. Angles are given in degrees.
 pose = cxs.EulerAnglePose(
     offset_x_in_angstroms=5.0,
@@ -66,7 +66,7 @@ transfer_theory = cxs.ContrastTransferTheory(ctf, amplitude_contrast_ratio=0.1)
 # The image configuration
 config = cxs.BasicConfig(shape=(320, 320), pixel_size=voxel_size, voltage_in_kilovolts=300.0)
 # Instantiate a cryoJAX `image_model` using the `make_image_model` function
-image_model = cxs.make_image_model(structure, config, pose, transfer_theory)
+image_model = cxs.make_image_model(volume, config, pose, transfer_theory)
 # Simulate an image
 image = image_model.simulate(outputs_real_space=True)
 ```
