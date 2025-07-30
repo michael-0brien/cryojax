@@ -68,12 +68,12 @@ There are many different data representations of biological structures for cryo-
 
 !!! info "Fourier-space conventions"
     - The `fourier_voxel_grid` and `frequency_slice` arguments to
-    `FourierVoxelGridStructure.__init__` should be loaded with the zero frequency
+    `FourierVoxelGridVolume.__init__` should be loaded with the zero frequency
     component in the center of the box. This is returned by the
-    - The parameters in an `AbstractPose` represent a rotation in real-space. This means that when calling `FourierVoxelGridStructure.rotate_to_pose`,
+    - The parameters in an `AbstractPose` represent a rotation in real-space. This means that when calling `FourierVoxelGridVolume.rotate_to_pose`,
     frequencies are rotated by the inverse rotation as stored in the pose.
 
-::: cryojax.simulator.FourierVoxelGridStructure
+::: cryojax.simulator.FourierVoxelGridVolume
         options:
             members:
                 - __init__
@@ -85,7 +85,7 @@ There are many different data representations of biological structures for cryo-
 
 ---
 
-::: cryojax.simulator.FourierVoxelSplineStructure
+::: cryojax.simulator.FourierVoxelSplineVolume
         options:
             members:
                 - __init__
@@ -99,7 +99,7 @@ There are many different data representations of biological structures for cryo-
 #### Real-space
 
 
-::: cryojax.simulator.RealVoxelGridStructure
+::: cryojax.simulator.RealVoxelGridVolume
         options:
             members:
                 - __init__
