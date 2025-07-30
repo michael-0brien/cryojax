@@ -1,5 +1,6 @@
 from .atomic_structure import (
     AbstractIndependentAtomStructure as AbstractIndependentAtomStructure,
+    PengIndependentAtomPotential as PengIndependentAtomPotential,
 )
 from .gmm_structure import GaussianMixtureStructure as GaussianMixtureStructure
 from .voxel_structure import (

@@ -15,12 +15,12 @@ from .representations import (
     FourierVoxelGridStructure as FourierVoxelGridStructure,
     FourierVoxelSplineStructure as FourierVoxelSplineStructure,
     GaussianMixtureStructure as GaussianMixtureStructure,
+    PengIndependentAtomPotential as PengIndependentAtomPotential,
     RealVoxelGridStructure as RealVoxelGridStructure,
 )
 from .scattering_potential import (
     AbstractScatteringPotential as AbstractScatteringPotential,
     AbstractTabulatedScatteringPotential as AbstractTabulatedScatteringPotential,
-    PengIndependentAtomPotential as PengIndependentAtomPotential,
     PengScatteringFactorParameters as PengScatteringFactorParameters,
 )
 from .structure_conversion import (
