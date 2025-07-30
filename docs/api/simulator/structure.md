@@ -1,14 +1,14 @@
 # Modeling cryo-EM structures
 
-There are many different data representations of biological structures for cryo-EM, including atomic models, voxel maps, and neural network representations. The optimal representation to use depends on the user's needs. Therefore, CryoJAX supports a variety of structure representations as well as a modeling interface for creating new representations downstream. More generally, cryoJAX implements *maps* to structures, . This page discusses how to use this interface and documents the structures included in the library.
+There are many different data representations of biological structures for cryo-EM, including atomic models, voxel maps, and neural network representations. The optimal representation to use depends on the user's needs. Therefore, CryoJAX supports a variety of structure representations as well as a modeling interface for creating new representations downstream. More generally, cryoJAX implements *functions* of structures via the core `AbstractStructureParameterisation` class. This page discusses how to use this interface and documents the structures included in the library.
 
 ## Core base classes
 
-???+ abstract "`cryojax.simulator.AbstractStructureMapping`"
-    ::: cryojax.simulator.AbstractStructureMapping
+???+ abstract "`cryojax.simulator.AbstractStructureParameterisation`"
+    ::: cryojax.simulator.AbstractStructureParameterisation
         options:
             members:
-                - map_to_structure
+                - evaluate
 
 
 ???+ abstract "`cryojax.simulator.AbstractStructureRepresentation`"
@@ -32,7 +32,7 @@ There are many different data representations of biological structures for cryo-
     options:
         members:
             - __init__
-            - map_to_structure
+            - evaluate
             - rotate_to_pose
             - translate_to_pose
 
@@ -57,7 +57,7 @@ There are many different data representations of biological structures for cryo-
             members:
                 - __init__
                 - from_scattering_factor_parameters
-                - map_to_structure
+                - evaluate
                 - rotate_to_pose
                 - translate_to_pose
                 - to_real_voxel_grid
@@ -105,7 +105,7 @@ There are many different data representations of biological structures for cryo-
             members:
                 - __init__
                 - from_real_voxel_grid
-                - map_to_structure
+                - evaluate
                 - rotate_to_pose
                 - frequency_slice_in_pixels
                 - shape
@@ -117,7 +117,7 @@ There are many different data representations of biological structures for cryo-
             members:
                 - __init__
                 - from_real_voxel_grid
-                - map_to_structure
+                - evaluate
                 - rotate_to_pose
                 - frequency_slice_in_pixels
                 - shape
@@ -140,7 +140,7 @@ There are many different data representations of biological structures for cryo-
             members:
                 - __init__
                 - from_real_voxel_grid
-                - map_to_structure
+                - evaluate
                 - rotate_to_pose
                 - coordinate_grid_in_pixels
                 - shape
@@ -154,10 +154,10 @@ There are many different data representations of biological structures for cryo-
         options:
             members:
                 - conformation
-                - map_to_structure
+                - evaluate
 
 ::: cryojax.simulator.DiscreteStructuralEnsemble
         options:
             members:
                 - __init__
-                - map_to_structure
+                - evaluate

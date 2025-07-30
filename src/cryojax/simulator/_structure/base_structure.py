@@ -19,17 +19,17 @@ T = TypeVar("T")
 #
 # Base classes for structures
 #
-class AbstractStructureMapping(eqx.Module, strict=True):
+class AbstractStructureParameterisation(eqx.Module, strict=True):
     """Abstract interface for a data representation of a protein
     structure.
     """
 
     @abc.abstractmethod
-    def map_to_structure(self) -> "AbstractStructureRepresentation":
+    def evaluate(self) -> "AbstractStructureRepresentation":
         raise NotImplementedError
 
 
-class AbstractStructureRepresentation(AbstractStructureMapping, strict=True):
+class AbstractStructureRepresentation(AbstractStructureParameterisation, strict=True):
     """Abstract interface for a structure with a coordinate system."""
 
     @abc.abstractmethod
@@ -37,7 +37,7 @@ class AbstractStructureRepresentation(AbstractStructureMapping, strict=True):
         raise NotImplementedError
 
     @override
-    def map_to_structure(self) -> Self:
+    def evaluate(self) -> Self:
         """Return the structure."""
         return self
 

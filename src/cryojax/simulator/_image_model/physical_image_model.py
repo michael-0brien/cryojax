@@ -13,7 +13,7 @@ from .._config import AbstractConfig, DoseConfig
 from .._detector import AbstractDetector
 from .._pose import AbstractPose
 from .._scattering_theory import AbstractScatteringTheory
-from .._structure import AbstractStructureMapping
+from .._structure import AbstractStructureParameterisation
 from .base_image_model import AbstractImageModel, ImageArray, PaddedImageArray
 
 
@@ -30,7 +30,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
     scattering theory.
     """
 
-    structure: AbstractStructureMapping
+    structure: AbstractStructureParameterisation
     pose: AbstractPose
     config: AbstractConfig
     scattering_theory: AbstractScatteringTheory
@@ -41,7 +41,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
 
     def __init__(
         self,
-        structure: AbstractStructureMapping,
+        structure: AbstractStructureParameterisation,
         pose: AbstractPose,
         config: AbstractConfig,
         scattering_theory: AbstractScatteringTheory,
@@ -85,7 +85,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
     ) -> ImageArray | PaddedImageArray:
         # Get the structure. Its data should be a scattering potential
         # to simulate in physical units
-        structure = self.structure.map_to_structure()
+        structure = self.structure.evaluate()
         # Rotate it to the lab frame
         structure = structure.rotate_to_pose(self.pose)
         # Compute the contrast
@@ -107,7 +107,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
     words a squared wavefunction.
     """
 
-    structure: AbstractStructureMapping
+    structure: AbstractStructureParameterisation
     pose: AbstractPose
     config: AbstractConfig
     scattering_theory: AbstractScatteringTheory
@@ -118,7 +118,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
 
     def __init__(
         self,
-        structure: AbstractStructureMapping,
+        structure: AbstractStructureParameterisation,
         pose: AbstractPose,
         config: AbstractConfig,
         scattering_theory: AbstractScatteringTheory,
@@ -162,7 +162,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
     ) -> ImageArray | PaddedImageArray:
         # Get the structure. Its data should be a scattering potential
         # to simulate in physical units
-        structure = self.structure.map_to_structure()
+        structure = self.structure.evaluate()
         # Rotate it to the lab frame
         structure = structure.rotate_to_pose(self.pose)
         # Compute the intensity spectrum
@@ -183,7 +183,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
     model for the detector.
     """
 
-    structure: AbstractStructureMapping
+    structure: AbstractStructureParameterisation
     pose: AbstractPose
     config: DoseConfig
     scattering_theory: AbstractScatteringTheory
@@ -195,7 +195,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
 
     def __init__(
         self,
-        structure: AbstractStructureMapping,
+        structure: AbstractStructureParameterisation,
         pose: AbstractPose,
         config: DoseConfig,
         scattering_theory: AbstractScatteringTheory,
@@ -241,7 +241,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
     ) -> ImageArray | PaddedImageArray:
         # Get the structure. Its data should be a scattering potential
         # to simulate in physical units
-        structure = self.structure.map_to_structure()
+        structure = self.structure.evaluate()
         # Rotate it to the lab frame
         structure = structure.rotate_to_pose(self.pose)
         if rng_key is None:

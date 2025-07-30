@@ -1,10 +1,10 @@
 from .base_structure import (
     AbstractPointCloudStructure as AbstractPointCloudStructure,
-    AbstractStructureMapping as AbstractStructureMapping,
+    AbstractStructureParameterisation as AbstractStructureParameterisation,
     AbstractStructureRepresentation as AbstractStructureRepresentation,
     AbstractVoxelStructure as AbstractVoxelStructure,
 )
-from .mappings import (
+from .parameterisations import (
     AbstractStructuralEnsemble as AbstractStructuralEnsemble,
     DiscreteStructuralEnsemble as DiscreteStructuralEnsemble,
 )

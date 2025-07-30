@@ -60,7 +60,7 @@ from ._structure import (
     AbstractRealVoxelStructure as AbstractRealVoxelStructure,
     AbstractScatteringPotential as AbstractScatteringPotential,
     AbstractStructuralEnsemble as AbstractStructuralEnsemble,
-    AbstractStructureMapping as AbstractStructureMapping,
+    AbstractStructureParameterisation as AbstractStructureParameterisation,
     AbstractStructureRepresentation as AbstractStructureRepresentation,
     AbstractTabulatedScatteringPotential as AbstractTabulatedScatteringPotential,
     AbstractVoxelStructure as AbstractVoxelStructure,

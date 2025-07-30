@@ -7,10 +7,13 @@ import jax.numpy as jnp
 from jaxtyping import Array, Int
 
 from ....internal import error_if_negative
-from ..base_structure import AbstractStructureMapping, AbstractStructureRepresentation
+from ..base_structure import (
+    AbstractStructureParameterisation,
+    AbstractStructureRepresentation,
+)
 
 
-class AbstractStructuralEnsemble(AbstractStructureMapping, strict=True):
+class AbstractStructuralEnsemble(AbstractStructureParameterisation, strict=True):
     """Abstract interface for a structure with conformational
     heterogeneity.
     """
@@ -41,7 +44,7 @@ class DiscreteStructuralEnsemble(AbstractStructuralEnsemble, strict=True):
         self.conformation = jnp.asarray(error_if_negative(conformation))
 
     @override
-    def map_to_structure(self) -> AbstractStructureRepresentation:
+    def evaluate(self) -> AbstractStructureRepresentation:
         """Map to the structure at `conformation`."""
         funcs = [
             lambda i=i: self.conformational_space[i]

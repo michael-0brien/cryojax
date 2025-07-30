@@ -19,7 +19,7 @@ from ._image_model import (
 from ._pose import AbstractPose
 from ._scattering_theory import WeakPhaseScatteringTheory
 from ._structure import (
-    AbstractStructureMapping,
+    AbstractStructureParameterisation,
     FourierVoxelGridStructure,
     FourierVoxelSplineStructure,
     GaussianMixtureStructure,
@@ -30,7 +30,7 @@ from ._transfer_theory import ContrastTransferTheory
 
 
 def make_image_model(
-    structure: AbstractStructureMapping,
+    structure: AbstractStructureParameterisation,
     config: AbstractConfig,
     pose: AbstractPose,
     transfer_theory: Optional[ContrastTransferTheory] = None,
@@ -150,7 +150,7 @@ def make_image_model(
 
 
 def _select_default_integrator(
-    structure: AbstractStructureMapping, physical_units: bool
+    structure: AbstractStructureParameterisation, physical_units: bool
 ) -> AbstractDirectIntegrator:
     if isinstance(structure, (FourierVoxelGridStructure, FourierVoxelSplineStructure)):
         integrator = FourierSliceExtraction(outputs_integral=physical_units)

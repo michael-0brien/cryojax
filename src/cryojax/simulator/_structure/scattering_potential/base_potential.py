@@ -1,7 +1,7 @@
-from ..base_structure import AbstractStructureMapping
+from ..base_structure import AbstractStructureParameterisation
 
 
-class AbstractScatteringPotential(AbstractStructureMapping, strict=True):
+class AbstractScatteringPotential(AbstractStructureParameterisation, strict=True):
     """Abstract interface for generating a spatial potential energy distribution.
 
     !!! info

@@ -41,5 +41,5 @@ def gmm_structure(sample_pdb_path):
 def test_conformation(structure, request):
     structure = request.getfixturevalue(structure)
     conformational_space = tuple([structure for _ in range(3)])
-    mapping = DiscreteStructuralEnsemble(conformational_space, conformation=0)
-    _ = mapping.map_to_structure()
+    structure = DiscreteStructuralEnsemble(conformational_space, conformation=0)
+    _ = structure.evaluate()
