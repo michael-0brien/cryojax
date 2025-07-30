@@ -26,7 +26,7 @@ from ._structure_parametrisation import (
     FourierVoxelGridVolume,
     FourierVoxelSplineVolume,
     GaussianMixtureVolume,
-    PengIndependentAtomVolume,
+    PengIndependentAtomPotential,
     RealVoxelGridVolume,
 )
 from ._transfer_theory import ContrastTransferTheory
@@ -53,7 +53,7 @@ def make_image_model(
     - `structure`:
         The representation of the protein structure.
         Common choices are the `FourierVoxelGridVolume`
-        for fourier-space voxel grids or the `PengIndependentAtomVolume`
+        for fourier-space voxel grids or the `PengIndependentAtomPotential`
         for gaussian mixtures of atoms parameterized by electron scattering factors.
     - `config`:
         The configuration for the image and imagining instrument. Unless using
@@ -194,7 +194,7 @@ def _select_default_integrator(
         integrator = FourierSliceExtraction(outputs_integral=simulates_quantity)
     elif isinstance(
         structure,
-        (PengIndependentAtomVolume, GaussianMixtureVolume),
+        (PengIndependentAtomPotential, GaussianMixtureVolume),
     ):
         integrator = GaussianMixtureProjection(use_error_functions=True)
     elif isinstance(structure, RealVoxelGridVolume):

@@ -43,7 +43,7 @@ There are many different data representations of biological structures for cryo-
 
 ---
 
-::: cryojax.simulator.PengIndependentAtomVolume
+::: cryojax.simulator.PengIndependentAtomPotential
     options:
         members:
             - __init__

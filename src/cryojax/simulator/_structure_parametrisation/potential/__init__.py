@@ -1,6 +1,6 @@
 from .tabulated_potential import (
     AbstractPengPotential as AbstractPengPotential,
     AbstractTabulatedPotential as AbstractTabulatedPotential,
-    PengIndependentAtomVolume as PengIndependentAtomVolume,
+    PengIndependentAtomPotential as PengIndependentAtomPotential,
     PengScatteringFactorParameters as PengScatteringFactorParameters,
 )

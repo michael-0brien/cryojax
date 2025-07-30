@@ -60,7 +60,7 @@ from ._structure_parametrisation import (
     FourierVoxelGridVolume as FourierVoxelGridVolume,
     FourierVoxelSplineVolume as FourierVoxelSplineVolume,
     GaussianMixtureVolume as GaussianMixtureVolume,
-    PengIndependentAtomVolume as PengIndependentAtomVolume,
+    PengIndependentAtomPotential as PengIndependentAtomPotential,
     PengScatteringFactorParameters as PengScatteringFactorParameters,
     RealVoxelGridVolume as RealVoxelGridVolume,
 )

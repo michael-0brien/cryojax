@@ -84,7 +84,7 @@ class AbstractPengPotential(AbstractTabulatedPotential, strict=True):
     b_factors: eqx.AbstractVar[Float[Array, "n_atoms n_gaussians"]]
 
 
-class PengIndependentAtomVolume(
+class PengIndependentAtomPotential(
     AbstractPengPotential,
     AbstractIndependentAtomVolume,
     strict=True,
@@ -93,19 +93,19 @@ class PengIndependentAtomVolume(
     gaussians per atom (Peng et al. 1996).
 
     !!! info
-        Use the following to load a `PengIndependentAtomVolume`
+        Use the following to load a `PengIndependentAtomPotential`
         from tabulated electron scattering factors
 
         ```python
         from cryojax.io import read_atoms_from_pdb
         from cryojax.simulator import (
-            PengIndependentAtomVolume, PengScatteringFactorParameters
+            PengIndependentAtomPotential, PengScatteringFactorParameters
         )
 
         # Load positions of atoms and one-hot encoded atom names
         atom_positions, atom_identities = read_atoms_from_pdb(...)
         parameters = PengScatteringFactorParameters(atom_identities)
-        volume = PengIndependentAtomVolume.from_scattering_factor_parameters(
+        potential = PengIndependentAtomPotential.from_scattering_factor_parameters(
             atom_positions, parameters
         )
         ```

@@ -47,7 +47,7 @@
 #         selection_string="not element H",
 #         loads_b_factors=True,
 #     )
-#     atom_potential = cxs.PengIndependentAtomVolume.from_scattering_factor_parameters(
+#     atom_potential = cxs.PengIndependentAtomPotential.from_scattering_factor_parameters(
 #         atom_positions,
 #         parameters=cxs.PengScatteringFactorParameters(atom_identities),
 #         extra_b_factors=b_factors,
@@ -168,7 +168,7 @@
 #         selection_string="not element H",
 #         loads_b_factors=True,
 #     )
-#     atom_potential = cxs.PengIndependentAtomVolume.from_scattering_factor_parameters(
+#     atom_potential = cxs.PengIndependentAtomPotential.from_scattering_factor_parameters(
 #         atom_positions,
 #         parameters=cxs.PengScatteringFactorParameters(atom_identities),
 #         extra_b_factors=b_factors,
