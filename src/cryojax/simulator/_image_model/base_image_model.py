@@ -254,15 +254,15 @@ class LinearImageModel(AbstractImageModel, strict=True):
     ) -> ImageArray | PaddedImageArray:
         # Get the volume
         if rng_key is None:
-            volume_rep = self.volume.to_volume_representation()
+            vol_rep = self.volume.to_volume_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            volume_rep = self.volume.to_volume_representation(this_key)
+            vol_rep = self.volume.to_volume_representation(this_key)
         # Rotate it to the lab frame
-        volume_rep = volume_rep.rotate_to_pose(self.pose)
+        vol_rep = vol_rep.rotate_to_pose(self.pose)
         # Compute the projection image
         fourier_image = self.integrator.integrate(
-            volume_rep, self.config, outputs_real_space=False
+            vol_rep, self.config, outputs_real_space=False
         )
         # Compute the image
         fourier_image = self.transfer_theory.propagate_object(  # noqa: E501
@@ -340,15 +340,15 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
     ) -> ImageArray | PaddedImageArray:
         # Get the volume
         if rng_key is None:
-            volume_rep = self.volume.to_volume_representation()
+            vol_rep = self.volume.to_volume_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            volume_rep = self.volume.to_volume_representation(this_key)
+            vol_rep = self.volume.to_volume_representation(this_key)
         # Rotate it to the lab frame
-        volume_rep = volume_rep.rotate_to_pose(self.pose)
+        vol_rep = vol_rep.rotate_to_pose(self.pose)
         # Compute the projection image
         fourier_image = self.integrator.integrate(
-            volume_rep, self.config, outputs_real_space=False
+            vol_rep, self.config, outputs_real_space=False
         )
         # Now for the in-plane translation
         if self.applies_translation:

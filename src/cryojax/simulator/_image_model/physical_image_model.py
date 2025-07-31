@@ -91,15 +91,15 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
         # Get the volume. Its data should be a scattering potential
         # to simulate in physical units
         if rng_key is None:
-            volume_rep = self.volume.to_volume_representation()
+            vol_rep = self.volume.to_volume_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            volume_rep = self.volume.to_volume_representation(this_key)
+            vol_rep = self.volume.to_volume_representation(this_key)
         # Rotate it to the lab frame
-        volume_rep = volume_rep.rotate_to_pose(self.pose)
+        vol_rep = vol_rep.rotate_to_pose(self.pose)
         # Compute the contrast
         contrast_spectrum = self.scattering_theory.compute_contrast_spectrum(
-            volume_rep,
+            vol_rep,
             self.config,
             rng_key,
             defocus_offset=self.pose.offset_z_in_angstroms,
@@ -175,15 +175,15 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
         # Get the volume. Its data should be a scattering potential
         # to simulate in physical units
         if rng_key is None:
-            volume_rep = self.volume.to_volume_representation()
+            vol_rep = self.volume.to_volume_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            volume_rep = self.volume.to_volume_representation(this_key)
+            vol_rep = self.volume.to_volume_representation(this_key)
         # Rotate it to the lab frame
-        volume_rep = volume_rep.rotate_to_pose(self.pose)
+        vol_rep = vol_rep.rotate_to_pose(self.pose)
         # Compute the intensity spectrum
         intensity_spectrum = self.scattering_theory.compute_intensity_spectrum(
-            volume_rep,
+            vol_rep,
             self.config,
             rng_key,
             defocus_offset=self.pose.offset_z_in_angstroms,
@@ -261,12 +261,12 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
         if rng_key is None:
             # Get the volume. Its data should be a scattering potential
             # to simulate in physical units
-            volume_rep = self.volume.to_volume_representation()
+            vol_rep = self.volume.to_volume_representation()
             # Rotate it to the lab frame
-            volume_rep = volume_rep.rotate_to_pose(self.pose)
+            vol_rep = vol_rep.rotate_to_pose(self.pose)
             # Compute the intensity
             fourier_intensity = self.scattering_theory.compute_intensity_spectrum(
-                volume_rep,
+                vol_rep,
                 self.config,
                 defocus_offset=self.pose.offset_z_in_angstroms,
             )
@@ -284,12 +284,12 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
             keys = jr.split(rng_key, 3)
             # Get the volume. Its data should be a scattering potential
             # to simulate in physical units
-            volume_rep = self.volume.to_volume_representation(keys[0])
+            vol_rep = self.volume.to_volume_representation(keys[0])
             # Rotate it to the lab frame
-            volume_rep = volume_rep.rotate_to_pose(self.pose)
+            vol_rep = vol_rep.rotate_to_pose(self.pose)
             # Compute the squared wavefunction
             fourier_intensity = self.scattering_theory.compute_intensity_spectrum(
-                volume_rep,
+                vol_rep,
                 self.config,
                 keys[1],
                 defocus_offset=self.pose.offset_z_in_angstroms,
