@@ -6,6 +6,8 @@ from .base_parametrisation import (
 )
 from .ensemble import DiscreteStructuralEnsemble as DiscreteStructuralEnsemble
 from .potential import (
+    AbstractPengPotential as AbstractPengPotential,
+    AbstractTabulatedPotential as AbstractTabulatedPotential,
     PengIndependentAtomPotential as PengIndependentAtomPotential,
     PengScatteringFactorParameters as PengScatteringFactorParameters,
 )

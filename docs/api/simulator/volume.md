@@ -17,17 +17,6 @@ There are many different volume representations of biological structures for cry
             members:
                 - rotate_to_pose
 
-??? abstract "`cryojax.simulator.AbstractEnsembleParametrisation`"
-    ::: cryojax.simulator.AbstractEnsembleParametrisation
-        options:
-            members:
-                - conformation
-
-??? abstract "`cryojax.simulator.AbstractPotentialParametrisation`"
-    ::: cryojax.simulator.AbstractPotentialParametrisation
-        options:
-            members:
-
 ## Volume representations
 
 ### Point clouds
@@ -53,16 +42,7 @@ There are many different volume representations of biological structures for cry
             - translate_to_pose
             - to_real_voxel_grid
 
----
-
-::: cryojax.simulator.PengScatteringFactorParameters
-        options:
-            members:
-                - __init__
-
 ### Voxel-based
-
-
 
 #### Fourier-space
 
@@ -110,7 +90,40 @@ There are many different volume representations of biological structures for cry
                 - shape
 
 
+## Parametrising scattering potentials
+
+??? abstract "`cryojax.simulator.AbstractPotentialParametrisation`"
+    ::: cryojax.simulator.AbstractPotentialParametrisation
+        options:
+            members:
+                - to_volume_representation
+
+???+ abstract "`cryojax.simulator.AbstractTabulatedPotential`"
+    ::: cryojax.simulator.AbstractTabulatedPotential
+        options:
+            members:
+                - to_volume_representation
+                - from_scattering_factor_parameters
+
+
+???+ abstract "`cryojax.simulator.AbstractPengPotential`"
+    ::: cryojax.simulator.AbstractPengPotential
+        options:
+            members:
+                - amplitudes
+                - b_factors
+                - to_volume_representation
+                - from_scattering_factor_parameters
+
+
 ## Parametrising ensembles
+
+??? abstract "`cryojax.simulator.AbstractEnsembleParametrisation`"
+    ::: cryojax.simulator.AbstractEnsembleParametrisation
+        options:
+            members:
+                - conformation
+                - to_volume_representation
 
 ::: cryojax.simulator.DiscreteStructuralEnsemble
         options:

@@ -60,7 +60,9 @@ from ._transfer_theory import (
 )
 from ._volume_parametrisation import (
     AbstractEnsembleParametrisation as AbstractEnsembleParametrisation,
+    AbstractPengPotential as AbstractPengPotential,
     AbstractPotentialParametrisation as AbstractPotentialParametrisation,
+    AbstractTabulatedPotential as AbstractTabulatedPotential,
     AbstractVolumeParametrisation as AbstractVolumeParametrisation,
     AbstractVolumeRepresentation as AbstractVolumeRepresentation,
     DiscreteStructuralEnsemble as DiscreteStructuralEnsemble,
