@@ -75,7 +75,7 @@ class GaussianMixtureVolume(AbstractPointCloudVolume, strict=True):
         shape: tuple[int, int, int],
         voxel_size: Float[NDArrayLike, ""] | float,
         *,
-        options: dict[str, Any] = {},
+        batch_options: dict[str, Any] = {},
     ) -> Float[Array, "{shape[0]} {shape[1]} {shape[2]}"]:
         """Return a voxel grid of the potential in real space.
 
@@ -83,7 +83,7 @@ class GaussianMixtureVolume(AbstractPointCloudVolume, strict=True):
 
         - `shape`: The shape of the resulting voxel grid.
         - `voxel_size`: The voxel size of the resulting voxel grid.
-        - `options`:
+        - `batch_options`:
             Advanced options for rendering. This is a dictionary
             with the following keys:
             - "batch_size":
@@ -105,5 +105,5 @@ class GaussianMixtureVolume(AbstractPointCloudVolume, strict=True):
             self.positions,
             self.amplitudes,
             convert_variance_to_b_factor(self.variances),
-            **options,
+            **batch_options,
         )

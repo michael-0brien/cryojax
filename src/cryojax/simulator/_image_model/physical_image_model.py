@@ -91,10 +91,10 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
         # Get the volume. Its data should be a scattering potential
         # to simulate in physical units
         if rng_key is None:
-            vol_rep = self.volume.to_volume_representation()
+            vol_rep = self.volume.compute_volume_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            vol_rep = self.volume.to_volume_representation(this_key)
+            vol_rep = self.volume.compute_volume_representation(this_key)
         # Rotate it to the lab frame
         vol_rep = vol_rep.rotate_to_pose(self.pose)
         # Compute the contrast
@@ -175,10 +175,10 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
         # Get the volume. Its data should be a scattering potential
         # to simulate in physical units
         if rng_key is None:
-            vol_rep = self.volume.to_volume_representation()
+            vol_rep = self.volume.compute_volume_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            vol_rep = self.volume.to_volume_representation(this_key)
+            vol_rep = self.volume.compute_volume_representation(this_key)
         # Rotate it to the lab frame
         vol_rep = vol_rep.rotate_to_pose(self.pose)
         # Compute the intensity spectrum
@@ -261,7 +261,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
         if rng_key is None:
             # Get the volume. Its data should be a scattering potential
             # to simulate in physical units
-            vol_rep = self.volume.to_volume_representation()
+            vol_rep = self.volume.compute_volume_representation()
             # Rotate it to the lab frame
             vol_rep = vol_rep.rotate_to_pose(self.pose)
             # Compute the intensity
@@ -284,7 +284,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
             keys = jr.split(rng_key, 3)
             # Get the volume. Its data should be a scattering potential
             # to simulate in physical units
-            vol_rep = self.volume.to_volume_representation(keys[0])
+            vol_rep = self.volume.compute_volume_representation(keys[0])
             # Rotate it to the lab frame
             vol_rep = vol_rep.rotate_to_pose(self.pose)
             # Compute the squared wavefunction

@@ -179,7 +179,7 @@ class PengIndependentAtomPotential(
         shape: tuple[int, int, int],
         voxel_size: Float[NDArrayLike, ""] | float,
         *,
-        options: dict[str, Any] = {},
+        batch_options: dict[str, Any] = {},
     ) -> Float[Array, "{shape[0]} {shape[1]} {shape[2]}"]:
         """Return a voxel grid of the potential in real space.
 
@@ -223,8 +223,8 @@ class PengIndependentAtomPotential(
             The shape of the resulting voxel grid.
         - `voxel_size`:
             The voxel size of the resulting voxel grid.
-        - `options`:
-            Advanced options for rendering. This is a dictionary
+        - `batch_options`:
+            Advanced options for controlling batching. This is a dictionary
             with the following keys:
             - "batch_size":
                 The number of z-planes to evaluate in parallel with
@@ -246,5 +246,5 @@ class PengIndependentAtomPotential(
             self.atom_positions,
             self.amplitudes,
             self.b_factors,
-            **options,
+            **batch_options,
         )

@@ -35,7 +35,7 @@ class DiscreteStructuralEnsemble(AbstractEnsembleParametrisation, strict=True):
         self.conformation = jnp.asarray(error_if_negative(conformation))
 
     @override
-    def to_volume_representation(
+    def compute_volume_representation(
         self, rng_key: Optional[PRNGKeyArray] = None
     ) -> AbstractVolumeRepresentation:
         """Map to the volume at `conformation`.

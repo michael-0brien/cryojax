@@ -314,7 +314,7 @@ def test_z_plane_batched_vs_non_batched_loop_agreement(
     voxels_with_batching = atom_potential.to_real_voxel_grid(
         shape,
         voxel_size,
-        options=dict(batch_size=batch_size, n_batches=n_batches),
+        batch_options=dict(batch_size=batch_size, n_batches=n_batches),
     )
     np.testing.assert_allclose(voxels, voxels_with_batching)
 

@@ -254,10 +254,10 @@ class LinearImageModel(AbstractImageModel, strict=True):
     ) -> ImageArray | PaddedImageArray:
         # Get the volume
         if rng_key is None:
-            vol_rep = self.volume.to_volume_representation()
+            vol_rep = self.volume.compute_volume_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            vol_rep = self.volume.to_volume_representation(this_key)
+            vol_rep = self.volume.compute_volume_representation(this_key)
         # Rotate it to the lab frame
         vol_rep = vol_rep.rotate_to_pose(self.pose)
         # Compute the projection image
@@ -340,10 +340,10 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
     ) -> ImageArray | PaddedImageArray:
         # Get the volume
         if rng_key is None:
-            vol_rep = self.volume.to_volume_representation()
+            vol_rep = self.volume.compute_volume_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            vol_rep = self.volume.to_volume_representation(this_key)
+            vol_rep = self.volume.compute_volume_representation(this_key)
         # Rotate it to the lab frame
         vol_rep = vol_rep.rotate_to_pose(self.pose)
         # Compute the projection image
