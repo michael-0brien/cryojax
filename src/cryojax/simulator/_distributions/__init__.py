@@ -3,6 +3,6 @@ from ._base_distribution import (
 )
 from ._gaussian_distributions import (
     AbstractGaussianDistribution as AbstractGaussianDistribution,
-    GaussianFrequencyDistribution as GaussianFrequencyDistribution,
-    GaussianPixelDistribution as GaussianPixelDistribution,
+    CorrelatedGaussianDistribution as CorrelatedGaussianDistribution,
+    UncorrelatedGaussianDistribution as UncorrelatedGaussianDistribution,
 )

@@ -21,8 +21,8 @@ from ._direct_integrator import (
 from ._distributions import (
     AbstractDistribution as AbstractDistribution,
     AbstractGaussianDistribution as AbstractGaussianDistribution,
-    GaussianFrequencyDistribution as GaussianFrequencyDistribution,
-    GaussianPixelDistribution as GaussianPixelDistribution,
+    CorrelatedGaussianDistribution as CorrelatedGaussianDistribution,
+    UncorrelatedGaussianDistribution as UncorrelatedGaussianDistribution,
 )
 from ._image_config import (
     AbstractImageConfig as AbstractImageConfig,
