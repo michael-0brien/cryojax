@@ -8,8 +8,8 @@ from ..simulator._scattering_theory import (
     HighEnergyScatteringTheory as HighEnergyScatteringTheory,
     MultisliceScatteringTheory as MultisliceScatteringTheory,
 )
-from ..simulator._solvent import (
-    GRFSolvent as GRFSolvent,
+from ..simulator._solvent_2d import (
+    GRFSolvent2D as GRFSolvent2D,
     SolventMixturePower as SolventMixturePower,
 )
 from ..simulator._transfer_theory import (

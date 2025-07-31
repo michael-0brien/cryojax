@@ -16,13 +16,13 @@ def voxel_volume(sample_mrc_path):
 
 @pytest.fixture
 def gmm_volume(sample_pdb_path):
-    atom_positions, atom_identities, b_factors = read_atoms_from_pdb(
+    atom_positions, atom_types, b_factors = read_atoms_from_pdb(
         sample_pdb_path,
         center=True,
         selection_string="not element H",
         loads_b_factors=True,
     )
-    scattering_factor_parameters = cxs.PengScatteringFactorParameters(atom_identities)
+    scattering_factor_parameters = cxs.PengScatteringFactorParameters(atom_types)
     return cxs.GaussianMixtureVolume(
         positions=atom_positions,
         amplitudes=scattering_factor_parameters.a,

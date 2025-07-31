@@ -29,8 +29,8 @@ class PengScatteringFactorParameters(eqx.Module, strict=True):
     from cryojax.simulator import PengScatteringFactorParameters
 
     # Load positions of atoms and one-hot encoded atom names
-    atom_positions, atom_identities = read_atoms_from_pdb(...)
-    parameters = PengScatteringFactorParameters(atom_identities)
+    atom_positions, atom_types = read_atoms_from_pdb(...)
+    parameters = PengScatteringFactorParameters(atom_types)
     print(parameters.a, parameters.b)  # a_i and b_i
     ```
     """
@@ -38,17 +38,17 @@ class PengScatteringFactorParameters(eqx.Module, strict=True):
     a: Float[Array, " n_atoms 5"]
     b: Float[Array, " n_atoms 5"]
 
-    def __init__(self, atom_identities: Int[np.ndarray, " n_atoms"]):
+    def __init__(self, atom_types: Int[np.ndarray, " n_atoms"]):
         """**Arguments:**
 
-        - `atom_identities`:
+        - `atom_types`:
             The atom types as an integer array.
         """
         scattering_factor_parameter_table = (
             read_peng_element_scattering_factor_parameter_table()
         )
         scattering_factor_parameter_dict = get_tabulated_scattering_factor_parameters(
-            atom_identities, scattering_factor_parameter_table
+            atom_types, scattering_factor_parameter_table
         )
         self.a = jnp.asarray(scattering_factor_parameter_dict["a"], dtype=float)
         self.b = jnp.asarray(scattering_factor_parameter_dict["b"], dtype=float)
@@ -60,7 +60,7 @@ class AbstractTabulatedPotential(AbstractPotentialParametrisation, strict=True):
 
     @classmethod
     @abc.abstractmethod
-    def from_scattering_factor_parameters(cls, *args: Any, **kwargs: Any) -> Self:
+    def from_tabulated_parameters(cls, *args: Any, **kwargs: Any) -> Self:
         """Construct a scattering potential parametrisation from
         tabulated electron scattering factors.
         """
@@ -103,9 +103,9 @@ class PengIndependentAtomPotential(
         )
 
         # Load positions of atoms and one-hot encoded atom names
-        atom_positions, atom_identities = read_atoms_from_pdb(...)
-        parameters = PengScatteringFactorParameters(atom_identities)
-        potential = PengIndependentAtomPotential.from_scattering_factor_parameters(
+        atom_positions, atom_types = read_atoms_from_pdb(...)
+        parameters = PengScatteringFactorParameters(atom_types)
+        potential = PengIndependentAtomPotential.from_tabulated_parameters(
             atom_positions, parameters
         )
         ```
@@ -148,7 +148,7 @@ class PengIndependentAtomPotential(
 
     @classmethod
     @override
-    def from_scattering_factor_parameters(
+    def from_tabulated_parameters(
         cls,
         atom_positions: Float[NDArrayLike, "n_atoms 3"],
         parameters: PengScatteringFactorParameters,

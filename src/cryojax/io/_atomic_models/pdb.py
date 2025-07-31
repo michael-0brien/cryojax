@@ -120,14 +120,14 @@ def read_atoms_from_pdb(
     numbers. To be clear,
 
     ```python
-    atom_positons, atom_identities = read_atoms_from_pdb(...)
+    atom_positons, atom_types = read_atoms_from_pdb(...)
     ```
 
     !!! info
 
         If your PDB has multiple models, `atom_positions` by
         default with a leading dimension that indexes each model.
-        On the other hand, `atom_identities` (and `b_factors`, if loaded)
+        On the other hand, `atom_types` (and `b_factors`, if loaded)
         do not have this leading dimension and are constant across
         models.
     """
@@ -147,7 +147,7 @@ def read_atoms_from_pdb(
     atom_properties = jax.tree.map(
         lambda arr: arr[selected_indices], atom_info["properties"]
     )
-    atom_identities = atom_properties["identities"]
+    atom_types = atom_properties["identities"]
     # Center by mass
     if center:
         atom_masses = cast(np.ndarray, atom_properties["masses"])
@@ -158,9 +158,9 @@ def read_atoms_from_pdb(
         atom_positions = np.squeeze(atom_positions, axis=0)
     if loads_b_factors:
         b_factors = cast(np.ndarray, atom_properties["b_factors"])
-        return atom_positions, atom_identities, b_factors
+        return atom_positions, atom_types, b_factors
     else:
-        return atom_positions, atom_identities
+        return atom_positions, atom_types
 
 
 def _center_atom_coordinates(atom_positions, atom_masses):

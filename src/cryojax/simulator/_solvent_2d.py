@@ -69,7 +69,7 @@ class SolventMixturePower(AbstractFourierOperator, strict=True):
         return mixture_function(frequency_grid_in_angstroms)
 
 
-class AbstractRandomSolvent(eqx.Module, strict=True):
+class AbstractRandomSolvent2D(eqx.Module, strict=True):
     """Base class for a model of the solvent in cryo-EM."""
 
     thickness_in_angstroms: eqx.AbstractVar[Float[Array, ""]]
@@ -155,7 +155,7 @@ class AbstractRandomSolvent(eqx.Module, strict=True):
             return fourier_in_plane_potential
 
 
-class GRFSolvent(AbstractRandomSolvent, strict=True):
+class GRFSolvent2D(AbstractRandomSolvent2D, strict=True):
     r"""Solvent modeled as a gaussian random field (GRF)."""
 
     thickness_in_angstroms: Float[Array, ""]

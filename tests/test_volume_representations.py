@@ -56,15 +56,15 @@ def toy_gaussian_cloud():
 
 @pytest.mark.parametrize("shape", ((64, 64), (63, 63), (63, 64), (64, 63)))
 def test_atom_integrator_shape(sample_pdb_path, shape):
-    atom_positions, atom_identities, b_factors = read_atoms_from_pdb(
+    atom_positions, atom_types, b_factors = read_atoms_from_pdb(
         sample_pdb_path,
         center=True,
         selection_string="not element H",
         loads_b_factors=True,
     )
-    atom_potential = PengIndependentAtomPotential.from_scattering_factor_parameters(
+    atom_potential = PengIndependentAtomPotential.from_tabulated_parameters(
         atom_positions,
-        parameters=PengScatteringFactorParameters(atom_identities),
+        parameters=PengScatteringFactorParameters(atom_types),
         extra_b_factors=b_factors,
     )
     pixel_size = 0.5
@@ -111,16 +111,16 @@ def test_fourier_vs_real_voxel_potential_agreement(sample_pdb_path):
     voxel_size = 0.5
 
     # Load the PDB file
-    atom_positions, atom_identities = read_atoms_from_pdb(
+    atom_positions, atom_types = read_atoms_from_pdb(
         sample_pdb_path,
         center=True,
         loads_b_factors=False,
         selection_string="not element H",
     )
     # Load atomistic potential
-    atom_potential = PengIndependentAtomPotential.from_scattering_factor_parameters(
+    atom_potential = PengIndependentAtomPotential.from_tabulated_parameters(
         atom_positions,
-        parameters=PengScatteringFactorParameters(atom_identities),
+        parameters=PengScatteringFactorParameters(atom_types),
     )
     # Build the grid
     potential_as_real_voxel_grid = atom_potential.to_real_voxel_grid(
@@ -154,16 +154,16 @@ def test_downsampled_voxel_potential_agreement(sample_pdb_path):
     )
     downsampled_voxel_size = voxel_size * downsampling_factor
     # Load the PDB file
-    atom_positions, atom_identities = read_atoms_from_pdb(
+    atom_positions, atom_types = read_atoms_from_pdb(
         sample_pdb_path,
         center=True,
         loads_b_factors=False,
         selection_string="not element H",
     )
     # Load atomistic potential
-    atom_potential = PengIndependentAtomPotential.from_scattering_factor_parameters(
+    atom_potential = PengIndependentAtomPotential.from_tabulated_parameters(
         atom_positions,
-        parameters=PengScatteringFactorParameters(atom_identities),
+        parameters=PengScatteringFactorParameters(atom_types),
     )
     # Build the grids
     low_resolution_potential_grid = atom_potential.to_real_voxel_grid(
@@ -184,15 +184,15 @@ def test_downsampled_gmm_potential_agreement(sample_pdb_path):
     """Integration test ensuring that rasterized voxel grids roughly
     agree with downsampled versions.
     """
-    atom_positions, atom_identities = read_atoms_from_pdb(
+    atom_positions, atom_types = read_atoms_from_pdb(
         sample_pdb_path,
         loads_b_factors=False,
         center=True,
         selection_string="not element H",
     )
-    atom_potential = PengIndependentAtomPotential.from_scattering_factor_parameters(
+    atom_potential = PengIndependentAtomPotential.from_tabulated_parameters(
         atom_positions,
-        parameters=PengScatteringFactorParameters(atom_identities),
+        parameters=PengScatteringFactorParameters(atom_types),
     )
 
     # Parameters for rasterization
@@ -229,15 +229,15 @@ def test_peng_vs_gmm_agreement(sample_pdb_path):
     gaussians are identical"""
 
     # Load atoms and build potentials
-    atom_positions, atom_identities = read_atoms_from_pdb(
+    atom_positions, atom_types = read_atoms_from_pdb(
         sample_pdb_path,
         loads_b_factors=False,
         center=True,
         selection_string="not element H",
     )
-    atom_potential = PengIndependentAtomPotential.from_scattering_factor_parameters(
+    atom_potential = PengIndependentAtomPotential.from_tabulated_parameters(
         atom_positions,
-        parameters=PengScatteringFactorParameters(atom_identities),
+        parameters=PengScatteringFactorParameters(atom_types),
     )
 
     b_factors = atom_potential.b_factors
@@ -271,16 +271,16 @@ def test_compute_rectangular_voxel_grid(sample_pdb_path, shape):
     voxel_size = 0.5
 
     # Load the PDB file
-    atom_positions, atom_identities = read_atoms_from_pdb(
+    atom_positions, atom_types = read_atoms_from_pdb(
         sample_pdb_path,
         center=True,
         loads_b_factors=False,
         selection_string="not element H",
     )
     # Load atomistic potential
-    atom_potential = PengIndependentAtomPotential.from_scattering_factor_parameters(
+    atom_potential = PengIndependentAtomPotential.from_tabulated_parameters(
         atom_positions,
-        parameters=PengScatteringFactorParameters(atom_identities),
+        parameters=PengScatteringFactorParameters(atom_types),
     )
     # Build the grid
     voxels = atom_potential.to_real_voxel_grid(shape, voxel_size)
@@ -298,16 +298,16 @@ def test_z_plane_batched_vs_non_batched_loop_agreement(
     voxel_size = 0.5
 
     # Load the PDB file
-    atom_positions, atom_identities = read_atoms_from_pdb(
+    atom_positions, atom_types = read_atoms_from_pdb(
         sample_pdb_path,
         center=True,
         loads_b_factors=False,
         selection_string="not element H",
     )
     # Load atomistic potential
-    atom_potential = PengIndependentAtomPotential.from_scattering_factor_parameters(
+    atom_potential = PengIndependentAtomPotential.from_tabulated_parameters(
         atom_positions,
-        parameters=PengScatteringFactorParameters(atom_identities),
+        parameters=PengScatteringFactorParameters(atom_types),
     )
     # Build the grid
     voxels = atom_potential.to_real_voxel_grid(shape, voxel_size)

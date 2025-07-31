@@ -6,7 +6,7 @@ from jaxtyping import Array, Complex, Float, PRNGKeyArray
 from .._common_functions import apply_interaction_constant
 from .._direct_integrator import AbstractDirectIntegrator, AbstractDirectVoxelIntegrator
 from .._image_config import AbstractImageConfig
-from .._solvent import AbstractRandomSolvent
+from .._solvent_2d import AbstractRandomSolvent2D
 from .._transfer_theory import ContrastTransferTheory
 from .._volume_parametrisation import AbstractVolumeRepresentation
 from .base_scattering_theory import AbstractWeakPhaseScatteringTheory
@@ -17,13 +17,13 @@ class WeakPhaseScatteringTheory(AbstractWeakPhaseScatteringTheory, strict=True):
 
     integrator: AbstractDirectIntegrator
     transfer_theory: ContrastTransferTheory
-    solvent: Optional[AbstractRandomSolvent] = None
+    solvent: Optional[AbstractRandomSolvent2D] = None
 
     def __init__(
         self,
         integrator: AbstractDirectIntegrator,
         transfer_theory: ContrastTransferTheory,
-        solvent: Optional[AbstractRandomSolvent] = None,
+        solvent: Optional[AbstractRandomSolvent2D] = None,
     ):
         """**Arguments:**
 

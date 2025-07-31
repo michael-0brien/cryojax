@@ -40,11 +40,11 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
     )
     # Real vs fourier volumes
     dim = max(*shape)  # Make sure to use `padded_shape` here
-    atom_positions, atom_identities, b_factors = read_atoms_from_pdb(
+    atom_positions, atom_types, b_factors = read_atoms_from_pdb(
         sample_pdb_path, center=True, loads_b_factors=True
     )
-    scattering_factor_parameters = cxs.PengScatteringFactorParameters(atom_identities)
-    base_volume = cxs.PengIndependentAtomPotential.from_scattering_factor_parameters(
+    scattering_factor_parameters = cxs.PengScatteringFactorParameters(atom_types)
+    base_volume = cxs.PengIndependentAtomPotential.from_tabulated_parameters(
         atom_positions,
         scattering_factor_parameters,
         extra_b_factors=b_factors,
@@ -118,11 +118,11 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
 #     euler_pose = cxs.EulerAnglePose(*euler_pose_params)
 #     # Real vs fourier potentials
 #     dim = max(*shape)
-#     atom_positions, atom_identities, b_factors = read_atoms_from_pdb(
+#     atom_positions, atom_types, b_factors = read_atoms_from_pdb(
 #         sample_pdb_path, center=True, loads_b_factors=True
 #     )
 #     scattering_factor_parameters = get_tabulated_scattering_factor_parameters(
-#         atom_identities, read_peng_element_scattering_factor_parameter_table()
+#         atom_types, read_peng_element_scattering_factor_parameter_table()
 #     )
 #     base_potential = cxs.PengAtomicPotential(
 #         atom_positions,

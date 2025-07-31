@@ -41,15 +41,15 @@
 #         astigmatism_angle,
 #     ) = ctf_params
 
-#     atom_positions, atom_identities, b_factors = read_atoms_from_pdb(
+#     atom_positions, atom_types, b_factors = read_atoms_from_pdb(
 #         sample_pdb_path,
 #         center=True,
 #         selection_string="not element H",
 #         loads_b_factors=True,
 #     )
-#     atom_potential = cxs.PengIndependentAtomPotential.from_scattering_factor_parameters(
+#     atom_potential = cxs.PengIndependentAtomPotential.from_tabulated_parameters(
 #         atom_positions,
-#         parameters=cxs.PengScatteringFactorParameters(atom_identities),
+#         parameters=cxs.PengScatteringFactorParameters(atom_types),
 #         extra_b_factors=b_factors,
 #     )
 
@@ -162,15 +162,15 @@
 #         astigmatism_angle,
 #     ) = ctf_params
 
-#     atom_positions, atom_identities, b_factors = read_atoms_from_pdb(
+#     atom_positions, atom_types, b_factors = read_atoms_from_pdb(
 #         sample_pdb_path,
 #         center=True,
 #         selection_string="not element H",
 #         loads_b_factors=True,
 #     )
-#     atom_potential = cxs.PengIndependentAtomPotential.from_scattering_factor_parameters(
+#     atom_potential = cxs.PengIndependentAtomPotential.from_tabulated_parameters(
 #         atom_positions,
-#         parameters=cxs.PengScatteringFactorParameters(atom_identities),
+#         parameters=cxs.PengScatteringFactorParameters(atom_types),
 #         extra_b_factors=b_factors,
 #     )
 

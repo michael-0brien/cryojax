@@ -9,7 +9,7 @@ from ...ndimage import ifftn, irfftn
 from .._common_functions import apply_amplitude_contrast_ratio, apply_interaction_constant
 from .._direct_integrator import AbstractDirectIntegrator, AbstractDirectVoxelIntegrator
 from .._image_config import AbstractImageConfig
-from .._solvent import AbstractRandomSolvent
+from .._solvent_2d import AbstractRandomSolvent2D
 from .._transfer_theory import WaveTransferTheory
 from .._volume_parametrisation import AbstractVolumeRepresentation
 from .base_scattering_theory import AbstractWaveScatteringTheory
@@ -29,14 +29,14 @@ class HighEnergyScatteringTheory(AbstractWaveScatteringTheory, strict=True):
 
     integrator: AbstractDirectIntegrator
     transfer_theory: WaveTransferTheory
-    solvent: Optional[AbstractRandomSolvent]
+    solvent: Optional[AbstractRandomSolvent2D]
     amplitude_contrast_ratio: Float[Array, ""]
 
     def __init__(
         self,
         integrator: AbstractDirectIntegrator,
         transfer_theory: WaveTransferTheory,
-        solvent: Optional[AbstractRandomSolvent] = None,
+        solvent: Optional[AbstractRandomSolvent2D] = None,
         amplitude_contrast_ratio: float | Float[Array, ""] = 0.1,
     ):
         """**Arguments:**

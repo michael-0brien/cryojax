@@ -50,7 +50,7 @@ from ._scattering_theory import (
     AbstractWeakPhaseScatteringTheory as AbstractWeakPhaseScatteringTheory,
     WeakPhaseScatteringTheory as WeakPhaseScatteringTheory,
 )
-from ._solvent import AbstractRandomSolvent as AbstractRandomSolvent
+from ._solvent_2d import AbstractRandomSolvent2D as AbstractRandomSolvent2D
 from ._transfer_theory import (
     AberratedAstigmaticCTF as AberratedAstigmaticCTF,
     AberratedAstigmaticCTF as CTF,  # noqa: F401
