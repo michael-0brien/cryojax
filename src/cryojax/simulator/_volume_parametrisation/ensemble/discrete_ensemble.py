@@ -8,7 +8,7 @@ from jaxtyping import Array, Int, PRNGKeyArray
 from ....internal import error_if_negative
 from ..base_parametrisation import (
     AbstractEnsembleParametrisation,
-    AbstractVolumeParametrisation,
+    AbstractVolumeRepresentation,
 )
 
 
@@ -17,12 +17,12 @@ class DiscreteStructuralEnsemble(AbstractEnsembleParametrisation, strict=True):
     heterogeneity.
     """
 
-    conformational_space: tuple[AbstractVolumeParametrisation, ...]
+    conformational_space: tuple[AbstractVolumeRepresentation, ...]
     conformation: Int[Array, ""]
 
     def __init__(
         self,
-        conformational_space: tuple[AbstractVolumeParametrisation, ...],
+        conformational_space: tuple[AbstractVolumeRepresentation, ...],
         conformation: int | Int[Array, ""],
     ):
         """**Arguments:**
@@ -35,10 +35,10 @@ class DiscreteStructuralEnsemble(AbstractEnsembleParametrisation, strict=True):
         self.conformation = jnp.asarray(error_if_negative(conformation))
 
     @override
-    def to_volume_parametrisation(
+    def to_volume_representation(
         self, rng_key: Optional[PRNGKeyArray] = None
-    ) -> AbstractVolumeParametrisation:
-        """Map to the structure at `conformation`.
+    ) -> AbstractVolumeRepresentation:
+        """Map to the volume at `conformation`.
 
         **Arguments:**
 
@@ -50,6 +50,6 @@ class DiscreteStructuralEnsemble(AbstractEnsembleParametrisation, strict=True):
             lambda i=i: self.conformational_space[i]
             for i in range(len(self.conformational_space))
         ]
-        structure = jax.lax.switch(self.conformation, funcs)
+        volume = jax.lax.switch(self.conformation, funcs)
 
-        return structure
+        return volume

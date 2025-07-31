@@ -6,7 +6,7 @@ from cryojax.io import read_array_from_mrc
 
 
 @pytest.fixture
-def structure_and_pixel_size(sample_mrc_path):
+def volume_and_pixel_size(sample_mrc_path):
     real_voxel_grid, voxel_size = read_array_from_mrc(sample_mrc_path, loads_spacing=True)
     return (
         cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid, pad_scale=1.3),
@@ -15,24 +15,24 @@ def structure_and_pixel_size(sample_mrc_path):
 
 
 @pytest.fixture
-def structure(structure_and_pixel_size):
-    return structure_and_pixel_size[0]
+def volume(volume_and_pixel_size):
+    return volume_and_pixel_size[0]
 
 
 @pytest.fixture
-def basic_config(structure_and_pixel_size):
-    structure, pixel_size = structure_and_pixel_size
+def basic_config(volume_and_pixel_size):
+    volume, pixel_size = volume_and_pixel_size
     return cxs.BasicImageConfig(
-        shape=structure.shape[0:2],
+        shape=volume.shape[0:2],
         pixel_size=pixel_size,
         voltage_in_kilovolts=300.0,
     )
 
 
 @pytest.fixture
-def image_model(structure, basic_config):
+def image_model(volume, basic_config):
     image_model = cxs.make_image_model(
-        structure,
+        volume,
         basic_config,
         pose=cxs.EulerAnglePose(),
         transfer_theory=cxs.ContrastTransferTheory(cxs.AberratedAstigmaticCTF()),

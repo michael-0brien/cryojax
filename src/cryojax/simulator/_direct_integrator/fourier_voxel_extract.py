@@ -20,7 +20,7 @@ from ...ndimage import (
 )
 from ...ndimage.transforms import InverseSincMask
 from .._image_config import AbstractImageConfig
-from .._structure_parametrisation import FourierVoxelGridVolume, FourierVoxelSplineVolume
+from .._volume_parametrisation import FourierVoxelGridVolume, FourierVoxelSplineVolume
 from .base_direct_integrator import AbstractDirectVoxelIntegrator
 
 
@@ -32,7 +32,8 @@ class AbstractFourierSurfaceExtraction(
 
 
 class FourierSliceExtraction(AbstractFourierSurfaceExtraction, strict=True):
-    """Integrate points to the exit plane using the Fourier projection-slice theorem.
+    """Integrate points to the exit plane using the Fourier
+    projection-slice theorem.
 
     This extracts slices using interpolation methods housed in
     `cryojax.image.map_coordinates` and
@@ -80,7 +81,7 @@ class FourierSliceExtraction(AbstractFourierSurfaceExtraction, strict=True):
     @override
     def integrate(
         self,
-        volume: FourierVoxelGridVolume | FourierVoxelSplineVolume,
+        volume_representation: FourierVoxelGridVolume | FourierVoxelSplineVolume,
         config: AbstractImageConfig,
         outputs_real_space: bool = False,
     ) -> (
@@ -96,35 +97,35 @@ class FourierSliceExtraction(AbstractFourierSurfaceExtraction, strict=True):
 
         **Arguments:**
 
-        - `volume`: The volume representation.
+        - `volume_representation`: The volume representation.
         - `config`: The configuration of the resulting image.
 
         **Returns:**
 
-        The extracted fourier voxels of the `volume`, at the
-        `config.padded_shape` and the `config.pixel_size`.
+        The extracted fourier voxels of the `volume_representation`,
+        at the `config.padded_shape` and the `config.pixel_size`.
         """
-        frequency_slice = volume.frequency_slice_in_pixels
+        frequency_slice = volume_representation.frequency_slice_in_pixels
         N = frequency_slice.shape[1]
-        if volume.shape != (N, N, N):
+        if volume_representation.shape != (N, N, N):
             raise AttributeError(
                 "Only cubic boxes are supported for fourier slice extraction."
             )
         # Compute the fourier projection
-        if isinstance(volume, FourierVoxelSplineVolume):
+        if isinstance(volume_representation, FourierVoxelSplineVolume):
             fourier_projection = self.extract_fourier_slice_from_spline(
-                volume.spline_coefficients,
+                volume_representation.spline_coefficients,
                 frequency_slice,
             )
-        elif isinstance(volume, FourierVoxelGridVolume):
+        elif isinstance(volume_representation, FourierVoxelGridVolume):
             fourier_projection = self.extract_fourier_slice_from_grid(
-                volume.fourier_voxel_grid,
+                volume_representation.fourier_voxel_grid,
                 frequency_slice,
             )
         else:
             raise ValueError(
-                "Supported types for `volume` are `FourierVoxelGridVolume` and "
-                "`FourierVoxelSplineVolume`."
+                "Supported types for `volume_representation` are "
+                "`FourierVoxelGridVolume` and FourierVoxelSplineVolume`."
             )
 
         # Resize the image to match the AbstractImageConfig.padded_shape
@@ -219,8 +220,8 @@ class FourierSliceExtraction(AbstractFourierSurfaceExtraction, strict=True):
 
 
 class EwaldSphereExtraction(AbstractFourierSurfaceExtraction, strict=True):
-    """Integrate points to the exit plane by extracting a surface of the ewald
-    sphere in fourier space.
+    """Integrate points to the exit plane by extracting a surface of
+    the ewald sphere in fourier space.
 
     This extracts surfaces using interpolation methods housed in
     `cryojax.image.map_coordinates`
@@ -268,7 +269,7 @@ class EwaldSphereExtraction(AbstractFourierSurfaceExtraction, strict=True):
     @override
     def integrate(
         self,
-        volume: FourierVoxelGridVolume | FourierVoxelSplineVolume,
+        volume_representation: FourierVoxelGridVolume | FourierVoxelSplineVolume,
         config: AbstractImageConfig,
         outputs_real_space: bool = False,
     ) -> (
@@ -276,43 +277,44 @@ class EwaldSphereExtraction(AbstractFourierSurfaceExtraction, strict=True):
         | Float[Array, "{config.padded_y_dim} {config.padded_x_dim}"]
     ):
         """Integrate the volume at the `AbstractImageConfig` settings
-        of a voxel-based representation in fourier-space, using fourier slice extraction.
+        of a voxel-based representation in fourier-space, using fourier
+        slice extraction.
 
         **Arguments:**
 
-        - `volume`: The volume representation.
+        - `volume_representation`: The volume representation.
         - `config`: The configuration of the resulting image.
 
         **Returns:**
 
-        The extracted fourier voxels of the `volume`, at the
+        The extracted fourier voxels of the `volume_representation`, at the
         `config.padded_shape` and the `config.pixel_size`.
         """
-        frequency_slice = volume.frequency_slice_in_pixels
+        frequency_slice = volume_representation.frequency_slice_in_pixels
         N = frequency_slice.shape[1]
-        if volume.shape != (N, N, N):
+        if volume_representation.shape != (N, N, N):
             raise AttributeError(
                 "Only cubic boxes are supported for fourier slice extraction."
             )
         # Compute the fourier projection
-        if isinstance(volume, FourierVoxelSplineVolume):
+        if isinstance(volume_representation, FourierVoxelSplineVolume):
             ewald_sphere_surface = self.extract_ewald_sphere_from_spline_coefficients(
-                volume.spline_coefficients,
+                volume_representation.spline_coefficients,
                 frequency_slice,
                 config.pixel_size,
                 config.wavelength_in_angstroms,
             )
-        elif isinstance(volume, FourierVoxelGridVolume):
+        elif isinstance(volume_representation, FourierVoxelGridVolume):
             ewald_sphere_surface = self.extract_ewald_sphere_from_grid_points(
-                volume.fourier_voxel_grid,
+                volume_representation.fourier_voxel_grid,
                 frequency_slice,
                 config.pixel_size,
                 config.wavelength_in_angstroms,
             )
         else:
             raise ValueError(
-                "Supported types for `volume` are `FourierVoxelGridVolume` and "
-                "`FourierVoxelSplineVolume`."
+                "Supported types for `volume_representation` are "
+                "`FourierVoxelGridVolume` and `FourierVoxelSplineVolume`."
             )
 
         # Resize the image to match the AbstractImageConfig.padded_shape

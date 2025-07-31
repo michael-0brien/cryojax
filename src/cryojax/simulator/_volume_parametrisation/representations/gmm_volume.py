@@ -13,7 +13,7 @@ from .base_volume import AbstractPointCloudVolume
 
 
 class GaussianMixtureVolume(AbstractPointCloudVolume, strict=True):
-    r"""A representation of a structure as a mixture of
+    r"""A representation of a volume as a mixture of
     gaussians, with multiple gaussians used per position.
 
     The convention of allowing multiple gaussians per position

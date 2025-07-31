@@ -130,7 +130,7 @@ def make_image_model_vmap(wxyz, potential, config, transfer_theory):
     image_model = cxs.make_image_model(
         potential, config, pose, transfer_theory, normalizes_signal=True
     )
-    where_pose = lambda model: model.structure.pose
+    where_pose = lambda model: model.pose
     filter_spec = get_filter_spec(image_model, where_pose)
     model_vmap, model_novmap = eqx.partition(image_model, filter_spec)
 

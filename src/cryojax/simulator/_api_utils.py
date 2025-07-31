@@ -21,19 +21,19 @@ from ._image_model import (
 )
 from ._pose import AbstractPose
 from ._scattering_theory import WeakPhaseScatteringTheory
-from ._structure_parametrisation import (
-    AbstractStructureParameterisation,
+from ._transfer_theory import ContrastTransferTheory
+from ._volume_parametrisation import (
+    AbstractVolumeParametrisation,
     FourierVoxelGridVolume,
     FourierVoxelSplineVolume,
     GaussianMixtureVolume,
     PengIndependentAtomPotential,
     RealVoxelGridVolume,
 )
-from ._transfer_theory import ContrastTransferTheory
 
 
 def make_image_model(
-    structure: AbstractStructureParameterisation,
+    volume: AbstractVolumeParametrisation,
     config: AbstractImageConfig,
     pose: AbstractPose,
     transfer_theory: Optional[ContrastTransferTheory] = None,
@@ -50,8 +50,8 @@ def make_image_model(
 
     **Arguments:**
 
-    - `structure`:
-        The representation of the protein structure.
+    - `volume`:
+        The representation of the protein volume.
         Common choices are the `FourierVoxelGridVolume`
         for fourier-space voxel grids or the `PengIndependentAtomPotential`
         for gaussian mixtures of atoms parameterized by electron scattering factors.
@@ -107,11 +107,11 @@ def make_image_model(
     ```
     """
     # Select default integrator
-    integrator = _select_default_integrator(structure, simulates_quantity)
+    integrator = _select_default_integrator(volume, simulates_quantity)
     if transfer_theory is None:
         # Image model for projections
         image_model = ProjectionImageModel(
-            structure,
+            volume,
             pose,
             config,
             integrator,
@@ -136,7 +136,7 @@ def make_image_model(
                         "counts, an `AbstractDetector` must be passed."
                     )
                 image_model = ElectronCountsImageModel(
-                    structure,
+                    volume,
                     pose,
                     config,
                     scattering_theory,
@@ -147,7 +147,7 @@ def make_image_model(
                 )
             elif quantity_mode == "contrast":
                 image_model = ContrastImageModel(
-                    structure,
+                    volume,
                     pose,
                     config,
                     scattering_theory,
@@ -157,7 +157,7 @@ def make_image_model(
                 )
             elif quantity_mode == "intensity":
                 image_model = IntensityImageModel(
-                    structure,
+                    volume,
                     pose,
                     config,
                     scattering_theory,
@@ -174,7 +174,7 @@ def make_image_model(
         else:
             # Linear image model
             image_model = LinearImageModel(
-                structure,
+                volume,
                 pose,
                 config,
                 integrator,
@@ -188,21 +188,21 @@ def make_image_model(
 
 
 def _select_default_integrator(
-    structure: AbstractStructureParameterisation, simulates_quantity: bool
+    volume: AbstractVolumeParametrisation, simulates_quantity: bool
 ) -> AbstractDirectIntegrator:
-    if isinstance(structure, (FourierVoxelGridVolume, FourierVoxelSplineVolume)):
+    if isinstance(volume, (FourierVoxelGridVolume, FourierVoxelSplineVolume)):
         integrator = FourierSliceExtraction(outputs_integral=simulates_quantity)
     elif isinstance(
-        structure,
+        volume,
         (PengIndependentAtomPotential, GaussianMixtureVolume),
     ):
         integrator = GaussianMixtureProjection(use_error_functions=True)
-    elif isinstance(structure, RealVoxelGridVolume):
+    elif isinstance(volume, RealVoxelGridVolume):
         integrator = NufftProjection(outputs_integral=simulates_quantity)
     else:
         raise ValueError(
-            "Could not select default integrator for structure of "
-            f"type {type(structure).__name__}. If using a custom potential "
+            "Could not select default integrator for volume of "
+            f"type {type(volume).__name__}. If using a custom potential "
             "please directly pass an integrator."
         )
     return integrator

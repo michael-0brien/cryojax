@@ -70,9 +70,9 @@ nav:
     - API:
         - cryojax.simulator:
             - 'api/simulator/api.md'
-            - Representing structures:
+            - Representing volumes:
                 - 'api/simulator/pose.md'
-                - 'api/simulator/structure.md'
+                - 'api/simulator/volume.md'
             - Image formation:
                 - 'api/simulator/integrator.md'
                 - 'api/simulator/transfer_theory.md'

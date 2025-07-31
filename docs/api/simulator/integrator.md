@@ -1,6 +1,6 @@
 # Structure integration methods
 
-`cryojax` provides different methods for integrating [structures](./structure.md#structure-representations) onto a plane to generate an image.
+`cryojax` provides different methods for integrating [volumes](./volume.md#volume-representations) onto a plane to generate an image.
 
 ???+ abstract "`cryojax.simulator.AbstractDirectIntegrator`"
     ::: cryojax.simulator.AbstractDirectIntegrator

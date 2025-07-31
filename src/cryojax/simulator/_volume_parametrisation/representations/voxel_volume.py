@@ -1,5 +1,5 @@
 """
-Voxel-based representations of a structure.
+Voxel-based representations of a volume.
 """
 
 from typing import Optional, cast
@@ -23,13 +23,13 @@ from .base_volume import AbstractVoxelVolume
 
 
 class AbstractFourierVoxelVolume(AbstractVoxelVolume, strict=True):
-    """Abstract interface for a voxel-based structure."""
+    """Abstract interface for a voxel-based volume."""
 
     frequency_slice_in_pixels: eqx.AbstractVar[Float[Array, "1 dim dim 3"]]
 
     @override
     def rotate_to_pose(self, pose: AbstractPose, inverse: bool = False) -> Self:
-        """Return a new structure with a rotated `frequency_slice_in_pixels`."""
+        """Return a new volume with a rotated `frequency_slice_in_pixels`."""
         return eqx.tree_at(
             lambda d: d.frequency_slice_in_pixels,
             self,
@@ -212,13 +212,13 @@ class FourierVoxelSplineVolume(AbstractFourierVoxelVolume, strict=True):
 
 
 class AbstractRealVoxelVolume(AbstractVoxelVolume, strict=True):
-    """Abstract interface for a voxel-based structure."""
+    """Abstract interface for a voxel-based volume."""
 
     coordinate_grid_in_pixels: eqx.AbstractVar[Float[Array, "dim dim dim 3"]]
 
     @override
     def rotate_to_pose(self, pose: AbstractPose, inverse: bool = False) -> Self:
-        """Return a new structure with a rotated
+        """Return a new volume with a rotated
         `coordinate_grid_in_pixels`.
         """
         return eqx.tree_at(

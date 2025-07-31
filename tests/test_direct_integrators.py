@@ -38,21 +38,21 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
         pixel_size,
         voltage_in_kilovolts=300.0,
     )
-    # Real vs fourier structures
+    # Real vs fourier volumes
     dim = max(*shape)  # Make sure to use `padded_shape` here
     atom_positions, atom_identities, b_factors = read_atoms_from_pdb(
         sample_pdb_path, center=True, loads_b_factors=True
     )
     scattering_factor_parameters = cxs.PengScatteringFactorParameters(atom_identities)
-    base_structure = cxs.PengIndependentAtomPotential.from_scattering_factor_parameters(
+    base_volume = cxs.PengIndependentAtomPotential.from_scattering_factor_parameters(
         atom_positions,
         scattering_factor_parameters,
         extra_b_factors=b_factors,
     )
     base_method = cxs.GaussianMixtureProjection(use_error_functions=True)
 
-    real_voxel_grid = base_structure.to_real_voxel_grid((dim, dim, dim), pixel_size)
-    other_structures = [
+    real_voxel_grid = base_volume.to_real_voxel_grid((dim, dim, dim), pixel_size)
+    other_volumes = [
         cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid),
         make_spline(real_voxel_grid),
         cxs.GaussianMixtureVolume(
@@ -70,13 +70,13 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
     ]
 
     projection_by_gaussian_integration = compute_projection(
-        base_structure, base_method, config
+        base_volume, base_method, config
     )
-    for structure, projection_method in zip(other_structures, other_projection_methods):
+    for volume, projection_method in zip(other_volumes, other_projection_methods):
         if isinstance(projection_method, cxs.NufftProjection):
             try:
                 projection_by_other_method = compute_projection(
-                    structure, projection_method, config
+                    volume, projection_method, config
                 )
             except Exception as err:
                 warnings.warn(
@@ -87,7 +87,7 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
                 continue
         else:
             projection_by_other_method = compute_projection(
-                structure, projection_method, config
+                volume, projection_method, config
             )
         np.testing.assert_allclose(
             projection_by_gaussian_integration, projection_by_other_method, atol=1e-12
@@ -187,11 +187,11 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
 
 @eqx.filter_jit
 def compute_projection(
-    structure: cxs.AbstractVolumeParametrisation,
+    volume: cxs.AbstractVolumeRepresentation,
     integrator: cxs.AbstractDirectIntegrator,
     config: cxs.BasicImageConfig,
 ) -> Array:
-    fourier_projection = integrator.integrate(structure, config, outputs_real_space=False)
+    fourier_projection = integrator.integrate(volume, config, outputs_real_space=False)
     return crop_to_shape(
         irfftn(
             fourier_projection,
@@ -203,14 +203,14 @@ def compute_projection(
 
 @eqx.filter_jit
 def compute_projection_at_pose(
-    structure: cxs.AbstractVolumeParametrisation,
+    volume: cxs.AbstractVolumeRepresentation,
     integrator: cxs.AbstractDirectIntegrator,
     pose: cxs.AbstractPose,
     config: cxs.BasicImageConfig,
 ) -> Array:
-    rotated_structure = structure.rotate_to_pose(pose)
+    rotated_volume = volume.rotate_to_pose(pose)
     fourier_projection = integrator.integrate(
-        rotated_structure, config, outputs_real_space=False
+        rotated_volume, config, outputs_real_space=False
     )
     translation_operator = pose.compute_translation_operator(
         config.padded_frequency_grid_in_angstroms

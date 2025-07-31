@@ -1,34 +1,34 @@
-# Modeling cryo-EM structures
+# Modeling cryo-EM volumes
 
-There are many different data representations of biological structures for cryo-EM, including atomic models, voxel maps, and neural network representations. Further, there are many ways to generate these structures, such as from protein generative modeling and molecular dynamics, and there are also different ways of parametrising an electrostatic potential once a structure is generated. The optimal implementation to use depends on the user's needs. Therefore, CryoJAX supports a variety of these structure representations as well as a modeling interface for creating new representations downstream. This page discusses how to use this interface and documents the structures included in the library.
+There are many different volume representations of biological structures for cryo-EM, including atomic models, voxel maps, and neural network representations. Further, there are many ways to generate these volumes, such as from protein generative modeling and molecular dynamics. The optimal implementation to use depends on the user's needs. Therefore, CryoJAX supports a variety of these representations as well as a modeling interface for usage downstream. This page discusses how to use this interface and documents the volumes included in the library.
 
 ## Core base classes
-
-???+ abstract "`cryojax.simulator.AbstractStructureParameterisation`"
-    ::: cryojax.simulator.AbstractStructureParameterisation
-        options:
-            members:
-                - to_volume_parametrisation
-
 
 ???+ abstract "`cryojax.simulator.AbstractVolumeParametrisation`"
     ::: cryojax.simulator.AbstractVolumeParametrisation
         options:
             members:
-                - rotate_to_pose
+                - to_volume_representation
 
-???+ abstract "`cryojax.simulator.AbstractEnsembleParametrisation`"
-    ::: cryojax.simulator.AbstractEnsembleParametrisation
+
+???+ abstract "`cryojax.simulator.AbstractVolumeRepresentation`"
+    ::: cryojax.simulator.AbstractVolumeRepresentation
         options:
             members:
                 - rotate_to_pose
 
-???+ abstract "`cryojax.simulator.AbstractPotentialParametrisation`"
+??? abstract "`cryojax.simulator.AbstractEnsembleParametrisation`"
+    ::: cryojax.simulator.AbstractEnsembleParametrisation
+        options:
+            members:
+                - conformation
+
+??? abstract "`cryojax.simulator.AbstractPotentialParametrisation`"
     ::: cryojax.simulator.AbstractPotentialParametrisation
         options:
             members:
 
-## Volume parametrisations
+## Volume representations
 
 ### Point clouds
 
@@ -36,7 +36,7 @@ There are many different data representations of biological structures for cryo-
     options:
         members:
             - __init__
-            - to_volume_parametrisation
+            - to_volume_representation
             - rotate_to_pose
             - translate_to_pose
             - to_real_voxel_grid
@@ -48,7 +48,7 @@ There are many different data representations of biological structures for cryo-
         members:
             - __init__
             - from_scattering_factor_parameters
-            - to_volume_parametrisation
+            - to_volume_representation
             - rotate_to_pose
             - translate_to_pose
             - to_real_voxel_grid
@@ -110,10 +110,10 @@ There are many different data representations of biological structures for cryo-
                 - shape
 
 
-## Ensemble parametrisations
+## Parametrising ensembles
 
 ::: cryojax.simulator.DiscreteStructuralEnsemble
         options:
             members:
                 - __init__
-                - to_volume_parametrisation
+                - to_volume_representation

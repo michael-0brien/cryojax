@@ -265,26 +265,6 @@ class AbstractImageConfig(eqx.Module, strict=True):
 class BasicImageConfig(AbstractImageConfig, strict=True):
     """Configuration and utilities for a basic electron microscopy
     image.
-
-    !!! info
-
-        If you are using a `structure` in a voxel representation
-        pass, the structure voxel size *must* be passed as the
-        `pixel_size` argument, e.g.
-
-        ```python
-        import cryojax.simulator as cxs
-        from cryojax.io import read_array_from_mrc
-
-        real_voxel_grid, voxel_size = read_array_from_mrc("example.mrc")
-        structure = cxs.FourierVoxelGridStructure.from_real_voxel_grid(real_voxel_grid)
-        ...
-        config = cxs.BasicImageConfig(shape, pixel_size=voxel_size, ...)
-        ```
-
-        If this is not done, the resulting
-        image will be incorrect and *not* rescaled to the specified
-        to the different pixel size.
     """
 
     shape: tuple[int, int] = eqx.field(static=True)

@@ -11,7 +11,7 @@ from jaxtyping import Array, Complex, Float
 
 from ...ndimage import convert_fftn_to_rfftn, irfftn
 from .._image_config import AbstractImageConfig
-from .._structure_parametrisation import RealVoxelGridVolume
+from .._volume_parametrisation import RealVoxelGridVolume
 from .base_direct_integrator import AbstractDirectVoxelIntegrator
 
 
@@ -68,7 +68,7 @@ class NufftProjection(
     @override
     def integrate(
         self,
-        volume: RealVoxelGridVolume,
+        volume_representation: RealVoxelGridVolume,
         config: AbstractImageConfig,
         outputs_real_space: bool = False,
     ) -> (
@@ -83,23 +83,27 @@ class NufftProjection(
 
         **Arguments:**
 
-        - `volume`: The volume representation.
+        - `volume_representation`: The volume representation.
         - `config`: The configuration of the resulting image.
 
         **Returns:**
 
-        The projection integral of the `volume` in fourier space, at the
+        The projection integral of the `volume_representation` in fourier space, at the
         `config.padded_shape` and the `config.pixel_size`.
         """
-        if isinstance(volume, RealVoxelGridVolume):
-            shape = volume.shape
+        if isinstance(volume_representation, RealVoxelGridVolume):
+            shape = volume_representation.shape
             fourier_projection = self.project_voxel_cloud_with_nufft(
-                volume.real_voxel_grid.ravel(),
-                volume.coordinate_grid_in_pixels.reshape((math.prod(shape), 3)),
+                volume_representation.real_voxel_grid.ravel(),
+                volume_representation.coordinate_grid_in_pixels.reshape(
+                    (math.prod(shape), 3)
+                ),
                 config.padded_shape,
             )
         else:
-            raise ValueError("Supported type for `volume` is `RealVoxelGridVolume`")
+            raise ValueError(
+                "Supported type for `volume_representation` is `RealVoxelGridVolume`"
+            )
         if self.outputs_integral:
             # Scale by voxel size to convert from projection to integral
             fourier_projection *= config.pixel_size

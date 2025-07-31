@@ -15,7 +15,7 @@ from .._detector import AbstractDetector
 from .._image_config import AbstractImageConfig, DoseImageConfig
 from .._pose import AbstractPose
 from .._scattering_theory import AbstractScatteringTheory
-from .._structure_parametrisation import AbstractStructureParameterisation
+from .._volume_parametrisation import AbstractVolumeParametrisation
 from .base_image_model import AbstractImageModel, ImageArray, PaddedImageArray
 
 
@@ -32,7 +32,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
     scattering theory.
     """
 
-    structure: AbstractStructureParameterisation
+    volume: AbstractVolumeParametrisation
     pose: AbstractPose
     config: AbstractImageConfig
     scattering_theory: AbstractScatteringTheory
@@ -43,7 +43,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
 
     def __init__(
         self,
-        structure: AbstractStructureParameterisation,
+        volume: AbstractVolumeParametrisation,
         pose: AbstractPose,
         config: AbstractImageConfig,
         scattering_theory: AbstractScatteringTheory,
@@ -54,10 +54,10 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
     ):
         """**Arguments:**
 
-        - `structure`:
-            The map to a biological structure.
+        - `volume`:
+            The map to a biological volume.
         - `pose`:
-            The pose of a structure.
+            The pose of a volume.
         - `config`:
             The configuration of the instrument, such as for the pixel size
             and the wavelength.
@@ -73,7 +73,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
             and 0 otherwise used to normalize the image.
             Must have shape equal to `AbstractImageConfig.shape`.
         """
-        self.structure = structure
+        self.volume = volume
         self.pose = pose
         self.config = config
         self.scattering_theory = scattering_theory
@@ -91,15 +91,15 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
         # Get the volume. Its data should be a scattering potential
         # to simulate in physical units
         if rng_key is None:
-            volume = self.structure.to_volume_parametrisation()
+            volume_rep = self.volume.to_volume_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            volume = self.structure.to_volume_parametrisation(this_key)
+            volume_rep = self.volume.to_volume_representation(this_key)
         # Rotate it to the lab frame
-        volume = volume.rotate_to_pose(self.pose)
+        volume_rep = volume_rep.rotate_to_pose(self.pose)
         # Compute the contrast
         contrast_spectrum = self.scattering_theory.compute_contrast_spectrum(
-            volume,
+            volume_rep,
             self.config,
             rng_key,
             defocus_offset=self.pose.offset_z_in_angstroms,
@@ -116,7 +116,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
     words a squared wavefunction.
     """
 
-    structure: AbstractStructureParameterisation
+    volume: AbstractVolumeParametrisation
     pose: AbstractPose
     config: AbstractImageConfig
     scattering_theory: AbstractScatteringTheory
@@ -127,7 +127,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
 
     def __init__(
         self,
-        structure: AbstractStructureParameterisation,
+        volume: AbstractVolumeParametrisation,
         pose: AbstractPose,
         config: AbstractImageConfig,
         scattering_theory: AbstractScatteringTheory,
@@ -138,10 +138,10 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
     ):
         """**Arguments:**
 
-        - `structure`:
-            The map to a biological structure.
+        - `volume`:
+            The map to a biological volume.
         - `pose`:
-            The pose of a structure.
+            The pose of a volume.
         - `config`:
             The configuration of the instrument, such as for the pixel size
             and the wavelength.
@@ -157,7 +157,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
             and 0 otherwise used to normalize the image.
             Must have shape equal to `AbstractImageConfig.shape`.
         """
-        self.structure = structure
+        self.volume = volume
         self.pose = pose
         self.config = config
         self.scattering_theory = scattering_theory
@@ -175,15 +175,15 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
         # Get the volume. Its data should be a scattering potential
         # to simulate in physical units
         if rng_key is None:
-            volume = self.structure.to_volume_parametrisation()
+            volume_rep = self.volume.to_volume_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            volume = self.structure.to_volume_parametrisation(this_key)
+            volume_rep = self.volume.to_volume_representation(this_key)
         # Rotate it to the lab frame
-        volume = volume.rotate_to_pose(self.pose)
+        volume_rep = volume_rep.rotate_to_pose(self.pose)
         # Compute the intensity spectrum
         intensity_spectrum = self.scattering_theory.compute_intensity_spectrum(
-            volume,
+            volume_rep,
             self.config,
             rng_key,
             defocus_offset=self.pose.offset_z_in_angstroms,
@@ -199,7 +199,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
     model for the detector.
     """
 
-    structure: AbstractStructureParameterisation
+    volume: AbstractVolumeParametrisation
     pose: AbstractPose
     config: DoseImageConfig
     scattering_theory: AbstractScatteringTheory
@@ -211,7 +211,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
 
     def __init__(
         self,
-        structure: AbstractStructureParameterisation,
+        volume: AbstractVolumeParametrisation,
         pose: AbstractPose,
         config: DoseImageConfig,
         scattering_theory: AbstractScatteringTheory,
@@ -223,10 +223,10 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
     ):
         """**Arguments:**
 
-        - `structure`:
-            The map to a biological structure.
+        - `volume`:
+            The map to a biological volume.
         - `pose`:
-            The pose of a structure.
+            The pose of a volume.
         - `config`:
             The configuration of the instrument, such as for the pixel size
             and the wavelength.
@@ -242,7 +242,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
             and 0 otherwise used to normalize the image.
             Must have shape equal to `AbstractImageConfig.shape`.
         """
-        self.structure = structure
+        self.volume = volume
         self.pose = pose
         self.config = config
         self.scattering_theory = scattering_theory
@@ -261,12 +261,12 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
         if rng_key is None:
             # Get the volume. Its data should be a scattering potential
             # to simulate in physical units
-            volume = self.structure.to_volume_parametrisation()
+            volume_rep = self.volume.to_volume_representation()
             # Rotate it to the lab frame
-            volume = volume.rotate_to_pose(self.pose)
+            volume_rep = volume_rep.rotate_to_pose(self.pose)
             # Compute the intensity
             fourier_intensity = self.scattering_theory.compute_intensity_spectrum(
-                volume,
+                volume_rep,
                 self.config,
                 defocus_offset=self.pose.offset_z_in_angstroms,
             )
@@ -284,12 +284,12 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
             keys = jr.split(rng_key, 3)
             # Get the volume. Its data should be a scattering potential
             # to simulate in physical units
-            volume = self.structure.to_volume_parametrisation(keys[0])
+            volume_rep = self.volume.to_volume_representation(keys[0])
             # Rotate it to the lab frame
-            volume = volume.rotate_to_pose(self.pose)
+            volume_rep = volume_rep.rotate_to_pose(self.pose)
             # Compute the squared wavefunction
             fourier_intensity = self.scattering_theory.compute_intensity_spectrum(
-                volume,
+                volume_rep,
                 self.config,
                 keys[1],
                 defocus_offset=self.pose.offset_z_in_angstroms,

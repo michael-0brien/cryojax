@@ -7,16 +7,16 @@ from jaxtyping import Array, Complex, Float
 from .._image_config import AbstractImageConfig
 
 
-VolumeT = TypeVar("VolumeT")
+VolumeRepT = TypeVar("VolumeRepT")
 
 
-class AbstractMultisliceIntegrator(eqx.Module, Generic[VolumeT], strict=True):
+class AbstractMultisliceIntegrator(eqx.Module, Generic[VolumeRepT], strict=True):
     """Base class for a multi-slice integration scheme."""
 
     @abstractmethod
     def integrate(
         self,
-        volume: VolumeT,
+        volume_representation: VolumeRepT,
         config: AbstractImageConfig,
         amplitude_contrast_ratio: Float[Array, ""] | float,
     ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim}"]:

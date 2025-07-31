@@ -45,7 +45,7 @@ import jax.numpy as jnp
 import cryojax.simulator as cxs
 from cryojax.io import read_array_from_mrc
 
-# Instantiate the voxel grid representation of a structure. See the documentation
+# Instantiate the voxel grid representation of a volume. See the documentation
 # for how to generate voxel grids from a PDB
 filename = "example_volume.mrc"
 real_voxel_grid, voxel_size = read_array_from_mrc(filename, loads_spacing=True)
@@ -132,12 +132,12 @@ from cryojax.jax_util import get_filter_spec
 # Vectorize model instantiation
 @eqx.filter_jit
 @eqx.filter_vmap(in_axes=(0, None, None, None), out_axes=(eqx.if_array(0), None))
-def make_image_model_vmap(wxyz, structure, config, transfer_theory):
+def make_image_model_vmap(wxyz, volume, config, transfer_theory):
     pose = cxs.QuaternionPose(wxyz=wxyz)
     image_model = cxs.make_image_model(
-        structure, config, pose, transfer_theory, normalizes_signal=True
+        volume, config, pose, transfer_theory, normalizes_signal=True
     )
-    where_pose = lambda model: model.structure.pose
+    where_pose = lambda model: model.pose
     filter_spec = get_filter_spec(image_model, where_pose)
     model_vmap, model_novmap = eqx.partition(image_model, filter_spec)
 
@@ -153,7 +153,7 @@ def simulate_fn_vmap(model_vmap, model_novmap):
 
 # Simulate batch of images
 wxyz = ...  # ... load quaternions
-model_vmap, model_novmap = make_image_model_vmap(wxyz, structure, config, transfer_theory)
+model_vmap, model_novmap = make_image_model_vmap(wxyz, volume, config, transfer_theory)
 images = simulate_fn_vmap(model_vmap, model_novmap)
 ```
 

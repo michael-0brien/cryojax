@@ -14,7 +14,7 @@ from ....constants import (
 from ....internal import NDArrayLike, error_if_negative
 from ..base_parametrisation import AbstractPotentialParametrisation
 from ..common_functions import gaussians_to_real_voxels
-from ..volume import AbstractIndependentAtomVolume
+from ..representations import AbstractIndependentAtomVolume
 
 
 class PengScatteringFactorParameters(eqx.Module, strict=True):

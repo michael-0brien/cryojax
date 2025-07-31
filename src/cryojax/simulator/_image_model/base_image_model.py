@@ -17,8 +17,8 @@ from ...ndimage.transforms import FilterLike, MaskLike
 from .._direct_integrator import AbstractDirectIntegrator
 from .._image_config import AbstractImageConfig
 from .._pose import AbstractPose
-from .._structure_parametrisation import AbstractStructureParameterisation
 from .._transfer_theory import ContrastTransferTheory
+from .._volume_parametrisation import AbstractVolumeParametrisation
 
 
 RealImageArray = Float[Array, "{self.config.y_dim} {self.config.x_dim}"]
@@ -42,7 +42,7 @@ class AbstractImageModel(eqx.Module, strict=True):
     Call an `AbstractImageModel`'s `render` routine.
     """
 
-    structure: eqx.AbstractVar[AbstractStructureParameterisation]
+    volume: eqx.AbstractVar[AbstractVolumeParametrisation]
     pose: eqx.AbstractVar[AbstractPose]
     config: eqx.AbstractVar[AbstractImageConfig]
 
@@ -191,7 +191,7 @@ class AbstractImageModel(eqx.Module, strict=True):
 class LinearImageModel(AbstractImageModel, strict=True):
     """An simple image model in linear image formation theory."""
 
-    structure: AbstractStructureParameterisation
+    volume: AbstractVolumeParametrisation
     pose: AbstractPose
     integrator: AbstractDirectIntegrator
     transfer_theory: ContrastTransferTheory
@@ -203,7 +203,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
 
     def __init__(
         self,
-        structure: AbstractStructureParameterisation,
+        volume: AbstractVolumeParametrisation,
         pose: AbstractPose,
         config: AbstractImageConfig,
         integrator: AbstractDirectIntegrator,
@@ -215,10 +215,10 @@ class LinearImageModel(AbstractImageModel, strict=True):
     ):
         """**Arguments:**
 
-        - `structure`:
-            The map to a biological structure.
+        - `volume`:
+            The map to a biological volume.
         - `pose`:
-            The pose of a structure.
+            The pose of a volume.
         - `config`:
             The configuration of the instrument, such as for the pixel size
             and the wavelength.
@@ -235,7 +235,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
             Must have shape equal to `AbstractImageConfig.shape`.
         """
         # Simulator components
-        self.structure = structure
+        self.volume = volume
         self.pose = pose
         self.config = config
         self.integrator = integrator
@@ -254,15 +254,15 @@ class LinearImageModel(AbstractImageModel, strict=True):
     ) -> ImageArray | PaddedImageArray:
         # Get the volume
         if rng_key is None:
-            volume = self.structure.to_volume_parametrisation()
+            volume_rep = self.volume.to_volume_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            volume = self.structure.to_volume_parametrisation(this_key)
+            volume_rep = self.volume.to_volume_representation(this_key)
         # Rotate it to the lab frame
-        volume = volume.rotate_to_pose(self.pose)
+        volume_rep = volume_rep.rotate_to_pose(self.pose)
         # Compute the projection image
         fourier_image = self.integrator.integrate(
-            volume, self.config, outputs_real_space=False
+            volume_rep, self.config, outputs_real_space=False
         )
         # Compute the image
         fourier_image = self.transfer_theory.propagate_object(  # noqa: E501
@@ -281,7 +281,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
 class ProjectionImageModel(AbstractImageModel, strict=True):
     """An simple image model for computing a projection."""
 
-    structure: AbstractStructureParameterisation
+    volume: AbstractVolumeParametrisation
     pose: AbstractPose
     integrator: AbstractDirectIntegrator
     config: AbstractImageConfig
@@ -292,7 +292,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
 
     def __init__(
         self,
-        structure: AbstractStructureParameterisation,
+        volume: AbstractVolumeParametrisation,
         pose: AbstractPose,
         config: AbstractImageConfig,
         integrator: AbstractDirectIntegrator,
@@ -303,10 +303,10 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
     ):
         """**Arguments:**
 
-        - `structure`:
-            The map to a biological structure.
+        - `volume`:
+            The map to a biological volume.
         - `pose`:
-            The pose of a structure.
+            The pose of a volume.
         - `config`:
             The configuration of the instrument, such as for the pixel size
             and the wavelength.
@@ -322,7 +322,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
             Must have shape equal to `AbstractImageConfig.shape`.
         """
         # Simulator components
-        self.structure = structure
+        self.volume = volume
         self.pose = pose
         self.config = config
         self.integrator = integrator
@@ -340,15 +340,15 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
     ) -> ImageArray | PaddedImageArray:
         # Get the volume
         if rng_key is None:
-            volume = self.structure.to_volume_parametrisation()
+            volume_rep = self.volume.to_volume_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            volume = self.structure.to_volume_parametrisation(this_key)
+            volume_rep = self.volume.to_volume_representation(this_key)
         # Rotate it to the lab frame
-        volume = volume.rotate_to_pose(self.pose)
+        volume_rep = volume_rep.rotate_to_pose(self.pose)
         # Compute the projection image
         fourier_image = self.integrator.integrate(
-            volume, self.config, outputs_real_space=False
+            volume_rep, self.config, outputs_real_space=False
         )
         # Now for the in-plane translation
         if self.applies_translation:

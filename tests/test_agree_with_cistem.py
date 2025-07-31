@@ -132,15 +132,15 @@ def test_compute_projection_with_cistem(
         real_voxel_grid, voxel_size = read_array_from_mrc(
             sample_mrc_path, loads_spacing=True
         )
-        structure = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
+        volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
         pose = cxs.EulerAnglePose(phi_angle=-phi, theta_angle=-theta, psi_angle=-psi)
         projection_method = cxs.FourierSliceExtraction()
-        box_size = structure.shape[0]
+        box_size = volume.shape[0]
         config = cxs.BasicImageConfig((box_size, box_size), voxel_size, 300.0)
         cryojax_projection = irfftn(
             (
                 projection_method.integrate(
-                    structure.rotate_to_pose(pose), config, outputs_real_space=False
+                    volume.rotate_to_pose(pose), config, outputs_real_space=False
                 )
                 / voxel_size
             )

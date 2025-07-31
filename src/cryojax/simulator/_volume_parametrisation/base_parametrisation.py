@@ -12,26 +12,26 @@ T = TypeVar("T")
 
 
 #
-# Core base class for parametrising a structure
+# Core base class for parametrising a volume
 #
-class AbstractStructureParameterisation(eqx.Module, strict=True):
-    """Abstract interface for a parametrisation of a protein structure."""
+class AbstractVolumeParametrisation(eqx.Module, strict=True):
+    """Abstract interface for a parametrisation of a volume."""
 
     @abc.abstractmethod
-    def to_volume_parametrisation(
+    def to_volume_representation(
         self, rng_key: Optional[PRNGKeyArray] = None
-    ) -> "AbstractVolumeParametrisation":
-        """Core interface for computing volumes from parametrisations
-        of structures.
+    ) -> "AbstractVolumeRepresentation":
+        """Core interface for computing the representation of
+        the volume
         """
         raise NotImplementedError
 
 
 #
-# Interfaces that give core properties to structures
+# Interfaces that give core properties to volumes
 #
-class AbstractVolumeParametrisation(AbstractStructureParameterisation, strict=True):
-    """Abstract interface for the volume parametrisation of a structure, such
+class AbstractVolumeRepresentation(AbstractVolumeParametrisation, strict=True):
+    """Abstract interface for the representation of a volume, such
     as atomic coordinates, voxels, or a neural network.
     """
 
@@ -41,7 +41,7 @@ class AbstractVolumeParametrisation(AbstractStructureParameterisation, strict=Tr
         raise NotImplementedError
 
     @override
-    def to_volume_parametrisation(self, rng_key: Optional[PRNGKeyArray] = None) -> Self:
+    def to_volume_representation(self, rng_key: Optional[PRNGKeyArray] = None) -> Self:
         """Since this class is itself an implementation of an
         `AbstractVolumeParametrisation`, this function maps to the identity.
 
@@ -54,8 +54,8 @@ class AbstractVolumeParametrisation(AbstractStructureParameterisation, strict=Tr
         return self
 
 
-class AbstractEnsembleParametrisation(AbstractStructureParameterisation, strict=True):
-    """Abstract interface for a structure with conformational
+class AbstractEnsembleParametrisation(AbstractVolumeParametrisation, strict=True):
+    """Abstract interface for a volume with conformational
     heterogeneity.
     """
 
@@ -64,9 +64,9 @@ class AbstractEnsembleParametrisation(AbstractStructureParameterisation, strict=
 
 
 class AbstractPotentialParametrisation(
-    AbstractStructureParameterisation, strict=eqx.StrictConfig(force_abstract=True)
+    AbstractVolumeParametrisation, strict=eqx.StrictConfig(force_abstract=True)
 ):
-    """Abstract interface for a structure's scattering potential.
+    """Abstract interface for a scattering potential.
 
     !!! info
         In, `cryojax`, potentials should be built in units of *inverse length squared*,

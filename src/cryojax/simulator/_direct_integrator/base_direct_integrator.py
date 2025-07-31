@@ -12,11 +12,11 @@ from jaxtyping import Array, Complex, Float
 from .._image_config import AbstractImageConfig
 
 
-VolumeT = TypeVar("VolumeT")
+VolumeRepT = TypeVar("VolumeRepT")
 VoxelVolumeT = TypeVar("VoxelVolumeT")
 
 
-class AbstractDirectIntegrator(eqx.Module, Generic[VolumeT], strict=True):
+class AbstractDirectIntegrator(eqx.Module, Generic[VolumeRepT], strict=True):
     """Base class for a method of integrating a volume onto
     the exit plane.
     """
@@ -26,7 +26,7 @@ class AbstractDirectIntegrator(eqx.Module, Generic[VolumeT], strict=True):
     @abstractmethod
     def integrate(
         self,
-        volume: VolumeT,
+        volume_representation: VolumeRepT,
         config: AbstractImageConfig,
         outputs_real_space: bool = False,
     ) -> (

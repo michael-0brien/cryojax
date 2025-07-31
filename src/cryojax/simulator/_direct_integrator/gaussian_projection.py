@@ -15,7 +15,7 @@ from ...ndimage import (
     rfftn,
 )
 from .._image_config import AbstractImageConfig
-from .._structure_parametrisation import (
+from .._volume_parametrisation import (
     GaussianMixtureVolume,
     PengIndependentAtomPotential as PengIndependentAtomPotential,
 )
@@ -78,7 +78,7 @@ class GaussianMixtureProjection(
     @override
     def integrate(
         self,
-        volume: GaussianMixtureVolume | PengIndependentAtomPotential,
+        volume_representation: GaussianMixtureVolume | PengIndependentAtomPotential,
         config: AbstractImageConfig,
         outputs_real_space: bool = False,
     ) -> (
@@ -92,7 +92,7 @@ class GaussianMixtureProjection(
 
         **Arguments:**
 
-        - `volume`: The volume representation to project.
+        - `volume_representation`: The volume representation to project.
         - `config`: The configuration of the imaging instrument.
 
         **Returns:**
@@ -115,18 +115,18 @@ class GaussianMixtureProjection(
         else:
             upsampled_pixel_size, upsampled_shape = pixel_size, shape
         # Grab the gaussian amplitudes and widths
-        if isinstance(volume, PengIndependentAtomPotential):
-            positions = volume.atom_positions
-            amplitudes = volume.amplitudes
-            b_factors = volume.b_factors
-        elif isinstance(volume, GaussianMixtureVolume):
-            positions = volume.positions
-            amplitudes = volume.amplitudes
-            b_factors = convert_variance_to_b_factor(volume.variances)
+        if isinstance(volume_representation, PengIndependentAtomPotential):
+            positions = volume_representation.atom_positions
+            amplitudes = volume_representation.amplitudes
+            b_factors = volume_representation.b_factors
+        elif isinstance(volume_representation, GaussianMixtureVolume):
+            positions = volume_representation.positions
+            amplitudes = volume_representation.amplitudes
+            b_factors = convert_variance_to_b_factor(volume_representation.variances)
         else:
             raise ValueError(
-                "Supported types for `volume` are `PengIndependentAtomPotential` "
-                "and `GaussianMixtureVolume`."
+                "Supported types for `volume_representation` are "
+                "`PengIndependentAtomPotential` and `GaussianMixtureVolume`."
             )
         # Compute the projection
         projection_integral = _gaussians_to_projection(

@@ -10,7 +10,7 @@ from .._common_functions import (
     apply_interaction_constant,
 )
 from .._image_config import AbstractImageConfig
-from .._structure_parametrisation import RealVoxelGridVolume
+from .._volume_parametrisation import RealVoxelGridVolume
 from .base_multislice_integrator import AbstractMultisliceIntegrator
 
 
@@ -43,7 +43,7 @@ class FFTMultisliceIntegrator(
     @override
     def integrate(
         self,
-        volume: RealVoxelGridVolume,
+        volume_representation: RealVoxelGridVolume,
         config: AbstractImageConfig,
         amplitude_contrast_ratio: Float[Array, ""] | float,
     ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim}"]:
@@ -52,8 +52,8 @@ class FFTMultisliceIntegrator(
 
         **Arguments:**
 
-        - `potential`:
-            The structure to integrate to the exit plane. This is
+        - `volume_representation`:
+            The volume to integrate to the exit plane. This is
             a real-valued voxel grid, which must be in physical units
             of a scattering potential. See rendering method
             `PengIndependentAtomPotential.to_real_voxel_grid` for an example.
@@ -65,11 +65,11 @@ class FFTMultisliceIntegrator(
         The wavefunction in the exit plane of the specimen.
         """  # noqa: E501
         # Interpolate volume to new pose at given coordinate system
-        z_dim, y_dim, x_dim = volume.real_voxel_grid.shape
+        z_dim, y_dim, x_dim = volume_representation.real_voxel_grid.shape
         voxel_size = config.pixel_size
         potential_voxel_grid = _interpolate_voxel_grid(
-            volume.real_voxel_grid,
-            volume.coordinate_grid_in_pixels,
+            volume_representation.real_voxel_grid,
+            volume_representation.coordinate_grid_in_pixels,
         )
         # Initialize multislice geometry
         n_slices = z_dim // self.slice_thickness_in_voxels

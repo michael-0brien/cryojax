@@ -51,11 +51,18 @@ from ._scattering_theory import (
     WeakPhaseScatteringTheory as WeakPhaseScatteringTheory,
 )
 from ._solvent import AbstractRandomSolvent as AbstractRandomSolvent
-from ._structure_parametrisation import (
+from ._transfer_theory import (
+    AberratedAstigmaticCTF as AberratedAstigmaticCTF,
+    AberratedAstigmaticCTF as CTF,  # noqa: F401
+    AbstractCTF as AbstractCTF,
+    AbstractTransferTheory as AbstractTransferTheory,
+    ContrastTransferTheory as ContrastTransferTheory,
+)
+from ._volume_parametrisation import (
     AbstractEnsembleParametrisation as AbstractEnsembleParametrisation,
     AbstractPotentialParametrisation as AbstractPotentialParametrisation,
-    AbstractStructureParameterisation as AbstractStructureParameterisation,
     AbstractVolumeParametrisation as AbstractVolumeParametrisation,
+    AbstractVolumeRepresentation as AbstractVolumeRepresentation,
     DiscreteStructuralEnsemble as DiscreteStructuralEnsemble,
     FourierVoxelGridVolume as FourierVoxelGridVolume,
     FourierVoxelSplineVolume as FourierVoxelSplineVolume,
@@ -63,11 +70,4 @@ from ._structure_parametrisation import (
     PengIndependentAtomPotential as PengIndependentAtomPotential,
     PengScatteringFactorParameters as PengScatteringFactorParameters,
     RealVoxelGridVolume as RealVoxelGridVolume,
-)
-from ._transfer_theory import (
-    AberratedAstigmaticCTF as AberratedAstigmaticCTF,
-    AberratedAstigmaticCTF as CTF,  # noqa: F401
-    AbstractCTF as AbstractCTF,
-    AbstractTransferTheory as AbstractTransferTheory,
-    ContrastTransferTheory as ContrastTransferTheory,
 )

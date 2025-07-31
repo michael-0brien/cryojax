@@ -1,5 +1,5 @@
 """
-Base representations of structures.
+Base representations of volumes.
 """
 
 import abc
@@ -12,13 +12,13 @@ from jaxtyping import Array, Float
 
 from ....internal import NDArrayLike
 from ..._pose import AbstractPose
-from ..base_parametrisation import AbstractVolumeParametrisation
+from ..base_parametrisation import AbstractVolumeRepresentation
 
 
 T = TypeVar("T")
 
 
-class AbstractPointCloudVolume(AbstractVolumeParametrisation, strict=True):
+class AbstractPointCloudVolume(AbstractVolumeRepresentation, strict=True):
     """Abstract interface for a volume represented as a point-cloud."""
 
     @abc.abstractmethod
@@ -26,8 +26,29 @@ class AbstractPointCloudVolume(AbstractVolumeParametrisation, strict=True):
         raise NotImplementedError
 
 
-class AbstractVoxelVolume(AbstractVolumeParametrisation, strict=True):
-    """Abstract interface for a volume represented with voxels."""
+class AbstractVoxelVolume(AbstractVolumeRepresentation, strict=True):
+    """Abstract interface for a volume represented with voxels.
+
+    !!! info
+
+        If you are using a `volume` in a voxel representation
+        pass, the voxel size *must* be passed as the
+        `pixel_size` argument, e.g.
+
+        ```python
+        import cryojax.simulator as cxs
+        from cryojax.io import read_array_from_mrc
+
+        real_voxel_grid, voxel_size = read_array_from_mrc("example.mrc")
+        volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
+        ...
+        config = cxs.BasicImageConfig(shape, pixel_size=voxel_size, ...)
+        ```
+
+        If this is not done, the resulting
+        image will be incorrect and *not* rescaled to the specified
+        to the different pixel size.
+    """
 
     @property
     @abc.abstractmethod
@@ -47,7 +68,7 @@ class AbstractVoxelVolume(AbstractVolumeParametrisation, strict=True):
 
 
 class AbstractIndependentAtomVolume(AbstractPointCloudVolume, strict=True):
-    """A molecular structure representation as independent atoms."""
+    """A molecular volume representation as independent atoms."""
 
     atom_positions: eqx.AbstractVar[Float[Array, "n_atoms 3"]]
 
