@@ -117,7 +117,7 @@ class AbstractGaussianDistribution(AbstractDistribution, strict=True):
         raise NotImplementedError
 
 
-class IndependentGaussianPixels(AbstractGaussianDistribution, strict=True):
+class GaussianPixelDistribution(AbstractGaussianDistribution, strict=True):
     r"""A gaussian noise model, where each pixel is independently drawn from
     a zero-mean gaussian of fixed variance (white noise).
 
@@ -247,8 +247,8 @@ class IndependentGaussianPixels(AbstractGaussianDistribution, strict=True):
         return log_likelihood
 
 
-class IndependentGaussianFourierModes(AbstractGaussianDistribution, strict=True):
-    r"""A gaussian noise model, where each fourier mode is independent.
+class GaussianFrequencyDistribution(AbstractGaussianDistribution, strict=True):
+    r"""A gaussian noise model, where each frequency is independent.
 
     This computes the likelihood in Fourier space,
     so that the variance to be an arbitrary noise power spectrum.

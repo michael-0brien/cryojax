@@ -43,8 +43,8 @@ def image_model(volume, basic_config):
 @pytest.mark.parametrize(
     "cls, model",
     [
-        (cxs.IndependentGaussianPixels, "image_model"),
-        (cxs.IndependentGaussianFourierModes, "image_model"),
+        (cxs.GaussianPixelDistribution, "image_model"),
+        (cxs.GaussianFrequencyDistribution, "image_model"),
     ],
 )
 def test_simulate_signal_from_gaussian_distributions(cls, model, request):
