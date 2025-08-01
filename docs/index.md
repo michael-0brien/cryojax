@@ -125,10 +125,10 @@ from cryojax.jax_util import get_filter_spec
 # Vectorize model instantiation
 @eqx.filter_jit
 @eqx.filter_vmap(in_axes=(0, None, None, None), out_axes=(eqx.if_array(0), None))
-def make_image_model_vmap(wxyz, potential, config, transfer_theory):
+def make_image_model_vmap(wxyz, volume, image_config, transfer_theory):
     pose = cxs.QuaternionPose(wxyz=wxyz)
     image_model = cxs.make_image_model(
-        potential, config, pose, transfer_theory, normalizes_signal=True
+        volume, image_config, pose, transfer_theory, normalizes_signal=True
     )
     where_pose = lambda model: model.pose
     filter_spec = get_filter_spec(image_model, where_pose)
@@ -146,7 +146,7 @@ def simulate_fn_vmap(model_vmap, model_novmap):
 
 # Simulate batch of images
 wxyz = ...  # ... load quaternions
-model_vmap, model_novmap = make_image_model_vmap(wxyz, potential, config, transfer_theory)
+model_vmap, model_novmap = make_image_model_vmap(wxyz, volume, image_config, transfer_theory)
 images = simulate_fn_vmap(model_vmap, model_novmap)
 ```
 
