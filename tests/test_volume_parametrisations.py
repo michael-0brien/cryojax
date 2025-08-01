@@ -40,4 +40,4 @@ def test_conformation(volume, request):
     volume = request.getfixturevalue(volume)
     conformational_space = tuple([volume for _ in range(3)])
     volume = DiscreteStructuralEnsemble(conformational_space, conformation=0)
-    _ = volume.compute_volume_representation()
+    _ = volume.compute_representation()

@@ -20,7 +20,6 @@ with install_import_hook("cryojax", "typeguard.typechecked"):
         RealVoxelGridVolume,
     )
 
-
 config.update("jax_enable_x64", True)
 
 
@@ -71,14 +70,14 @@ def test_atom_integrator_shape(sample_pdb_path, shape):
 
     integrator = GaussianMixtureProjection(upsampling_factor=2)
     # # ... and the configuration of the imaging instrument
-    config = BasicImageConfig(
+    image_config = BasicImageConfig(
         shape=shape,
         pixel_size=pixel_size,
         voltage_in_kilovolts=300.0,
     )
     # ... compute the integrated volumetric_potential
     fourier_integrated_potential = integrator.integrate(
-        atom_potential, config, outputs_real_space=False
+        atom_potential, image_config, outputs_real_space=False
     )
 
     assert fourier_integrated_potential.shape == (shape[0], shape[1] // 2 + 1)
@@ -212,14 +211,14 @@ def test_downsampled_gmm_potential_agreement(sample_pdb_path):
     )
     integrator_int_lowres = GaussianMixtureProjection(upsampling_factor=1)
     # ... and the configuration of the imaging instrument
-    config = BasicImageConfig(
+    image_config = BasicImageConfig(
         shape=downsampled_shape,
         pixel_size=downsampled_pixel_size,
         voltage_in_kilovolts=300.0,
     )
     # ... compute the integrated volumetric_potential
-    image_from_hires = integrator_int_hires.integrate(atom_potential, config)
-    image_lowres = integrator_int_lowres.integrate(atom_potential, config)
+    image_from_hires = integrator_int_hires.integrate(atom_potential, image_config)
+    image_lowres = integrator_int_lowres.integrate(atom_potential, image_config)
 
     assert image_from_hires.shape == image_lowres.shape
 
@@ -252,7 +251,7 @@ def test_peng_vs_gmm_agreement(sample_pdb_path):
     # Create instrument configuration
     shape = (64, 64)
     pixel_size = 0.5
-    config = BasicImageConfig(
+    image_config = BasicImageConfig(
         shape=shape,
         pixel_size=pixel_size,
         voltage_in_kilovolts=300.0,
@@ -260,8 +259,8 @@ def test_peng_vs_gmm_agreement(sample_pdb_path):
 
     # Compute projections
     integrator = GaussianMixtureProjection(upsampling_factor=1)
-    projection_gmm = integrator.integrate(gmm_potential, config)
-    projection_peng = integrator.integrate(atom_potential, config)
+    projection_gmm = integrator.integrate(gmm_potential, image_config)
+    projection_peng = integrator.integrate(atom_potential, image_config)
 
     np.testing.assert_allclose(projection_gmm, projection_peng)
 
@@ -341,7 +340,7 @@ class TestIntegrateGMMToPixels:
         atomic_potential = GaussianMixtureVolume(
             atom_positions, ff_a, ff_b / (8.0 * jnp.pi**2)
         )
-        config = BasicImageConfig(
+        image_config = BasicImageConfig(
             shape=n_pixels_per_side,
             pixel_size=voxel_size,
             voltage_in_kilovolts=300.0,
@@ -349,7 +348,7 @@ class TestIntegrateGMMToPixels:
         # Build the potential integrators
         integrator = GaussianMixtureProjection()
         # Compute projections
-        projection = integrator.integrate(atomic_potential, config)
+        projection = integrator.integrate(atomic_potential, image_config)
         projection = irfftn(projection)
 
         # Find the maximum
@@ -376,7 +375,7 @@ class TestIntegrateGMMToPixels:
         atomic_potential = GaussianMixtureVolume(
             atom_positions, ff_a, ff_b / (8.0 * jnp.pi**2)
         )
-        config = BasicImageConfig(
+        image_config = BasicImageConfig(
             shape=n_pixels_per_side,
             pixel_size=voxel_size,
             voltage_in_kilovolts=300.0,
@@ -384,7 +383,7 @@ class TestIntegrateGMMToPixels:
         # Build the potential integrators
         integrator = GaussianMixtureProjection()
         # Compute projections
-        projection = integrator.integrate(atomic_potential, config)
+        projection = integrator.integrate(atomic_potential, image_config)
         projection = irfftn(projection)
 
         integral = jnp.sum(projection) * voxel_size**2

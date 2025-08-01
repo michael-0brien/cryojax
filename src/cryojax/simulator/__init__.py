@@ -11,13 +11,6 @@ from ._detector import (
     NullDQE as NullDQE,
     PoissonDetector as PoissonDetector,
 )
-from ._direct_integrator import (
-    AbstractDirectIntegrator as AbstractDirectIntegrator,
-    AbstractDirectVoxelIntegrator as AbstractDirectVoxelIntegrator,
-    FourierSliceExtraction as FourierSliceExtraction,
-    GaussianMixtureProjection as GaussianMixtureProjection,
-    NufftProjection as NufftProjection,
-)
 from ._distributions import (
     AbstractDistribution as AbstractDistribution,
     AbstractGaussianDistribution as AbstractGaussianDistribution,
@@ -57,6 +50,13 @@ from ._transfer_theory import (
     AbstractCTF as AbstractCTF,
     AbstractTransferTheory as AbstractTransferTheory,
     ContrastTransferTheory as ContrastTransferTheory,
+)
+from ._volume_integrator import (
+    AbstractDirectIntegrator as AbstractDirectIntegrator,
+    AbstractDirectVoxelIntegrator as AbstractDirectVoxelIntegrator,
+    FourierSliceExtraction as FourierSliceExtraction,
+    GaussianMixtureProjection as GaussianMixtureProjection,
+    NufftProjection as NufftProjection,
 )
 from ._volume_parametrisation import (
     AbstractEnsembleParametrisation as AbstractEnsembleParametrisation,

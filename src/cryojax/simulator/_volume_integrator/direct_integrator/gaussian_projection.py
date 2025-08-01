@@ -7,15 +7,15 @@ import jax.numpy as jnp
 import jax.scipy as jsp
 from jaxtyping import Array, Complex, Float
 
-from ...constants import convert_variance_to_b_factor
-from ...coordinates import make_1d_coordinate_grid
-from ...ndimage import (
+from ....constants import convert_variance_to_b_factor
+from ....coordinates import make_1d_coordinate_grid
+from ....ndimage import (
     downsample_to_shape_with_fourier_cropping,
     resize_with_crop_or_pad,
     rfftn,
 )
-from .._image_config import AbstractImageConfig
-from .._volume_parametrisation import (
+from ..._image_config import AbstractImageConfig
+from ..._volume_parametrisation import (
     GaussianMixtureVolume,
     PengIndependentAtomPotential as PengIndependentAtomPotential,
 )
@@ -79,21 +79,21 @@ class GaussianMixtureProjection(
     def integrate(
         self,
         volume_representation: GaussianMixtureVolume | PengIndependentAtomPotential,
-        config: AbstractImageConfig,
+        image_config: AbstractImageConfig,
         outputs_real_space: bool = False,
     ) -> (
         Complex[
             Array,
-            "{config.padded_y_dim} {config.padded_x_dim//2+1}",
+            "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}",
         ]
-        | Float[Array, "{config.padded_y_dim} {config.padded_x_dim}"]
+        | Float[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
     ):
         """Compute a projection from gaussians.
 
         **Arguments:**
 
         - `volume_representation`: The volume representation to project.
-        - `config`: The configuration of the imaging instrument.
+        - `image_config`: The configuration of the imaging instrument.
 
         **Returns:**
 
@@ -101,8 +101,8 @@ class GaussianMixtureProjection(
         `AbstractImageConfig.padded_shape`.
         """  # noqa: E501
         # Grab the image configuration
-        shape = config.padded_shape if self.shape is None else self.shape
-        pixel_size = config.pixel_size
+        shape = image_config.padded_shape if self.shape is None else self.shape
+        pixel_size = image_config.pixel_size
         if self.upsampling_factor is not None:
             u = self.upsampling_factor
             upsampled_pixel_size, upsampled_shape = (
@@ -155,7 +155,7 @@ class GaussianMixtureProjection(
                     outputs_real_space=True,
                 )
                 projection_integral = resize_with_crop_or_pad(
-                    projection_integral, config.padded_shape
+                    projection_integral, image_config.padded_shape
                 )
                 return (
                     projection_integral
@@ -171,7 +171,7 @@ class GaussianMixtureProjection(
                 )
             else:
                 projection_integral = resize_with_crop_or_pad(
-                    projection_integral, config.padded_shape
+                    projection_integral, image_config.padded_shape
                 )
                 return (
                     projection_integral

@@ -76,7 +76,7 @@ def simulate_particle_stack(
         # `constant_args` do not change between images. For
         # example, include the method of taking projections
         potential_integrator, ... = constant_args
-        # Using the pose, CTF, and config from the
+        # Using the pose, CTF, and image config from the
         # `parameters`, build image simulation model
         image_model = cxs.ContrastImageModel(...)
         # ... and compute
@@ -251,7 +251,7 @@ def _configure_simulation_fn(
     if batch_size is None:
 
         def compute_image_stack_fn(parameters, constant_args, per_particle_args):  # type: ignore
-            shape = parameters["config"].shape
+            shape = parameters["image_config"].shape
             image_stack = np.empty((images_per_file, *shape))
             for i in range(images_per_file):
                 parameters_at_i = _index_pytree(i, parameters)

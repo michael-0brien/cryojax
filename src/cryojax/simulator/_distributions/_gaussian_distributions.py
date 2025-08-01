@@ -21,11 +21,11 @@ from ._base_distribution import AbstractDistribution
 
 RealImageArray = Float[
     Array,
-    "{self.image_model.config.y_dim} {self.image_model.config.x_dim}",  # noqa: E501
+    "{self.image_model.image_config.y_dim} {self.image_model.image_config.x_dim}",  # noqa: E501
 ]
 FourierImageArray = Complex[
     Array,
-    "{self.image_model.config.y_dim} {self.image_model.config.x_dim//2+1}",  # noqa: E501
+    "{self.image_model.image_config.y_dim} {self.image_model.image_config.x_dim//2+1}",  # noqa: E501
 ]
 ImageArray = RealImageArray | FourierImageArray
 
@@ -177,13 +177,13 @@ class UncorrelatedGaussianDistribution(AbstractGaussianDistribution, strict=True
         - `filter`:
             A filter to apply to the final image.
         """
-        pipeline = self.image_model
-        n_pixels = pipeline.config.padded_n_pixels
-        freqs = pipeline.config.padded_frequency_grid_in_angstroms
+        image_model = self.image_model
+        n_pixels = image_model.image_config.padded_n_pixels
+        freqs = image_model.image_config.padded_frequency_grid_in_angstroms
         # Compute the zero mean variance and scale up to be independent of the number of
         # pixels
         std = jnp.sqrt(n_pixels * self.variance)
-        noise = pipeline.postprocess(
+        noise = image_model.postprocess(
             std
             * jr.normal(rng_key, shape=freqs.shape[0:-1])
             .at[0, 0]
@@ -201,7 +201,8 @@ class UncorrelatedGaussianDistribution(AbstractGaussianDistribution, strict=True
         self,
         observed: Float[
             Array,
-            "{self.image_model.config.y_dim} " "{self.image_model.config.x_dim}",
+            "{self.image_model.image_config.y_dim} "
+            "{self.image_model.image_config.x_dim}",
         ],
         *,
         mask: Optional[MaskLike] = None,
@@ -305,13 +306,13 @@ class CorrelatedGaussianDistribution(AbstractGaussianDistribution, strict=True):
         - `filter`:
             A filter to apply to the final image.
         """
-        pipeline = self.image_model
-        n_pixels = pipeline.config.padded_n_pixels
-        freqs = pipeline.config.padded_frequency_grid_in_angstroms
+        image_model = self.image_model
+        n_pixels = image_model.image_config.padded_n_pixels
+        freqs = image_model.image_config.padded_frequency_grid_in_angstroms
         # Compute the zero mean variance and scale up to be independent of the number of
         # pixels
         std = jnp.sqrt(n_pixels * self.variance_function(freqs))
-        noise = pipeline.postprocess(
+        noise = image_model.postprocess(
             std
             * jr.normal(rng_key, shape=freqs.shape[0:-1])
             .at[0, 0]
@@ -329,7 +330,8 @@ class CorrelatedGaussianDistribution(AbstractGaussianDistribution, strict=True):
         self,
         observed: Complex[
             Array,
-            "{self.image_model.config.y_dim} " "{self.image_model.config.x_dim//2+1}",
+            "{self.image_model.image_config.y_dim} "
+            "{self.image_model.image_config.x_dim//2+1}",
         ],
         *,
         mask: Optional[MaskLike] = None,
@@ -354,9 +356,9 @@ class CorrelatedGaussianDistribution(AbstractGaussianDistribution, strict=True):
         - `filter`:
             A filter to apply to the final image.
         """
-        pipeline = self.image_model
-        n_pixels = pipeline.config.n_pixels
-        freqs = pipeline.config.frequency_grid_in_angstroms
+        config = self.image_model.image_config
+        n_pixels = config.n_pixels
+        freqs = config.frequency_grid_in_angstroms
         # Compute the variance and scale up to be independent of the number of pixels
         variance = n_pixels * self.variance_function(freqs)
         # Create simulated data

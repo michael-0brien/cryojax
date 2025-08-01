@@ -33,7 +33,7 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
     at the same orientation.
     """
     # Objects for imaging
-    config = cxs.BasicImageConfig(
+    image_config = cxs.BasicImageConfig(
         shape,
         pixel_size,
         voltage_in_kilovolts=300.0,
@@ -70,13 +70,13 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
     ]
 
     projection_by_gaussian_integration = compute_projection(
-        base_volume, base_method, config
+        base_volume, base_method, image_config
     )
     for volume, projection_method in zip(other_volumes, other_projection_methods):
         if isinstance(projection_method, cxs.NufftProjection):
             try:
                 projection_by_other_method = compute_projection(
-                    volume, projection_method, config
+                    volume, projection_method, image_config
                 )
             except Exception as err:
                 warnings.warn(
@@ -87,7 +87,7 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
                 continue
         else:
             projection_by_other_method = compute_projection(
-                volume, projection_method, config
+                volume, projection_method, image_config
             )
         np.testing.assert_allclose(
             projection_by_gaussian_integration, projection_by_other_method, atol=1e-12
@@ -189,15 +189,17 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
 def compute_projection(
     volume: cxs.AbstractVolumeRepresentation,
     integrator: cxs.AbstractDirectIntegrator,
-    config: cxs.BasicImageConfig,
+    image_config: cxs.BasicImageConfig,
 ) -> Array:
-    fourier_projection = integrator.integrate(volume, config, outputs_real_space=False)
+    fourier_projection = integrator.integrate(
+        volume, image_config, outputs_real_space=False
+    )
     return crop_to_shape(
         irfftn(
             fourier_projection,
-            s=config.padded_shape,
+            s=image_config.padded_shape,
         ),
-        config.shape,
+        image_config.shape,
     )
 
 
@@ -206,25 +208,25 @@ def compute_projection_at_pose(
     volume: cxs.AbstractVolumeRepresentation,
     integrator: cxs.AbstractDirectIntegrator,
     pose: cxs.AbstractPose,
-    config: cxs.BasicImageConfig,
+    image_config: cxs.BasicImageConfig,
 ) -> Array:
     rotated_volume = volume.rotate_to_pose(pose)
     fourier_projection = integrator.integrate(
-        rotated_volume, config, outputs_real_space=False
+        rotated_volume, image_config, outputs_real_space=False
     )
     translation_operator = pose.compute_translation_operator(
-        config.padded_frequency_grid_in_angstroms
+        image_config.padded_frequency_grid_in_angstroms
     )
     return crop_to_shape(
         irfftn(
             pose.translate_image(
                 fourier_projection,
                 translation_operator,
-                config.padded_shape,
+                image_config.padded_shape,
             ),
-            s=config.padded_shape,
+            s=image_config.padded_shape,
         ),
-        config.shape,
+        image_config.shape,
     )
 
 

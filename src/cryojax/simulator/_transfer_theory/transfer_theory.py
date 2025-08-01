@@ -57,18 +57,18 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
         object_spectrum: (
             Complex[
                 Array,
-                "{config.padded_y_dim} {config.padded_x_dim//2+1}",
+                "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}",
             ]
             | Complex[
                 Array,
-                "{config.padded_y_dim} {config.padded_x_dim}",
+                "{image_config.padded_y_dim} {image_config.padded_x_dim}",
             ]
         ),
-        config: AbstractImageConfig,
+        image_config: AbstractImageConfig,
         *,
         defocus_offset: Optional[Float[Array, ""] | float] = None,
         is_projection_approximation: bool = True,
-    ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim//2+1}"]:
+    ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         """Apply the CTF directly to the phase shifts in the exit plane.
 
         **Arguments:**
@@ -76,7 +76,7 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
         - `object_spectrum`:
             The fourier spectrum of the scatterer phase shifts in a plane directly
             below it.
-        - `config`:
+        - `image_config`:
             The configuration of the resulting image.
         - `is_projection_approximation`:
             If `True`, the `object_spectrum_in_exit_plane` is a projection
@@ -88,12 +88,12 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
             An optional defocus offset to apply to the CTF defocus at
             runtime.
         """
-        frequency_grid = config.padded_frequency_grid_in_angstroms
+        frequency_grid = image_config.padded_frequency_grid_in_angstroms
         if is_projection_approximation:
             # Compute the CTF, including additional phase shifts
             ctf_array = self.ctf(
                 frequency_grid,
-                voltage_in_kilovolts=config.voltage_in_kilovolts,
+                voltage_in_kilovolts=image_config.voltage_in_kilovolts,
                 phase_shift=self.phase_shift,
                 amplitude_contrast_ratio=self.amplitude_contrast_ratio,
                 outputs_exp=False,
@@ -107,14 +107,14 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
             # the surface of the ewald sphere
             aberration_phase_shifts = self.ctf.compute_aberration_phase_shifts(
                 frequency_grid,
-                voltage_in_kilovolts=config.voltage_in_kilovolts,
+                voltage_in_kilovolts=image_config.voltage_in_kilovolts,
                 defocus_offset=defocus_offset,
             ) - jnp.deg2rad(self.phase_shift)
             contrast_spectrum = _compute_contrast_from_ewald_sphere(
                 object_spectrum,
                 aberration_phase_shifts,
                 self.amplitude_contrast_ratio,
-                config,
+                image_config,
             )
         if self.envelope is not None:
             contrast_spectrum *= self.envelope(frequency_grid)
@@ -142,18 +142,18 @@ class WaveTransferTheory(AbstractTransferTheory, strict=True):
         self,
         wavefunction_spectrum: Complex[
             Array,
-            "{config.padded_y_dim} {config.padded_x_dim}",
+            "{image_config.padded_y_dim} {image_config.padded_x_dim}",
         ],
-        config: AbstractImageConfig,
+        image_config: AbstractImageConfig,
         *,
         defocus_offset: Optional[Float[Array, ""] | float] = None,
-    ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim}"]:
+    ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]:
         """Apply the wave transfer function to the wavefunction in the exit plane."""
-        frequency_grid = config.padded_full_frequency_grid_in_angstroms
+        frequency_grid = image_config.padded_full_frequency_grid_in_angstroms
         # Compute the wave transfer function
         ctf_array = self.ctf(
             frequency_grid,
-            voltage_in_kilovolts=config.voltage_in_kilovolts,
+            voltage_in_kilovolts=image_config.voltage_in_kilovolts,
             outputs_exp=True,
             defocus_offset=defocus_offset,
         )
@@ -168,13 +168,13 @@ def _compute_contrast_from_ewald_sphere(
     object_spectrum,
     aberration_phase_shifts,
     amplitude_contrast_ratio,
-    config,
+    image_config,
 ):
     cos, sin = jnp.cos(aberration_phase_shifts), jnp.sin(aberration_phase_shifts)
     ac = amplitude_contrast_ratio
     # Compute the contrast, breaking the computation into positive and
     # negative frequencies
-    y_dim, x_dim = config.padded_y_dim, config.padded_x_dim
+    y_dim, x_dim = image_config.padded_y_dim, image_config.padded_x_dim
     # ... first handle the grid of frequencies
     pos_object_yx = object_spectrum[1:, 1 : x_dim // 2 + x_dim % 2]
     neg_object_yx = jnp.flip(

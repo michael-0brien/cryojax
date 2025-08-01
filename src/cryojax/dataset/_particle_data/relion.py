@@ -81,7 +81,7 @@ RELION_SUPPORTED_PARTICLE_ENTRIES = [
 class ParticleParameterInfo(TypedDict):
     """Parameters for a particle stack from RELION."""
 
-    config: BasicImageConfig
+    image_config: BasicImageConfig
     pose: EulerAnglePose
     transfer_theory: ContrastTransferTheory
 
@@ -309,7 +309,7 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
             particle_data_at_index, optics_data
         )
         # Load the image stack and STAR file parameters
-        config, transfer_theory, pose = _make_pytrees_from_starfile(
+        image_config, transfer_theory, pose = _make_pytrees_from_starfile(
             particle_data_at_index,
             optics_group,
             self.broadcasts_optics_group,
@@ -334,7 +334,7 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
             pose = _invert_rotation(pose)
 
         return ParticleParameterInfo(
-            config=config,
+            image_config=image_config,
             pose=pose,
             transfer_theory=transfer_theory,
             metadata=metadata,
@@ -661,7 +661,7 @@ class RelionParticleStackDataset(
                 "but no entry found for 'rlnImageName'."
             )
         # ... then, load stack of images
-        shape = parameters["config"].shape
+        shape = parameters["image_config"].shape
         images = _load_image_stack_from_mrc(
             shape, particle_dataframe_at_index, self.path_to_relion_project
         )
@@ -751,8 +751,8 @@ class RelionParticleStackDataset(
             )
         else:
             pixel_size, dim = (
-                float(np.atleast_1d(parameters["config"].pixel_size)[0]),
-                parameters["config"].shape[0],
+                float(np.atleast_1d(parameters["image_config"].pixel_size)[0]),
+                parameters["image_config"].shape[0],
             )
         if not (images.ndim in [2, 3] and images.shape[-2:] == (dim, dim)):
             raise ValueError(
@@ -975,7 +975,7 @@ def _make_pytrees_from_starfile(
     # ... create cryojax objects. First, the BasicImageConfig
     image_shape = (image_size, image_size)
     batch_dim = 0 if defocus_in_angstroms.ndim == 0 else defocus_in_angstroms.shape[0]
-    config = _make_config(
+    image_config = _make_config(
         image_shape,
         pixel_size,
         voltage_in_kilovolts,
@@ -1100,7 +1100,7 @@ def _make_pytrees_from_starfile(
         ),
     )
 
-    return config, transfer_theory, pose
+    return image_config, transfer_theory, pose
 
 
 def _make_config(
@@ -1352,18 +1352,18 @@ def _unpack_particle_stack_dict(
 #
 def _validate_parameters(parameters: ParticleParameterLike, force_keys: bool = False):
     if force_keys:
-        if not {"config", "transfer_theory", "pose"}.issubset(parameters):
+        if not {"image_config", "transfer_theory", "pose"}.issubset(parameters):
             raise ValueError(
                 "When passing dictionary `foo` as `parameter_file.append(foo)` "
-                "`foo` must have keys 'pose', 'transfer_theory', and 'config'."
+                "`foo` must have keys 'pose', 'transfer_theory', and 'image_config'."
             )
-    if "config" in parameters:
-        if not isinstance(parameters["config"], BasicImageConfig):
+    if "image_config" in parameters:
+        if not isinstance(parameters["image_config"], BasicImageConfig):
             raise TypeError(
-                "Found that dict key 'config' was "
+                "Found that dict key 'image_config' was "
                 "not type `cryojax.simulator.BasicImageConfig`. "
                 f"Instead, it was type "
-                f"{type(parameters['config']).__name__}."
+                f"{type(parameters['image_config']).__name__}."
             )
     if "transfer_theory" in parameters:
         if not isinstance(parameters["transfer_theory"], ContrastTransferTheory):
@@ -1386,18 +1386,18 @@ def _validate_parameters(parameters: ParticleParameterLike, force_keys: bool = F
 def _parameters_to_optics_data(
     parameters: ParticleParameterLike, optics_group_index: int
 ) -> pd.DataFrame:
-    if {"config", "transfer_theory"}.issubset(parameters):
-        shape = parameters["config"].shape
+    if {"image_config", "transfer_theory"}.issubset(parameters):
+        shape = parameters["image_config"].shape
         if shape[0] == shape[1]:
             dim = shape[0]
         else:
             raise ValueError(
                 "When adding optics group to STAR file, found "
-                "non-square shape in `config.shape`. Only "
+                "non-square shape in `image_config.shape`. Only "
                 "square shapes are supported."
             )
-        pixel_size = parameters["config"].pixel_size
-        voltage_in_kilovolts = parameters["config"].voltage_in_kilovolts
+        pixel_size = parameters["image_config"].pixel_size
+        voltage_in_kilovolts = parameters["image_config"].voltage_in_kilovolts
         amplitude_contrast_ratio = parameters["transfer_theory"].amplitude_contrast_ratio
         if isinstance(parameters["transfer_theory"].ctf, AberratedAstigmaticCTF):
             spherical_aberration_in_mm = getattr(
@@ -1439,7 +1439,7 @@ def _parameters_to_optics_data(
     else:
         raise ValueError(
             "Tried to add optics group to the STAR file, but "
-            "parameter dictionary did not include 'config' "
+            "parameter dictionary did not include 'image_config' "
             "and 'transfer_theory' keys. If you are setting parameters "
             "`parameter_file[index] = dict(pose=pose)` make sure "
             "`parameter_file.updates_optics_group = False`."

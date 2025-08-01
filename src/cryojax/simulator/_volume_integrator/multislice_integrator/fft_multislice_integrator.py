@@ -4,13 +4,13 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
-from ...ndimage import fftn, ifftn, map_coordinates
-from .._common_functions import (
+from ....ndimage import fftn, ifftn, map_coordinates
+from ..._common_functions import (
     apply_amplitude_contrast_ratio,
     apply_interaction_constant,
 )
-from .._image_config import AbstractImageConfig
-from .._volume_parametrisation import RealVoxelGridVolume
+from ..._image_config import AbstractImageConfig
+from ..._volume_parametrisation import RealVoxelGridVolume
 from .base_multislice_integrator import AbstractMultisliceIntegrator
 
 
@@ -44,9 +44,9 @@ class FFTMultisliceIntegrator(
     def integrate(
         self,
         volume_representation: RealVoxelGridVolume,
-        config: AbstractImageConfig,
+        image_config: AbstractImageConfig,
         amplitude_contrast_ratio: Float[Array, ""] | float,
-    ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim}"]:
+    ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]:
         """Compute the exit wave from an atomic potential using the multislice
         method.
 
@@ -57,7 +57,7 @@ class FFTMultisliceIntegrator(
             a real-valued voxel grid, which must be in physical units
             of a scattering potential. See rendering method
             `PengIndependentAtomPotential.to_real_voxel_grid` for an example.
-        - `config`:
+        - `image_config`:
             The configuration of the imaging instrument.
 
         **Returns:**
@@ -66,7 +66,7 @@ class FFTMultisliceIntegrator(
         """  # noqa: E501
         # Interpolate volume to new pose at given coordinate system
         z_dim, y_dim, x_dim = volume_representation.real_voxel_grid.shape
-        voxel_size = config.pixel_size
+        voxel_size = image_config.pixel_size
         potential_voxel_grid = _interpolate_voxel_grid(
             volume_representation.real_voxel_grid,
             volume_representation.coordinate_grid_in_pixels,
@@ -100,20 +100,20 @@ class FFTMultisliceIntegrator(
         # the slice thickness (TODO: interpolate for different slice thicknesses?)
         compute_object_fn = lambda pot: apply_interaction_constant(
             apply_amplitude_contrast_ratio(voxel_size * pot, amplitude_contrast_ratio),
-            config.wavelength_in_angstroms,
+            image_config.wavelength_in_angstroms,
         )
         object_per_slice = jax.vmap(compute_object_fn)(potential_per_slice)
         # Compute the transmission function
         transmission = jnp.exp(1.0j * object_per_slice)
         # Compute the fresnel propagator (TODO: check numerical factors)
         radial_frequency_grid = jnp.sum(
-            config.padded_full_frequency_grid_in_angstroms**2,
+            image_config.padded_full_frequency_grid_in_angstroms**2,
             axis=-1,
         )
         fresnel_propagator = jnp.exp(
             1.0j
             * jnp.pi
-            * config.wavelength_in_angstroms
+            * image_config.wavelength_in_angstroms
             * radial_frequency_grid
             * slice_thickness
         )
@@ -126,8 +126,8 @@ class FFTMultisliceIntegrator(
         # Compute exit wave
         exit_wave = jax.lax.fori_loop(0, n_slices, make_step, plane_wave)
         # Resize the image to match the AbstractImageConfig.padded_shape
-        if config.padded_shape != exit_wave.shape:
-            exit_wave = config.crop_or_pad_to_padded_shape(
+        if image_config.padded_shape != exit_wave.shape:
+            exit_wave = image_config.crop_or_pad_to_padded_shape(
                 exit_wave, constant_values=1.0 + 0.0j
             )
 

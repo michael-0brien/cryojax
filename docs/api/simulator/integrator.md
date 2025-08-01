@@ -1,4 +1,4 @@
-# Structure integration methods
+# Volume integration methods
 
 `cryojax` provides different methods for integrating [volumes](./volume.md#volume-representations) onto a plane to generate an image.
 

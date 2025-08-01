@@ -9,7 +9,7 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
-from ...ndimage import (
+from ....ndimage import (
     convert_fftn_to_rfftn,
     fftn,
     ifftn,
@@ -18,9 +18,9 @@ from ...ndimage import (
     map_coordinates_spline,
     rfftn,
 )
-from ...ndimage.transforms import InverseSincMask
-from .._image_config import AbstractImageConfig
-from .._volume_parametrisation import FourierVoxelGridVolume, FourierVoxelSplineVolume
+from ....ndimage.transforms import InverseSincMask
+from ..._image_config import AbstractImageConfig
+from ..._volume_parametrisation import FourierVoxelGridVolume, FourierVoxelSplineVolume
 from .base_direct_integrator import AbstractDirectVoxelIntegrator
 
 
@@ -82,14 +82,14 @@ class FourierSliceExtraction(AbstractFourierSurfaceExtraction, strict=True):
     def integrate(
         self,
         volume_representation: FourierVoxelGridVolume | FourierVoxelSplineVolume,
-        config: AbstractImageConfig,
+        image_config: AbstractImageConfig,
         outputs_real_space: bool = False,
     ) -> (
         Complex[
             Array,
-            "{config.padded_y_dim} {config.padded_x_dim//2+1}",
+            "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}",
         ]
-        | Float[Array, "{config.padded_y_dim} {config.padded_x_dim}"]
+        | Float[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
     ):
         """Integrate the volume at the `AbstractImageConfig` settings
         of a voxel-based representation in fourier-space,
@@ -98,12 +98,12 @@ class FourierSliceExtraction(AbstractFourierSurfaceExtraction, strict=True):
         **Arguments:**
 
         - `volume_representation`: The volume representation.
-        - `config`: The configuration of the resulting image.
+        - `image_config`: The configuration of the resulting image.
 
         **Returns:**
 
         The extracted fourier voxels of the `volume_representation`,
-        at the `config.padded_shape` and the `config.pixel_size`.
+        at the `image_config.padded_shape` and the `image_config.pixel_size`.
         """
         frequency_slice = volume_representation.frequency_slice_in_pixels
         N = frequency_slice.shape[1]
@@ -129,15 +129,17 @@ class FourierSliceExtraction(AbstractFourierSurfaceExtraction, strict=True):
             )
 
         # Resize the image to match the AbstractImageConfig.padded_shape
-        if config.padded_shape != (N, N):
+        if image_config.padded_shape != (N, N):
             fourier_projection = rfftn(
-                config.crop_or_pad_to_padded_shape(irfftn(fourier_projection, s=(N, N)))
+                image_config.crop_or_pad_to_padded_shape(
+                    irfftn(fourier_projection, s=(N, N))
+                )
             )
         # Scale by voxel size to convert from projection to integral
         if self.outputs_integral:
-            fourier_projection *= config.pixel_size
+            fourier_projection *= image_config.pixel_size
         return (
-            irfftn(fourier_projection, s=config.padded_shape)
+            irfftn(fourier_projection, s=image_config.padded_shape)
             if outputs_real_space
             else fourier_projection
         )
@@ -270,11 +272,11 @@ class EwaldSphereExtraction(AbstractFourierSurfaceExtraction, strict=True):
     def integrate(
         self,
         volume_representation: FourierVoxelGridVolume | FourierVoxelSplineVolume,
-        config: AbstractImageConfig,
+        image_config: AbstractImageConfig,
         outputs_real_space: bool = False,
     ) -> (
-        Complex[Array, "{config.padded_y_dim} {config.padded_x_dim}"]
-        | Float[Array, "{config.padded_y_dim} {config.padded_x_dim}"]
+        Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
+        | Float[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
     ):
         """Integrate the volume at the `AbstractImageConfig` settings
         of a voxel-based representation in fourier-space, using fourier
@@ -283,12 +285,12 @@ class EwaldSphereExtraction(AbstractFourierSurfaceExtraction, strict=True):
         **Arguments:**
 
         - `volume_representation`: The volume representation.
-        - `config`: The configuration of the resulting image.
+        - `image_config`: The configuration of the resulting image.
 
         **Returns:**
 
         The extracted fourier voxels of the `volume_representation`, at the
-        `config.padded_shape` and the `config.pixel_size`.
+        `image_config.padded_shape` and the `image_config.pixel_size`.
         """
         frequency_slice = volume_representation.frequency_slice_in_pixels
         N = frequency_slice.shape[1]
@@ -301,15 +303,15 @@ class EwaldSphereExtraction(AbstractFourierSurfaceExtraction, strict=True):
             ewald_sphere_surface = self.extract_ewald_sphere_from_spline_coefficients(
                 volume_representation.spline_coefficients,
                 frequency_slice,
-                config.pixel_size,
-                config.wavelength_in_angstroms,
+                image_config.pixel_size,
+                image_config.wavelength_in_angstroms,
             )
         elif isinstance(volume_representation, FourierVoxelGridVolume):
             ewald_sphere_surface = self.extract_ewald_sphere_from_grid_points(
                 volume_representation.fourier_voxel_grid,
                 frequency_slice,
-                config.pixel_size,
-                config.wavelength_in_angstroms,
+                image_config.pixel_size,
+                image_config.wavelength_in_angstroms,
             )
         else:
             raise ValueError(
@@ -318,15 +320,17 @@ class EwaldSphereExtraction(AbstractFourierSurfaceExtraction, strict=True):
             )
 
         # Resize the image to match the AbstractImageConfig.padded_shape
-        if config.padded_shape != (N, N):
+        if image_config.padded_shape != (N, N):
             ewald_sphere_surface = fftn(
-                config.crop_or_pad_to_padded_shape(ifftn(ewald_sphere_surface, s=(N, N)))
+                image_config.crop_or_pad_to_padded_shape(
+                    ifftn(ewald_sphere_surface, s=(N, N))
+                )
             )
         # Scale by voxel size to convert from projection to integral
         if self.outputs_integral:
-            ewald_sphere_surface *= config.pixel_size
+            ewald_sphere_surface *= image_config.pixel_size
         return (
-            irfftn(ewald_sphere_surface, s=config.padded_shape)
+            irfftn(ewald_sphere_surface, s=image_config.padded_shape)
             if outputs_real_space
             else ewald_sphere_surface
         )

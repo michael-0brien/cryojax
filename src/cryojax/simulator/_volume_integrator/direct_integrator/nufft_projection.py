@@ -9,9 +9,9 @@ from typing_extensions import override
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
-from ...ndimage import convert_fftn_to_rfftn, irfftn
-from .._image_config import AbstractImageConfig
-from .._volume_parametrisation import RealVoxelGridVolume
+from ....ndimage import convert_fftn_to_rfftn, irfftn
+from ..._image_config import AbstractImageConfig
+from ..._volume_parametrisation import RealVoxelGridVolume
 from .base_direct_integrator import AbstractDirectVoxelIntegrator
 
 
@@ -69,14 +69,14 @@ class NufftProjection(
     def integrate(
         self,
         volume_representation: RealVoxelGridVolume,
-        config: AbstractImageConfig,
+        image_config: AbstractImageConfig,
         outputs_real_space: bool = False,
     ) -> (
         Complex[
             Array,
-            "{config.padded_y_dim} {config.padded_x_dim//2+1}",
+            "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}",
         ]
-        | Float[Array, "{config.padded_y_dim} {config.padded_x_dim}"]
+        | Float[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
     ):
         """Integrate the volume at the `AbstractImageConfig` settings
         of a voxel-based representation in real-space, using non-uniform FFTs.
@@ -84,12 +84,12 @@ class NufftProjection(
         **Arguments:**
 
         - `volume_representation`: The volume representation.
-        - `config`: The configuration of the resulting image.
+        - `image_config`: The configuration of the resulting image.
 
         **Returns:**
 
         The projection integral of the `volume_representation` in fourier space, at the
-        `config.padded_shape` and the `config.pixel_size`.
+        `image_config.padded_shape` and the `image_config.pixel_size`.
         """
         if isinstance(volume_representation, RealVoxelGridVolume):
             shape = volume_representation.shape
@@ -98,7 +98,7 @@ class NufftProjection(
                 volume_representation.coordinate_grid_in_pixels.reshape(
                     (math.prod(shape), 3)
                 ),
-                config.padded_shape,
+                image_config.padded_shape,
             )
         else:
             raise ValueError(
@@ -106,9 +106,9 @@ class NufftProjection(
             )
         if self.outputs_integral:
             # Scale by voxel size to convert from projection to integral
-            fourier_projection *= config.pixel_size
+            fourier_projection *= image_config.pixel_size
         return (
-            irfftn(fourier_projection, s=config.padded_shape)
+            irfftn(fourier_projection, s=image_config.padded_shape)
             if outputs_real_space
             else fourier_projection
         )

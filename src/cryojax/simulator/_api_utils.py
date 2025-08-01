@@ -4,12 +4,6 @@ from jaxtyping import Bool
 
 from ..internal import NDArrayLike
 from ._detector import AbstractDetector
-from ._direct_integrator import (
-    AbstractDirectIntegrator,
-    FourierSliceExtraction,
-    GaussianMixtureProjection,
-    NufftProjection,
-)
 from ._image_config import AbstractImageConfig, DoseImageConfig
 from ._image_model import (
     AbstractImageModel,
@@ -22,6 +16,12 @@ from ._image_model import (
 from ._pose import AbstractPose
 from ._scattering_theory import WeakPhaseScatteringTheory
 from ._transfer_theory import ContrastTransferTheory
+from ._volume_integrator import (
+    AbstractDirectIntegrator,
+    FourierSliceExtraction,
+    GaussianMixtureProjection,
+    NufftProjection,
+)
 from ._volume_parametrisation import (
     AbstractVolumeParametrisation,
     FourierVoxelGridVolume,
@@ -33,11 +33,11 @@ from ._volume_parametrisation import (
 
 
 def make_image_model(
-    volume: AbstractVolumeParametrisation,
-    config: AbstractImageConfig,
+    volume_parametrisation: AbstractVolumeParametrisation,
+    image_config: AbstractImageConfig,
     pose: AbstractPose,
     transfer_theory: Optional[ContrastTransferTheory] = None,
-    integrator: Optional[AbstractDirectIntegrator] = None,
+    volume_integrator: Optional[AbstractDirectIntegrator] = None,
     detector: Optional[AbstractDetector] = None,
     *,
     applies_translation: bool = True,
@@ -50,12 +50,12 @@ def make_image_model(
 
     **Arguments:**
 
-    - `volume`:
+    - `volume_parametrisation`:
         The representation of the protein volume.
         Common choices are the `FourierVoxelGridVolume`
         for fourier-space voxel grids or the `PengIndependentAtomPotential`
         for gaussian mixtures of atoms parameterized by electron scattering factors.
-    - `config`:
+    - `image_config`:
         The configuration for the image and imagining instrument. Unless using
         a model that uses the electron dose as a parameter, choose the
         `BasicImageConfig`. Otherwise, choose the `DoseImageConfig`.
@@ -65,7 +65,7 @@ def make_image_model(
     - `transfer_theory`:
         The contrast transfer function and its theory for how it is applied
         to the image.
-    - `integrator`:
+    - `volume_integrator`:
         Optionally pass the method for integrating the electrostatic potential onto
         the plane (e.g. projection via fourier slice extraction). If not provided,
         a default option is chosen.
@@ -107,14 +107,16 @@ def make_image_model(
     ```
     """
     # Select default integrator
-    integrator = _select_default_integrator(volume, simulates_quantity)
+    volume_integrator = _select_default_integrator(
+        volume_parametrisation, simulates_quantity
+    )
     if transfer_theory is None:
         # Image model for projections
         image_model = ProjectionImageModel(
-            volume,
+            volume_parametrisation,
             pose,
-            config,
-            integrator,
+            image_config,
+            volume_integrator,
             applies_translation=applies_translation,
             normalizes_signal=normalizes_signal,
             signal_region=signal_region,
@@ -122,13 +124,15 @@ def make_image_model(
     else:
         # Simulate physical observables
         if simulates_quantity:
-            scattering_theory = WeakPhaseScatteringTheory(integrator, transfer_theory)
+            scattering_theory = WeakPhaseScatteringTheory(
+                volume_integrator, transfer_theory
+            )
             if quantity_mode == "counts":
-                if not isinstance(config, DoseImageConfig):
+                if not isinstance(image_config, DoseImageConfig):
                     raise ValueError(
                         "If using `quantity_mode = 'counts'` to simulate electron "
-                        "counts, pass `config = DoseImageConfig(...)`. Got config "
-                        f"{type(config).__name__}."
+                        "counts, pass `image_config = DoseImageConfig(...)`. Got config "
+                        f"{type(image_config).__name__}."
                     )
                 if detector is None:
                     raise ValueError(
@@ -136,9 +140,9 @@ def make_image_model(
                         "counts, an `AbstractDetector` must be passed."
                     )
                 image_model = ElectronCountsImageModel(
-                    volume,
+                    volume_parametrisation,
                     pose,
-                    config,
+                    image_config,
                     scattering_theory,
                     detector,
                     applies_translation=applies_translation,
@@ -147,9 +151,9 @@ def make_image_model(
                 )
             elif quantity_mode == "contrast":
                 image_model = ContrastImageModel(
-                    volume,
+                    volume_parametrisation,
                     pose,
-                    config,
+                    image_config,
                     scattering_theory,
                     applies_translation=applies_translation,
                     normalizes_signal=normalizes_signal,
@@ -157,9 +161,9 @@ def make_image_model(
                 )
             elif quantity_mode == "intensity":
                 image_model = IntensityImageModel(
-                    volume,
+                    volume_parametrisation,
                     pose,
-                    config,
+                    image_config,
                     scattering_theory,
                     applies_translation=applies_translation,
                     normalizes_signal=normalizes_signal,
@@ -174,10 +178,10 @@ def make_image_model(
         else:
             # Linear image model
             image_model = LinearImageModel(
-                volume,
+                volume_parametrisation,
                 pose,
-                config,
-                integrator,
+                image_config,
+                volume_integrator,
                 transfer_theory,
                 applies_translation=applies_translation,
                 normalizes_signal=normalizes_signal,

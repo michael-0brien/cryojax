@@ -8,7 +8,7 @@ There are many different volume representations of biological structures for cry
     ::: cryojax.simulator.AbstractVolumeParametrisation
         options:
             members:
-                - compute_volume_representation
+                - compute_representation
 
 
 ???+ abstract "`cryojax.simulator.AbstractVolumeRepresentation`"
@@ -25,7 +25,7 @@ There are many different volume representations of biological structures for cry
     options:
         members:
             - __init__
-            - compute_volume_representation
+            - compute_representation
             - rotate_to_pose
             - translate_to_pose
             - to_real_voxel_grid
@@ -37,7 +37,7 @@ There are many different volume representations of biological structures for cry
         members:
             - __init__
             - from_scattering_factor_parameters
-            - compute_volume_representation
+            - compute_representation
             - rotate_to_pose
             - translate_to_pose
             - to_real_voxel_grid
@@ -58,7 +58,7 @@ There are many different volume representations of biological structures for cry
             members:
                 - __init__
                 - from_real_voxel_grid
-                - to_representation
+                - compute_representation
                 - rotate_to_pose
                 - frequency_slice_in_pixels
                 - shape
@@ -70,7 +70,7 @@ There are many different volume representations of biological structures for cry
             members:
                 - __init__
                 - from_real_voxel_grid
-                - to_representation
+                - compute_representation
                 - rotate_to_pose
                 - frequency_slice_in_pixels
                 - shape
@@ -84,7 +84,7 @@ There are many different volume representations of biological structures for cry
             members:
                 - __init__
                 - from_real_voxel_grid
-                - to_representation
+                - compute_representation
                 - rotate_to_pose
                 - coordinate_grid_in_pixels
                 - shape
@@ -96,14 +96,14 @@ There are many different volume representations of biological structures for cry
     ::: cryojax.simulator.AbstractPotentialParametrisation
         options:
             members:
-                - compute_volume_representation
+                - compute_representation
 
 ???+ abstract "`cryojax.simulator.AbstractTabulatedPotential`"
     ::: cryojax.simulator.AbstractTabulatedPotential
         options:
             members:
-                - compute_volume_representation
-                - from_scattering_factor_parameters
+                - compute_representation
+                - from_tabulated_parameters
 
 
 ???+ abstract "`cryojax.simulator.AbstractPengPotential`"
@@ -112,8 +112,8 @@ There are many different volume representations of biological structures for cry
             members:
                 - amplitudes
                 - b_factors
-                - compute_volume_representation
-                - from_scattering_factor_parameters
+                - compute_representation
+                - from_tabulated_parameters
 
 
 ## Parametrising ensembles
@@ -123,10 +123,10 @@ There are many different volume representations of biological structures for cry
         options:
             members:
                 - conformation
-                - compute_volume_representation
+                - compute_representation
 
 ::: cryojax.simulator.DiscreteStructuralEnsemble
         options:
             members:
                 - __init__
-                - compute_volume_representation
+                - compute_representation

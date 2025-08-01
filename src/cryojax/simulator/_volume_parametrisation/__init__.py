@@ -12,6 +12,8 @@ from .potential import (
     PengScatteringFactorParameters as PengScatteringFactorParameters,
 )
 from .representations import (
+    AbstractPointCloudVolume as AbstractPointCloudVolume,
+    AbstractVoxelVolume as AbstractVoxelVolume,
     FourierVoxelGridVolume as FourierVoxelGridVolume,
     FourierVoxelSplineVolume as FourierVoxelSplineVolume,
     GaussianMixtureVolume as GaussianMixtureVolume,
