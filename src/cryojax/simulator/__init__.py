@@ -11,12 +11,6 @@ from ._detector import (
     NullDQE as NullDQE,
     PoissonDetector as PoissonDetector,
 )
-from ._distributions import (
-    AbstractDistribution as AbstractDistribution,
-    AbstractGaussianDistribution as AbstractGaussianDistribution,
-    CorrelatedGaussianDistribution as CorrelatedGaussianDistribution,
-    UncorrelatedGaussianDistribution as UncorrelatedGaussianDistribution,
-)
 from ._image_config import (
     AbstractImageConfig as AbstractImageConfig,
     BasicImageConfig as BasicImageConfig,
@@ -31,6 +25,12 @@ from ._image_model import (
     IntensityImageModel as IntensityImageModel,
     LinearImageModel as LinearImageModel,
     ProjectionImageModel as ProjectionImageModel,
+)
+from ._noise_model import (
+    AbstractGaussianNoiseModel as AbstractGaussianNoiseModel,
+    AbstractNoiseModel as AbstractNoiseModel,
+    CorrelatedGaussianNoiseModel as CorrelatedGaussianNoiseModel,
+    UncorrelatedGaussianNoiseModel as UncorrelatedGaussianNoiseModel,
 )
 from ._pose import (
     AbstractPose as AbstractPose,

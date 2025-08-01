@@ -16,7 +16,7 @@ from ...ndimage import rfftn
 from ...ndimage.operators import Constant, FourierOperatorLike
 from ...ndimage.transforms import FilterLike, MaskLike
 from .._image_model import AbstractImageModel
-from ._base_distribution import AbstractDistribution
+from .base_noise_model import AbstractNoiseModel
 
 
 RealImageArray = Float[
@@ -30,8 +30,8 @@ FourierImageArray = Complex[
 ImageArray = RealImageArray | FourierImageArray
 
 
-class AbstractGaussianDistribution(AbstractDistribution, strict=True):
-    r"""An `AbstractDistribution` where images are formed via additive
+class AbstractGaussianNoiseModel(AbstractNoiseModel, strict=True):
+    r"""An `AbstractNoiseModel` where images are formed via additive
     gaussian noise.
 
     Subclasses may compute the likelihood in real or fourier space and
@@ -117,7 +117,7 @@ class AbstractGaussianDistribution(AbstractDistribution, strict=True):
         raise NotImplementedError
 
 
-class UncorrelatedGaussianDistribution(AbstractGaussianDistribution, strict=True):
+class UncorrelatedGaussianNoiseModel(AbstractGaussianNoiseModel, strict=True):
     r"""A gaussian noise model, where each pixel is independently drawn from
     a zero-mean gaussian of fixed variance (white noise).
 
@@ -248,8 +248,9 @@ class UncorrelatedGaussianDistribution(AbstractGaussianDistribution, strict=True
         return log_likelihood
 
 
-class CorrelatedGaussianDistribution(AbstractGaussianDistribution, strict=True):
-    r"""A gaussian noise model, where each frequency is independent.
+class CorrelatedGaussianNoiseModel(AbstractGaussianNoiseModel, strict=True):
+    r"""A gaussian noise model, where pixels are correlated, but each
+    frequency is independent (colored noise).
 
     This computes the likelihood in Fourier space,
     so that the variance to be an arbitrary noise power spectrum.

@@ -80,7 +80,7 @@ nav:
             - Putting it all together:
                 - 'api/simulator/config.md'
                 - 'api/simulator/image_model.md'
-                - 'api/simulator/distribution.md'
+                - 'api/simulator/noise_model.md'
         - cryojax.dataset:
             - 'api/dataset/relion.md'
         - cryojax.io:
