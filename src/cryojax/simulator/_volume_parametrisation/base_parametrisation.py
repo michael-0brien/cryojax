@@ -19,10 +19,7 @@ class AbstractVolumeParametrisation(eqx.Module, strict=True):
 
     @abc.abstractmethod
     def compute_representation(
-        self,
-        *args: Any,
-        rng_key: Optional[PRNGKeyArray] = None,
-        **kwargs: Any,
+        self, rng_key: Optional[PRNGKeyArray] = None
     ) -> "AbstractVolumeRepresentation":
         """Core interface for computing the representation of
         the volume.
