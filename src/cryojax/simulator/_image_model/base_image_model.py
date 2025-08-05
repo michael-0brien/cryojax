@@ -262,11 +262,15 @@ class LinearImageModel(AbstractImageModel, strict=True):
     ) -> ImageArray | PaddedImageArray:
         # Get the representation of the volume
         if rng_key is None:
-            volume_representation = self.volume_parametrisation.compute_representation()
+            volume_representation = (
+                self.volume_parametrisation.compute_volume_representation()
+            )
         else:
             this_key, rng_key = jr.split(rng_key)
-            volume_representation = self.volume_parametrisation.compute_representation(
-                rng_key=this_key
+            volume_representation = (
+                self.volume_parametrisation.compute_volume_representation(
+                    rng_key=this_key
+                )
             )
         # Rotate it to the lab frame
         volume_representation = volume_representation.rotate_to_pose(self.pose)
@@ -350,11 +354,15 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
     ) -> ImageArray | PaddedImageArray:
         # Get the representation of the volume
         if rng_key is None:
-            volume_representation = self.volume_parametrisation.compute_representation()
+            volume_representation = (
+                self.volume_parametrisation.compute_volume_representation()
+            )
         else:
             this_key, rng_key = jr.split(rng_key)
-            volume_representation = self.volume_parametrisation.compute_representation(
-                rng_key=this_key
+            volume_representation = (
+                self.volume_parametrisation.compute_volume_representation(
+                    rng_key=this_key
+                )
             )
         # Rotate it to the lab frame
         volume_representation = volume_representation.rotate_to_pose(self.pose)
