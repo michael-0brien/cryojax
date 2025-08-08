@@ -11,7 +11,7 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 from jaxtyping import Array, PyTree
 
-from ...internal import fori_loop_tqdm_decorator
+from .._tqdm_decorator import fori_loop_tqdm_decorator
 from .custom_types import PyTreeGrid, PyTreeGridPoint
 from .pytree_manipulation import (
     tree_grid_shape,
@@ -84,7 +84,7 @@ def run_grid_search(
     fn = eqx.filter_closure_convert(fn, test_tree_grid_point, args)
     f_struct = jtu.tree_map(
         lambda x: x.value,
-        jtu.tree_map(eqxi.Static, fn.out_struct),
+        jtu.tree_map(eqxi.Static, fn.out_struct),  # type: ignore
         is_leaf=lambda x: isinstance(x, eqxi.Static),
     )
     # Get the initial state of the search method

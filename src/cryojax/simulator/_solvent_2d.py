@@ -11,7 +11,7 @@ import jax.random as jr
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
 from ..constants import PARKHURST2024_POWER_CONSTANTS
-from ..internal import error_if_negative
+from ..jax_util import error_if_negative
 from ..ndimage import ifftn, irfftn, rescale_image
 from ..ndimage.operators import (
     AbstractFourierOperator,

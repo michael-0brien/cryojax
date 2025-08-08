@@ -11,7 +11,7 @@ import jax.random as jr
 from equinox import AbstractVar
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
-from ...internal import NDArrayLike, error_if_not_positive
+from ...jax_util import NDArrayLike, error_if_not_positive
 from ...ndimage import rfftn
 from ...ndimage.operators import Constant, FourierOperatorLike
 from ...ndimage.transforms import FilterLike, MaskLike

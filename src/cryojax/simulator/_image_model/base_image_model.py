@@ -11,7 +11,7 @@ import jax.numpy as jnp
 import jax.random as jr
 from jaxtyping import Array, Bool, Complex, Float, PRNGKeyArray
 
-from ...internal import NDArrayLike
+from ...jax_util import NDArrayLike
 from ...ndimage import irfftn, rfftn
 from ...ndimage.transforms import FilterLike, MaskLike
 from .._image_config import AbstractImageConfig

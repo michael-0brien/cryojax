@@ -4,7 +4,7 @@ from typing_extensions import override
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
-from ...internal import error_if_not_fractional
+from ...jax_util import error_if_not_fractional
 from ...ndimage import ifftn, irfftn
 from .._common_functions import apply_amplitude_contrast_ratio, apply_interaction_constant
 from .._image_config import AbstractImageConfig

@@ -7,7 +7,7 @@ from typing import Optional
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float, Inexact
 
-from ..internal import NDArrayLike
+from ..jax_util import NDArrayLike
 
 
 def ifftn(

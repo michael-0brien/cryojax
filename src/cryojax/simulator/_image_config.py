@@ -10,7 +10,7 @@ from jaxtyping import Array, Float, Inexact
 
 from ..constants import convert_keV_to_angstroms
 from ..coordinates import make_coordinate_grid, make_frequency_grid
-from ..internal import error_if_not_positive
+from ..jax_util import error_if_not_positive
 from ..ndimage import (
     crop_to_shape,
     pad_to_shape,

@@ -2,7 +2,7 @@ from typing import Literal, Optional
 
 from jaxtyping import Bool
 
-from ..internal import NDArrayLike
+from ..jax_util import NDArrayLike
 from ._detector import AbstractDetector
 from ._image_config import AbstractImageConfig, DoseImageConfig
 from ._image_model import (

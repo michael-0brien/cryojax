@@ -16,8 +16,8 @@ import numpy as np
 import pandas as pd
 from jaxtyping import Array, Float, Int
 
-from ...internal import NDArrayLike
 from ...io import read_starfile, write_image_stack_to_mrc, write_starfile
+from ...jax_util import NDArrayLike
 from ...ndimage.operators import Constant, FourierGaussian
 from ...simulator import (
     AberratedAstigmaticCTF,

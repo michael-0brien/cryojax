@@ -10,7 +10,7 @@ import jax.numpy as jnp
 import jax.random as jr
 from jaxtyping import Array, Bool, PRNGKeyArray
 
-from ...internal import NDArrayLike
+from ...jax_util import NDArrayLike
 from .._detector import AbstractDetector
 from .._image_config import AbstractImageConfig, DoseImageConfig
 from .._pose import AbstractPose

@@ -10,7 +10,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
 from ....coordinates import make_coordinate_grid, make_frequency_slice
-from ....internal import NDArrayLike
+from ....jax_util import NDArrayLike
 from ....ndimage import (
     compute_spline_coefficients,
     crop_to_shape,

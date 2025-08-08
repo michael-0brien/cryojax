@@ -3,7 +3,7 @@ from typing_extensions import override
 
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
-from ...internal import error_if_not_fractional
+from ...jax_util import error_if_not_fractional
 from .._image_config import AbstractImageConfig
 from .._transfer_theory import WaveTransferTheory
 from .._volume_integrator import AbstractMultisliceIntegrator

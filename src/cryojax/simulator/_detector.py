@@ -13,7 +13,7 @@ import numpy as np
 from equinox import AbstractVar, Module
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
-from ..internal import error_if_not_fractional
+from ..jax_util import error_if_not_fractional
 from ..ndimage import irfftn, rfftn
 from ._image_config import DoseImageConfig
 

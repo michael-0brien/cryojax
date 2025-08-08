@@ -10,7 +10,7 @@ import jax.numpy as jnp
 import numpy as np
 from jaxtyping import Array, Float
 
-from ...internal import error_if_not_positive
+from ...jax_util import error_if_not_positive
 from ._base_operator import AbstractImageOperator
 
 

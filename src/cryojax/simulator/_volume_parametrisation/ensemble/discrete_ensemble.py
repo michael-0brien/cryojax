@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Int, PRNGKeyArray
 
-from ....internal import error_if_negative
+from ....jax_util import error_if_negative
 from ..base_parametrisation import (
     AbstractEnsembleParametrisation,
     AbstractVolumeRepresentation,

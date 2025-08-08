@@ -11,7 +11,7 @@ from ....constants import (
     get_tabulated_scattering_factor_parameters,
     read_peng_element_scattering_factor_parameter_table,
 )
-from ....internal import NDArrayLike, error_if_negative
+from ....jax_util import NDArrayLike, error_if_negative
 from ..base_parametrisation import AbstractPotentialParametrisation
 from ..common_functions import gaussians_to_real_voxels
 from ..representations import AbstractIndependentAtomVolume

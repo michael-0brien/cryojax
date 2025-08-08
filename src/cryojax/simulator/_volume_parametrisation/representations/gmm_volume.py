@@ -6,7 +6,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from ....constants import convert_variance_to_b_factor
-from ....internal import NDArrayLike, error_if_not_positive
+from ....jax_util import NDArrayLike, error_if_not_positive
 from ..._pose import AbstractPose
 from ..common_functions import gaussians_to_real_voxels
 from .base_volume import AbstractPointCloudVolume

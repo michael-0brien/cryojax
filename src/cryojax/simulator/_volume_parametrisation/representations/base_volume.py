@@ -10,7 +10,7 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
-from ....internal import NDArrayLike
+from ....jax_util import NDArrayLike
 from ..._pose import AbstractPose
 from ..base_parametrisation import AbstractVolumeRepresentation
 

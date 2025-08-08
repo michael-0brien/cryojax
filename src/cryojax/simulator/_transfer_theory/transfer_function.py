@@ -6,7 +6,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
 from ...constants import convert_keV_to_angstroms
-from ...internal import error_if_negative
+from ...jax_util import error_if_negative
 from .common_functions import (
     compute_phase_shift_from_amplitude_contrast_ratio,
     compute_phase_shifts_with_spherical_aberration,
