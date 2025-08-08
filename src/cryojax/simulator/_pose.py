@@ -10,10 +10,10 @@ from typing_extensions import Self, override
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-import numpy as np
 from equinox import AbstractVar, Module
 from jaxtyping import Array, Complex, Float
 
+from ..jax_util import NDArrayLike
 from ..ndimage import enforce_self_conjugate_rfftn_components
 from ..rotations import SO3, convert_quaternion_to_euler_angles
 
@@ -227,13 +227,13 @@ class EulerAnglePose(AbstractPose, strict=True):
 
     def __init__(
         self,
-        offset_x_in_angstroms: float | Float[Array, ""] = 0.0,
-        offset_y_in_angstroms: float | Float[Array, ""] = 0.0,
-        phi_angle: float | Float[Array, ""] = 0.0,
-        theta_angle: float | Float[Array, ""] = 0.0,
-        psi_angle: float | Float[Array, ""] = 0.0,
+        offset_x_in_angstroms: float | Float[NDArrayLike, ""] = 0.0,
+        offset_y_in_angstroms: float | Float[NDArrayLike, ""] = 0.0,
+        phi_angle: float | Float[NDArrayLike, ""] = 0.0,
+        theta_angle: float | Float[NDArrayLike, ""] = 0.0,
+        psi_angle: float | Float[NDArrayLike, ""] = 0.0,
         *,
-        offset_z_in_angstroms: Optional[float | Float[Array, ""]] = None,
+        offset_z_in_angstroms: Optional[float | Float[NDArrayLike, ""]] = None,
     ):
         """**Arguments:**
 
@@ -292,13 +292,16 @@ class QuaternionPose(AbstractPose, strict=True):
 
     def __init__(
         self,
-        offset_x_in_angstroms: float | Float[Array, ""] = 0.0,
-        offset_y_in_angstroms: float | Float[Array, ""] = 0.0,
-        wxyz: (
-            tuple[float, float, float, float] | Float[np.ndarray, "4"] | Float[Array, "4"]
-        ) = (1.0, 0.0, 0.0, 0.0),
+        offset_x_in_angstroms: float | Float[NDArrayLike, ""] = 0.0,
+        offset_y_in_angstroms: float | Float[NDArrayLike, ""] = 0.0,
+        wxyz: (tuple[float, float, float, float] | Float[NDArrayLike, "4"]) = (
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+        ),
         *,
-        offset_z_in_angstroms: Optional[float | Float[Array, ""]] = None,
+        offset_z_in_angstroms: Optional[float | Float[NDArrayLike, ""]] = None,
     ):
         """**Arguments:**
 
@@ -353,13 +356,15 @@ class AxisAnglePose(AbstractPose, strict=True):
 
     def __init__(
         self,
-        offset_x_in_angstroms: float | Float[Array, ""] = 0.0,
-        offset_y_in_angstroms: float | Float[Array, ""] = 0.0,
-        euler_vector: (
-            tuple[float, float, float] | Float[np.ndarray, "3"] | Float[Array, "3"]
-        ) = (0.0, 0.0, 0.0),
+        offset_x_in_angstroms: float | Float[NDArrayLike, ""] = 0.0,
+        offset_y_in_angstroms: float | Float[NDArrayLike, ""] = 0.0,
+        euler_vector: (tuple[float, float, float] | Float[NDArrayLike, "3"]) = (
+            0.0,
+            0.0,
+            0.0,
+        ),
         *,
-        offset_z_in_angstroms: Optional[float | Float[Array, ""]] = None,
+        offset_z_in_angstroms: Optional[float | Float[NDArrayLike, ""]] = None,
     ):
         """**Arguments:**
 
