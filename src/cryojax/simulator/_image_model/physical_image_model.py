@@ -16,7 +16,7 @@ from .._image_config import AbstractImageConfig, DoseImageConfig
 from .._pose import AbstractPose
 from .._scattering_theory import AbstractScatteringTheory
 from .._volume_parametrisation import AbstractVolumeParametrisation
-from .base_image_model import AbstractImageModel, ImageArray, PaddedImageArray
+from .base_image_model import AbstractImageModel, PaddedFourierImageArray
 
 
 class AbstractPhysicalImageModel(AbstractImageModel, strict=True):
@@ -87,7 +87,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
     @override
     def compute_fourier_image(
         self, rng_key: Optional[PRNGKeyArray] = None
-    ) -> ImageArray | PaddedImageArray:
+    ) -> PaddedFourierImageArray:
         # Get the volume representation. Its data should be a scattering potential
         # to simulate in physical units
         if rng_key is None:
@@ -177,7 +177,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
     @override
     def compute_fourier_image(
         self, rng_key: Optional[PRNGKeyArray] = None
-    ) -> ImageArray | PaddedImageArray:
+    ) -> PaddedFourierImageArray:
         # Get the volume representation. Its data should be a scattering potential
         # to simulate in physical units
         if rng_key is None:
@@ -269,7 +269,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
     @override
     def compute_fourier_image(
         self, rng_key: Optional[PRNGKeyArray] = None
-    ) -> ImageArray | PaddedImageArray:
+    ) -> PaddedFourierImageArray:
         if rng_key is None:
             # Get the volume representation. Its data should be a scattering potential
             # to simulate in physical units

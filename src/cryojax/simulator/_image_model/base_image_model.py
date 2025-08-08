@@ -44,7 +44,6 @@ class AbstractImageModel(eqx.Module, strict=True):
     Call an `AbstractImageModel`'s `simulate` routine.
     """
 
-    volume_parametrisation: eqx.AbstractVar[AbstractVolumeParametrisation]
     pose: eqx.AbstractVar[AbstractPose]
     image_config: eqx.AbstractVar[AbstractImageConfig]
 
@@ -55,7 +54,7 @@ class AbstractImageModel(eqx.Module, strict=True):
     @abstractmethod
     def compute_fourier_image(
         self, rng_key: Optional[PRNGKeyArray] = None
-    ) -> ImageArray | PaddedImageArray:
+    ) -> PaddedFourierImageArray:
         """Render an image without postprocessing."""
         raise NotImplementedError
 
@@ -259,7 +258,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
     @override
     def compute_fourier_image(
         self, rng_key: Optional[PRNGKeyArray] = None
-    ) -> ImageArray | PaddedImageArray:
+    ) -> PaddedFourierImageArray:
         # Get the representation of the volume
         if rng_key is None:
             volume_representation = (
