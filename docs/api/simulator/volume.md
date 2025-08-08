@@ -21,6 +21,12 @@ There are many different volume representations of biological structures for cry
 
 ### Point clouds
 
+??? abstract "`cryojax.simulator.AbstractPointCloudVolume`"
+    ::: cryojax.simulator.AbstractPointCloudVolume
+        options:
+            members:
+                - translate_to_pose
+
 ::: cryojax.simulator.GaussianMixtureVolume
     options:
         members:

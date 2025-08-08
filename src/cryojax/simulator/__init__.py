@@ -61,6 +61,7 @@ from ._volume_integrator import (
 from ._volume_parametrisation import (
     AbstractEnsembleParametrisation as AbstractEnsembleParametrisation,
     AbstractPengPotential as AbstractPengPotential,
+    AbstractPointCloudVolume as AbstractPointCloudVolume,
     AbstractPotentialParametrisation as AbstractPotentialParametrisation,
     AbstractTabulatedPotential as AbstractTabulatedPotential,
     AbstractVolumeParametrisation as AbstractVolumeParametrisation,
