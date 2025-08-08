@@ -50,7 +50,7 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
         self.ctf = ctf
         self.envelope = envelope
         self.amplitude_contrast_ratio = error_if_not_fractional(amplitude_contrast_ratio)
-        self.phase_shift = jnp.asarray(phase_shift)
+        self.phase_shift = jnp.asarray(phase_shift, dtype=float)
 
     def propagate_object(
         self,

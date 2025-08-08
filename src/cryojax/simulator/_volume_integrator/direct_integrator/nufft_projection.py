@@ -118,14 +118,14 @@ def _project_with_nufft(weights, coordinate_list, shape, eps=1e-6):
     from jax_finufft import nufft1
 
     weights, coordinate_list = (
-        jnp.asarray(weights).astype(complex),
-        jnp.asarray(coordinate_list),
+        jnp.asarray(weights, dtype=complex),
+        jnp.asarray(coordinate_list, dtype=float),
     )
     # Get x and y coordinates
     coordinates_xy = coordinate_list[:, :2]
     # Normalize coordinates betweeen -pi and pi
     ny, nx = shape
-    box_xy = jnp.asarray((nx, ny), dtype=float)
+    box_xy = jnp.asarray((nx, ny))
     coordinates_periodic = 2 * jnp.pi * coordinates_xy / box_xy
     # Unpack and compute
     x, y = coordinates_periodic[:, 0], coordinates_periodic[:, 1]

@@ -201,7 +201,7 @@ class FourierVoxelSplineVolume(AbstractFourierVoxelVolume, strict=True):
         # ... store the grid with the zero frequency component in the center
         fourier_voxel_grid = jnp.fft.fftshift(fourier_voxel_grid_with_zero_in_corner)
         # ... compute spline coefficients
-        spline_coefficients = compute_spline_coefficients(jnp.asarray(fourier_voxel_grid))
+        spline_coefficients = compute_spline_coefficients(fourier_voxel_grid)
         # ... create in-plane frequency slice on the half space
         frequency_slice = make_frequency_slice(
             cast(tuple[int, int], padded_real_voxel_grid.shape[:-1]),

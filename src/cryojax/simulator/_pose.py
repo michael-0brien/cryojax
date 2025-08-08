@@ -308,9 +308,9 @@ class QuaternionPose(AbstractPose, strict=True):
             The quaternion, represented as a vector $\\mathbf{q} = (q_w, q_x, q_y, q_z)$.
         - `offset_z_in_angstroms`: Out-of-plane translation in z direction.
         """
-        self.offset_x_in_angstroms = jnp.asarray(offset_x_in_angstroms)
-        self.offset_y_in_angstroms = jnp.asarray(offset_y_in_angstroms)
-        self.wxyz = jnp.asarray(wxyz)
+        self.offset_x_in_angstroms = jnp.asarray(offset_x_in_angstroms, dtype=float)
+        self.offset_y_in_angstroms = jnp.asarray(offset_y_in_angstroms, dtype=float)
+        self.wxyz = jnp.asarray(wxyz, dtype=float)
         self.offset_z_in_angstroms = (
             None
             if offset_z_in_angstroms is None
@@ -370,9 +370,9 @@ class AxisAnglePose(AbstractPose, strict=True):
             vector $\\boldsymbol{\\omega}$.
         - `offset_z_in_angstroms`: Out-of-plane translation in z direction.
         """
-        self.offset_x_in_angstroms = jnp.asarray(offset_x_in_angstroms)
-        self.offset_y_in_angstroms = jnp.asarray(offset_y_in_angstroms)
-        self.euler_vector = jnp.asarray(euler_vector)
+        self.offset_x_in_angstroms = jnp.asarray(offset_x_in_angstroms, dtype=float)
+        self.offset_y_in_angstroms = jnp.asarray(offset_y_in_angstroms, dtype=float)
+        self.euler_vector = jnp.asarray(euler_vector, dtype=float)
         self.offset_z_in_angstroms = (
             None
             if offset_z_in_angstroms is None

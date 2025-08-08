@@ -394,7 +394,7 @@ def _safe_multiply_by_constant(
     """Multiplies a coordinate grid by a constant in a
     safe way for gradient computation.
     """
-    return jnp.where(grid != 0.0, jnp.asarray(constant) * grid, 0.0)
+    return jnp.where(grid != 0.0, constant * grid, 0.0)
 
 
 def _dict_to_pad_options(d: dict[str, Any], default_shape: tuple[int, int]) -> PadOptions:

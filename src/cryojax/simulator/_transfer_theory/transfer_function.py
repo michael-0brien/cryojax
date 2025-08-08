@@ -115,10 +115,12 @@ class AberratedAstigmaticCTF(AbstractCTF, strict=True):
         - `astigmatism_angle`: The defocus angle.
         - `spherical_aberration_in_mm`: The spherical aberration coefficient in mm.
         """
-        self.defocus_in_angstroms = jnp.asarray(defocus_in_angstroms)
-        self.astigmatism_in_angstroms = jnp.asarray(astigmatism_in_angstroms)
-        self.astigmatism_angle = jnp.asarray(astigmatism_angle)
-        self.spherical_aberration_in_mm = error_if_negative(spherical_aberration_in_mm)
+        self.defocus_in_angstroms = jnp.asarray(defocus_in_angstroms, dtype=float)
+        self.astigmatism_in_angstroms = jnp.asarray(astigmatism_in_angstroms, dtype=float)
+        self.astigmatism_angle = jnp.asarray(astigmatism_angle, dtype=float)
+        self.spherical_aberration_in_mm = error_if_negative(
+            jnp.asarray(spherical_aberration_in_mm, dtype=float)
+        )
 
     def compute_aberration_phase_shifts(
         self,

@@ -32,7 +32,7 @@ class DiscreteStructuralEnsemble(AbstractEnsembleParametrisation, strict=True):
                           the tuple.
         """
         self.conformational_space = conformational_space
-        self.conformation = jnp.asarray(error_if_negative(conformation))
+        self.conformation = jnp.asarray(error_if_negative(conformation), dtype=int)
 
     @override
     def compute_volume_representation(

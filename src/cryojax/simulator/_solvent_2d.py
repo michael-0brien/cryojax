@@ -198,7 +198,7 @@ class GRFSolvent2D(AbstractRandomSolvent2D, strict=True):
         self.power_spectrum_function = power_spectrum_function or SolventMixturePower()
         self.samples_power = samples_power
         self.thickness_in_angstroms = error_if_negative(
-            jnp.asarray(thickness_in_angstroms)
+            jnp.asarray(thickness_in_angstroms, dtype=float)
         )
         self.molecules_per_angstrom_cubed = molecules_per_angstrom_cubed
         self.total_potential_per_molecule = total_potential_per_molecule

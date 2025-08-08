@@ -53,7 +53,7 @@ class CountingDQE(AbstractDQE, strict=True):
 
     def __init__(self, fraction_detected_electrons: float | Float[Array, ""] = 1.0):
         self.fraction_detected_electrons = error_if_not_fractional(
-            jnp.asarray(fraction_detected_electrons)
+            jnp.asarray(fraction_detected_electrons, dtype=float)
         )
 
     @override
@@ -83,7 +83,7 @@ class NullDQE(AbstractDQE, strict=True):
 
     def __init__(self, fraction_detected_electrons: float | Float[Array, ""] = 1.0):
         self.fraction_detected_electrons = error_if_not_fractional(
-            jnp.asarray(fraction_detected_electrons)
+            jnp.asarray(fraction_detected_electrons, dtype=float)
         )
 
     @override
