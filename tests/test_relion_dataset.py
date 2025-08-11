@@ -411,26 +411,26 @@ def test_load_optics_group_broadcasting(sample_starfile_path):
         path_to_starfile=sample_starfile_path,
         loads_envelope=False,
         loads_metadata=True,
-        broadcasts_optics_group=True,
+        broadcasts_image_config=True,
     )
 
     parameters = parameter_file[:]
     image_config = parameters["image_config"]
     assert image_config.voltage_in_kilovolts.ndim > 0
     assert image_config.pixel_size.ndim > 0
-    assert parameter_file.broadcasts_optics_group is True
+    assert parameter_file.broadcasts_image_config is True
 
     parameter_file = RelionParticleParameterFile(
         path_to_starfile=sample_starfile_path,
         loads_envelope=False,
         loads_metadata=True,
-        broadcasts_optics_group=False,
+        broadcasts_image_config=False,
     )
     parameters = parameter_file[:]
     image_config = parameters["image_config"]
     assert image_config.voltage_in_kilovolts.ndim == 0
     assert image_config.pixel_size.ndim == 0
-    assert parameter_file.broadcasts_optics_group is False
+    assert parameter_file.broadcasts_image_config is False
 
     return
 
@@ -440,7 +440,7 @@ def test_parameter_file_setters(sample_starfile_path):
         path_to_starfile=sample_starfile_path,
         loads_envelope=False,
         loads_metadata=False,
-        broadcasts_optics_group=False,
+        broadcasts_image_config=False,
         updates_optics_group=False,
     )
 
@@ -450,8 +450,8 @@ def test_parameter_file_setters(sample_starfile_path):
     parameter_file.loads_envelope = True
     assert parameter_file.loads_envelope
 
-    parameter_file.broadcasts_optics_group = True
-    assert parameter_file.broadcasts_optics_group
+    parameter_file.broadcasts_image_config = True
+    assert parameter_file.broadcasts_image_config
 
     parameter_file.updates_optics_group = True
     assert parameter_file.updates_optics_group
@@ -463,28 +463,95 @@ def test_load_starfile_vs_mrcs_shape(sample_starfile_path, sample_relion_project
         path_to_starfile=sample_starfile_path,
         loads_envelope=False,
         loads_metadata=False,
-        broadcasts_optics_group=False,
+        broadcasts_image_config=False,
     )
-    dataset = RelionParticleStackDataset(parameter_file, sample_relion_project_path)
+    dataset = RelionParticleStackDataset(
+        parameter_file, sample_relion_project_path, loads_parameters=True
+    )
 
     particle_stack = dataset[:]
-    image_config = particle_stack["parameters"]["image_config"]
+    parameters = particle_stack["parameters"]
+    assert parameters is not None
+    image_config = parameters["image_config"]
     assert particle_stack["images"].shape == (
         len(parameter_file),
         *image_config.shape,
     )
 
     particle_stack = dataset[0]
-    image_config = particle_stack["parameters"]["image_config"]
+    image_config = parameters["image_config"]
     assert particle_stack["images"].shape == image_config.shape
 
     particle_stack = dataset[0:2]
-    image_config = particle_stack["parameters"]["image_config"]
+    image_config = parameters["image_config"]
     assert particle_stack["images"].shape == (2, *image_config.shape)
 
     assert len(dataset) == len(parameter_file)
 
     return
+
+
+def test_no_load_parameters(sample_starfile_path, sample_relion_project_path):
+    """Test loading a starfile with mrcs."""
+    parameter_file = RelionParticleParameterFile(path_to_starfile=sample_starfile_path)
+    dataset = RelionParticleStackDataset(
+        parameter_file, sample_relion_project_path, loads_parameters=True
+    )
+
+    # For particle stack with leading dim
+    dataset.loads_parameters = True
+    particle_stack_params = dataset[:]
+    dataset.loads_parameters = False
+    particle_stack_noparams = dataset[:]
+
+    assert particle_stack_noparams["parameters"] is None
+    assert (
+        particle_stack_params["images"].shape == particle_stack_noparams["images"].shape
+    )
+
+    # For particle stack with no leading dim
+    dataset.loads_parameters = True
+    particle_stack_params = dataset[0]
+    dataset.loads_parameters = False
+    particle_stack_noparams = dataset[0]
+    assert (
+        particle_stack_params["images"].shape == particle_stack_noparams["images"].shape
+    )
+
+    return
+
+
+def test_load_on_sharding(sample_starfile_path):
+    """Test loading a starfile with mrcs."""
+    is_pytree_on_sharding = lambda pytree, sharding: all(
+        jax.tree.leaves(
+            jax.tree.map(
+                lambda x: x.sharding == sharding, eqx.filter(pytree, eqx.is_array)
+            )
+        )
+    )
+    is_pytree_committed = lambda pytree: all(
+        jax.tree.leaves(
+            jax.tree.map(lambda x: x.committed, eqx.filter(pytree, eqx.is_array))
+        )
+    )
+    # Default device sharding
+    default_device = jax.devices()[0]
+    sharding = jax.sharding.SingleDeviceSharding(default_device)
+    parameter_file = RelionParticleParameterFile(
+        path_to_starfile=sample_starfile_path, sharding=sharding
+    )
+    # Load parameters and assert they are committed and on sharding
+    parameters = parameter_file[:]
+    assert is_pytree_on_sharding(parameters, sharding)
+    assert is_pytree_committed(parameters)
+    # No sharding
+    parameter_file = RelionParticleParameterFile(
+        path_to_starfile=sample_starfile_path, sharding=None
+    )
+    # Load parameters and assert they are committed and on sharding
+    parameters = parameter_file[:]
+    assert not is_pytree_committed(parameters)
 
 
 #

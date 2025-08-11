@@ -91,8 +91,8 @@ class ParticleParameterInfo(TypedDict):
 class ParticleStackInfo(TypedDict):
     """Particle stack info from RELION."""
 
-    parameters: ParticleParameterInfo
-    images: Float[Array, "... y_dim x_dim"]
+    parameters: Optional[ParticleParameterInfo]
+    images: Float[np.ndarray, "... y_dim x_dim"]
 
 
 ParticleParameterLike = dict[str, Any] | ParticleParameterInfo
@@ -172,12 +172,12 @@ class AbstractParticleStarFile(
 
     @property
     @abc.abstractmethod
-    def broadcasts_optics_group(self) -> bool:
+    def broadcasts_image_config(self) -> bool:
         raise NotImplementedError
 
-    @broadcasts_optics_group.setter
+    @broadcasts_image_config.setter
     @abc.abstractmethod
-    def broadcasts_optics_group(self, value: bool):
+    def broadcasts_image_config(self, value: bool):
         raise NotImplementedError
 
     @property
@@ -217,8 +217,9 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
         exists_ok: bool = False,
         selection_filter: Optional[dict[str, Callable]] = None,
         *,
+        sharding: Optional[jax.sharding.Sharding] = None,
         loads_metadata: bool = False,
-        broadcasts_optics_group: bool = True,
+        broadcasts_image_config: bool = True,
         loads_envelope: bool = False,
         updates_optics_group: bool = False,
         inverts_rotation: bool = False,
@@ -250,16 +251,19 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
             column and returns a boolean mask for the column. For example,
             filter by class using
             `selection_filter["rlnClassNumber"] = lambda x: x == 0`.
+        - `sharding`:
+            Optionally, specify the sharding on which to load the parameters.
+            See `jax.device_put` for more details. If `None`, then parameters
+            are loaded as JAX arrays uncommitted on the default device.
         - `loads_metadata`:
             If `True`, the resulting `ParticleParameterInfo` dict loads
             the raw metadata from the STAR file that is not otherwise included
             in the `ParticleParameterInfo` as a `pandas.DataFrame`.
             If this is set to `True`, note that dictionaries cannot pass through
             JIT boundaries without removing the metadata.
-        - `broadcasts_optics_group`:
-            If `True`, select optics group parameters are broadcasted. If
-            there are multiple optics groups in the STAR file, parameters
-            are always broadcasted and this option is null.
+        - `broadcasts_image_config`:
+            If `True`, image config parameters are broadcasted with leading dimension
+            as the number of particles.
         - `loads_envelope`:
             If `True`, read in the parameters of the CTF envelope function, i.e.
             "rlnCtfScalefactor" and "rlnCtfBfactor".
@@ -273,12 +277,12 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
             using the fourier slice extraction and other voxel representations.
         - `make_config_fn`:
             A function used for `BasicImageConfig` initialization that returns
-            an `BasicImageConfig`. This is used to customize the metadata of the
-            read object.
+            an `BasicImageConfig`.
         """
         # Private attributes
         self._make_config_fn = make_config_fn
         self._mode = _validate_mode(mode)
+        self._sharding = sharding
         # The STAR file data
         self._path_to_starfile = pathlib.Path(path_to_starfile)
         self._starfile_data = _load_starfile_data(
@@ -286,7 +290,7 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
         )
         # Properties for loading
         self._loads_metadata = loads_metadata
-        self._broadcasts_optics_group = broadcasts_optics_group
+        self._broadcasts_image_config = broadcasts_image_config
         self._loads_envelope = loads_envelope
         # Properties for writing
         self._updates_optics_group = updates_optics_group
@@ -312,9 +316,10 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
         image_config, transfer_theory, pose = _make_pytrees_from_starfile(
             particle_data_at_index,
             optics_group,
-            self.broadcasts_optics_group,
+            self.broadcasts_image_config,
             self.loads_envelope,
             self._make_config_fn,
+            self._sharding,
         )
         if self.loads_metadata:
             # ... convert to dataframe for serialization
@@ -516,13 +521,13 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
 
     @property
     @override
-    def broadcasts_optics_group(self) -> bool:
-        return self._broadcasts_optics_group
+    def broadcasts_image_config(self) -> bool:
+        return self._broadcasts_image_config
 
-    @broadcasts_optics_group.setter
+    @broadcasts_image_config.setter
     @override
-    def broadcasts_optics_group(self, value: bool):
-        self._broadcasts_optics_group = value
+    def broadcasts_image_config(self, value: bool):
+        self._broadcasts_image_config = value
 
     @property
     @override
@@ -556,6 +561,8 @@ class RelionParticleStackDataset(
         path_to_relion_project: str | pathlib.Path,
         mode: Literal["r", "w"] = "r",
         mrcfile_settings: dict[str, Any] = {},
+        *,
+        loads_parameters: bool = True,
     ):
         """**Arguments:**
 
@@ -596,6 +603,8 @@ class RelionParticleStackDataset(
                 for `n_characters = 5` and `prefix = 'f'`.
             - 'overwrite':
                 If `True`, overwrite existing MRC file path if it exists.
+        - `loads_parameters`:
+            If `True`, load parameters and images. Otherwise, load only images.
         """
         # Set properties. First, core properties of the dataset, starting
         # with the `mode``
@@ -611,9 +620,11 @@ class RelionParticleStackDataset(
         if mode == "w" and images_exist:
             parameter_file = parameter_file.copy()
         self._parameter_file = parameter_file
-        # ... next, properties common to reading and writing images
+        # ... properties common to reading and writing images
         self._path_to_relion_project = pathlib.Path(path_to_relion_project)
-        # ... last, properties for writing images
+        # ... properties for reading images
+        self._loads_parameters = loads_parameters
+        # ... properties for writing images
         self._mrcfile_settings = _dict_to_mrcfile_settings(mrcfile_settings)
         # Now, initialize for `mode = 'r'` vs `mode = 'w'`
         project_exists = self.path_to_relion_project.exists()
@@ -647,33 +658,60 @@ class RelionParticleStackDataset(
     def __getitem__(
         self, index: int | slice | Int[np.ndarray, ""] | Int[np.ndarray, " N"]
     ) -> ParticleStackInfo:
-        # ... make sure particle metadata is being loaded
-        loads_metadata = self.parameter_file.loads_metadata
-        self.parameter_file.loads_metadata = True
-        # ... read parameters
-        parameters = self.parameter_file[index]
-        # ... and construct dataframe
-        particle_dataframe_at_index = cast(pd.DataFrame, parameters["metadata"])
-        if "rlnImageName" not in particle_dataframe_at_index.columns:
-            raise IOError(
-                "Tried to read STAR file for "
-                f"`RelionParticleStackDataset` index = {index}, "
-                "but no entry found for 'rlnImageName'."
+        if self.loads_parameters:
+            # Load images and parameters. First, read parameters
+            # and metadata from the STAR file
+            loads_metadata = self.parameter_file.loads_metadata
+            self.parameter_file.loads_metadata = True
+            # ... read parameters
+            parameters = self.parameter_file[index]
+            # ... validate the metadata
+            particle_data_at_index = cast(pd.DataFrame, parameters["metadata"])
+            _validate_rln_image_name_exists(particle_data_at_index, index)
+            # ... reset boolean to original value
+            self.parameter_file.loads_metadata = loads_metadata
+            if not loads_metadata:
+                parameters["metadata"] = None
+            # ... grab shape
+            shape = parameters["image_config"].shape
+            # ... load stack of images
+            images = _load_image_stack_from_mrc(
+                shape, particle_data_at_index, self.path_to_relion_project
             )
-        # ... then, load stack of images
-        shape = parameters["image_config"].shape
-        images = _load_image_stack_from_mrc(
-            shape, particle_dataframe_at_index, self.path_to_relion_project
-        )
-        if parameters["pose"].offset_x_in_angstroms.ndim == 0:
-            images = jnp.squeeze(images)
+            # ... make sure images and parameters have same leading dim
+            if parameters["pose"].offset_x_in_angstroms.ndim == 0:
+                images = np.squeeze(images)
 
-        # ... reset boolean
-        self.parameter_file.loads_metadata = loads_metadata
-        if not loads_metadata:
-            parameters["metadata"] = None
+            return ParticleStackInfo(parameters=parameters, images=images)
+        else:
+            # Otherwise, do not read parameters to more efficiently read images. First,
+            # validate the dataset index.
+            n_rows = self.parameter_file.starfile_data["particles"].shape[0]
+            _validate_dataset_index(type(self), index, n_rows)
+            # ... read particle data at the requested indices
+            particle_data = self.parameter_file.starfile_data["particles"]
+            particle_data_at_index = particle_data.iloc[index]
+            if isinstance(particle_data_at_index, pd.Series):
+                particle_data_at_index = particle_data_at_index.to_frame().T
+            _validate_rln_image_name_exists(particle_data_at_index, index)
+            # ... grab shape by reading the optics group
+            optics_data = self.parameter_file.starfile_data["optics"]
+            optics_group = _get_optics_group_from_particle_data(
+                particle_data_at_index, optics_data
+            )
+            image_size = int(optics_group["rlnImageSize"])
+            shape = (image_size, image_size)
+            # ... load stack of images
+            images = _load_image_stack_from_mrc(
+                shape, particle_data_at_index, self.path_to_relion_project
+            )
+            # ... make sure image leading dim matches with index query
+            if isinstance(index, int) or (
+                isinstance(index, np.ndarray) and index.size == 0
+            ):
+                images = np.squeeze(images)
 
-        return ParticleStackInfo(parameters=parameters, images=images)
+            return ParticleStackInfo(parameters=None, images=images)
 
     @override
     def __len__(self) -> int:
@@ -832,6 +870,14 @@ class RelionParticleStackDataset(
     def mrcfile_settings(self, value: dict[str, Any]):
         self._mrcfile_settings = _dict_to_mrcfile_settings(value)
 
+    @property
+    def loads_parameters(self) -> bool:
+        return self._loads_parameters
+
+    @loads_parameters.setter
+    def loads_parameters(self, value: bool):
+        self._loads_parameters = value
+
 
 def _load_starfile_data(
     path_to_starfile: pathlib.Path,
@@ -949,10 +995,12 @@ def _select_particles(
 def _make_pytrees_from_starfile(
     starfile_dataframe,
     optics_group,
-    broadcasts_optics_group,
+    broadcasts_image_config,
     loads_envelope,
     make_config_fn,
+    sharding,
 ) -> tuple[BasicImageConfig, ContrastTransferTheory, EulerAnglePose]:
+    # Load CTF parameters
     defocus_in_angstroms = (
         np.asarray(starfile_dataframe["rlnDefocusU"], dtype=float)
         + np.asarray(starfile_dataframe["rlnDefocusV"], dtype=float)
@@ -962,28 +1010,21 @@ def _make_pytrees_from_starfile(
     ) - np.asarray(starfile_dataframe["rlnDefocusV"], dtype=float)
     astigmatism_angle = np.asarray(starfile_dataframe["rlnDefocusAngle"], dtype=float)
     phase_shift = np.asarray(starfile_dataframe["rlnPhaseShift"], dtype=float)
-    # ... optics group data
-    image_size = int(optics_group["rlnImageSize"])
-    pixel_size = np.asarray(optics_group["rlnImagePixelSize"], dtype=float)
-    voltage_in_kilovolts = np.asarray(optics_group["rlnVoltage"], dtype=float)
     spherical_aberration_in_mm = np.asarray(
         optics_group["rlnSphericalAberration"], dtype=float
     )
     amplitude_contrast_ratio = np.asarray(
         optics_group["rlnAmplitudeContrast"], dtype=float
     )
-    # ... create cryojax objects. First, the BasicImageConfig
-    image_shape = (image_size, image_size)
-    batch_dim = 0 if defocus_in_angstroms.ndim == 0 else defocus_in_angstroms.shape[0]
-    image_config = _make_config(
-        image_shape,
-        pixel_size,
-        voltage_in_kilovolts,
-        batch_dim,
-        make_config_fn,
-        broadcasts_optics_group,
+    ctf_params = (
+        defocus_in_angstroms,
+        astigmatism_in_angstroms,
+        astigmatism_angle,
+        spherical_aberration_in_mm,
+        amplitude_contrast_ratio,
+        phase_shift,
     )
-    # ... now the ContrastTransferTheory
+    # Envelope parameters
     if loads_envelope:
         b_factor, scale_factor = (
             (
@@ -997,23 +1038,13 @@ def _make_pytrees_from_starfile(
                 else None
             ),
         )
-        envelope = _make_envelope_function(scale_factor, b_factor)
     else:
-        envelope = None
-
-    transfer_theory = _make_transfer_theory(
-        defocus_in_angstroms,
-        astigmatism_in_angstroms,
-        astigmatism_angle,
-        spherical_aberration_in_mm,
-        amplitude_contrast_ratio,
-        phase_shift,
-        envelope,
-    )
-    # ... and finally, the EulerAnglePose
-    pose = EulerAnglePose()
-    # ... values for the pose are optional, so look to see if
-    # each key is present
+        b_factor, scale_factor = None, None
+    # Image config parameters
+    voltage_in_kilovolts = np.asarray(optics_group["rlnVoltage"], dtype=float)
+    pixel_size = np.asarray(optics_group["rlnImagePixelSize"], dtype=float)
+    # Pose parameters. Values for the pose are optional,
+    # so look to see if each key is present
     particle_keys = starfile_dataframe.keys()
     # Read the pose. first, xy offsets
     rln_origin_x_angst = (
@@ -1069,36 +1100,46 @@ def _make_pytrees_from_starfile(
     # Now, flip the sign of the translations and transpose rotations.
     # RELION's convention thinks about the translation as "undoing" the translation
     # and rotation in the image
-    pose_parameter_names = (
-        "offset_x_in_angstroms",
-        "offset_y_in_angstroms",
-        "phi_angle",
-        "theta_angle",
-        "psi_angle",
-    )
-    pose_parameter_values = (
-        -np.asarray(rln_origin_x_angst, dtype=float),
-        -np.asarray(rln_origin_y_angst, dtype=float),
-        -np.asarray(rln_angle_rot, dtype=float),
-        -np.asarray(rln_angle_tilt, dtype=float),
-        -np.asarray(rln_angle_psi, dtype=float),
-    )
-    # ... fill the EulerAnglePose will keys that are present. if they are not
-    # present, keep the default values in the `pose = EulerAnglePose()`
-    # instantiation
+    batch_dim = 0 if defocus_in_angstroms.ndim == 0 else defocus_in_angstroms.shape[0]
     maybe_make_full = lambda param: (
         np.full((batch_dim,), param) if batch_dim > 0 and param.shape == () else param
     )
-    pose = eqx.tree_at(
-        lambda p: tuple([getattr(p, name) for name in pose_parameter_names]),
-        pose,
-        tuple(
-            [
-                jnp.asarray(maybe_make_full(value), dtype=float)
-                for value in pose_parameter_values
-            ]
-        ),
+    pose_params = tuple(
+        maybe_make_full(x)
+        for x in (
+            -np.asarray(rln_origin_x_angst, dtype=float),
+            -np.asarray(rln_origin_y_angst, dtype=float),
+            -np.asarray(rln_angle_rot, dtype=float),
+            -np.asarray(rln_angle_tilt, dtype=float),
+            -np.asarray(rln_angle_psi, dtype=float),
+        )
     )
+    # Load on the specified sharding if given
+    if sharding is not None:
+        pose_params = jax.device_put(pose_params, sharding)
+        ctf_params = jax.device_put(ctf_params, sharding)
+        pixel_size, voltage_in_kilovolts = jax.device_put(
+            (pixel_size, voltage_in_kilovolts), sharding
+        )
+        if loads_envelope:
+            b_factor, scale_factor = jax.device_put((b_factor, scale_factor), sharding)
+    # Now, create cryojax objects. First, the `BasicImageConfig`
+    image_size = int(optics_group["rlnImageSize"])
+    image_shape = (image_size, image_size)
+    image_config = _make_config(
+        image_shape,
+        pixel_size,
+        voltage_in_kilovolts,
+        batch_dim,
+        make_config_fn,
+        broadcasts_image_config,
+    )
+    # ... now the `ContrastTransferTheory`
+    envelope = _make_envelope_function(scale_factor, b_factor) if loads_envelope else None
+    transfer_theory_params = (*ctf_params, envelope)
+    transfer_theory = _make_transfer_theory(*transfer_theory_params)  # type: ignore
+    # ... finally the `EulerAnglePose`
+    pose = _make_pose(*pose_params)
 
     return image_config, transfer_theory, pose
 
@@ -1109,10 +1150,10 @@ def _make_config(
     voltage_in_kilovolts,
     batch_dim,
     make_config_fn,
-    broadcasts_optics_group,
+    broadcasts_image_config,
 ):
     make_fn = lambda ps, volt: make_config_fn(image_shape, ps, volt)
-    if broadcasts_optics_group:
+    if broadcasts_image_config:
         make_fn_vmap = eqx.filter_vmap(make_fn)
         return (
             make_fn(pixel_size, voltage_in_kilovolts)
@@ -1126,12 +1167,23 @@ def _make_config(
         return make_fn(pixel_size, voltage_in_kilovolts)
 
 
+def _make_pose(offset_x, offset_y, phi, theta, psi):
+    return EulerAnglePose(
+        offset_x_in_angstroms=offset_x,
+        offset_y_in_angstroms=offset_y,
+        phi_angle=phi,
+        theta_angle=theta,
+        psi_angle=psi,
+    )
+
+
 def _make_envelope_function(amp, b_factor):
     if b_factor is None and amp is None:
         warnings.warn(
-            "loads_envelope was set to True, but no envelope parameters were found. "
-            + "Setting envelope as None. "
-            + "Make sure your starfile is correctly formatted or set loads_envelope=False"
+            "`loads_envelope` was set to True, but no envelope parameters were found. "
+            "Setting envelope as None. "
+            "Make sure your starfile is correctly formatted or set "
+            "`loads_envelope=False`."
         )
         return None
 
@@ -1223,7 +1275,7 @@ def _load_image_stack_from_mrc(
     shape: tuple[int, int],
     particle_dataframe_at_index: pd.DataFrame,
     path_to_relion_project: str | pathlib.Path,
-) -> Float[Array, "... y_dim x_dim"]:
+) -> Float[np.ndarray, "... y_dim x_dim"]:
     # Load particle image stack rlnImageName
     rln_image_names = particle_dataframe_at_index["rlnImageName"].reset_index(drop=True)
     if rln_image_names.convert_dtypes().dtype != "string":
@@ -1269,7 +1321,7 @@ def _load_image_stack_from_mrc(
                 mrc_data if mrc_ndim == 2 else mrc_data[mrc_index_at_filename]
             )
 
-    return jnp.asarray(image_stack)
+    return image_stack
 
 
 def _validate_dataset_index(cls, index, n_rows):
@@ -1324,6 +1376,15 @@ def _validate_starfile_data(starfile_data: dict[str, pd.DataFrame]):
                 "Missing required keys in starfile 'optics' group. "
                 f"Required keys are {required_optics_keys}."
             )
+
+
+def _validate_rln_image_name_exists(particle_data, index):
+    if "rlnImageName" not in particle_data.columns:
+        raise IOError(
+            "Tried to read STAR file for "
+            f"`RelionParticleStackDataset` index = {index}, "
+            "but no entry found for 'rlnImageName'."
+        )
 
 
 #
