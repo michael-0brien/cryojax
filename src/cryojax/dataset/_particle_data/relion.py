@@ -217,7 +217,6 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
         exists_ok: bool = False,
         selection_filter: Optional[dict[str, Callable]] = None,
         *,
-        sharding: Optional[jax.sharding.Sharding] = None,
         loads_metadata: bool = False,
         broadcasts_image_config: bool = True,
         loads_envelope: bool = False,
@@ -251,10 +250,6 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
             column and returns a boolean mask for the column. For example,
             filter by class using
             `selection_filter["rlnClassNumber"] = lambda x: x == 0`.
-        - `sharding`:
-            Optionally, specify the sharding on which to load the parameters.
-            See `jax.device_put` for more details. If `None`, then parameters
-            are loaded as JAX arrays uncommitted on the default device.
         - `loads_metadata`:
             If `True`, the resulting `ParticleParameterInfo` dict loads
             the raw metadata from the STAR file that is not otherwise included
@@ -282,7 +277,6 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
         # Private attributes
         self._make_config_fn = make_config_fn
         self._mode = _validate_mode(mode)
-        self._sharding = sharding
         # The STAR file data
         self._path_to_starfile = pathlib.Path(path_to_starfile)
         self._starfile_data = _load_starfile_data(
@@ -319,7 +313,7 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
             self.broadcasts_image_config,
             self.loads_envelope,
             self._make_config_fn,
-            self._sharding,
+            self._inverts_rotation,
         )
         if self.loads_metadata:
             # ... convert to dataframe for serialization
@@ -334,9 +328,6 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
             metadata = particle_data_at_index.drop(remove_columns, axis="columns")
         else:
             metadata = None
-        # Invert the rotation if desired
-        if self.inverts_rotation:
-            pose = _invert_rotation(pose)
 
         return ParticleParameterInfo(
             image_config=image_config,
@@ -998,7 +989,7 @@ def _make_pytrees_from_starfile(
     broadcasts_image_config,
     loads_envelope,
     make_config_fn,
-    sharding,
+    inverts_rotation,
 ) -> tuple[BasicImageConfig, ContrastTransferTheory, EulerAnglePose]:
     # Load CTF parameters
     defocus_in_angstroms = (
@@ -1114,32 +1105,36 @@ def _make_pytrees_from_starfile(
             -np.asarray(rln_angle_psi, dtype=float),
         )
     )
-    # Load on the specified sharding if given
-    if sharding is not None:
-        pose_params = jax.device_put(pose_params, sharding)
-        ctf_params = jax.device_put(ctf_params, sharding)
-        pixel_size, voltage_in_kilovolts = jax.device_put(
-            (pixel_size, voltage_in_kilovolts), sharding
+    # Now, create cryojax objects. Do this on the CPU
+    cpu_device = jax.devices(backend="cpu")[0]
+    with jax.default_device(cpu_device):
+        # First, create the `BasicImageConfig`
+        image_size = int(optics_group["rlnImageSize"])
+        image_shape = (image_size, image_size)
+        image_config = _make_config(
+            image_shape,
+            pixel_size,
+            voltage_in_kilovolts,
+            batch_dim,
+            make_config_fn,
+            broadcasts_image_config,
         )
-        if loads_envelope:
-            b_factor, scale_factor = jax.device_put((b_factor, scale_factor), sharding)
-    # Now, create cryojax objects. First, the `BasicImageConfig`
-    image_size = int(optics_group["rlnImageSize"])
-    image_shape = (image_size, image_size)
-    image_config = _make_config(
-        image_shape,
-        pixel_size,
-        voltage_in_kilovolts,
-        batch_dim,
-        make_config_fn,
-        broadcasts_image_config,
+        # ... now the `ContrastTransferTheory`
+        envelope = (
+            _make_envelope_function(scale_factor, b_factor) if loads_envelope else None
+        )
+        transfer_theory_params = (*ctf_params, envelope)
+        transfer_theory = _make_transfer_theory(*transfer_theory_params)  # type: ignore
+        # ... finally the `EulerAnglePose`
+        pose = _make_pose(*pose_params)
+        if inverts_rotation:
+            pose = _invert_rotation(pose)
+    # Now, convert arrays to numpy in case the user wishes to do preprocessing
+    pytree_dynamic, pytree_static = eqx.partition(
+        (image_config, transfer_theory, pose), eqx.is_array
     )
-    # ... now the `ContrastTransferTheory`
-    envelope = _make_envelope_function(scale_factor, b_factor) if loads_envelope else None
-    transfer_theory_params = (*ctf_params, envelope)
-    transfer_theory = _make_transfer_theory(*transfer_theory_params)  # type: ignore
-    # ... finally the `EulerAnglePose`
-    pose = _make_pose(*pose_params)
+    pytree_dynamic = jax.tree.map(lambda x: np.asarray(x), pytree_dynamic)
+    image_config, transfer_theory, pose = eqx.combine(pytree_dynamic, pytree_static)
 
     return image_config, transfer_theory, pose
 

@@ -523,39 +523,6 @@ def test_no_load_parameters(sample_starfile_path, sample_relion_project_path):
     return
 
 
-def test_load_on_sharding(sample_starfile_path):
-    """Test loading a starfile with mrcs."""
-    is_pytree_on_sharding = lambda pytree, sharding: all(
-        jax.tree.leaves(
-            jax.tree.map(
-                lambda x: x.sharding == sharding, eqx.filter(pytree, eqx.is_array)
-            )
-        )
-    )
-    is_pytree_committed = lambda pytree: all(
-        jax.tree.leaves(
-            jax.tree.map(lambda x: x.committed, eqx.filter(pytree, eqx.is_array))
-        )
-    )
-    # Default device sharding
-    default_device = jax.devices()[0]
-    sharding = jax.sharding.SingleDeviceSharding(default_device)
-    parameter_file = RelionParticleParameterFile(
-        path_to_starfile=sample_starfile_path, sharding=sharding
-    )
-    # Load parameters and assert they are committed and on sharding
-    parameters = parameter_file[:]
-    assert is_pytree_on_sharding(parameters, sharding)
-    assert is_pytree_committed(parameters)
-    # No sharding
-    parameter_file = RelionParticleParameterFile(
-        path_to_starfile=sample_starfile_path, sharding=None
-    )
-    # Load parameters and assert they are committed and on sharding
-    parameters = parameter_file[:]
-    assert not is_pytree_committed(parameters)
-
-
 #
 # Tests for starfile writing
 #
