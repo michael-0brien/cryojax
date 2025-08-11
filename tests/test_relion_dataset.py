@@ -508,6 +508,7 @@ def test_no_load_parameters(sample_starfile_path, sample_relion_project_path):
     assert (
         particle_stack_params["images"].shape == particle_stack_noparams["images"].shape
     )
+    assert isinstance(particle_stack_params["images"], np.ndarray)
 
     # For particle stack with no leading dim
     dataset.loads_parameters = True
@@ -517,6 +518,7 @@ def test_no_load_parameters(sample_starfile_path, sample_relion_project_path):
     assert (
         particle_stack_params["images"].shape == particle_stack_noparams["images"].shape
     )
+    assert isinstance(particle_stack_noparams["images"], np.ndarray)
 
     return
 
