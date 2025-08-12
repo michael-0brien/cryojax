@@ -128,3 +128,18 @@ class StopGradientTransform(AbstractPyTreeTransform[T]):
         return eqx.combine(
             jax.lax.stop_gradient(self.pytree_differentiable), self.pytree_static
         )
+
+
+class StaticTransform(AbstractPyTreeTransform[T]):
+    """Wraps non-arrays into the PyTree structure."""
+
+    pytree_dynamic: T
+    pytree_static: T = field(static=True)
+
+    def __init__(self, pytree: T):
+        self.pytree_dynamic, self.pytree_static = eqx.partition(pytree, eqx.is_array)
+
+    @property
+    @override
+    def value(self) -> T:
+        return eqx.combine(self.pytree_dynamic, self.pytree_static)

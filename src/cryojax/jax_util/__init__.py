@@ -24,6 +24,7 @@ from ._grid_search import (
 from ._pytree_transforms import (
     AbstractPyTreeTransform as AbstractPyTreeTransform,
     CustomTransform as CustomTransform,
+    StaticTransform as StaticTransform,
     StopGradientTransform as StopGradientTransform,
     resolve_transforms as resolve_transforms,
 )
