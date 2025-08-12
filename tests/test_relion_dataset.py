@@ -196,10 +196,11 @@ def test_default_make_config_fn(sample_starfile_path):
         voltage_in_kilovolts=300.0,
         pad_options=dict(mode="constant", shape=(16, 16)),
     )
-
     assert image_config.shape == ref_config.shape
-    assert image_config.pixel_size == ref_config.pixel_size
-    assert image_config.voltage_in_kilovolts == ref_config.voltage_in_kilovolts
+    assert image_config.pixel_size == np.asarray(ref_config.pixel_size)
+    assert image_config.voltage_in_kilovolts == np.asarray(
+        ref_config.voltage_in_kilovolts
+    )
 
     assert image_config.padded_shape == ref_config.padded_shape
     assert image_config.pad_mode == ref_config.pad_mode

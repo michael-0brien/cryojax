@@ -984,28 +984,31 @@ def _select_particles(
 # STAR file reading
 #
 def _make_pytrees_from_starfile(
-    starfile_dataframe,
-    optics_group,
+    particle_data,
+    optics_data,
     broadcasts_image_config,
     loads_envelope,
     make_config_fn,
     inverts_rotation,
 ) -> tuple[BasicImageConfig, ContrastTransferTheory, EulerAnglePose]:
-    # Load CTF parameters
+    float_dtype = jax.dtypes.canonicalize_dtype(float)
+    # Load CTF parameters. First from particle data
     defocus_in_angstroms = (
-        np.asarray(starfile_dataframe["rlnDefocusU"], dtype=float)
-        + np.asarray(starfile_dataframe["rlnDefocusV"], dtype=float)
+        np.asarray(particle_data["rlnDefocusU"], dtype=float_dtype)
+        + np.asarray(particle_data["rlnDefocusV"], dtype=float_dtype)
     ) / 2
     astigmatism_in_angstroms = np.asarray(
-        starfile_dataframe["rlnDefocusU"], dtype=float
-    ) - np.asarray(starfile_dataframe["rlnDefocusV"], dtype=float)
-    astigmatism_angle = np.asarray(starfile_dataframe["rlnDefocusAngle"], dtype=float)
-    phase_shift = np.asarray(starfile_dataframe["rlnPhaseShift"], dtype=float)
-    spherical_aberration_in_mm = np.asarray(
-        optics_group["rlnSphericalAberration"], dtype=float
+        particle_data["rlnDefocusU"], dtype=float_dtype
+    ) - np.asarray(particle_data["rlnDefocusV"], dtype=float_dtype)
+    astigmatism_angle = np.asarray(particle_data["rlnDefocusAngle"], dtype=float_dtype)
+    phase_shift = np.asarray(particle_data["rlnPhaseShift"], dtype=float_dtype)
+    # Then from optics data
+    batch_dim = 0 if defocus_in_angstroms.ndim == 0 else defocus_in_angstroms.shape[0]
+    spherical_aberration_in_mm = np.full(
+        (batch_dim,), np.asarray(optics_data["rlnSphericalAberration"], dtype=float_dtype)
     )
-    amplitude_contrast_ratio = np.asarray(
-        optics_group["rlnAmplitudeContrast"], dtype=float
+    amplitude_contrast_ratio = np.full(
+        (batch_dim,), np.asarray(optics_data["rlnAmplitudeContrast"], dtype=float_dtype)
     )
     ctf_params = (
         defocus_in_angstroms,
@@ -1019,61 +1022,60 @@ def _make_pytrees_from_starfile(
     if loads_envelope:
         b_factor, scale_factor = (
             (
-                np.asarray(starfile_dataframe["rlnCtfBfactor"], dtype=float)
-                if "rlnCtfBfactor" in starfile_dataframe.keys()
+                np.asarray(particle_data["rlnCtfBfactor"], dtype=float_dtype)
+                if "rlnCtfBfactor" in particle_data.keys()
                 else None
             ),
             (
-                np.asarray(starfile_dataframe["rlnCtfScalefactor"], dtype=float)
-                if "rlnCtfScalefactor" in starfile_dataframe.keys()
+                np.asarray(particle_data["rlnCtfScalefactor"], dtype=float_dtype)
+                if "rlnCtfScalefactor" in particle_data.keys()
                 else None
             ),
         )
     else:
         b_factor, scale_factor = None, None
     # Image config parameters
-    voltage_in_kilovolts = np.asarray(optics_group["rlnVoltage"], dtype=float)
-    pixel_size = np.asarray(optics_group["rlnImagePixelSize"], dtype=float)
+    pixel_size = np.asarray(optics_data["rlnImagePixelSize"], dtype=float_dtype)
+    voltage_in_kilovolts = np.asarray(optics_data["rlnVoltage"], dtype=float_dtype)
+    if broadcasts_image_config and batch_dim > 0:
+        pixel_size = np.full((batch_dim,), pixel_size)
+        voltage_in_kilovolts = np.full((batch_dim,), voltage_in_kilovolts)
     # Pose parameters. Values for the pose are optional,
     # so look to see if each key is present
-    particle_keys = starfile_dataframe.keys()
+    particle_keys = particle_data.keys()
     # Read the pose. first, xy offsets
     rln_origin_x_angst = (
-        starfile_dataframe["rlnOriginXAngst"]
-        if "rlnOriginXAngst" in particle_keys
-        else 0.0
+        particle_data["rlnOriginXAngst"] if "rlnOriginXAngst" in particle_keys else 0.0
     )
     rln_origin_y_angst = (
-        starfile_dataframe["rlnOriginYAngst"]
-        if "rlnOriginYAngst" in particle_keys
-        else 0.0
+        particle_data["rlnOriginYAngst"] if "rlnOriginYAngst" in particle_keys else 0.0
     )
     # ... rot angle
     rln_angle_rot = (
-        starfile_dataframe["rlnAngleRot"] if "rlnAngleRot" in particle_keys else 0.0
+        particle_data["rlnAngleRot"] if "rlnAngleRot" in particle_keys else 0.0
     )
     # ... tilt angle
     if "rlnAngleTilt" in particle_keys:
-        rln_angle_tilt = starfile_dataframe["rlnAngleTilt"]
+        rln_angle_tilt = particle_data["rlnAngleTilt"]
     elif "rlnAngleTiltPrior" in particle_keys:  # support for helices
-        rln_angle_tilt = starfile_dataframe["rlnAngleTiltPrior"]
+        rln_angle_tilt = particle_data["rlnAngleTiltPrior"]
     else:
         rln_angle_tilt = 0.0
     # ... psi angle
     if "rlnAnglePsi" in particle_keys:
         # Relion uses -999.0 as a placeholder for an un-estimated in-plane
         # rotation
-        if isinstance(starfile_dataframe["rlnAnglePsi"], pd.Series):
+        if isinstance(particle_data["rlnAnglePsi"], pd.Series):
             # ... check if all values are equal to -999.0. If so, just
             # replace the whole pandas.Series with 0.0
             if (
-                starfile_dataframe["rlnAnglePsi"].nunique() == 1
-                and starfile_dataframe["rlnAnglePsi"].iloc[0] == -999.0
+                particle_data["rlnAnglePsi"].nunique() == 1
+                and particle_data["rlnAnglePsi"].iloc[0] == -999.0
             ):
                 rln_angle_psi = 0.0
             # ... otherwise, replace -999.0 values with 0.0
             else:
-                rln_angle_psi = starfile_dataframe["rlnAnglePsi"].where(
+                rln_angle_psi = particle_data["rlnAnglePsi"].where(
                     lambda x: x != -999.0, 0.0
                 )
         else:
@@ -1081,43 +1083,37 @@ def _make_pytrees_from_starfile(
             # directly check if it is equal to -999.0
             rln_angle_psi = (
                 0.0
-                if starfile_dataframe["rlnAnglePsi"] == -999.0
-                else starfile_dataframe["rlnAnglePsi"]
+                if particle_data["rlnAnglePsi"] == -999.0
+                else particle_data["rlnAnglePsi"]
             )
     elif "rlnAnglePsiPrior" in particle_keys:  # support for helices
-        rln_angle_psi = starfile_dataframe["rlnAnglePsiPrior"]
+        rln_angle_psi = particle_data["rlnAnglePsiPrior"]
     else:
         rln_angle_psi = 0.0
     # Now, flip the sign of the translations and transpose rotations.
     # RELION's convention thinks about the translation as "undoing" the translation
     # and rotation in the image
-    batch_dim = 0 if defocus_in_angstroms.ndim == 0 else defocus_in_angstroms.shape[0]
     maybe_make_full = lambda param: (
         np.full((batch_dim,), param) if batch_dim > 0 and param.shape == () else param
     )
     pose_params = tuple(
         maybe_make_full(x)
         for x in (
-            -np.asarray(rln_origin_x_angst, dtype=float),
-            -np.asarray(rln_origin_y_angst, dtype=float),
-            -np.asarray(rln_angle_rot, dtype=float),
-            -np.asarray(rln_angle_tilt, dtype=float),
-            -np.asarray(rln_angle_psi, dtype=float),
+            -np.asarray(rln_origin_x_angst, dtype=float_dtype),
+            -np.asarray(rln_origin_y_angst, dtype=float_dtype),
+            -np.asarray(rln_angle_rot, dtype=float_dtype),
+            -np.asarray(rln_angle_tilt, dtype=float_dtype),
+            -np.asarray(rln_angle_psi, dtype=float_dtype),
         )
     )
     # Now, create cryojax objects. Do this on the CPU
     cpu_device = jax.devices(backend="cpu")[0]
     with jax.default_device(cpu_device):
         # First, create the `BasicImageConfig`
-        image_size = int(optics_group["rlnImageSize"])
+        image_size = int(optics_data["rlnImageSize"])
         image_shape = (image_size, image_size)
         image_config = _make_config(
-            image_shape,
-            pixel_size,
-            voltage_in_kilovolts,
-            batch_dim,
-            make_config_fn,
-            broadcasts_image_config,
+            image_shape, pixel_size, voltage_in_kilovolts, make_config_fn
         )
         # ... now the `ContrastTransferTheory`
         envelope = (
@@ -1143,23 +1139,13 @@ def _make_config(
     image_shape,
     pixel_size,
     voltage_in_kilovolts,
-    batch_dim,
     make_config_fn,
-    broadcasts_image_config,
 ):
-    make_fn = lambda ps, volt: make_config_fn(image_shape, ps, volt)
-    if broadcasts_image_config:
-        make_fn_vmap = eqx.filter_vmap(make_fn)
-        return (
-            make_fn(pixel_size, voltage_in_kilovolts)
-            if batch_dim == 0
-            else make_fn_vmap(
-                jnp.full((batch_dim,), pixel_size),
-                jnp.full((batch_dim,), voltage_in_kilovolts),
-            )
-        )
-    else:
-        return make_fn(pixel_size, voltage_in_kilovolts)
+    return eqx.tree_at(
+        lambda x: (x.pixel_size, x.voltage_in_kilovolts),
+        make_config_fn(image_shape, 1.0, 1.0),
+        (pixel_size, voltage_in_kilovolts),
+    )
 
 
 def _make_pose(offset_x, offset_y, phi, theta, psi):
@@ -1183,87 +1169,43 @@ def _make_envelope_function(amp, b_factor):
         return None
 
     elif b_factor is None and amp is not None:
-
-        def _make_const_env(amp):
-            return Constant(amp)
-
-        @eqx.filter_vmap(in_axes=0, out_axes=0)
-        def _make_const_env_vmap(amp):
-            return _make_const_env(amp)
-
-        return _make_const_env(amp) if amp.ndim == 0 else _make_const_env_vmap(amp)
+        return eqx.tree_at(lambda x: x.value, Constant(1.0), amp)
     else:
         if amp is None:
-            amp = jnp.asarray(1.0) if b_factor.ndim == 0 else jnp.ones_like(b_factor)
-
-        def _make_gaussian_env(amp, b):
-            return FourierGaussian(amplitude=amp, b_factor=b)
-
-        @eqx.filter_vmap(in_axes=(0, 0), out_axes=0)
-        def _make_gaussian_env_vmap(amp, b):
-            return _make_gaussian_env(amp, b)
-
-        return (
-            _make_gaussian_env(amp, b_factor)
-            if b_factor.ndim == 0
-            else _make_gaussian_env_vmap(amp, b_factor)
+            amp = np.asarray(1.0) if b_factor.ndim == 0 else np.ones_like(b_factor)
+        return eqx.tree_at(
+            lambda x: (x.amplitude, x.b_factor),
+            FourierGaussian(1.0, 1.0),
+            (amp, b_factor),
         )
 
 
 def _make_transfer_theory(defocus, astig, angle, sph, ac, ps, env=None):
-    if env is not None:
+    ctf = eqx.tree_at(
+        lambda x: (
+            x.defocus_in_angstroms,
+            x.astigmatism_in_angstroms,
+            x.astigmatism_angle,
+            x.spherical_aberration_in_mm,
+        ),
+        AberratedAstigmaticCTF(),
+        (defocus, astig, angle, sph),
+    )
+    transfer_theory = ContrastTransferTheory(
+        ctf, envelope=env, amplitude_contrast_ratio=0.1, phase_shift=0.0
+    )
 
-        def _make_w_env(defocus, astig, angle, sph, ac, ps, env):
-            ctf = AberratedAstigmaticCTF(
-                defocus_in_angstroms=defocus,
-                astigmatism_in_angstroms=astig,
-                astigmatism_angle=angle,
-                spherical_aberration_in_mm=sph,
-            )
-            return ContrastTransferTheory(
-                ctf, env, amplitude_contrast_ratio=ac, phase_shift=ps
-            )
-
-        @eqx.filter_vmap(in_axes=(0, 0, 0, None, None, 0, 0), out_axes=0)
-        def _make_w_env_vmap(defocus, astig, angle, sph, ac, ps, env):
-            return _make_w_env(defocus, astig, angle, sph, ac, ps, env)
-
-        return (
-            _make_w_env(defocus, astig, angle, sph, ac, ps, env)
-            if defocus.ndim == 0
-            else _make_w_env_vmap(defocus, astig, angle, sph, ac, ps, env)
-        )
-
-    else:
-
-        def _make_wo_env(defocus, astig, angle, sph, ac, ps):
-            ctf = AberratedAstigmaticCTF(
-                defocus_in_angstroms=defocus,
-                astigmatism_in_angstroms=astig,
-                astigmatism_angle=angle,
-                spherical_aberration_in_mm=sph,
-            )
-            return ContrastTransferTheory(
-                ctf, envelope=None, amplitude_contrast_ratio=ac, phase_shift=ps
-            )
-
-        @eqx.filter_vmap(in_axes=(0, 0, 0, None, None, 0), out_axes=0)
-        def _make_wo_env_vmap(defocus, astig, angle, sph, ac, ps):
-            return _make_wo_env(defocus, astig, angle, sph, ac, ps)
-
-        return (
-            _make_wo_env(defocus, astig, angle, sph, ac, ps)
-            if defocus.ndim == 0
-            else _make_wo_env_vmap(defocus, astig, angle, sph, ac, ps)
-        )
+    return eqx.tree_at(
+        lambda x: (x.amplitude_contrast_ratio, x.phase_shift), transfer_theory, (ac, ps)
+    )
 
 
 def _invert_rotation(pose: EulerAnglePose) -> EulerAnglePose:
-    if pose.offset_x_in_angstroms.ndim == 0:
-        return pose.to_inverse_rotation()
-    else:
-        invert_vmap = eqx.filter_vmap(lambda pose: pose.to_inverse_rotation())
-        return invert_vmap(pose)
+    return eqx.tree_at(
+        lambda x: (x.phi_angle, x.theta_angle, x.psi_angle),
+        pose,
+        (-pose.psi_angle, -pose.theta_angle, -pose.phi_angle),
+    )
 
 
 def _load_image_stack_from_mrc(
