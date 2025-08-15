@@ -1201,10 +1201,15 @@ def _make_transfer_theory(defocus, astig, angle, sph, ac, ps, env=None):
 
 
 def _invert_rotation(pose: EulerAnglePose) -> EulerAnglePose:
+    negate_angle = lambda angle: ((-angle + 180) % 360) - 180
     return eqx.tree_at(
         lambda x: (x.phi_angle, x.theta_angle, x.psi_angle),
         pose,
-        (-pose.psi_angle, -pose.theta_angle, -pose.phi_angle),
+        (
+            negate_angle(pose.psi_angle),
+            negate_angle(pose.theta_angle),
+            negate_angle(pose.phi_angle),
+        ),
     )
 
 

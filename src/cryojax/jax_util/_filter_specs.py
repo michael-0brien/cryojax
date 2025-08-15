@@ -9,7 +9,7 @@ import jax.tree_util as jtu
 from jaxtyping import PyTree
 
 
-def get_filter_spec(
+def make_filter_spec(
     pytree: PyTree,
     where: Callable[[PyTree], Union[Any, Sequence[Any]]],
     *,

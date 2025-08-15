@@ -10,7 +10,7 @@ from ._errors import (
     error_if_not_positive as error_if_not_positive,
     error_if_zero as error_if_zero,
 )
-from ._filter_specs import get_filter_spec as get_filter_spec
+from ._filter_specs import make_filter_spec as make_filter_spec
 from ._grid_search import (
     AbstractGridSearchMethod as AbstractGridSearchMethod,
     MinimumSearchMethod as MinimumSearchMethod,
@@ -24,7 +24,7 @@ from ._grid_search import (
 from ._pytree_transforms import (
     AbstractPyTreeTransform as AbstractPyTreeTransform,
     CustomTransform as CustomTransform,
-    StaticTransform as StaticTransform,
+    NonArrayStaticTransform as NonArrayStaticTransform,
     StopGradientTransform as StopGradientTransform,
     resolve_transforms as resolve_transforms,
 )

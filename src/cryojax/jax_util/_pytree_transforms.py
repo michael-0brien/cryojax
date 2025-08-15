@@ -43,14 +43,15 @@ def resolve_transforms(pytree: T) -> T:
 
 
 class AbstractPyTreeTransform(Module, Generic[T], strict=True):
-    """Base class for a parameter transformation.
+    """Base class for a pytree transformation.
 
-    This interface tries to implement a user-friendly way to get custom
+    This interface can be used to get custom
     per-parameter behavior in pytrees, as described in the [equinox docs](
     https://docs.kidger.site/equinox/tricks/#custom-per-parameter-behaviour).
 
-    Typically this is used to do inference in better geometries or to enforce
-    parameter constraints, however it can be used generally.
+    For example, this used to do inference in better geometries or to
+    enforce parameter constraints, however it can also be used generally for
+    assisting with JAX transformations.
 
     This is a very simple class. When the class is initialized,
     class fields are stored a transformed parameter space. When
@@ -130,7 +131,7 @@ class StopGradientTransform(AbstractPyTreeTransform[T]):
         )
 
 
-class StaticTransform(AbstractPyTreeTransform[T]):
+class NonArrayStaticTransform(AbstractPyTreeTransform[T]):
     """Wraps non-arrays into the PyTree structure."""
 
     pytree_dynamic: T

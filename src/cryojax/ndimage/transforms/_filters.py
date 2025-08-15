@@ -10,6 +10,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float, Inexact
 
 from ...coordinates import make_frequency_grid
+from ...jax_util import NDArrayLike
 from .._average import interpolate_radial_average_on_grid
 from .._edges import resize_with_crop_or_pad
 from .._fft import irfftn, rfftn
@@ -46,9 +47,12 @@ class CustomFilter(AbstractFilter, strict=True):
 
     def __init__(
         self,
-        filter: Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"],
+        filter: (
+            Inexact[NDArrayLike, "y_dim x_dim"]
+            | Inexact[NDArrayLike, "z_dim y_dim x_dim"]
+        ),
     ):
-        self.array = filter
+        self.array = jnp.asarray(filter)
 
 
 class LowpassFilter(AbstractFilter, strict=True):
@@ -63,9 +67,9 @@ class LowpassFilter(AbstractFilter, strict=True):
         frequency_grid_in_angstroms_or_pixels: (
             Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
         ),
-        grid_spacing: float | Float[Array, ""] = 1.0,
-        frequency_cutoff_fraction: float | Float[Array, ""] = 0.95,
-        rolloff_width_fraction: float | Float[Array, ""] = 0.05,
+        grid_spacing: float | Float[NDArrayLike, ""] = 1.0,
+        frequency_cutoff_fraction: float | Float[NDArrayLike, ""] = 0.95,
+        rolloff_width_fraction: float | Float[NDArrayLike, ""] = 0.05,
     ):
         """**Arguments:**
 
@@ -100,9 +104,9 @@ class HighpassFilter(AbstractFilter, strict=True):
         frequency_grid_in_angstroms_or_pixels: (
             Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
         ),
-        grid_spacing: float | Float[Array, ""] = 1.0,
-        frequency_cutoff_fraction: float | Float[Array, ""] = 0.95,
-        rolloff_width_fraction: float | Float[Array, ""] = 0.05,
+        grid_spacing: float | Float[NDArrayLike, ""] = 1.0,
+        frequency_cutoff_fraction: float | Float[NDArrayLike, ""] = 0.95,
+        rolloff_width_fraction: float | Float[NDArrayLike, ""] = 0.05,
     ):
         """**Arguments:**
 
@@ -139,8 +143,8 @@ class WhiteningFilter(AbstractFilter, strict=True):
     def __init__(
         self,
         image_or_image_stack: (
-            Float[Array, "image_y_dim image_x_dim"]
-            | Float[Array, "n_images image_y_dim image_x_dim"]
+            Float[NDArrayLike, "image_y_dim image_x_dim"]
+            | Float[NDArrayLike, "n_images image_y_dim image_x_dim"]
         ),
         shape: Optional[tuple[int, int]] = None,
         *,
@@ -164,7 +168,7 @@ class WhiteningFilter(AbstractFilter, strict=True):
         image_stack = (
             jnp.expand_dims(image_or_image_stack, 0)
             if image_or_image_stack.ndim == 2
-            else image_or_image_stack
+            else jnp.asarray(image_or_image_stack)
         )
         if shape is not None:
             if shape[-2] > image_stack.shape[-2] or shape[-1] > image_stack.shape[-1]:

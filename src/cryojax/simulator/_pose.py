@@ -294,7 +294,7 @@ class QuaternionPose(AbstractPose, strict=True):
         self,
         offset_x_in_angstroms: float | Float[NDArrayLike, ""] = 0.0,
         offset_y_in_angstroms: float | Float[NDArrayLike, ""] = 0.0,
-        wxyz: (tuple[float, float, float, float] | Float[NDArrayLike, "4"]) = (
+        wxyz: tuple[float, float, float, float] | Float[NDArrayLike, "4"] = (
             1.0,
             0.0,
             0.0,
@@ -358,7 +358,7 @@ class AxisAnglePose(AbstractPose, strict=True):
         self,
         offset_x_in_angstroms: float | Float[NDArrayLike, ""] = 0.0,
         offset_y_in_angstroms: float | Float[NDArrayLike, ""] = 0.0,
-        euler_vector: (tuple[float, float, float] | Float[NDArrayLike, "3"]) = (
+        euler_vector: tuple[float, float, float] | Float[NDArrayLike, "3"] = (
             0.0,
             0.0,
             0.0,
