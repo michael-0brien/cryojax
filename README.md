@@ -99,7 +99,7 @@ image = simulate_fn(image_model)
 ```python
 import equinox as eqx
 import jax.numpy as jnp
-from cryojax.jax_util import get_filter_spec
+from cryojax.jax_util import make_filter_spec
 
 # Load observed data
 observed_image = ...
@@ -107,7 +107,7 @@ observed_image = ...
 # Split the `image_model` by differentiated and non-differentiated
 # arguments
 where_pose = lambda model: model.pose
-filter_spec = get_filter_spec(image_model, where_pose)
+filter_spec = make_filter_spec(image_model, where_pose)
 model_grad, model_nograd = eqx.partition(image_model, filter_spec)
 
 @eqx.filter_jit
@@ -127,7 +127,7 @@ gradients = gradient_fn(model_grad, model_nograd, observed_image)
 
 ```python
 import equinox as eqx
-from cryojax.jax_util import get_filter_spec
+from cryojax.jax_util import make_filter_spec
 
 # Vectorize model instantiation
 @eqx.filter_jit
@@ -138,7 +138,7 @@ def make_image_model_vmap(wxyz, volume, image_config, transfer_theory):
         volume, image_config, pose, transfer_theory, normalizes_signal=True
     )
     where_pose = lambda model: model.pose
-    filter_spec = get_filter_spec(image_model, where_pose)
+    filter_spec = make_filter_spec(image_model, where_pose)
     model_vmap, model_novmap = eqx.partition(image_model, filter_spec)
 
     return model_vmap, model_novmap
