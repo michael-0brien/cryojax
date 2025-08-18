@@ -267,7 +267,7 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
     image.
     """
 
-    shape: tuple[int, int] = eqx.field(static=True)
+    shape: tuple[int, int]
     pixel_size: Float[Array, ""]
     voltage_in_kilovolts: Float[Array, ""]
 
@@ -327,7 +327,7 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
     """Configuration and utilities for an electron microscopy image,
     including the electron dose."""
 
-    shape: tuple[int, int] = eqx.field(static=True)
+    shape: tuple[int, int]
     pixel_size: Float[Array, ""]
     voltage_in_kilovolts: Float[Array, ""]
     electrons_per_angstrom_squared: Float[Array, ""]
