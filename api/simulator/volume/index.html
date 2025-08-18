@@ -1,0 +1,3966 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The documentation for cryoJAX.">
+      
+      
+        <meta name="author" content="Michael O'Brien">
+      
+      
+        <link rel="canonical" href="https://mjo22.github.io/cryojax/api/simulator/volume/">
+      
+      
+        <link rel="prev" href="../pose/">
+      
+      
+        <link rel="next" href="../integrator/">
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.17">
+    
+    
+      
+        <title>Modeling cryo-EM volumes - cryoJAX</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.7e37652d.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../../_static/custom_css.css">
+    
+      <link rel="stylesheet" href="../../../css/ansi-colours.css">
+    
+      <link rel="stylesheet" href="../../../css/jupyter-cells.css">
+    
+      <link rel="stylesheet" href="../../../css/pandas-dataframe.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#modeling-cryo-em-volumes" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="cryoJAX" class="md-header__button md-logo" aria-label="cryoJAX" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m20.79 13.95-2.33.62-2-1.13v-2.88l2-1.13 2.33.62.52-1.93-1.77-.47.46-1.77-1.93-.52-.62 2.33-2 1.13L13 7.38V5.12l1.71-1.71L13.29 2 12 3.29 10.71 2 9.29 3.41 11 5.12v2.26L8.5 8.82l-2-1.13-.58-2.33L4 5.88l.47 1.77-1.77.47.52 1.93 2.33-.62 2 1.13v2.89l-2 1.13-2.33-.62-.52 1.93 1.77.47L4 18.12l1.93.52.62-2.33 2-1.13L11 16.62v2.26l-1.71 1.71L10.71 22 12 20.71 13.29 22l1.41-1.41-1.7-1.71v-2.26l2.5-1.45 2 1.13.62 2.33 1.88-.51-.47-1.77 1.77-.47zM9.5 10.56 12 9.11l2.5 1.45v2.88L12 14.89l-2.5-1.45z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            cryoJAX
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Modeling cryo-EM volumes
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/mjo22/cryojax" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    mjo22/cryojax
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="cryoJAX" class="md-nav__button md-logo" aria-label="cryoJAX" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m20.79 13.95-2.33.62-2-1.13v-2.88l2-1.13 2.33.62.52-1.93-1.77-.47.46-1.77-1.93-.52-.62 2.33-2 1.13L13 7.38V5.12l1.71-1.71L13.29 2 12 3.29 10.71 2 9.29 3.41 11 5.12v2.26L8.5 8.82l-2-1.13-.58-2.33L4 5.88l.47 1.77-1.77.47.52 1.93 2.33-.62 2 1.13v2.89l-2 1.13-2.33-.62-.52 1.93 1.77.47L4 18.12l1.93.52.62-2.33 2-1.13L11 16.62v2.26l-1.71 1.71L10.71 22 12 20.71 13.29 22l1.41-1.41-1.7-1.71v-2.26l2.5-1.45 2 1.13.62 2.33 1.88-.51-.47-1.77 1.77-.47zM9.5 10.56 12 9.11l2.5 1.45v2.88L12 14.89l-2.5-1.45z"/></svg>
+
+    </a>
+    cryoJAX
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/mjo22/cryojax" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    mjo22/cryojax
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Welcome to cryoJAX!
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    Examples
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Examples
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_1" id="__nav_2_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Getting started
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_1">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/simulate-image/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Simulate an image
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/jax-transformations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    JAX transformations
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/compute-potential/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Render a volume
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/read-dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Load cryo-EM images
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_2" id="__nav_2_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Your first program
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_2">
+            <span class="md-nav__icon md-icon"></span>
+            Your first program
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/simulate-relion-dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Write a STAR file of simulated data
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    API
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            API
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    cryojax.simulator
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_1">
+            <span class="md-nav__icon md-icon"></span>
+            cryojax.simulator
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Api
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_1_2" id="__nav_3_1_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Representing volumes
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_1_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_1_2">
+            <span class="md-nav__icon md-icon"></span>
+            Representing volumes
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pose/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Representing poses
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Modeling cryo-EM volumes
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Modeling cryo-EM volumes
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#core-base-classes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Core base classes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Core base classes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cryojax.simulator.AbstractVolumeParametrisation" class="md-nav__link">
+    <span class="md-ellipsis">
+      AbstractVolumeParametrisation
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cryojax.simulator.AbstractVolumeRepresentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      AbstractVolumeRepresentation
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#volume-representations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Volume representations
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Volume representations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#point-clouds" class="md-nav__link">
+    <span class="md-ellipsis">
+      Point clouds
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Point clouds">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cryojax.simulator.AbstractPointCloudVolume" class="md-nav__link">
+    <span class="md-ellipsis">
+      AbstractPointCloudVolume
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cryojax.simulator.GaussianMixtureVolume" class="md-nav__link">
+    <span class="md-ellipsis">
+      GaussianMixtureVolume
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cryojax.simulator.PengIndependentAtomPotential" class="md-nav__link">
+    <span class="md-ellipsis">
+      PengIndependentAtomPotential
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#voxel-based" class="md-nav__link">
+    <span class="md-ellipsis">
+      Voxel-based
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Voxel-based">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fourier-space" class="md-nav__link">
+    <span class="md-ellipsis">
+      Fourier-space
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cryojax.simulator.FourierVoxelGridVolume" class="md-nav__link">
+    <span class="md-ellipsis">
+      FourierVoxelGridVolume
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cryojax.simulator.FourierVoxelSplineVolume" class="md-nav__link">
+    <span class="md-ellipsis">
+      FourierVoxelSplineVolume
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#real-space" class="md-nav__link">
+    <span class="md-ellipsis">
+      Real-space
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cryojax.simulator.RealVoxelGridVolume" class="md-nav__link">
+    <span class="md-ellipsis">
+      RealVoxelGridVolume
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parametrising-scattering-potentials" class="md-nav__link">
+    <span class="md-ellipsis">
+      Parametrising scattering potentials
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parametrising scattering potentials">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cryojax.simulator.AbstractPotentialParametrisation" class="md-nav__link">
+    <span class="md-ellipsis">
+      AbstractPotentialParametrisation
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cryojax.simulator.AbstractTabulatedPotential" class="md-nav__link">
+    <span class="md-ellipsis">
+      AbstractTabulatedPotential
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cryojax.simulator.AbstractPengPotential" class="md-nav__link">
+    <span class="md-ellipsis">
+      AbstractPengPotential
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parametrising-ensembles" class="md-nav__link">
+    <span class="md-ellipsis">
+      Parametrising ensembles
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parametrising ensembles">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cryojax.simulator.AbstractEnsembleParametrisation" class="md-nav__link">
+    <span class="md-ellipsis">
+      AbstractEnsembleParametrisation
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cryojax.simulator.DiscreteStructuralEnsemble" class="md-nav__link">
+    <span class="md-ellipsis">
+      DiscreteStructuralEnsemble
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_1_3" id="__nav_3_1_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Image formation
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_1_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_1_3">
+            <span class="md-nav__icon md-icon"></span>
+            Image formation
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Volume integration methods
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transfer_theory/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Contrast transfer functions
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scattering_theory/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Scattering approximations
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_1_4" id="__nav_3_1_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Putting it all together
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_1_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_1_4">
+            <span class="md-nav__icon md-icon"></span>
+            Putting it all together
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Configuring an image
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../image_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Rendering an image
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../noise_model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Distributions: noisy images and likelihoods
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    cryojax.dataset
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            cryojax.dataset
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../dataset/relion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    RELION compatibility
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    cryojax.io
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            cryojax.io
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../io/mrc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Reading and writing MRC files
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../io/atom_loading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Reading atomic structures
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    cryojax.ndimage
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_4">
+            <span class="md-nav__icon md-icon"></span>
+            cryojax.ndimage
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ndimage/functions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Utility functions for image and volume arrays
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_4_2" id="__nav_3_4_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    cryojax.ndimage.operators
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_4_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_4_2">
+            <span class="md-nav__icon md-icon"></span>
+            cryojax.ndimage.operators
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ndimage/operators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Filters and masks
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_4_3" id="__nav_3_4_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    cryojax.ndimage.transforms
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_4_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_4_3">
+            <span class="md-nav__icon md-icon"></span>
+            cryojax.ndimage.transforms
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ndimage/transforms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Transforms
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_5" id="__nav_3_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    cryojax.coordinates
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_5">
+            <span class="md-nav__icon md-icon"></span>
+            cryojax.coordinates
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../coordinates/making_coordinates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Creating coordinate systems
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../coordinates/transforming_coordinates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Transforming coordinate systems
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_6" id="__nav_3_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    cryojax.rotations
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6">
+            <span class="md-nav__icon md-icon"></span>
+            cryojax.rotations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rotations/lie_groups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Representing rotations
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rotations/conversions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Helpers for converting angular parameterizations
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_7" id="__nav_3_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    cryojax.constants
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7">
+            <span class="md-nav__icon md-icon"></span>
+            cryojax.constants
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../constants/units/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Working with physical units
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../constants/scattering_factor_parameters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Scattering factor parameters
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../constants/conventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Converting between common conventions
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_8" id="__nav_3_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    cryojax.jax_util
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8">
+            <span class="md-nav__icon md-icon"></span>
+            cryojax.jax_util
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../jax_util/filter_specs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Helper functions for Equinox filtering
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../jax_util/grid_search/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Grid search interface
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../jax_util/pytree_transforms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Reparameterizing pytrees
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../jax_util/useful_functions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Useful JAX functions
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="modeling-cryo-em-volumes">Modeling cryo-EM volumes<a class="headerlink" href="#modeling-cryo-em-volumes" title="Permanent link">¤</a></h1>
+<p>There are many different volume representations of biological structures for cryo-EM, including atomic models, voxel maps, and neural network representations. Further, there are many ways to generate these volumes, such as from protein generative modeling and molecular dynamics. The optimal implementation to use depends on the user's needs. Therefore, CryoJAX supports a variety of these representations as well as a modeling interface for usage downstream. This page discusses how to use this interface and documents the volumes included in the library.</p>
+<h2 id="core-base-classes">Core base classes<a class="headerlink" href="#core-base-classes" title="Permanent link">¤</a></h2>
+<details class="abstract" open="open">
+<summary><code>cryojax.simulator.AbstractVolumeParametrisation</code></summary>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="cryojax.simulator.AbstractVolumeParametrisation" class="doc doc-heading">
+            <code>cryojax.simulator.AbstractVolumeParametrisation</code>
+
+
+<a href="#cryojax.simulator.AbstractVolumeParametrisation" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+
+        <p>Abstract interface for a parametrisation of a volume.</p>
+
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.AbstractVolumeParametrisation.compute_volume_representation" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractVolumeParametrisation</span><span class="o">.</span><span class="n">compute_volume_representation</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PRNGKeyArray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AbstractVolumeRepresentation</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
+  </span>
+
+<a href="#cryojax.simulator.AbstractVolumeParametrisation.compute_volume_representation" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Core interface for computing the representation of
+the volume.</p>
+
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div></details>
+<details class="abstract" open="open">
+<summary><code>cryojax.simulator.AbstractVolumeRepresentation</code></summary>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="cryojax.simulator.AbstractVolumeRepresentation" class="doc doc-heading">
+            <code>cryojax.simulator.AbstractVolumeRepresentation</code>
+
+
+<a href="#cryojax.simulator.AbstractVolumeRepresentation" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+
+        <p>Abstract interface for the representation of a volume, such
+as atomic coordinates, voxels, or a neural network.</p>
+
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.AbstractVolumeRepresentation.rotate_to_pose" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractVolumeRepresentation</span><span class="o">.</span><span class="n">rotate_to_pose</span><span class="p">(</span><span class="n">pose</span><span class="p">:</span> <span class="n">AbstractPose</span><span class="p">,</span> <span class="n">inverse</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
+  </span>
+
+<a href="#cryojax.simulator.AbstractVolumeRepresentation.rotate_to_pose" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Rotate the coordinate system of the volume.</p>
+
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div></details>
+<h2 id="volume-representations">Volume representations<a class="headerlink" href="#volume-representations" title="Permanent link">¤</a></h2>
+<h3 id="point-clouds">Point clouds<a class="headerlink" href="#point-clouds" title="Permanent link">¤</a></h3>
+<details class="abstract">
+<summary><code>cryojax.simulator.AbstractPointCloudVolume</code></summary>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="cryojax.simulator.AbstractPointCloudVolume" class="doc doc-heading">
+            <code>cryojax.simulator.AbstractPointCloudVolume</code>
+
+
+<a href="#cryojax.simulator.AbstractPointCloudVolume" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+
+        <p>Abstract interface for a volume represented as a point-cloud.</p>
+
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.AbstractPointCloudVolume.translate_to_pose" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractPointCloudVolume</span><span class="o">.</span><span class="n">translate_to_pose</span><span class="p">(</span><span class="n">pose</span><span class="p">:</span> <span class="n">AbstractPose</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
+  </span>
+
+<a href="#cryojax.simulator.AbstractPointCloudVolume.translate_to_pose" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div></details>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="cryojax.simulator.GaussianMixtureVolume" class="doc doc-heading">
+            <code>cryojax.simulator.GaussianMixtureVolume</code>
+
+
+<a href="#cryojax.simulator.GaussianMixtureVolume" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+
+        <p>A representation of a volume as a mixture of
+gaussians, with multiple gaussians used per position.</p>
+<p>The convention of allowing multiple gaussians per position
+follows "Robust Parameterization of Elastic and Absorptive
+Electron Atomic Scattering Factors" by Peng et al. (1996), where
+<code>amplitudes</code> follows <span class="arithmatex">\(a_i\)</span> and <span class="arithmatex">\(b_i\)</span> follows <code>variances</code>
+(multiplied by <span class="arithmatex">\(8\pi^2\)</span> to convert to a variance).</p>
+
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.GaussianMixtureVolume.__init__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">GaussianMixtureVolume</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">positions</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;n_gaussians 3&#39;</span><span class="p">],</span> <span class="n">amplitudes</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;n_positions n_gaussians&#39;</span><span class="p">],</span> <span class="n">variances</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;n_positions n_gaussians&#39;</span><span class="p">])</span></code>
+
+<a href="#cryojax.simulator.GaussianMixtureVolume.__init__" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p><strong>Arguments:</strong></p>
+<ul>
+<li><code>positions</code>:
+    The coordinates of the gaussians in units of angstroms.</li>
+<li><code>amplitudes</code>:
+    The amplitude for each gaussian.
+    To simulate in physical units of a scattering potential,
+    this should have units of angstroms.</li>
+<li><code>variances</code>:
+    The variance for each gaussian. This has units of angstroms
+    squared.</li>
+</ul>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.GaussianMixtureVolume.compute_volume_representation" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">GaussianMixtureVolume</span><span class="o">.</span><span class="n">compute_volume_representation</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PRNGKeyArray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
+
+<a href="#cryojax.simulator.GaussianMixtureVolume.compute_volume_representation" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Since this class is itself an implementation of an
+<code>AbstractVolumeParametrisation</code>, this function maps to the identity.</p>
+<p><strong>Arguments:</strong></p>
+<ul>
+<li><code>rng_key</code>:
+    Not used in this implementation, but optionally
+    included for other implementations.</li>
+</ul>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.GaussianMixtureVolume.rotate_to_pose" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">GaussianMixtureVolume</span><span class="o">.</span><span class="n">rotate_to_pose</span><span class="p">(</span><span class="n">pose</span><span class="p">:</span> <span class="n">AbstractPose</span><span class="p">,</span> <span class="n">inverse</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
+
+<a href="#cryojax.simulator.GaussianMixtureVolume.rotate_to_pose" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return a new potential with rotated <code>positions</code>.</p>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.GaussianMixtureVolume.translate_to_pose" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">GaussianMixtureVolume</span><span class="o">.</span><span class="n">translate_to_pose</span><span class="p">(</span><span class="n">pose</span><span class="p">:</span> <span class="n">AbstractPose</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
+
+<a href="#cryojax.simulator.GaussianMixtureVolume.translate_to_pose" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return a new potential with rotated <code>positions</code>.</p>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.GaussianMixtureVolume.to_real_voxel_grid" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">GaussianMixtureVolume</span><span class="o">.</span><span class="n">to_real_voxel_grid</span><span class="p">(</span><span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">voxel_size</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="nb">float</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">batch_options</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{})</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{shape[0]}</span><span class="s1"> </span><span class="si">{shape[1]}</span><span class="s1"> </span><span class="si">{shape[2]}</span><span class="s1">&#39;</span><span class="p">]</span></code>
+
+<a href="#cryojax.simulator.GaussianMixtureVolume.to_real_voxel_grid" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return a voxel grid of the potential in real space.</p>
+<p><strong>Arguments:</strong></p>
+<ul>
+<li><code>shape</code>: The shape of the resulting voxel grid.</li>
+<li><code>voxel_size</code>: The voxel size of the resulting voxel grid.</li>
+<li><code>batch_options</code>:
+    Advanced options for rendering. This is a dictionary
+    with the following keys:<ul>
+<li>"batch_size":
+    The number of z-planes to evaluate in parallel with
+    <code>jax.vmap</code>. By default, <code>1</code>.</li>
+<li>"n_batches":
+    The number of iterations used to evaluate the volume,
+    where the iteration is taken over groups of gaussians.
+    This is useful if <code>batch_size = 1</code>
+    and GPU memory is exhausted. By default, <code>1</code>.</li>
+</ul>
+</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p>A voxel grid of <code>shape</code> and voxel size <code>voxel_size</code>.</p>
+
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div><hr />
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="cryojax.simulator.PengIndependentAtomPotential" class="doc doc-heading">
+            <code>cryojax.simulator.PengIndependentAtomPotential</code>
+
+
+<a href="#cryojax.simulator.PengIndependentAtomPotential" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+
+        <p>The scattering potential parameterized as a mixture of five
+gaussians per atom (Peng et al. 1996).</p>
+<div class="admonition info">
+<p class="admonition-title">Info</p>
+<p>Use the following to load a <code>PengIndependentAtomPotential</code>
+from tabulated electron scattering factors</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">cryojax.io</span><span class="w"> </span><span class="kn">import</span> <span class="n">read_atoms_from_pdb</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">cryojax.simulator</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">PengIndependentAtomPotential</span><span class="p">,</span> <span class="n">PengScatteringFactorParameters</span>
+<span class="p">)</span>
+
+<span class="c1"># Load positions of atoms and one-hot encoded atom names</span>
+<span class="n">atom_positions</span><span class="p">,</span> <span class="n">atom_types</span> <span class="o">=</span> <span class="n">read_atoms_from_pdb</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+<span class="n">parameters</span> <span class="o">=</span> <span class="n">PengScatteringFactorParameters</span><span class="p">(</span><span class="n">atom_types</span><span class="p">)</span>
+<span class="n">potential</span> <span class="o">=</span> <span class="n">PengIndependentAtomPotential</span><span class="o">.</span><span class="n">from_tabulated_parameters</span><span class="p">(</span>
+    <span class="n">atom_positions</span><span class="p">,</span> <span class="n">parameters</span>
+<span class="p">)</span>
+</code></pre></div>
+</div>
+<p><strong>References:</strong></p>
+<ul>
+<li>Peng, L-M. "Electron atomic scattering factors and scattering potentials of crystals."
+    Micron 30.6 (1999): 625-648.</li>
+<li>Peng, L-M., et al. "Robust parameterization of elastic and absorptive electron atomic
+    scattering factors." Acta Crystallographica Section A: Foundations of Crystallography
+    52.2 (1996): 257-276.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.PengIndependentAtomPotential.__init__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">PengIndependentAtomPotential</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">atom_positions</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;n_atoms 3&#39;</span><span class="p">],</span> <span class="n">amplitudes</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;n_atoms n_gaussians&#39;</span><span class="p">],</span> <span class="n">b_factors</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;n_atoms n_gaussians&#39;</span><span class="p">])</span></code>
+
+<a href="#cryojax.simulator.PengIndependentAtomPotential.__init__" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p><strong>Arguments:</strong></p>
+<ul>
+<li><code>atom_positions</code>:
+    The coordinates of the atoms in units of angstroms.</li>
+<li><code>amplitudes</code>:
+    The strength for each atom and gaussian per atom.
+    This are <span class="arithmatex">\(a_i\)</span> from Peng et al. (1996) and
+    has units of angstroms.</li>
+<li><code>b_factors</code>:
+    The B-factors for each atom and gaussian per atom.
+    This are <span class="arithmatex">\(b_i\)</span> from Peng et al. (1996) and
+    has units of angstroms squared.</li>
+</ul>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.PengIndependentAtomPotential.from_tabulated_parameters" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">PengIndependentAtomPotential</span><span class="o">.</span><span class="n">from_tabulated_parameters</span><span class="p">(</span><span class="n">atom_positions</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;n_atoms 3&#39;</span><span class="p">],</span> <span class="n">parameters</span><span class="p">:</span> <span class="n">PengScatteringFactorParameters</span><span class="p">,</span> <span class="n">extra_b_factors</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39; n_atoms&#39;</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#cryojax.simulator.PengIndependentAtomPotential.from_tabulated_parameters" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Initialize a <code>PengIndependentAtomPotential</code> with a
+convenience wrapper for the scattering factor parameters.</p>
+<p><strong>Arguments:</strong></p>
+<ul>
+<li><code>atom_positions</code>:
+    The coordinates of the atoms in units of angstroms.</li>
+<li><code>parameters</code>:
+    A pytree for the scattering factor parameters from
+    Peng et al. (1996).</li>
+<li><code>extra_b_factors</code>:
+    Additional per-atom B-factors that are added to
+    the values in <code>scattering_parameters.b</code>.</li>
+</ul>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.PengIndependentAtomPotential.compute_volume_representation" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">PengIndependentAtomPotential</span><span class="o">.</span><span class="n">compute_volume_representation</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PRNGKeyArray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
+
+<a href="#cryojax.simulator.PengIndependentAtomPotential.compute_volume_representation" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Since this class is itself an implementation of an
+<code>AbstractVolumeParametrisation</code>, this function maps to the identity.</p>
+<p><strong>Arguments:</strong></p>
+<ul>
+<li><code>rng_key</code>:
+    Not used in this implementation, but optionally
+    included for other implementations.</li>
+</ul>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.PengIndependentAtomPotential.rotate_to_pose" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">PengIndependentAtomPotential</span><span class="o">.</span><span class="n">rotate_to_pose</span><span class="p">(</span><span class="n">pose</span><span class="p">:</span> <span class="n">AbstractPose</span><span class="p">,</span> <span class="n">inverse</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
+
+<a href="#cryojax.simulator.PengIndependentAtomPotential.rotate_to_pose" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return a new potential with rotated <code>atom_positions</code>.</p>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.PengIndependentAtomPotential.translate_to_pose" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">PengIndependentAtomPotential</span><span class="o">.</span><span class="n">translate_to_pose</span><span class="p">(</span><span class="n">pose</span><span class="p">:</span> <span class="n">AbstractPose</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
+
+<a href="#cryojax.simulator.PengIndependentAtomPotential.translate_to_pose" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return a new potential with rotated <code>atom_positions</code>.</p>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.PengIndependentAtomPotential.to_real_voxel_grid" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">PengIndependentAtomPotential</span><span class="o">.</span><span class="n">to_real_voxel_grid</span><span class="p">(</span><span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">voxel_size</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="nb">float</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">batch_options</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{})</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{shape[0]}</span><span class="s1"> </span><span class="si">{shape[1]}</span><span class="s1"> </span><span class="si">{shape[2]}</span><span class="s1">&#39;</span><span class="p">]</span></code>
+
+<a href="#cryojax.simulator.PengIndependentAtomPotential.to_real_voxel_grid" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return a voxel grid of the potential in real space.</p>
+<p>Through the work of Peng et al. (1996), tabulated elastic electron scattering factors
+are defined as</p>
+<div class="arithmatex">\[f^{(e)}(\mathbf{q}) = \sum\limits_{i = 1}^5 a_i \exp(- b_i |\mathbf{q}|^2),\]</div>
+<p>where <span class="arithmatex">\(a_i\)</span> is stored as <code>PengAtomicPotential.scattering_factor_a</code> and <span class="arithmatex">\(b_i\)</span> is
+stored as <code>PengAtomicPotential.scattering_factor_b</code> for the scattering vector <span class="arithmatex">\(\mathbf{q}\)</span>.
+Under usual scattering approximations (i.e. the first-born approximation),
+the rescaled electrostatic potential energy <span class="arithmatex">\(U(\mathbf{r})\)</span> is then given by
+<span class="arithmatex">\(4 \pi \mathcal{F}^{-1}[f^{(e)}(\boldsymbol{\xi} / 2)](\mathbf{r})\)</span>, which is computed
+analytically as</p>
+<div class="arithmatex">\[U(\mathbf{r}) = 4 \pi \sum\limits_{i = 1}^5 \frac{a_i}{(2\pi (b_i / 8 \pi^2))^{3/2}} \exp(- \frac{|\mathbf{r} - \mathbf{r}'|^2}{2 (b_i / 8 \pi^2)}),\]</div>
+<p>where <span class="arithmatex">\(\mathbf{r}'\)</span> is the position of the atom. Including an additional B-factor (denoted by
+<span class="arithmatex">\(B\)</span>) gives the expression for the potential
+<span class="arithmatex">\(U(\mathbf{r})\)</span> of a single atom type and its fourier transform pair <span class="arithmatex">\(\tilde{U}(\boldsymbol{\xi}) \equiv \mathcal{F}[U](\boldsymbol{\xi})\)</span>,</p>
+<div class="arithmatex">\[U(\mathbf{r}) = 4 \pi \sum\limits_{i = 1}^5 \frac{a_i}{(2\pi ((b_i + B) / 8 \pi^2))^{3/2}} \exp(- \frac{|\mathbf{r} - \mathbf{r}'|^2}{2 ((b_i + B) / 8 \pi^2)}),\]</div>
+<div class="arithmatex">\[\tilde{U}(\boldsymbol{\xi}) = 4 \pi \sum\limits_{i = 1}^5 a_i \exp(- (b_i + B) |\boldsymbol{\xi}|^2 / 4) \exp(2 \pi i \boldsymbol{\xi}\cdot\mathbf{r}'),\]</div>
+<p>where <span class="arithmatex">\(\mathbf{q} = \boldsymbol{\xi} / 2\)</span> gives the relationship between the wave vector and the
+scattering vector.</p>
+<p>In practice, for a discretization on a grid with voxel size <span class="arithmatex">\(\Delta r\)</span> and grid point <span class="arithmatex">\(\mathbf{r}_{\ell}\)</span>,
+the potential is evaluated as the average value inside the voxel</p>
+<div class="arithmatex">\[U_{\ell} = 4 \pi \frac{1}{\Delta r^3} \sum\limits_{i = 1}^5 a_i \prod\limits_{j = 1}^3 \int_{r^{\ell}_j-\Delta r/2}^{r^{\ell}_j+\Delta r/2} dr_j \ \frac{1}{{\sqrt{2\pi ((b_i + B) / 8 \pi^2)}}} \exp(- \frac{(r_j - r'_j)^2}{2 ((b_i + B) / 8 \pi^2)}),\]</div>
+<p>where <span class="arithmatex">\(j\)</span> indexes the components of the spatial coordinate vector <span class="arithmatex">\(\mathbf{r}\)</span>. The above expression is evaluated using the error function as</p>
+<div class="arithmatex">\[U_{\ell} = 4 \pi \frac{1}{(2 \Delta r)^3} \sum\limits_{i = 1}^5 a_i \prod\limits_{j = 1}^3 \textrm{erf}(\frac{r_j^{\ell} - r'_j + \Delta r / 2}{\sqrt{2 ((b_i + B) / 8\pi^2)}}) - \textrm{erf}(\frac{r_j^{\ell} - r'_j - \Delta r / 2}{\sqrt{2 ((b_i + B) / 8\pi^2)}}).\]</div>
+<p><strong>Arguments:</strong></p>
+<ul>
+<li><code>shape</code>:
+    The shape of the resulting voxel grid.</li>
+<li><code>voxel_size</code>:
+    The voxel size of the resulting voxel grid.</li>
+<li><code>batch_options</code>:
+    Advanced options for controlling batching. This is a dictionary
+    with the following keys:<ul>
+<li>"batch_size":
+    The number of z-planes to evaluate in parallel with
+    <code>jax.vmap</code>. By default, <code>1</code>.</li>
+<li>"n_batches":
+    The number of iterations used to evaluate the volume,
+    where the iteration is taken over groups of atoms.
+    This is useful if <code>batch_size = 1</code>
+    and GPU memory is exhausted. By default, <code>1</code>.</li>
+</ul>
+</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p>The rescaled potential <span class="arithmatex">\(U_{\ell}\)</span> as a voxel grid of shape <code>shape</code>
+and voxel size <code>voxel_size</code>.</p>
+
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div><h3 id="voxel-based">Voxel-based<a class="headerlink" href="#voxel-based" title="Permanent link">¤</a></h3>
+<h4 id="fourier-space">Fourier-space<a class="headerlink" href="#fourier-space" title="Permanent link">¤</a></h4>
+<div class="admonition info">
+<p class="admonition-title">Fourier-space conventions</p>
+<ul>
+<li>The <code>fourier_voxel_grid</code> and <code>frequency_slice</code> arguments to
+<code>FourierVoxelGridVolume.__init__</code> should be loaded with the zero frequency
+component in the center of the box. This is returned by the</li>
+<li>The parameters in an <code>AbstractPose</code> represent a rotation in real-space. This means that when calling <code>FourierVoxelGridVolume.rotate_to_pose</code>,
+frequencies are rotated by the inverse rotation as stored in the pose.</li>
+</ul>
+</div>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="cryojax.simulator.FourierVoxelGridVolume" class="doc doc-heading">
+            <code>cryojax.simulator.FourierVoxelGridVolume</code>
+
+
+<a href="#cryojax.simulator.FourierVoxelGridVolume" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+
+        <p>A 3D voxel grid in fourier-space.</p>
+
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.FourierVoxelGridVolume.__init__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelGridVolume</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">fourier_voxel_grid</span><span class="p">:</span> <span class="n">Complex</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;dim dim dim&#39;</span><span class="p">],</span> <span class="n">frequency_slice_in_pixels</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;1 dim dim 3&#39;</span><span class="p">])</span></code>
+
+<a href="#cryojax.simulator.FourierVoxelGridVolume.__init__" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p><strong>Arguments:</strong></p>
+<ul>
+<li><code>fourier_voxel_grid</code>:
+    The cubic voxel grid in fourier space.</li>
+<li><code>frequency_slice_in_pixels</code>:
+    The frequency slice coordinate system.</li>
+</ul>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.FourierVoxelGridVolume.from_real_voxel_grid" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelGridVolume</span><span class="o">.</span><span class="n">from_real_voxel_grid</span><span class="p">(</span><span class="n">real_voxel_grid</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;dim dim dim&#39;</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">pad_scale</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">pad_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;constant&#39;</span><span class="p">,</span> <span class="nb">filter</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">AbstractFilter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#cryojax.simulator.FourierVoxelGridVolume.from_real_voxel_grid" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Load from a real-valued 3D voxel grid.</p>
+<p><strong>Arguments:</strong></p>
+<ul>
+<li><code>real_voxel_grid</code>: A voxel grid in real space.</li>
+<li><code>pad_scale</code>: Scale factor at which to pad <code>real_voxel_grid</code> before fourier
+             transform. Must be a value greater than <code>1.0</code>.</li>
+<li><code>pad_mode</code>: Padding method. See <code>jax.numpy.pad</code> for documentation.</li>
+<li><code>filter</code>: A filter to apply to the result of the fourier transform of
+          <code>real_voxel_grid</code>, i.e. <code>fftn(real_voxel_grid)</code>. Note that the zero
+          frequency component is assumed to be in the corner.</li>
+</ul>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.FourierVoxelGridVolume.compute_volume_representation" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelGridVolume</span><span class="o">.</span><span class="n">compute_volume_representation</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PRNGKeyArray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
+
+<a href="#cryojax.simulator.FourierVoxelGridVolume.compute_volume_representation" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Since this class is itself an implementation of an
+<code>AbstractVolumeParametrisation</code>, this function maps to the identity.</p>
+<p><strong>Arguments:</strong></p>
+<ul>
+<li><code>rng_key</code>:
+    Not used in this implementation, but optionally
+    included for other implementations.</li>
+</ul>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.FourierVoxelGridVolume.rotate_to_pose" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelGridVolume</span><span class="o">.</span><span class="n">rotate_to_pose</span><span class="p">(</span><span class="n">pose</span><span class="p">:</span> <span class="n">AbstractPose</span><span class="p">,</span> <span class="n">inverse</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
+
+<a href="#cryojax.simulator.FourierVoxelGridVolume.rotate_to_pose" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return a new volume with a rotated <code>frequency_slice_in_pixels</code>.</p>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="cryojax.simulator.FourierVoxelGridVolume.frequency_slice_in_pixels" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelGridVolume</span><span class="o">.</span><span class="n">frequency_slice_in_pixels</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;1 dim dim 3&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">frequency_slice_in_pixels</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#cryojax.simulator.FourierVoxelGridVolume.frequency_slice_in_pixels" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="cryojax.simulator.FourierVoxelGridVolume.shape" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelGridVolume</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#cryojax.simulator.FourierVoxelGridVolume.shape" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The shape of the <code>fourier_voxel_grid</code>.</p>
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div><hr />
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="cryojax.simulator.FourierVoxelSplineVolume" class="doc doc-heading">
+            <code>cryojax.simulator.FourierVoxelSplineVolume</code>
+
+
+<a href="#cryojax.simulator.FourierVoxelSplineVolume" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+
+        <p>A 3D voxel grid in fourier-space, represented
+by spline coefficients.</p>
+
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.FourierVoxelSplineVolume.__init__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelSplineVolume</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">spline_coefficients</span><span class="p">:</span> <span class="n">Complex</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;coeff_dim coeff_dim coeff_dim&#39;</span><span class="p">],</span> <span class="n">frequency_slice_in_pixels</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;1 dim dim 3&#39;</span><span class="p">])</span></code>
+
+<a href="#cryojax.simulator.FourierVoxelSplineVolume.__init__" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p><strong>Arguments:</strong></p>
+<ul>
+<li><code>spline_coefficients</code>:
+    The spline coefficents computed from the cubic voxel grid
+    in fourier space. See <code>cryojax.ndimage.compute_spline_coefficients</code>.</li>
+<li><code>frequency_slice_in_pixels</code>:
+    Frequency slice coordinate system.
+    See <code>cryojax.coordinates.make_frequency_slice</code>.</li>
+</ul>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.FourierVoxelSplineVolume.from_real_voxel_grid" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelSplineVolume</span><span class="o">.</span><span class="n">from_real_voxel_grid</span><span class="p">(</span><span class="n">real_voxel_grid</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;dim dim dim&#39;</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">pad_scale</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">pad_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;constant&#39;</span><span class="p">,</span> <span class="nb">filter</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">AbstractFilter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#cryojax.simulator.FourierVoxelSplineVolume.from_real_voxel_grid" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Load from a real-valued 3D voxel grid.</p>
+<p><strong>Arguments:</strong></p>
+<ul>
+<li><code>real_voxel_grid</code>: A voxel grid in real space.</li>
+<li><code>pad_scale</code>: Scale factor at which to pad <code>real_voxel_grid</code> before fourier
+             transform. Must be a value greater than <code>1.0</code>.</li>
+<li><code>pad_mode</code>: Padding method. See <code>jax.numpy.pad</code> for documentation.</li>
+<li><code>filter</code>: A filter to apply to the result of the fourier transform of
+          <code>real_voxel_grid</code>, i.e. <code>fftn(real_voxel_grid)</code>. Note that the zero
+          frequency component is assumed to be in the corner.</li>
+</ul>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.FourierVoxelSplineVolume.compute_volume_representation" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelSplineVolume</span><span class="o">.</span><span class="n">compute_volume_representation</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PRNGKeyArray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
+
+<a href="#cryojax.simulator.FourierVoxelSplineVolume.compute_volume_representation" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Since this class is itself an implementation of an
+<code>AbstractVolumeParametrisation</code>, this function maps to the identity.</p>
+<p><strong>Arguments:</strong></p>
+<ul>
+<li><code>rng_key</code>:
+    Not used in this implementation, but optionally
+    included for other implementations.</li>
+</ul>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.FourierVoxelSplineVolume.rotate_to_pose" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelSplineVolume</span><span class="o">.</span><span class="n">rotate_to_pose</span><span class="p">(</span><span class="n">pose</span><span class="p">:</span> <span class="n">AbstractPose</span><span class="p">,</span> <span class="n">inverse</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
+
+<a href="#cryojax.simulator.FourierVoxelSplineVolume.rotate_to_pose" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return a new volume with a rotated <code>frequency_slice_in_pixels</code>.</p>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="cryojax.simulator.FourierVoxelSplineVolume.frequency_slice_in_pixels" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelSplineVolume</span><span class="o">.</span><span class="n">frequency_slice_in_pixels</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;1 dim dim 3&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">frequency_slice_in_pixels</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#cryojax.simulator.FourierVoxelSplineVolume.frequency_slice_in_pixels" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="cryojax.simulator.FourierVoxelSplineVolume.shape" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelSplineVolume</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#cryojax.simulator.FourierVoxelSplineVolume.shape" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The shape of the original <code>fourier_voxel_grid</code> from which
+<code>coefficients</code> were computed.</p>
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div><h4 id="real-space">Real-space<a class="headerlink" href="#real-space" title="Permanent link">¤</a></h4>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="cryojax.simulator.RealVoxelGridVolume" class="doc doc-heading">
+            <code>cryojax.simulator.RealVoxelGridVolume</code>
+
+
+<a href="#cryojax.simulator.RealVoxelGridVolume" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+
+        <p>A 3D voxel grid in real-space.</p>
+
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.RealVoxelGridVolume.__init__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">RealVoxelGridVolume</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">real_voxel_grid</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;dim dim dim&#39;</span><span class="p">],</span> <span class="n">coordinate_grid_in_pixels</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;dim dim dim 3&#39;</span><span class="p">])</span></code>
+
+<a href="#cryojax.simulator.RealVoxelGridVolume.__init__" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p><strong>Arguments:</strong></p>
+<ul>
+<li><code>real_voxel_grid</code>: The voxel grid in fourier space.</li>
+<li><code>coordinate_grid_in_pixels</code>: A coordinate grid.</li>
+</ul>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.RealVoxelGridVolume.from_real_voxel_grid" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">RealVoxelGridVolume</span><span class="o">.</span><span class="n">from_real_voxel_grid</span><span class="p">(</span><span class="n">real_voxel_grid</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;dim dim dim&#39;</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">coordinate_grid_in_pixels</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;dim dim dim 3&#39;</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">crop_scale</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#cryojax.simulator.RealVoxelGridVolume.from_real_voxel_grid" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Load a <code>RealVoxelGridVolume</code> from a real-valued 3D voxel grid.</p>
+<p><strong>Arguments:</strong></p>
+<ul>
+<li><code>real_voxel_grid</code>: A voxel grid in real space.</li>
+<li><code>crop_scale</code>: Scale factor at which to crop <code>real_voxel_grid</code>.
+                Must be a value greater than <code>1</code>.</li>
+</ul>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.RealVoxelGridVolume.compute_volume_representation" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">RealVoxelGridVolume</span><span class="o">.</span><span class="n">compute_volume_representation</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PRNGKeyArray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
+
+<a href="#cryojax.simulator.RealVoxelGridVolume.compute_volume_representation" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Since this class is itself an implementation of an
+<code>AbstractVolumeParametrisation</code>, this function maps to the identity.</p>
+<p><strong>Arguments:</strong></p>
+<ul>
+<li><code>rng_key</code>:
+    Not used in this implementation, but optionally
+    included for other implementations.</li>
+</ul>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.RealVoxelGridVolume.rotate_to_pose" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">RealVoxelGridVolume</span><span class="o">.</span><span class="n">rotate_to_pose</span><span class="p">(</span><span class="n">pose</span><span class="p">:</span> <span class="n">AbstractPose</span><span class="p">,</span> <span class="n">inverse</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
+
+<a href="#cryojax.simulator.RealVoxelGridVolume.rotate_to_pose" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return a new volume with a rotated
+<code>coordinate_grid_in_pixels</code>.</p>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="cryojax.simulator.RealVoxelGridVolume.coordinate_grid_in_pixels" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">RealVoxelGridVolume</span><span class="o">.</span><span class="n">coordinate_grid_in_pixels</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;dim dim dim 3&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">coordinate_grid_in_pixels</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#cryojax.simulator.RealVoxelGridVolume.coordinate_grid_in_pixels" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="cryojax.simulator.RealVoxelGridVolume.shape" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">RealVoxelGridVolume</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#cryojax.simulator.RealVoxelGridVolume.shape" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The shape of the <code>real_voxel_grid</code>.</p>
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div><h2 id="parametrising-scattering-potentials">Parametrising scattering potentials<a class="headerlink" href="#parametrising-scattering-potentials" title="Permanent link">¤</a></h2>
+<details class="abstract">
+<summary><code>cryojax.simulator.AbstractPotentialParametrisation</code></summary>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="cryojax.simulator.AbstractPotentialParametrisation" class="doc doc-heading">
+            <code>cryojax.simulator.AbstractPotentialParametrisation</code>
+
+
+<a href="#cryojax.simulator.AbstractPotentialParametrisation" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+
+        <p>Abstract interface for a scattering potential.</p>
+<div class="admonition info">
+<p class="admonition-title">Info</p>
+<p>In, <code>cryojax</code>, potentials should be built in units of <em>inverse length squared</em>,
+<span class="arithmatex">\([L]^{-2}\)</span>. This rescaled potential is defined to be</p>
+<div class="arithmatex">\[U(\mathbf{r}) = \frac{2 m e}{\hbar^2} V(\mathbf{r}),\]</div>
+<p>where <span class="arithmatex">\(V\)</span> is the electrostatic potential energy, <span class="arithmatex">\(\mathbf{r}\)</span> is a positional
+coordinate, <span class="arithmatex">\(m\)</span> is the electron mass, and <span class="arithmatex">\(e\)</span> is the electron charge.</p>
+<p>For a single atom, this rescaled potential has the advantage that under usual
+scattering approximations (i.e. the first-born approximation), the
+fourier transform of this quantity is closely related to tabulated electron scattering
+factors. In particular, for a single atom with scattering factor <span class="arithmatex">\(f^{(e)}(\mathbf{q})\)</span>
+and scattering vector <span class="arithmatex">\(\mathbf{q}\)</span>, its rescaled potential is equal to</p>
+<div class="arithmatex">\[U(\mathbf{r}) = 4 \pi \mathcal{F}^{-1}[f^{(e)}(\boldsymbol{\xi} / 2)](\mathbf{r}),\]</div>
+<p>where <span class="arithmatex">\(\boldsymbol{\xi} = 2 \mathbf{q}\)</span> is the wave vector coordinate and
+<span class="arithmatex">\(\mathcal{F}^{-1}\)</span> is the inverse fourier transform operator in the convention</p>
+<div class="arithmatex">\[\mathcal{F}[f](\boldsymbol{\xi}) = \int d^3\mathbf{r} \ \exp(2\pi i \boldsymbol{\xi}\cdot\mathbf{r}) f(\mathbf{r}).\]</div>
+<p>The rescaled potential <span class="arithmatex">\(U\)</span> gives the following time-independent schrodinger equation
+for the scattering problem,</p>
+<div class="arithmatex">\[(\nabla^2 + k^2) \psi(\mathbf{r}) = - U(\mathbf{r}) \psi(\mathbf{r}),\]</div>
+<p>where <span class="arithmatex">\(k\)</span> is the incident wavenumber of the electron beam.</p>
+<p><strong>References</strong>:</p>
+<ul>
+<li>For the definition of the rescaled potential, see
+Chapter 69, Page 2003, Equation 69.6 from <em>Hawkes, Peter W., and Erwin Kasper.
+Principles of Electron Optics, Volume 4: Advanced Wave Optics. Academic Press,
+2022.</em></li>
+<li>To work out the correspondence between the rescaled potential and the electron
+scattering factors, see the supplementary information from <em>Vulović, Miloš, et al.
+"Image formation modeling in cryo-electron microscopy." Journal of structural
+biology 183.1 (2013): 19-32.</em></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.AbstractPotentialParametrisation.compute_volume_representation" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractPotentialParametrisation</span><span class="o">.</span><span class="n">compute_volume_representation</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PRNGKeyArray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AbstractVolumeRepresentation</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
+  </span>
+
+<a href="#cryojax.simulator.AbstractPotentialParametrisation.compute_volume_representation" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Core interface for computing the representation of
+the volume.</p>
+
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div></details>
+<details class="abstract" open="open">
+<summary><code>cryojax.simulator.AbstractTabulatedPotential</code></summary>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="cryojax.simulator.AbstractTabulatedPotential" class="doc doc-heading">
+            <code>cryojax.simulator.AbstractTabulatedPotential</code>
+
+
+<a href="#cryojax.simulator.AbstractTabulatedPotential" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+
+        <p>Abstract class for a scattering potential from tabulated
+electron scattering factors.</p>
+
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.AbstractTabulatedPotential.compute_volume_representation" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractTabulatedPotential</span><span class="o">.</span><span class="n">compute_volume_representation</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PRNGKeyArray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AbstractVolumeRepresentation</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
+  </span>
+
+<a href="#cryojax.simulator.AbstractTabulatedPotential.compute_volume_representation" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Core interface for computing the representation of
+the volume.</p>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.AbstractTabulatedPotential.from_tabulated_parameters" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractTabulatedPotential</span><span class="o">.</span><span class="n">from_tabulated_parameters</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#cryojax.simulator.AbstractTabulatedPotential.from_tabulated_parameters" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Construct a scattering potential parametrisation from
+tabulated electron scattering factors.</p>
+
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div></details>
+<details class="abstract" open="open">
+<summary><code>cryojax.simulator.AbstractPengPotential</code></summary>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="cryojax.simulator.AbstractPengPotential" class="doc doc-heading">
+            <code>cryojax.simulator.AbstractPengPotential</code>
+
+
+<a href="#cryojax.simulator.AbstractPengPotential" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+
+        <p>Abstract class for a scattering potential parametrised
+as a mixture of five gaussians per atom (Peng et al. 1996).</p>
+<p><strong>References:</strong></p>
+<ul>
+<li>Peng, L-M. "Electron atomic scattering factors and scattering potentials of crystals."
+    Micron 30.6 (1999): 625-648.</li>
+<li>Peng, L-M., et al. "Robust parameterization of elastic and absorptive electron atomic
+    scattering factors." Acta Crystallographica Section A: Foundations of Crystallography
+    52.2 (1996): 257-276.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="cryojax.simulator.AbstractPengPotential.amplitudes" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractPengPotential</span><span class="o">.</span><span class="n">amplitudes</span><span class="p">:</span> <span class="n">eqx</span><span class="o">.</span><span class="n">AbstractVar</span><span class="p">[</span><span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;n_atoms n_gaussians&#39;</span><span class="p">]]</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#cryojax.simulator.AbstractPengPotential.amplitudes" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="cryojax.simulator.AbstractPengPotential.b_factors" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractPengPotential</span><span class="o">.</span><span class="n">b_factors</span><span class="p">:</span> <span class="n">eqx</span><span class="o">.</span><span class="n">AbstractVar</span><span class="p">[</span><span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;n_atoms n_gaussians&#39;</span><span class="p">]]</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#cryojax.simulator.AbstractPengPotential.b_factors" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.AbstractPengPotential.compute_volume_representation" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractPengPotential</span><span class="o">.</span><span class="n">compute_volume_representation</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PRNGKeyArray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AbstractVolumeRepresentation</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
+  </span>
+
+<a href="#cryojax.simulator.AbstractPengPotential.compute_volume_representation" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Core interface for computing the representation of
+the volume.</p>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.AbstractPengPotential.from_tabulated_parameters" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractPengPotential</span><span class="o">.</span><span class="n">from_tabulated_parameters</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#cryojax.simulator.AbstractPengPotential.from_tabulated_parameters" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Construct a scattering potential parametrisation from
+tabulated electron scattering factors.</p>
+
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div></details>
+<h2 id="parametrising-ensembles">Parametrising ensembles<a class="headerlink" href="#parametrising-ensembles" title="Permanent link">¤</a></h2>
+<details class="abstract">
+<summary><code>cryojax.simulator.AbstractEnsembleParametrisation</code></summary>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="cryojax.simulator.AbstractEnsembleParametrisation" class="doc doc-heading">
+            <code>cryojax.simulator.AbstractEnsembleParametrisation</code>
+
+
+<a href="#cryojax.simulator.AbstractEnsembleParametrisation" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+
+        <p>Abstract interface for a volume with conformational
+heterogeneity.</p>
+
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h5 id="cryojax.simulator.AbstractEnsembleParametrisation.conformation" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractEnsembleParametrisation</span><span class="o">.</span><span class="n">conformation</span><span class="p">:</span> <span class="n">eqx</span><span class="o">.</span><span class="n">AbstractVar</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#cryojax.simulator.AbstractEnsembleParametrisation.conformation" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>A variable for the ensemble's conformational state.</p>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.AbstractEnsembleParametrisation.compute_volume_representation" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractEnsembleParametrisation</span><span class="o">.</span><span class="n">compute_volume_representation</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PRNGKeyArray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AbstractVolumeRepresentation</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
+  </span>
+
+<a href="#cryojax.simulator.AbstractEnsembleParametrisation.compute_volume_representation" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Core interface for computing the representation of
+the volume.</p>
+
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div></details>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="cryojax.simulator.DiscreteStructuralEnsemble" class="doc doc-heading">
+            <code>cryojax.simulator.DiscreteStructuralEnsemble</code>
+
+
+<a href="#cryojax.simulator.DiscreteStructuralEnsemble" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+
+        <p>Abstraction of an ensemble with discrete conformational
+heterogeneity.</p>
+
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.DiscreteStructuralEnsemble.__init__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">DiscreteStructuralEnsemble</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">conformational_space</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">AbstractVolumeRepresentation</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">conformation</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="n">Int</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">])</span></code>
+
+<a href="#cryojax.simulator.DiscreteStructuralEnsemble.__init__" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p><strong>Arguments:</strong></p>
+<ul>
+<li><code>conformational_space</code>: A tuple of <code>AbstractStructureRepresentation</code>s.</li>
+<li><code>conformation</code>: A conformation with a discrete index at which to evaluate
+                  the tuple.</li>
+</ul>
+
+
+    </div>
+
+</div>
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.DiscreteStructuralEnsemble.compute_volume_representation" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">DiscreteStructuralEnsemble</span><span class="o">.</span><span class="n">compute_volume_representation</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PRNGKeyArray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AbstractVolumeRepresentation</span></code>
+
+<a href="#cryojax.simulator.DiscreteStructuralEnsemble.compute_volume_representation" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Map to the volume at <code>conformation</code>.</p>
+<p><strong>Arguments:</strong></p>
+<ul>
+<li><code>rng_key</code>:
+    Not used in this implementation, but optionally
+    included for other implementations.</li>
+</ul>
+
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "../../..", "features": ["navigation.sections", "toc.integrate"], "search": "../../../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.92b07e13.min.js"></script>
+      
+        <script src="../../../javascripts/mathjax.js"></script>
+      
+        <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
