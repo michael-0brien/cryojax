@@ -8,7 +8,7 @@ from typing import Optional, overload
 
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, Bool, Float
+from jaxtyping import Array, Float
 
 from ._base_transform import AbstractImageTransform
 
@@ -223,7 +223,6 @@ class Rectangular3DCosineMask(AbstractMask, strict=True):
     """
 
     array: Float[Array, "z_dim y_dim x_dim"]
-    is_not_masked: Bool[Array, "z_dim y_dim x_dim"]
 
     def __init__(
         self,

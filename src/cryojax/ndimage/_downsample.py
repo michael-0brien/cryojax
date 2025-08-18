@@ -9,22 +9,6 @@ from ._edges import crop_to_shape
 from ._fft import fftn, ifftn, rfftn
 
 
-@overload
-def downsample_with_fourier_cropping(
-    image_or_volume: Inexact[Array, "_ _ _"],
-    downsampling_factor: float | int,
-    outputs_real_space: bool = True,
-) -> Inexact[Array, "_ _ _"]: ...
-
-
-@overload
-def downsample_with_fourier_cropping(
-    image_or_volume: Inexact[Array, "_ _"],
-    downsampling_factor: float | int,
-    outputs_real_space: bool = True,
-) -> Inexact[Array, "_ _"]: ...
-
-
 def downsample_with_fourier_cropping(
     image_or_volume: Inexact[Array, "_ _"] | Inexact[Array, "_ _ _"],
     downsampling_factor: float | int,

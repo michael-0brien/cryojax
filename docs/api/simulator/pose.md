@@ -39,12 +39,14 @@
     ::: cryojax.simulator.AbstractPose
         options:
             members:
-                - compute_shifts
+                - compute_translation_operator
+                - translate_image
                 - rotate_coordinates
                 - offset_in_angstroms
                 - rotation
                 - from_rotation
                 - from_rotation_and_translation
+                - to_inverse_rotation
 
 ::: cryojax.simulator.EulerAnglePose
         options:

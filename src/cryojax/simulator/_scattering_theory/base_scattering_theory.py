@@ -7,12 +7,12 @@ import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
 from ...ndimage import fftn, ifftn, rfftn
-from .._config import AbstractConfig
-from .._potential_representation import AbstractPotentialRepresentation
+from .._image_config import AbstractImageConfig
 from .._transfer_theory import (
     ContrastTransferTheory,
     WaveTransferTheory,
 )
+from .._volume_parametrisation import AbstractVolumeRepresentation
 
 
 class AbstractScatteringTheory(eqx.Module, strict=True):
@@ -21,21 +21,21 @@ class AbstractScatteringTheory(eqx.Module, strict=True):
     @abstractmethod
     def compute_contrast_spectrum(
         self,
-        potential: AbstractPotentialRepresentation,
-        config: AbstractConfig,
+        volume_representation: AbstractVolumeRepresentation,
+        image_config: AbstractImageConfig,
         rng_key: Optional[PRNGKeyArray] = None,
         defocus_offset: Optional[float | Float[Array, ""]] = None,
-    ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim//2+1}"]:
+    ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         raise NotImplementedError
 
     @abstractmethod
     def compute_intensity_spectrum(
         self,
-        potential: AbstractPotentialRepresentation,
-        config: AbstractConfig,
+        volume_representation: AbstractVolumeRepresentation,
+        image_config: AbstractImageConfig,
         rng_key: Optional[PRNGKeyArray] = None,
         defocus_offset: Optional[float | Float[Array, ""]] = None,
-    ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim//2+1}"]:
+    ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         raise NotImplementedError
 
 
@@ -48,26 +48,28 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
     @abstractmethod
     def compute_exit_wave(
         self,
-        potential: AbstractPotentialRepresentation,
-        config: AbstractConfig,
+        volume_representation: AbstractVolumeRepresentation,
+        image_config: AbstractImageConfig,
         rng_key: Optional[PRNGKeyArray] = None,
-    ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim}"]:
+    ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]:
         raise NotImplementedError
 
     @override
     def compute_intensity_spectrum(
         self,
-        potential: AbstractPotentialRepresentation,
-        config: AbstractConfig,
+        volume_representation: AbstractVolumeRepresentation,
+        image_config: AbstractImageConfig,
         rng_key: Optional[PRNGKeyArray] = None,
         defocus_offset: Optional[float | Float[Array, ""]] = None,
-    ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim//2+1}"]:
+    ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         # ... compute the exit wave
-        fourier_wavefunction = fftn(self.compute_exit_wave(potential, config, rng_key))
+        fourier_wavefunction = fftn(
+            self.compute_exit_wave(volume_representation, image_config, rng_key)
+        )
         # ... propagate to the detector plane
         fourier_wavefunction = self.transfer_theory.propagate_exit_wave(
             fourier_wavefunction,
-            config,
+            image_config,
             defocus_offset=defocus_offset,
         )
         wavefunction = ifftn(fourier_wavefunction)
@@ -79,18 +81,20 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
     @override
     def compute_contrast_spectrum(
         self,
-        potential: AbstractPotentialRepresentation,
-        config: AbstractConfig,
+        volume_representation: AbstractVolumeRepresentation,
+        image_config: AbstractImageConfig,
         rng_key: Optional[PRNGKeyArray] = None,
         defocus_offset: Optional[float | Float[Array, ""]] = None,
-    ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim//2+1}"]:
+    ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         """Compute the contrast at the detector plane, given the squared wavefunction."""
         # ... compute the exit wave
-        fourier_wavefunction = fftn(self.compute_exit_wave(potential, config, rng_key))
+        fourier_wavefunction = fftn(
+            self.compute_exit_wave(volume_representation, image_config, rng_key)
+        )
         # ... propagate to the detector plane
         fourier_wavefunction = self.transfer_theory.propagate_exit_wave(
             fourier_wavefunction,
-            config,
+            image_config,
             defocus_offset=defocus_offset,
         )
         wavefunction = ifftn(fourier_wavefunction)
@@ -115,28 +119,28 @@ class AbstractWeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
     @abstractmethod
     def compute_object_spectrum(
         self,
-        potential: AbstractPotentialRepresentation,
-        config: AbstractConfig,
+        volume_representation: AbstractVolumeRepresentation,
+        image_config: AbstractImageConfig,
         rng_key: Optional[PRNGKeyArray] = None,
-    ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim//2+1}"]:
+    ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         raise NotImplementedError
 
     @override
     def compute_intensity_spectrum(
         self,
-        potential: AbstractPotentialRepresentation,
-        config: AbstractConfig,
+        volume_representation: AbstractVolumeRepresentation,
+        image_config: AbstractImageConfig,
         rng_key: Optional[PRNGKeyArray] = None,
         defocus_offset: Optional[float | Float[Array, ""]] = None,
-    ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim//2+1}"]:
+    ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         """Compute the squared wavefunction at the detector plane, given the
         contrast.
         """
-        N1, N2 = config.padded_shape
+        N1, N2 = image_config.padded_shape
         # ... compute the squared wavefunction directly from the image contrast
         # as |psi|^2 = 1 + 2C.
         contrast_spectrum = self.compute_contrast_spectrum(
-            potential, config, rng_key, defocus_offset=defocus_offset
+            volume_representation, image_config, rng_key, defocus_offset=defocus_offset
         )
         intensity_spectrum = (2 * contrast_spectrum).at[0, 0].add(1.0 * N1 * N2)
         return intensity_spectrum

@@ -5,7 +5,7 @@ from typing import Generic, Literal, Optional, TypeVar
 import numpy as np
 from jaxtyping import Float, Int, PyTree
 
-from ...internal import NDArrayLike
+from ...jax_util import NDArrayLike
 from .._dataset import AbstractDataset
 
 

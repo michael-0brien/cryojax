@@ -132,24 +132,22 @@ def test_compute_projection_with_cistem(
         real_voxel_grid, voxel_size = read_array_from_mrc(
             sample_mrc_path, loads_spacing=True
         )
-        potential = cxs.FourierVoxelGridPotential.from_real_voxel_grid(
-            real_voxel_grid, voxel_size
-        )
+        volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
         pose = cxs.EulerAnglePose(phi_angle=-phi, theta_angle=-theta, psi_angle=-psi)
         projection_method = cxs.FourierSliceExtraction()
-        box_size = potential.shape[0]
-        config = cxs.BasicConfig((box_size, box_size), voxel_size, 300.0)
+        box_size = volume.shape[0]
+        image_config = cxs.BasicImageConfig((box_size, box_size), voxel_size, 300.0)
         cryojax_projection = irfftn(
             (
                 projection_method.integrate(
-                    potential.rotate_to_pose(pose), config, outputs_real_space=False
+                    volume.rotate_to_pose(pose), image_config, outputs_real_space=False
                 )
                 / voxel_size
             )
             .at[0, 0]
             .set(0.0 + 0.0j)
-            / np.sqrt(np.prod(config.shape)),
-            s=config.padded_shape,
+            / np.sqrt(np.prod(image_config.shape)),
+            s=image_config.padded_shape,
         )
         # pycistem
         pycistem_volume = _load_pycistem_template(sample_mrc_path, box_size)

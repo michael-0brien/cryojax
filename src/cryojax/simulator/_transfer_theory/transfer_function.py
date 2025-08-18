@@ -1,13 +1,12 @@
 from abc import abstractmethod
 from typing import Optional
-from typing_extensions import override
 
 import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
 from ...constants import convert_keV_to_angstroms
-from ...internal import error_if_negative
+from ...jax_util import error_if_negative
 from .common_functions import (
     compute_phase_shift_from_amplitude_contrast_ratio,
     compute_phase_shifts_with_spherical_aberration,
@@ -116,10 +115,12 @@ class AberratedAstigmaticCTF(AbstractCTF, strict=True):
         - `astigmatism_angle`: The defocus angle.
         - `spherical_aberration_in_mm`: The spherical aberration coefficient in mm.
         """
-        self.defocus_in_angstroms = jnp.asarray(defocus_in_angstroms)
-        self.astigmatism_in_angstroms = jnp.asarray(astigmatism_in_angstroms)
-        self.astigmatism_angle = jnp.asarray(astigmatism_angle)
-        self.spherical_aberration_in_mm = error_if_negative(spherical_aberration_in_mm)
+        self.defocus_in_angstroms = jnp.asarray(defocus_in_angstroms, dtype=float)
+        self.astigmatism_in_angstroms = jnp.asarray(astigmatism_in_angstroms, dtype=float)
+        self.astigmatism_angle = jnp.asarray(astigmatism_angle, dtype=float)
+        self.spherical_aberration_in_mm = error_if_negative(
+            jnp.asarray(spherical_aberration_in_mm, dtype=float)
+        )
 
     def compute_aberration_phase_shifts(
         self,
@@ -165,18 +166,3 @@ class AberratedAstigmaticCTF(AbstractCTF, strict=True):
             spherical_aberration_in_angstroms,
         )
         return phase_shifts
-
-
-class NullCTF(AbstractCTF, strict=True):
-    """A perfect transfer function, useful for imaging
-    cryo-EM densities."""
-
-    @override
-    def compute_aberration_phase_shifts(
-        self,
-        frequency_grid_in_angstroms: Float[Array, "y_dim x_dim 2"],
-        voltage_in_kilovolts: Float[Array, ""] | float,
-        defocus_offset: Optional[Float[Array, ""] | float] = None,
-    ) -> Float[Array, "y_dim x_dim"]:
-        shape = frequency_grid_in_angstroms.shape[:2]
-        return jnp.full(shape, jnp.pi / 2)

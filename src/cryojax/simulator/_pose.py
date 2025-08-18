@@ -10,10 +10,10 @@ from typing_extensions import Self, override
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-import numpy as np
 from equinox import AbstractVar, Module
 from jaxtyping import Array, Complex, Float
 
+from ..jax_util import NDArrayLike
 from ..ndimage import enforce_self_conjugate_rfftn_components
 from ..rotations import SO3, convert_quaternion_to_euler_angles
 
@@ -193,6 +193,14 @@ class AbstractPose(Module, strict=True):
                 f"`{offset_in_angstroms.shape}`"
             )
 
+    def to_inverse_rotation(self) -> Self:
+        """Convert an `AbstractPose` to the inverse of its rotation
+        representation.
+        """
+        return self.from_rotation_and_translation(
+            self.rotation.inverse(), self.offset_in_angstroms
+        )
+
 
 class EulerAnglePose(AbstractPose, strict=True):
     r"""An `AbstractPose` represented by Euler angles.
@@ -219,13 +227,13 @@ class EulerAnglePose(AbstractPose, strict=True):
 
     def __init__(
         self,
-        offset_x_in_angstroms: float | Float[Array, ""] = 0.0,
-        offset_y_in_angstroms: float | Float[Array, ""] = 0.0,
-        phi_angle: float | Float[Array, ""] = 0.0,
-        theta_angle: float | Float[Array, ""] = 0.0,
-        psi_angle: float | Float[Array, ""] = 0.0,
+        offset_x_in_angstroms: float | Float[NDArrayLike, ""] = 0.0,
+        offset_y_in_angstroms: float | Float[NDArrayLike, ""] = 0.0,
+        phi_angle: float | Float[NDArrayLike, ""] = 0.0,
+        theta_angle: float | Float[NDArrayLike, ""] = 0.0,
+        psi_angle: float | Float[NDArrayLike, ""] = 0.0,
         *,
-        offset_z_in_angstroms: Optional[float | Float[Array, ""]] = None,
+        offset_z_in_angstroms: Optional[float | Float[NDArrayLike, ""]] = None,
     ):
         """**Arguments:**
 
@@ -284,13 +292,16 @@ class QuaternionPose(AbstractPose, strict=True):
 
     def __init__(
         self,
-        offset_x_in_angstroms: float | Float[Array, ""] = 0.0,
-        offset_y_in_angstroms: float | Float[Array, ""] = 0.0,
-        wxyz: (
-            tuple[float, float, float, float] | Float[np.ndarray, "4"] | Float[Array, "4"]
-        ) = (1.0, 0.0, 0.0, 0.0),
+        offset_x_in_angstroms: float | Float[NDArrayLike, ""] = 0.0,
+        offset_y_in_angstroms: float | Float[NDArrayLike, ""] = 0.0,
+        wxyz: (tuple[float, float, float, float] | Float[NDArrayLike, "4"]) = (
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+        ),
         *,
-        offset_z_in_angstroms: Optional[float | Float[Array, ""]] = None,
+        offset_z_in_angstroms: Optional[float | Float[NDArrayLike, ""]] = None,
     ):
         """**Arguments:**
 
@@ -300,9 +311,9 @@ class QuaternionPose(AbstractPose, strict=True):
             The quaternion, represented as a vector $\\mathbf{q} = (q_w, q_x, q_y, q_z)$.
         - `offset_z_in_angstroms`: Out-of-plane translation in z direction.
         """
-        self.offset_x_in_angstroms = jnp.asarray(offset_x_in_angstroms)
-        self.offset_y_in_angstroms = jnp.asarray(offset_y_in_angstroms)
-        self.wxyz = jnp.asarray(wxyz)
+        self.offset_x_in_angstroms = jnp.asarray(offset_x_in_angstroms, dtype=float)
+        self.offset_y_in_angstroms = jnp.asarray(offset_y_in_angstroms, dtype=float)
+        self.wxyz = jnp.asarray(wxyz, dtype=float)
         self.offset_z_in_angstroms = (
             None
             if offset_z_in_angstroms is None
@@ -345,13 +356,15 @@ class AxisAnglePose(AbstractPose, strict=True):
 
     def __init__(
         self,
-        offset_x_in_angstroms: float | Float[Array, ""] = 0.0,
-        offset_y_in_angstroms: float | Float[Array, ""] = 0.0,
-        euler_vector: (
-            tuple[float, float, float] | Float[np.ndarray, "3"] | Float[Array, "3"]
-        ) = (0.0, 0.0, 0.0),
+        offset_x_in_angstroms: float | Float[NDArrayLike, ""] = 0.0,
+        offset_y_in_angstroms: float | Float[NDArrayLike, ""] = 0.0,
+        euler_vector: (tuple[float, float, float] | Float[NDArrayLike, "3"]) = (
+            0.0,
+            0.0,
+            0.0,
+        ),
         *,
-        offset_z_in_angstroms: Optional[float | Float[Array, ""]] = None,
+        offset_z_in_angstroms: Optional[float | Float[NDArrayLike, ""]] = None,
     ):
         """**Arguments:**
 
@@ -362,9 +375,9 @@ class AxisAnglePose(AbstractPose, strict=True):
             vector $\\boldsymbol{\\omega}$.
         - `offset_z_in_angstroms`: Out-of-plane translation in z direction.
         """
-        self.offset_x_in_angstroms = jnp.asarray(offset_x_in_angstroms)
-        self.offset_y_in_angstroms = jnp.asarray(offset_y_in_angstroms)
-        self.euler_vector = jnp.asarray(euler_vector)
+        self.offset_x_in_angstroms = jnp.asarray(offset_x_in_angstroms, dtype=float)
+        self.offset_y_in_angstroms = jnp.asarray(offset_y_in_angstroms, dtype=float)
+        self.euler_vector = jnp.asarray(euler_vector, dtype=float)
         self.offset_z_in_angstroms = (
             None
             if offset_z_in_angstroms is None

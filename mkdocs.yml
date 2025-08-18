@@ -71,9 +71,8 @@ nav:
         - cryojax.simulator:
             - 'api/simulator/api.md'
             - Representing volumes:
-                - 'api/simulator/potential.md'
                 - 'api/simulator/pose.md'
-                - 'api/simulator/structure.md'
+                - 'api/simulator/volume.md'
             - Image formation:
                 - 'api/simulator/integrator.md'
                 - 'api/simulator/transfer_theory.md'
@@ -81,7 +80,7 @@ nav:
             - Putting it all together:
                 - 'api/simulator/config.md'
                 - 'api/simulator/image_model.md'
-                - 'api/simulator/distribution.md'
+                - 'api/simulator/noise_model.md'
         - cryojax.dataset:
             - 'api/dataset/relion.md'
         - cryojax.io:
@@ -102,6 +101,7 @@ nav:
         - cryojax.constants:
             - 'api/constants/units.md'
             - 'api/constants/scattering_factor_parameters.md'
+            - 'api/constants/conventions.md'
         - cryojax.jax_util:
             - 'api/jax_util/filter_specs.md'
             - 'api/jax_util/grid_search.md'

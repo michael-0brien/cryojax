@@ -45,7 +45,7 @@ def map_coordinates(
         raise NotImplementedError(f"map_coordinates does not support order={order}.")
 
 
-def map_coordinates_with_cubic_spline(
+def map_coordinates_spline(
     coefficients: Array,
     coordinates: Sequence[Array],
     mode: str = "fill",

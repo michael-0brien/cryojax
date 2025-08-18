@@ -47,12 +47,7 @@ This documentation describes the elements of transfer theory in `cryojax`. More 
         options:
             members:
                 - __init__
-                - __call__
-
-::: cryojax.simulator.NullCTF
-        options:
-            members:
-                - __init__
+                - compute_aberration_phase_shifts
                 - __call__
 
 ## Transfer Theories
@@ -61,4 +56,4 @@ This documentation describes the elements of transfer theory in `cryojax`. More 
         options:
             members:
                 - __init__
-                - propagate_object_to_detector_plane
+                - propagate_object
