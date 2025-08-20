@@ -130,7 +130,7 @@ def test_compute_projection_with_cistem(
     if AnglesAndShifts is not None:
         # cryojax
         real_voxel_grid, voxel_size = read_array_from_mrc(
-            sample_mrc_path, loads_spacing=True
+            sample_mrc_path, loads_grid_spacing=True
         )
         volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
         pose = cxs.EulerAnglePose(phi_angle=-phi, theta_angle=-theta, psi_angle=-psi)
