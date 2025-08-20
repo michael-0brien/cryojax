@@ -13,7 +13,7 @@ from jaxtyping import Array, Float
 @overload
 def read_array_from_mrc(
     filename: str | pathlib.Path,
-    loads_spacing: Literal[True],
+    loads_grid_spacing: Literal[True],
     *,
     mmap: bool = False,
     permissive: bool = False,
@@ -23,7 +23,7 @@ def read_array_from_mrc(
 @overload
 def read_array_from_mrc(
     filename: str | pathlib.Path,
-    loads_spacing: Literal[False],
+    loads_grid_spacing: Literal[False],
     *,
     mmap: bool = False,
     permissive: bool = False,
@@ -33,7 +33,7 @@ def read_array_from_mrc(
 @overload
 def read_array_from_mrc(
     filename: str | pathlib.Path,
-    loads_spacing: bool = False,
+    loads_grid_spacing: bool = False,
     *,
     mmap: bool = False,
     permissive: bool = False,
@@ -42,7 +42,7 @@ def read_array_from_mrc(
 
 def read_array_from_mrc(
     filename: str | pathlib.Path,
-    loads_spacing: bool = False,
+    loads_grid_spacing: bool = False,
     *,
     mmap: bool = False,
     permissive: bool = False,
@@ -53,7 +53,7 @@ def read_array_from_mrc(
 
     - `filename` : Path to data.
     - `mmap`: Whether or not to open the data as a `numpy.memmap` array.
-    - `loads_spacing`: If `True`, load the pixel or voxel size of the array.
+    - `loads_grid_spacing`: If `True`, load the pixel or voxel size of the array.
 
     **Returns:**
 
@@ -93,7 +93,7 @@ def read_array_from_mrc(
         if not mmap:
             array = array.astype(np.float64)
 
-        if loads_spacing:
+        if loads_grid_spacing:
             # Only allow the same spacing in each direction
             assert all(
                 grid_spacing_per_dimension != np.zeros(grid_spacing_per_dimension.shape)

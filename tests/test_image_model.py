@@ -12,7 +12,9 @@ jax.config.update("jax_enable_x64", True)
 
 @pytest.fixture
 def volume_and_pixel_size(sample_mrc_path):
-    real_voxel_grid, voxel_size = read_array_from_mrc(sample_mrc_path, loads_spacing=True)
+    real_voxel_grid, voxel_size = read_array_from_mrc(
+        sample_mrc_path, loads_grid_spacing=True
+    )
     return (
         cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid, pad_scale=1.3),
         voxel_size,
