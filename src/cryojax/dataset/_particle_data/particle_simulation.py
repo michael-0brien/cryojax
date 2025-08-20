@@ -5,7 +5,7 @@ import jax
 import numpy as np
 from jaxtyping import Array, Float, Int, PyTree
 
-from ...jax_util import NDArrayLike, batched_scan
+from ...jax_util import NDArrayLike, filter_bscan
 from .base_particle_dataset import (
     AbstractParticleParameterFile,
     AbstractParticleStackDataset,
@@ -272,31 +272,19 @@ def _configure_simulation_fn(
 
             @eqx.filter_jit
             def compute_image_stack_fn(parameters, constant_args, per_particle_args):
-                # Compute with `jax.lax.scan`
-                params_dynamic, params_static = eqx.partition(parameters, eqx.is_array)
-                const_dynamic, const_static = eqx.partition(constant_args, eqx.is_array)
-                per_particle_dynamic, per_particle_static = eqx.partition(
-                    per_particle_args, eqx.is_array
-                )
-                # ... prepare for scan
-                init = const_dynamic
-                xs = (params_dynamic, per_particle_dynamic)
+                # Compute with `jax.lax.scan` via `cryojax.jax_util.filter_bscan`
+                init = constant_args
+                xs = (parameters, per_particle_args)
 
                 def f_scan(carry, xs):
-                    params_dynamic, per_particle_dynamic = xs
-                    parameters = eqx.combine(params_dynamic, params_static)
-                    per_particle_args = eqx.combine(
-                        per_particle_dynamic, per_particle_static
-                    )
-                    constant_args = eqx.combine(carry, const_static)
-
+                    _constant_args = carry
+                    _parameters, _per_particle_args = xs
                     image_stack = compute_vmap(
-                        parameters, constant_args, per_particle_args
+                        _parameters, _constant_args, _per_particle_args
                     )
-
                     return carry, image_stack
 
-                _, image_stack = batched_scan(f_scan, init, xs, batch_size=batch_size)
+                _, image_stack = filter_bscan(f_scan, init, xs, batch_size=batch_size)
 
                 return image_stack
 

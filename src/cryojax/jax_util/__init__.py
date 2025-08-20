@@ -3,7 +3,7 @@ for Equinox filtered transformations and Equinox recommendations for creating cu
 per-leaf behavior for pytrees.
 """
 
-from ._batched_loop import batched_map as batched_map, batched_scan as batched_scan
+from ._batched_loop import filter_bmap as filter_bmap, filter_bscan as filter_bscan
 from ._errors import (
     error_if_negative as error_if_negative,
     error_if_not_fractional as error_if_not_fractional,
