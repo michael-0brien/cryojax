@@ -49,21 +49,19 @@ python -m pytest
 
 ## Building documentation
 
-Again in the `cryojax` base directory, prepare to build the documentation by installing dependencies and pulling large-ish files from [git LFS](https://git-lfs.com/).
+Again in the `cryojax` base directory, build the documentation by installing dependencies using [`mkdocs`](https://www.mkdocs.org/getting-started/#getting-started-with-mkdocs).
 
 ```
 python -m pip install -r docs/requirements.txt
-sudo apt-get install git-lfs  # If using macOS, `brew install git-lfs`
-git lfs install; git lfs pull
-```
-
-Now, build the documentation with
-
-```
 mkdocs serve
 ```
 
-and navigate to the local webpage by following the instructions in your terminal.
+Then, navigate to the local webpage by following the instructions in your terminal. In order to run the notebooks in the documentation, it may be necessary to pull large-ish files from [git LFS](https://git-lfs.com/).
+
+```
+sudo apt-get install git-lfs  # If using macOS, `brew install git-lfs`
+git lfs install; git lfs pull
+```
 
 ## How to submit changes
 
