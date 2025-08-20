@@ -3,16 +3,19 @@
 Contributions to this repository are welcome and greatly appreciated! We would love
 for this package to grow and be supported by a larger community.
 
-## Design principles
-
-`cryojax` is built on [equinox](https://docs.kidger.site/equinox/). In short, `equinox` provides an interface to writing parameterized functions in `jax`. The core object of these parameterized functions is called a [Module](https://docs.kidger.site/equinox/api/module/module/) (yes, this takes inspiration from pytorch). `equinox` ships with features to interact with these `Module`s, and more generally with [pytrees](https://jax.readthedocs.io/en/latest/pytrees.html) in `jax`. One of the most useful of these features, not found in `jax` itself, is a means of performing out-of-place updates on pytrees through `equinox.tree_at`.
-
-Equinox also provides a recommended pattern for writing `Module`s: https://docs.kidger.site/equinox/pattern/. We think this is a good template for code readability, so `cryojax` tries to adhere to these principles as much as possible.
-
 ## What contributions fit into `cryojax`?
 
-`cryojax` does not try to be a one-stop shop for cryo-EM analysis. The current scope of the package is outlined in the README.md. However, we would like to know what you would find helpful for your research, so if you have a contribution in mind please feel free to get in touch on the [Issue
-Tracker](https://github.com/mjo22/cryojax/issues) and ask.
+CryoJAX does not try to be a one-stop shop for cryo-EM analysis. Instead, it is a modeling framework for image simulation via its abstract base class (ABC) interfaces that ships with core functionality for image simulation. CryoJAX also supports some utilities for building data analysis or working with JAX downstream.
+
+### What belongs in the cryoJAX core library?
+
+Core functionality for image simulation should be common knowledge in the field and/or demonstrated in real experiments. A good metric of whether or not an image simulation model or algorithm belongs in cryoJAX could be but is not limited to the following: "has this been shown to increase resolution in 3D reconstructions in real experiments?". If you would like to discuss if something is appropriate for cryoJAX core, please open an [issue](https://github.com/mjo22/cryojax/issues) and make a feature request.
+
+### What belongs in a separate library or workflow?
+
+If an image simulation model or algorithm is being prototyped, then it belongs downstream to cryoJAX. Further, if it is not common to many users---such as functionality for particular proteins---it also belongs downstream. If your application cannot be built downstream, it may be necessary to update the cryoJAX ABC interface. In this case, please also open an [issue](https://github.com/mjo22/cryojax/issues).
+
+After discussing the contribution and implementing it either in your local fork of cryoJAX or in an external library, open a [Pull Request](https://github.com/mjo22/cryojax/pulls).
 
 ## Getting started
 
@@ -66,6 +69,12 @@ and navigate to the local webpage by following the instructions in your terminal
 
 Now, if the tests and documentation look okay, push your changes and open a [Pull Request](https://github.com/mjo22/cryojax/pulls)!
 
+## Design principles
+
+`cryojax` is built on [equinox](https://docs.kidger.site/equinox/). In short, `equinox` provides an interface to writing parameterized functions in `jax`. The core object of these parameterized functions is called a [Module](https://docs.kidger.site/equinox/api/module/module/) (yes, this takes inspiration from pytorch). `equinox` ships with features to interact with these `Module`s, and more generally with [pytrees](https://jax.readthedocs.io/en/latest/pytrees.html).
+
+Equinox also provides a recommended pattern for writing `Module`s: https://docs.kidger.site/equinox/pattern/. We think this is a good template for code readability, so `cryojax` tries to adhere to these principles as much as possible.
+
 ## How to report a bug
 
 Report bugs on the [Issue Tracker](https://github.com/mjo22/cryojax/issues).
@@ -81,8 +90,3 @@ When filing an issue, here are some guidelines that may be helpful to know:
 The best way to get your bug fixed is to provide a test case, and/or steps to
 reproduce the issue. In particular, consider including a [Minimal, Reproducible
 Example](https://stackoverflow.com/help/minimal-reproducible-example).
-
-## How to request a feature
-
-Feel free to request features on the [Issue
-Tracker](https://github.com/mjo22/cryojax/issues).
