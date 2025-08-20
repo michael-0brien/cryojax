@@ -177,7 +177,7 @@ def write_image_stack_to_mrc(
     with mrcfile.new(filename, compression=compression, overwrite=overwrite) as mrc:
         mrc.set_data(image_stack_as_numpy)
         mrc.set_image_stack()
-        mrc.voxel_size = (1.0, pixel_size_as_numpy, pixel_size_as_numpy)
+        mrc.voxel_size = pixel_size_as_numpy
 
 
 def write_volume_to_mrc(
@@ -214,7 +214,7 @@ def write_volume_to_mrc(
     with mrcfile.new(filename, compression=compression, overwrite=overwrite) as mrc:
         mrc.set_data(voxel_grid_as_numpy)
         mrc.set_volume()
-        mrc.voxel_size = (voxel_size_as_numpy, voxel_size_as_numpy, voxel_size_as_numpy)
+        mrc.voxel_size = voxel_size_as_numpy
 
 
 def _validate_filename_and_return_suffix(filename: str | pathlib.Path):
