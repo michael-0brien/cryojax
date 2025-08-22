@@ -5,17 +5,17 @@ for this package to grow and be supported by a larger community.
 
 ## What contributions fit into `cryojax`?
 
-CryoJAX does not try to be a one-stop shop for cryo-EM analysis. Instead, it is a modeling framework for image simulation via its abstract base class (ABC) interfaces that ships with core functionality for image simulation. CryoJAX also supports some utilities for building data analysis or working with JAX downstream.
+CryoJAX does not try to be a one-stop shop for cryo-EM analysis. Instead, it is a modeling framework for image simulation via abstract base class (ABC) interfaces that ship with core functionality for image simulation. CryoJAX also supports some utilities for building data analysis or working with JAX downstream.
 
 ### What belongs in the cryoJAX core library?
 
-Core functionality for image simulation should be common knowledge in the field and/or demonstrated in real experiments. A good metric of whether or not an image simulation model or algorithm belongs in cryoJAX could be but is not limited to the following: "has this been shown to increase resolution in 3D reconstructions in real experiments?". If you would like to discuss if something is appropriate for cryoJAX core, please open an [issue](https://github.com/mjo22/cryojax/issues) and make a feature request.
+Core functionality for image simulation should be common knowledge in the field and/or demonstrated in real experiments. A good metric of whether or not an image simulation model or algorithm belongs in cryoJAX could be but is not limited to the following: "has this been shown to increase resolution of 3D reconstructions in real experiments?". If you would like to discuss if something is appropriate for cryoJAX core, please make a feature request on the [issues](https://github.com/mjo22/cryojax/issues) page.
 
 ### What belongs in a separate library or workflow?
 
 If an image simulation model or algorithm is being prototyped, then it belongs downstream to cryoJAX. Further, if it is not common to many users---such as functionality for particular proteins---it also belongs downstream. If your application cannot be built downstream, it may be necessary to update the cryoJAX ABC interface. In this case, please also open an [issue](https://github.com/mjo22/cryojax/issues).
 
-After discussing the contribution and implementing it either in your local fork of cryoJAX or in an external library, open a [Pull Request](https://github.com/mjo22/cryojax/pulls).
+After discussing the contribution and implementing it either in your local fork of cryoJAX or in an external repository, open a [pull request](https://github.com/mjo22/cryojax/pulls).
 
 ## Getting started
 
@@ -71,7 +71,7 @@ Now, if the tests and documentation look okay, push your changes and open a [Pul
 
 `cryojax` is built on [equinox](https://docs.kidger.site/equinox/). In short, `equinox` provides an interface to writing parameterized functions in `jax`. The core object of these parameterized functions is called a [Module](https://docs.kidger.site/equinox/api/module/module/) (yes, this takes inspiration from pytorch). `equinox` ships with features to interact with these `Module`s, and more generally with [pytrees](https://jax.readthedocs.io/en/latest/pytrees.html).
 
-Equinox also provides a recommended pattern for writing `Module`s: https://docs.kidger.site/equinox/pattern/. We think this is a good template for code readability, so `cryojax` tries to adhere to these principles as much as possible.
+Equinox also provides a recommended pattern for writing `Module`s: https://docs.kidger.site/equinox/pattern/. We think this is a good template for code readability, so `cryojax` tries to adhere to these principles.
 
 ## How to report a bug
 
