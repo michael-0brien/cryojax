@@ -378,3 +378,11 @@ def make_spline_potential(real_voxel_grid, voxel_size):
     return cxs.FourierVoxelSplinePotential.from_real_voxel_grid(
         real_voxel_grid, voxel_size
     )
+
+if __name__ == '__main__':
+    test_multislice_with_pose('/Users/gw/repos/cryojax/docs/examples/data/groel_chainA.pdb',
+                              pixel_size=2.0,
+                              shape=(150, 150),
+                              euler_pose_params=(2.5, -5.0, 0.0, 0.0, 0.0),
+                              ctf_params=(0.1, 300.0, 10000.0, -100.0, 10.0)
+    )
