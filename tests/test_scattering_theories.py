@@ -1,6 +1,5 @@
-import pytest
-
 import numpy as np
+import pytest
 
 import cryojax.experimental as cxe
 import cryojax.simulator as cxs
@@ -9,6 +8,8 @@ from cryojax.io import read_atoms_from_pdb
 
 pixel_size = 8.0
 shape_0 = 32
+
+
 @pytest.mark.parametrize(
     "pixel_size, shape, ctf_params",
     (
@@ -223,4 +224,9 @@ def test_scattering_theories_pose(
 
     close_fraction = 0.95
     atol = 1.0
-    assert np.isclose(normalize_image(ms), normalize_image(wp), atol=atol).astype(float).mean() > close_fraction
+    assert (
+        np.isclose(normalize_image(ms), normalize_image(wp), atol=atol)
+        .astype(float)
+        .mean()
+        > close_fraction
+    )
