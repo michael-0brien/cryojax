@@ -114,7 +114,6 @@ def test_scattering_theories_no_pose(
     np.testing.assert_allclose(normalize_image(ms), normalize_image(wp), atol=atol)
 
 
-
 @pytest.mark.parametrize(
     "pixel_size, shape, euler_pose_params, ctf_params",
     (
