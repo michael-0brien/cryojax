@@ -94,7 +94,9 @@ class HighEnergyScatteringTheory(AbstractWaveScatteringTheory, strict=True):
             do_ifft(fourier_in_plane_potential), self.amplitude_contrast_ratio
         )
         object = apply_interaction_constant(
-            integrated_potential, image_config.wavelength_in_angstroms
+            integrated_potential,
+            image_config.wavelength_in_angstroms,
+            image_config.lorenz_factor,
         )
         # Compute wavefunction, with amplitude and phase contrast
         return jnp.exp(1.0j * object)

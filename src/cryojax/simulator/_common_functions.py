@@ -1,10 +1,13 @@
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float, Inexact
 
+from ..jax_util import NDArrayLike
+
 
 def apply_interaction_constant(
     integrated_potential: Inexact[Array, "y_dim x_dim"],
-    wavelength_in_angstroms: Float[Array, ""] | float,
+    wavelength_in_angstroms: Float[NDArrayLike, ""] | float,
+    lorenz_factor: Float[NDArrayLike, ""] | float,
 ) -> Inexact[Array, "y_dim x_dim"]:
     """Given an integrated potential, convert units to the object
     phase shift distribution using the interaction
@@ -15,17 +18,25 @@ def apply_interaction_constant(
         In the projection approximation in cryo-EM, the phase shifts in the
         exit plane are given by
 
-        $$\\eta(x, y) = \\sigma \\int dz \\ V(x, y, z),$$
+        $$\\eta(x, y) = \\sigma_e \\int dz \\ V(x, y, z),$$
 
-        where $\\sigma$ is typically referred to as the interaction
+        where $\\sigma_e$ is typically referred to as the interaction
         constant. However, in `cryojax`, the potential is rescaled
         to units of inverse length squared as
 
-        $$U(x, y, z) = \\frac{2 m e}{\\hbar^2} V(x, y, z).$$
+        $$U(x, y, z) = \\frac{2 m_0 e}{\\hbar^2} V(x, y, z).$$
 
-        With this rescaling of the potential, the phase shifts are equal to
+        With this rescaling of the potential, the defined as with the
+        equation
 
-        $$\\eta(x, y) = \\frac{\\lambda}{4 \\pi} \\int dz \\ U(x, y, z).$$
+        $$\\eta(x, y) = \\sigma_e \\int dz \\ U(x, y, z)$$
+
+        with
+
+        $$\\sigma_e = \\frac{\\lambda \\gamma}{4 \\pi},$$
+
+        where $\\lambda$ the relativistic electron wavelength $\\gamma$ is
+        the lorenz factor.
 
         **References**:
 
@@ -40,7 +51,10 @@ def apply_interaction_constant(
 
     See the documentation on atom-based scattering potentials for more information.
     """  # noqa: E501
-    return integrated_potential * jnp.asarray(wavelength_in_angstroms) / (4 * jnp.pi)
+    interaction_constant = jnp.asarray(wavelength_in_angstroms * lorenz_factor) / (
+        4 * jnp.pi
+    )
+    return interaction_constant * integrated_potential
 
 
 def apply_amplitude_contrast_ratio(

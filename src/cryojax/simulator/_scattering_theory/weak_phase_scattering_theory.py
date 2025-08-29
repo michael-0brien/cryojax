@@ -67,7 +67,9 @@ class WeakPhaseScatteringTheory(AbstractWeakPhaseScatteringTheory, strict=True):
                 )
 
         object_spectrum = apply_interaction_constant(
-            fourier_in_plane_potential, image_config.wavelength_in_angstroms
+            fourier_in_plane_potential,
+            image_config.wavelength_in_angstroms,
+            image_config.lorenz_factor,
         )
 
         return object_spectrum

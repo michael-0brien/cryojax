@@ -5,10 +5,11 @@ from ._conventions import (
 from ._parkhurst2024_solvent_power import (
     PARKHURST2024_POWER_CONSTANTS as PARKHURST2024_POWER_CONSTANTS,
 )
+from ._physical_constants import (
+    convert_kilovolts_to_lorenz_factor as convert_kilovolts_to_lorenz_factor,
+    convert_kilovolts_to_wavelength as convert_kilovolts_to_wavelength,
+)
 from ._scattering_factor_parameters import (
     get_tabulated_scattering_factor_parameters as get_tabulated_scattering_factor_parameters,  # noqa: E501
     read_peng_element_scattering_factor_parameter_table as read_peng_element_scattering_factor_parameter_table,  # noqa: E501
-)
-from ._unit_conversions import (
-    convert_keV_to_angstroms as convert_keV_to_angstroms,
 )
