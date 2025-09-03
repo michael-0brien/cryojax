@@ -1,7 +1,7 @@
 import pytest
 
 import cryojax.simulator as cxs
-from cryojax.constants import convert_b_factor_to_variance
+from cryojax.constants import b_factor_to_variance
 from cryojax.io import read_array_from_mrc, read_atoms_from_pdb
 from cryojax.simulator import DiscreteStructuralEnsemble
 
@@ -26,7 +26,7 @@ def gmm_volume(sample_pdb_path):
     return cxs.GaussianMixtureVolume(
         positions=atom_positions,
         amplitudes=scattering_factor_parameters.a,
-        variances=convert_b_factor_to_variance(
+        variances=b_factor_to_variance(
             scattering_factor_parameters.b + b_factors[:, None]
         ),
     )

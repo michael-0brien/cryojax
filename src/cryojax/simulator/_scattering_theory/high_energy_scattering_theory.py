@@ -95,8 +95,7 @@ class HighEnergyScatteringTheory(AbstractWaveScatteringTheory, strict=True):
         )
         object = apply_interaction_constant(
             integrated_potential,
-            image_config.wavelength_in_angstroms,
-            image_config.lorenz_factor,
+            image_config.voltage_in_kilovolts,
         )
         # Compute wavefunction, with amplitude and phase contrast
         return jnp.exp(1.0j * object)

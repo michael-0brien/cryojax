@@ -7,7 +7,7 @@ import jax.numpy as jnp
 import jax.scipy as jsp
 from jaxtyping import Array, Complex, Float
 
-from ....constants import convert_variance_to_b_factor
+from ....constants import variance_to_b_factor
 from ....coordinates import make_1d_coordinate_grid
 from ....ndimage import (
     downsample_to_shape_with_fourier_cropping,
@@ -122,7 +122,7 @@ class GaussianMixtureProjection(
         elif isinstance(volume_representation, GaussianMixtureVolume):
             positions = volume_representation.positions
             amplitudes = volume_representation.amplitudes
-            b_factors = convert_variance_to_b_factor(volume_representation.variances)
+            b_factors = variance_to_b_factor(volume_representation.variances)
         else:
             raise ValueError(
                 "Supported types for `volume_representation` are "

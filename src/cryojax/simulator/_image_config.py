@@ -8,10 +8,7 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float, Inexact
 
-from ..constants import (
-    convert_kilovolts_to_lorenz_factor,
-    convert_kilovolts_to_wavelength,
-)
+from ..constants import lorentz_factor_from_kilovolts, wavelength_from_kilovolts
 from ..coordinates import make_coordinate_grid, make_frequency_grid
 from ..jax_util import error_if_not_positive
 from ..ndimage import (
@@ -62,7 +59,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
         """The incident electron wavelength corresponding to the beam
         energy `voltage_in_kilovolts`.
         """
-        return convert_kilovolts_to_wavelength(self.voltage_in_kilovolts)
+        return wavelength_from_kilovolts(self.voltage_in_kilovolts)
 
     @property
     def wavenumber_in_inverse_angstroms(self) -> Float[Array, ""]:
@@ -74,7 +71,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
     @property
     def lorenz_factor(self) -> Float[Array, ""]:
         """The lorenz factor at the given `voltage_in_kilovolts`."""
-        return convert_kilovolts_to_lorenz_factor(self.voltage_in_kilovolts)
+        return lorentz_factor_from_kilovolts(self.voltage_in_kilovolts)
 
     @cached_property
     def coordinate_grid_in_pixels(

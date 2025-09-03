@@ -1,13 +1,13 @@
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float, Inexact
 
+from ..constants import lorentz_factor_from_kilovolts, wavelength_from_kilovolts
 from ..jax_util import NDArrayLike
 
 
 def apply_interaction_constant(
     integrated_potential: Inexact[Array, "y_dim x_dim"],
-    wavelength_in_angstroms: Float[NDArrayLike, ""] | float,
-    lorenz_factor: Float[NDArrayLike, ""] | float,
+    voltage_in_kilovolts: Float[NDArrayLike, ""] | float,
 ) -> Inexact[Array, "y_dim x_dim"]:
     """Given an integrated potential, convert units to the object
     phase shift distribution using the interaction
@@ -51,7 +51,9 @@ def apply_interaction_constant(
 
     See the documentation on atom-based scattering potentials for more information.
     """  # noqa: E501
-    interaction_constant = jnp.asarray(wavelength_in_angstroms * lorenz_factor) / (
+    wavelength_in_angstroms = wavelength_from_kilovolts(voltage_in_kilovolts)
+    lorentz_factor = lorentz_factor_from_kilovolts(voltage_in_kilovolts)
+    interaction_constant = jnp.asarray(wavelength_in_angstroms * lorentz_factor) / (
         4 * jnp.pi
     )
     return interaction_constant * integrated_potential

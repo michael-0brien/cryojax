@@ -100,8 +100,7 @@ class FFTMultisliceIntegrator(
         # the slice thickness (TODO: interpolate for different slice thicknesses?)
         compute_object_fn = lambda pot: apply_interaction_constant(
             apply_amplitude_contrast_ratio(voxel_size * pot, amplitude_contrast_ratio),
-            image_config.wavelength_in_angstroms,
-            image_config.lorenz_factor,
+            image_config.voltage_in_kilovolts,
         )
         object_per_slice = jax.vmap(compute_object_fn)(potential_per_slice)
         # Compute the transmission function
