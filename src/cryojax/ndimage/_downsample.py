@@ -5,12 +5,13 @@ from typing import overload
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float, Inexact
 
+from ..jax_util import NDArrayLike
 from ._edges import crop_to_shape
 from ._fft import fftn, ifftn, rfftn
 
 
 def downsample_with_fourier_cropping(
-    image_or_volume: Inexact[Array, "_ _"] | Inexact[Array, "_ _ _"],
+    image_or_volume: Inexact[NDArrayLike, "_ _"] | Inexact[NDArrayLike, "_ _ _"],
     downsampling_factor: float | int,
     outputs_real_space: bool = True,
 ) -> Inexact[Array, "_ _"] | Inexact[Array, "_ _ _"]:
@@ -66,7 +67,7 @@ def downsample_with_fourier_cropping(
 
 @overload
 def downsample_to_shape_with_fourier_cropping(
-    image_or_volume: Inexact[Array, "_ _"],
+    image_or_volume: Inexact[NDArrayLike, "_ _"],
     downsampled_shape: tuple[int, int],
     outputs_real_space: bool = True,
 ) -> Inexact[Array, "_ _"]: ...
@@ -74,14 +75,14 @@ def downsample_to_shape_with_fourier_cropping(
 
 @overload
 def downsample_to_shape_with_fourier_cropping(
-    image_or_volume: Inexact[Array, "_ _ _"],
+    image_or_volume: Inexact[NDArrayLike, "_ _ _"],
     downsampled_shape: tuple[int, int, int],
     outputs_real_space: bool = True,
 ) -> Inexact[Array, "_ _ _"]: ...
 
 
 def downsample_to_shape_with_fourier_cropping(
-    image_or_volume: Inexact[Array, "_ _"] | Inexact[Array, "_ _ _"],
+    image_or_volume: Inexact[NDArrayLike, "_ _"] | Inexact[NDArrayLike, "_ _ _"],
     downsampled_shape: tuple[int, int] | tuple[int, int, int],
     outputs_real_space: bool = True,
 ) -> Inexact[Array, "_ _"] | Inexact[Array, "_ _ _"]:
@@ -120,7 +121,7 @@ def downsample_to_shape_with_fourier_cropping(
 
 
 def _downsample_real_signal_to_shape(
-    image_or_volume: Float[Array, "_ _"] | Float[Array, "_ _ _"],
+    image_or_volume: Float[NDArrayLike, "_ _"] | Float[NDArrayLike, "_ _ _"],
     downsampled_shape: tuple[int, int] | tuple[int, int, int],
     outputs_real_space: bool = True,
 ) -> Inexact[Array, "_ _"] | Inexact[Array, "_ _ _"]:
@@ -143,7 +144,7 @@ def _downsample_real_signal_to_shape(
 
 
 def _downsample_complex_signal_to_shape(
-    image_or_volume: Complex[Array, "_ _"] | Complex[Array, "_ _ _"],
+    image_or_volume: Complex[NDArrayLike, "_ _"] | Complex[NDArrayLike, "_ _ _"],
     downsampled_shape: tuple[int, int] | tuple[int, int, int],
     outputs_real_space: bool = True,
 ) -> Complex[Array, "_ _"] | Complex[Array, "_ _ _"]:

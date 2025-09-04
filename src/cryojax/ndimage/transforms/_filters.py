@@ -170,15 +170,6 @@ class WhiteningFilter(AbstractFilter, strict=True):
             if image_or_image_stack.ndim == 2
             else jnp.asarray(image_or_image_stack)
         )
-        if shape is not None:
-            if shape[-2] > image_stack.shape[-2] or shape[-1] > image_stack.shape[-1]:
-                raise ValueError(
-                    "The requested shape at which to compute the "
-                    "whitening filter is larger than the shape of "
-                    "the image from which to compute the filter. "
-                    f"The requested shape was {shape} and the image "
-                    f"shape was {image_stack.shape[-2:]}."
-                )
         self.array = _compute_whitening_filter(
             image_stack,
             shape,
@@ -265,7 +256,7 @@ def _compute_whitening_filter(
             resize_with_crop_or_pad(
                 irfftn(radially_averaged_powerspectrum_on_grid, s=image_stack.shape[1:]),
                 shape,
-                pad_mode="edge",
+                mode="edge",
             )
         ).real
         # ... resizing and going back to fourier space can introduce negative values

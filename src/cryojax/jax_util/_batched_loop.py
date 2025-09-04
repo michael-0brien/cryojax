@@ -1,5 +1,6 @@
 from typing import Callable, TypeVar
 
+import equinox as eqx
 import jax
 from jaxtyping import Array, PyTree, Shaped
 
@@ -83,35 +84,41 @@ def filter_bscan(
     batch_dim = jax.tree.leaves(xs)[0].shape[0]
     n_batches = batch_dim // batch_size
     # Filter
-    xs_transform = NonArrayStaticTransform(xs)
-    init_transform = NonArrayStaticTransform(init)
+    xs_dynamic, xs_static = eqx.partition(xs, eqx.is_array)
+    init_dynamic, init_static = eqx.partition(init, eqx.is_array)
 
-    def f_scan(_carry_transform, _xs_transform):
-        _carry, _ys = f(_carry_transform.value, _xs_transform.value)
-        return NonArrayStaticTransform(_carry), NonArrayStaticTransform(_ys)
+    def f_scan(_carry_dynamic, _xs_dynamic):
+        _carry, _xs = (
+            eqx.combine(_carry_dynamic, init_static),
+            eqx.combine(_xs_dynamic, xs_static),
+        )
+        _carry, _ys = f(_carry, _xs)
+        _carry_dynamic = eqx.filter(_carry, eqx.is_array)
+        _ys_wrapped = NonArrayStaticTransform(_ys)
+        return _carry_dynamic, _ys_wrapped
 
     # Scan over batches
-    xs_transform = jax.tree.map(
+    xs_dynamic = jax.tree.map(
         lambda x: x[: batch_dim - batch_dim % batch_size, ...].reshape(
             (n_batches, batch_size, *x.shape[1:])
         ),
-        xs_transform,
+        xs_dynamic,
     )
-    carry_transform, ys_transform = jax.lax.scan(
-        f_scan, init_transform, xs_transform, length=length, unroll=unroll
+    carry_dynamic, ys_wrapped = jax.lax.scan(
+        f_scan, init_dynamic, xs_dynamic, length=length, unroll=unroll
     )
-    ys_transform = jax.tree.map(
-        lambda y: y.reshape(n_batches * batch_size, *y.shape[2:]), ys_transform
+    ys_wrapped = jax.tree.map(
+        lambda y: y.reshape(n_batches * batch_size, *y.shape[2:]), ys_wrapped
     )
     if batch_dim % batch_size != 0:
         xs_remainder = jax.tree.map(
-            lambda x: x[batch_dim - batch_dim % batch_size :, ...], xs_transform
+            lambda x: x[batch_dim - batch_dim % batch_size :, ...], xs_dynamic
         )
-        carry_transform, ys_remainder = f_scan(carry_transform, xs_remainder)
-        ys_transform = jax.tree.map(
+        carry_dynamic, ys_remainder = f_scan(carry_dynamic, xs_remainder)
+        ys_wrapped = jax.tree.map(
             lambda x, y: jax.lax.concatenate([x, y], dimension=0),
-            ys_transform,
+            ys_wrapped,
             ys_remainder,
         )
 
-    return carry_transform.value, ys_transform.value
+    return eqx.combine(carry_dynamic, init_static), ys_wrapped.value
