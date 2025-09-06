@@ -13,8 +13,18 @@ from jaxtyping import Array, Float
 @overload
 def read_array_from_mrc(
     filename: str | pathlib.Path,
-    loads_grid_spacing: Literal[True],
     *,
+    loads_grid_spacing: Literal[False],
+    mmap: bool = False,
+    permissive: bool = False,
+) -> Float[np.ndarray, "..."]: ...
+
+
+@overload
+def read_array_from_mrc(  # type: ignore
+    filename: str | pathlib.Path,
+    *,
+    loads_grid_spacing: Literal[True],
     mmap: bool = False,
     permissive: bool = False,
 ) -> tuple[Float[np.ndarray, "..."], float]: ...
@@ -23,27 +33,17 @@ def read_array_from_mrc(
 @overload
 def read_array_from_mrc(
     filename: str | pathlib.Path,
-    loads_grid_spacing: Literal[False],
     *,
+    loads_grid_spacing: bool = False,
     mmap: bool = False,
     permissive: bool = False,
 ) -> Float[np.ndarray, "..."]: ...
 
 
-@overload
 def read_array_from_mrc(
     filename: str | pathlib.Path,
-    loads_grid_spacing: bool = False,
     *,
-    mmap: bool = False,
-    permissive: bool = False,
-): ...
-
-
-def read_array_from_mrc(
-    filename: str | pathlib.Path,
     loads_grid_spacing: bool = False,
-    *,
     mmap: bool = False,
     permissive: bool = False,
 ) -> Float[np.ndarray, "..."] | tuple[Float[np.ndarray, "..."], float]:
