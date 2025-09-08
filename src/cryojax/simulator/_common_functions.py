@@ -58,8 +58,13 @@ def apply_amplitude_contrast_ratio(
     """
     ac = amplitude_contrast_ratio
     if jnp.iscomplexobj(integrated_potential):
-        return jnp.sqrt(1.0 - ac**2) * integrated_potential.real + 1.0j * (
-            integrated_potential.imag + ac * integrated_potential.real
+        raise NotImplementedError(
+            "You may have tried to use a `HighEnergyScatteringTheory` "
+            "together with `EwaldSphereExtraction` for simulating images. "
+            "This is not implemented!"
         )
+        # return jnp.sqrt(1.0 - ac**2) * integrated_potential.real + 1.0j * (
+        #     integrated_potential.imag + ac * integrated_potential.real
+        # )
     else:
         return (jnp.sqrt(1.0 - ac**2) + 1.0j * ac) * integrated_potential
