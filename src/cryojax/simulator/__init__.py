@@ -45,10 +45,9 @@ from ._scattering_theory import (
 )
 from ._solvent_2d import AbstractRandomSolvent2D as AbstractRandomSolvent2D
 from ._transfer_theory import (
-    AberratedAstigmaticCTF as AberratedAstigmaticCTF,
-    AberratedAstigmaticCTF as CTF,  # noqa: F401
     AbstractCTF as AbstractCTF,
     AbstractTransferTheory as AbstractTransferTheory,
+    AstigmaticCTF as AstigmaticCTF,
     ContrastTransferTheory as ContrastTransferTheory,
 )
 from ._volume_integrator import (

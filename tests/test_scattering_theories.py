@@ -69,7 +69,7 @@
 #     pose = cxs.EulerAnglePose()
 #     pose_inv = pose.to_inverse_rotation()
 
-#     ctf = cxs.AberratedAstigmaticCTF(
+#     ctf = cxs.AstigmaticCTF(
 #         defocus_in_angstroms=defocus_in_angstroms,
 #         astigmatism_in_angstroms=astigmatism_in_angstroms,
 #         astigmatism_angle=astigmatism_angle,
@@ -190,7 +190,7 @@
 #     pose = cxs.EulerAnglePose(*euler_pose_params)
 #     pose_inv = pose.to_inverse_rotation()
 
-#     ctf = cxs.AberratedAstigmaticCTF(
+#     ctf = cxs.AstigmaticCTF(
 #         defocus_in_angstroms=defocus_in_angstroms,
 #         astigmatism_in_angstroms=astigmatism_in_angstroms,
 #         astigmatism_angle=astigmatism_angle,
