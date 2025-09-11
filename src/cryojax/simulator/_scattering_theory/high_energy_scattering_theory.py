@@ -2,11 +2,10 @@ from typing import Optional
 from typing_extensions import override
 
 import jax.numpy as jnp
-from jaxtyping import Array, Complex, Float, PRNGKeyArray
+from jaxtyping import Array, Complex, Float, Inexact, PRNGKeyArray
 
 from ...jax_util import error_if_not_fractional
 from ...ndimage import ifftn, irfftn
-from .._common_functions import apply_amplitude_contrast_ratio, apply_interaction_constant
 from .._image_config import AbstractImageConfig
 from .._solvent_2d import AbstractRandomSolvent2D
 from .._transfer_theory import WaveTransferTheory
@@ -19,6 +18,17 @@ class HighEnergyScatteringTheory(AbstractWaveScatteringTheory, strict=True):
     """Scattering theory in the high-energy approximation (eikonal approximation).
 
     This is the simplest model for multiple scattering events.
+
+    !!! info
+        Unlike in the weak-phase approximation, it is not possible to absorb a model
+        for amplitude contrast (here via the amplitude contrast ratio) into the CTF.
+        Instead, it is necessary to compute a complex scattering potential, where the
+        imaginary part captures inelastic scattering.
+
+        In particular, given a projected electrostatic potential $\\u(x, y)$, the
+        complex potential $\\phi(x, y)$ for amplitude contrast ratio $\\alpha$ is
+
+        $$\\phi(x, y) = \\sqrt{1 - \\alpha^2} \\ u(x, y) + i \\alpha \\ u(x, y).$$
 
     **References:**
 
@@ -90,12 +100,27 @@ class HighEnergyScatteringTheory(AbstractWaveScatteringTheory, strict=True):
             if is_projection_approx
             else ifftn(ft, s=image_config.padded_shape)
         )
-        integrated_potential = apply_amplitude_contrast_ratio(
+        integrated_potential = _compute_complex_potential(
             do_ifft(fourier_in_plane_potential), self.amplitude_contrast_ratio
         )
-        object = apply_interaction_constant(
-            integrated_potential,
-            image_config.voltage_in_kilovolts,
-        )
+        object = image_config.interaction_constant * integrated_potential
         # Compute wavefunction, with amplitude and phase contrast
         return jnp.exp(1.0j * object)
+
+
+def _compute_complex_potential(
+    in_plane_potential: Inexact[Array, "y_dim x_dim"],
+    amplitude_contrast_ratio: Float[Array, ""] | float,
+) -> Complex[Array, "y_dim x_dim"]:
+    ac = amplitude_contrast_ratio
+    if jnp.iscomplexobj(in_plane_potential):
+        raise NotImplementedError(
+            "You may have tried to use a `HighEnergyScatteringTheory` "
+            "together with `EwaldSphereExtraction` for simulating images. "
+            "This is not implemented!"
+        )
+        # return jnp.sqrt(1.0 - ac**2) * integrated_potential.real + 1.0j * (
+        #     integrated_potential.imag + ac * integrated_potential.real
+        # )
+    else:
+        return (jnp.sqrt(1.0 - ac**2) + 1.0j * ac) * in_plane_potential

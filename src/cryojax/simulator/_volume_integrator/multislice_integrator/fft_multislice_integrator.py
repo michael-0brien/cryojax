@@ -5,10 +5,6 @@ import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
 from ....ndimage import fftn, ifftn, map_coordinates
-from ..._common_functions import (
-    apply_amplitude_contrast_ratio,
-    apply_interaction_constant,
-)
 from ..._image_config import AbstractImageConfig
 from ..._volume_parametrisation import RealVoxelGridVolume
 from .base_multislice_integrator import AbstractMultisliceIntegrator
@@ -98,9 +94,14 @@ class FFTMultisliceIntegrator(
             potential_per_slice = potential_voxel_grid
         # Compute the integrated potential in a given slice interval, multiplying by
         # the slice thickness (TODO: interpolate for different slice thicknesses?)
-        compute_object_fn = lambda pot: apply_interaction_constant(
-            apply_amplitude_contrast_ratio(voxel_size * pot, amplitude_contrast_ratio),
-            image_config.voltage_in_kilovolts,
+        ac = amplitude_contrast_ratio
+        compute_object_fn = (
+            lambda pot: (
+                (jnp.sqrt(1.0 - ac**2) + 1.0j * ac)
+                * image_config.interaction_constant
+                * voxel_size
+            )
+            * pot
         )
         object_per_slice = jax.vmap(compute_object_fn)(potential_per_slice)
         # Compute the transmission function

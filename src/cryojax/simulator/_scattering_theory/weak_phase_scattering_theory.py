@@ -3,7 +3,6 @@ from typing_extensions import override
 
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
-from .._common_functions import apply_interaction_constant
 from .._image_config import AbstractImageConfig
 from .._solvent_2d import AbstractRandomSolvent2D
 from .._transfer_theory import ContrastTransferTheory
@@ -66,10 +65,7 @@ class WeakPhaseScatteringTheory(AbstractWeakPhaseScatteringTheory, strict=True):
                     input_is_rfft=self.volume_integrator.is_projection_approximation,
                 )
 
-        object_spectrum = apply_interaction_constant(
-            fourier_in_plane_potential,
-            image_config.voltage_in_kilovolts,
-        )
+        object_spectrum = image_config.interaction_constant * fourier_in_plane_potential
 
         return object_spectrum
 

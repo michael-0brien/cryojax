@@ -8,7 +8,11 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float, Inexact
 
-from ..constants import lorentz_factor_from_kilovolts, wavelength_from_kilovolts
+from ..constants import (
+    interaction_constant_from_kilovolts,
+    lorentz_factor_from_kilovolts,
+    wavelength_from_kilovolts,
+)
 from ..coordinates import make_coordinate_grid, make_frequency_grid
 from ..jax_util import error_if_not_positive
 from ..ndimage import (
@@ -69,9 +73,14 @@ class AbstractImageConfig(eqx.Module, strict=True):
         return 2 * jnp.pi / self.wavelength_in_angstroms
 
     @property
-    def lorenz_factor(self) -> Float[Array, ""]:
+    def lorentz_factor(self) -> Float[Array, ""]:
         """The lorenz factor at the given `voltage_in_kilovolts`."""
         return lorentz_factor_from_kilovolts(self.voltage_in_kilovolts)
+
+    @property
+    def interaction_constant(self) -> Float[Array, ""]:
+        """The electron interaction constant at the given `voltage_in_kilovolts`."""
+        return interaction_constant_from_kilovolts(self.voltage_in_kilovolts)
 
     @cached_property
     def coordinate_grid_in_pixels(
