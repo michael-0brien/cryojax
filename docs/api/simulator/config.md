@@ -8,6 +8,8 @@ The `AbstractImageConfig` is an object at the core of simulating images in `cryo
                 - __init__
                 - wavelength_in_angstroms
                 - wavenumber_in_inverse_angstroms
+                - lorentz_factor
+                - interaction_constant
                 - n_pixels
                 - y_dim
                 - x_dim

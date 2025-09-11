@@ -9,7 +9,7 @@ from jaxtyping import Array, Float, Int
 
 from ....constants import (
     get_tabulated_scattering_factor_parameters,
-    read_peng_element_scattering_factor_parameter_table,
+    read_peng_scattering_factor_parameter_table,
 )
 from ....jax_util import NDArrayLike, error_if_negative
 from ..base_parametrisation import AbstractPotentialParametrisation
@@ -44,9 +44,7 @@ class PengScatteringFactorParameters(eqx.Module, strict=True):
         - `atom_types`:
             The atom types as an integer array.
         """
-        scattering_factor_parameter_table = (
-            read_peng_element_scattering_factor_parameter_table()
-        )
+        scattering_factor_parameter_table = read_peng_scattering_factor_parameter_table()
         scattering_factor_parameter_dict = get_tabulated_scattering_factor_parameters(
             atom_types, scattering_factor_parameter_table
         )

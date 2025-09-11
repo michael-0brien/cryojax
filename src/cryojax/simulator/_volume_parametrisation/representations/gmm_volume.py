@@ -5,7 +5,7 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
-from ....constants import convert_variance_to_b_factor
+from ....constants import variance_to_b_factor
 from ....jax_util import NDArrayLike, error_if_not_positive
 from ..._pose import AbstractPose
 from ..common_functions import gaussians_to_real_voxels
@@ -104,6 +104,6 @@ class GaussianMixtureVolume(AbstractPointCloudVolume, strict=True):
             jnp.asarray(voxel_size, dtype=float),
             self.positions,
             self.amplitudes,
-            convert_variance_to_b_factor(self.variances),
+            variance_to_b_factor(self.variances),
             **batch_options,
         )

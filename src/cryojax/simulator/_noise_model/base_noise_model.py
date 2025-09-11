@@ -3,16 +3,25 @@ Base class for a cryojax distribution.
 """
 
 from abc import abstractmethod
+from typing import Optional
 
 from equinox import Module
 from jaxtyping import Array, Float, Inexact, PRNGKeyArray
+
+from ...ndimage.transforms import FilterLike, MaskLike
 
 
 class AbstractNoiseModel(Module, strict=True):
     """An image formation model equipped with a noise model."""
 
     @abstractmethod
-    def log_likelihood(self, observed: Inexact[Array, "y_dim x_dim"]) -> Float[Array, ""]:
+    def log_likelihood(
+        self,
+        observed: Inexact[Array, "y_dim x_dim"],
+        *,
+        mask: Optional[MaskLike] = None,
+        filter: Optional[FilterLike] = None,
+    ) -> Float[Array, ""]:
         """Evaluate the log likelihood.
 
         **Arguments:**
@@ -23,7 +32,12 @@ class AbstractNoiseModel(Module, strict=True):
 
     @abstractmethod
     def sample(
-        self, rng_key: PRNGKeyArray, *, outputs_real_space: bool = True
+        self,
+        rng_key: PRNGKeyArray,
+        *,
+        outputs_real_space: bool = True,
+        mask: Optional[MaskLike] = None,
+        filter: Optional[FilterLike] = None,
     ) -> Inexact[Array, "y_dim x_dim"]:
         """Sample from the distribution.
 
@@ -36,7 +50,11 @@ class AbstractNoiseModel(Module, strict=True):
 
     @abstractmethod
     def compute_signal(
-        self, *, outputs_real_space: bool = True
+        self,
+        *,
+        outputs_real_space: bool = True,
+        mask: Optional[MaskLike] = None,
+        filter: Optional[FilterLike] = None,
     ) -> Inexact[Array, "y_dim x_dim"]:
         """Render the image formation model."""
         raise NotImplementedError

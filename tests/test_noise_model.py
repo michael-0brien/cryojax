@@ -37,7 +37,7 @@ def image_model(volume, basic_config):
         volume,
         basic_config,
         pose=cxs.EulerAnglePose(),
-        transfer_theory=cxs.ContrastTransferTheory(cxs.AberratedAstigmaticCTF()),
+        transfer_theory=cxs.ContrastTransferTheory(cxs.AstigmaticCTF()),
     )
     return image_model
 

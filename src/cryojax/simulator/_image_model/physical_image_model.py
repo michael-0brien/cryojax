@@ -85,6 +85,18 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
             self.signal_region = jnp.asarray(signal_region, dtype=bool)
 
     @override
+    def get_pose(self) -> AbstractPose:
+        return self.pose
+
+    @override
+    def get_image_config(self) -> AbstractImageConfig:
+        return self.image_config
+
+    @override
+    def get_signal_region(self) -> Optional[Bool[Array, "_ _"]]:
+        return self.signal_region
+
+    @override
     def compute_fourier_image(
         self, rng_key: Optional[PRNGKeyArray] = None
     ) -> PaddedFourierImageArray:
@@ -173,6 +185,18 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
             self.signal_region = None
         else:
             self.signal_region = jnp.asarray(signal_region, dtype=bool)
+
+    @override
+    def get_pose(self) -> AbstractPose:
+        return self.pose
+
+    @override
+    def get_image_config(self) -> AbstractImageConfig:
+        return self.image_config
+
+    @override
+    def get_signal_region(self) -> Optional[Bool[Array, "_ _"]]:
+        return self.signal_region
 
     @override
     def compute_fourier_image(
@@ -265,6 +289,18 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
             self.signal_region = None
         else:
             self.signal_region = jnp.asarray(signal_region, dtype=bool)
+
+    @override
+    def get_pose(self) -> AbstractPose:
+        return self.pose
+
+    @override
+    def get_image_config(self) -> DoseImageConfig:
+        return self.image_config
+
+    @override
+    def get_signal_region(self) -> Optional[Bool[Array, "_ _"]]:
+        return self.signal_region
 
     @override
     def compute_fourier_image(

@@ -6,7 +6,7 @@ from jaxtyping import Array, Float, install_import_hook
 
 
 with install_import_hook("cryojax", "typeguard.typechecked"):
-    from cryojax.constants import convert_b_factor_to_variance
+    from cryojax.constants import b_factor_to_variance
     from cryojax.coordinates import make_coordinate_grid
     from cryojax.io import read_atoms_from_pdb
     from cryojax.ndimage import downsample_with_fourier_cropping, ifftn, irfftn
@@ -245,7 +245,7 @@ def test_peng_vs_gmm_agreement(sample_pdb_path):
     gmm_potential = GaussianMixtureVolume(
         atom_positions,
         amplitudes,
-        convert_b_factor_to_variance(b_factors),
+        b_factor_to_variance(b_factors),
     )
 
     # Create instrument configuration

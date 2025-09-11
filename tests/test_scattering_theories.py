@@ -68,7 +68,7 @@ def test_scattering_theories_no_pose(
     pose = cxs.EulerAnglePose()
     # pose_inv = pose.to_inverse_rotation()
 
-    ctf = cxs.AberratedAstigmaticCTF(
+    ctf = cxs.AstigmaticCTF(
         defocus_in_angstroms=defocus_in_angstroms,
         astigmatism_in_angstroms=astigmatism_in_angstroms,
         astigmatism_angle=astigmatism_angle,
@@ -188,7 +188,7 @@ def test_scattering_theories_pose(
     #     slice_thickness_in_voxels=3,
     # )
 
-    ctf = cxs.AberratedAstigmaticCTF(
+    ctf = cxs.AstigmaticCTF(
         defocus_in_angstroms=defocus_in_angstroms,
         astigmatism_in_angstroms=astigmatism_in_angstroms,
         astigmatism_angle=astigmatism_angle,

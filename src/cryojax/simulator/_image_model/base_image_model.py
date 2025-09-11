@@ -44,17 +44,23 @@ class AbstractImageModel(eqx.Module, strict=True):
     Call an `AbstractImageModel`'s `simulate` routine.
     """
 
-    pose: eqx.AbstractVar[AbstractPose]
-    image_config: eqx.AbstractVar[AbstractImageConfig]
-
     applies_translation: eqx.AbstractVar[bool]
     normalizes_signal: eqx.AbstractVar[bool]
-    signal_region: eqx.AbstractVar[Optional[Bool[Array, "_ _"]]]
 
     @abstractmethod
-    def compute_fourier_image(
-        self, rng_key: Optional[PRNGKeyArray] = None
-    ) -> PaddedFourierImageArray:
+    def get_pose(self) -> AbstractPose:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_image_config(self) -> AbstractImageConfig:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_signal_region(self) -> Optional[Bool[Array, "_ _"]]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def compute_fourier_image(self, rng_key: Optional[PRNGKeyArray] = None) -> Array:
         """Render an image without postprocessing."""
         raise NotImplementedError
 
@@ -66,7 +72,7 @@ class AbstractImageModel(eqx.Module, strict=True):
         outputs_real_space: bool = True,
         mask: Optional[MaskLike] = None,
         filter: Optional[FilterLike] = None,
-    ) -> ImageArray | PaddedImageArray:
+    ) -> Array:
         """Render an image.
 
         **Arguments:**
@@ -99,16 +105,16 @@ class AbstractImageModel(eqx.Module, strict=True):
 
     def postprocess(
         self,
-        fourier_image: PaddedFourierImageArray,
+        fourier_image: Array,
         *,
         outputs_real_space: bool = True,
         mask: Optional[MaskLike] = None,
         filter: Optional[FilterLike] = None,
-    ) -> ImageArray:
+    ) -> Array:
         """Return an image postprocessed with filters, cropping, masking,
         and normalization in either real or fourier space.
         """
-        image_config = self.image_config
+        image_config = self.get_image_config()
         if (
             mask is None
             and image_config.padded_shape == image_config.shape
@@ -150,24 +156,24 @@ class AbstractImageModel(eqx.Module, strict=True):
                 image = mask(image)
             return image if outputs_real_space else rfftn(image)
 
-    def _apply_translation(
-        self, fourier_image: PaddedFourierImageArray
-    ) -> PaddedFourierImageArray:
-        phase_shifts = self.pose.compute_translation_operator(
-            self.image_config.padded_frequency_grid_in_angstroms
+    def _apply_translation(self, fourier_image: Array) -> Array:
+        pose, image_config = self.get_pose(), self.get_image_config()
+        phase_shifts = pose.compute_translation_operator(
+            image_config.padded_frequency_grid_in_angstroms
         )
-        fourier_image = self.pose.translate_image(
+        fourier_image = pose.translate_image(
             fourier_image,
             phase_shifts,
-            self.image_config.padded_shape,
+            image_config.padded_shape,
         )
 
         return fourier_image
 
-    def _normalize_image(self, image: RealImageArray) -> RealImageArray:
+    def _normalize_image(self, image: Array) -> Array:
+        signal_region = self.get_signal_region()
         mean, std = (
-            jnp.mean(image, where=self.signal_region),
-            jnp.std(image, where=self.signal_region),
+            jnp.mean(image, where=signal_region),
+            jnp.std(image, where=signal_region),
         )
         image = (image - mean) / std
 
@@ -175,14 +181,14 @@ class AbstractImageModel(eqx.Module, strict=True):
 
     def _maybe_postprocess(
         self,
-        image: PaddedFourierImageArray,
+        image: Array,
         *,
         removes_padding: bool = True,
         outputs_real_space: bool = True,
         mask: Optional[MaskLike] = None,
         filter: Optional[FilterLike] = None,
-    ) -> PaddedImageArray | ImageArray:
-        image_config = self.image_config
+    ) -> Array:
+        image_config = self.get_image_config()
         if removes_padding:
             return self.postprocess(
                 image, outputs_real_space=outputs_real_space, mask=mask, filter=filter
@@ -254,6 +260,18 @@ class LinearImageModel(AbstractImageModel, strict=True):
             self.signal_region = None
         else:
             self.signal_region = jnp.asarray(signal_region, dtype=bool)
+
+    @override
+    def get_pose(self) -> AbstractPose:
+        return self.pose
+
+    @override
+    def get_image_config(self) -> AbstractImageConfig:
+        return self.image_config
+
+    @override
+    def get_signal_region(self) -> Optional[Bool[Array, "_ _"]]:
+        return self.signal_region
 
     @override
     def compute_fourier_image(
@@ -346,6 +364,18 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
             self.signal_region = None
         else:
             self.signal_region = jnp.asarray(signal_region, dtype=bool)
+
+    @override
+    def get_pose(self) -> AbstractPose:
+        return self.pose
+
+    @override
+    def get_image_config(self) -> AbstractImageConfig:
+        return self.image_config
+
+    @override
+    def get_signal_region(self) -> Optional[Bool[Array, "_ _"]]:
+        return self.signal_region
 
     @override
     def compute_fourier_image(

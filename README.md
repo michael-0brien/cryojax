@@ -59,7 +59,7 @@ pose = cxs.EulerAnglePose(
     psi_angle=-10.0,
 )
 # The model for the CTF
-ctf = cxs.AberratedAstigmaticCTF(
+ctf = cxs.AstigmaticCTF(
     defocus_in_angstroms=9800.0, astigmatism_in_angstroms=200.0, astigmatism_angle=10.0
 )
 transfer_theory = cxs.ContrastTransferTheory(ctf, amplitude_contrast_ratio=0.1)

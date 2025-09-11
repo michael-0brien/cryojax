@@ -31,9 +31,9 @@ _VALID_URLS.discard("")
 @overload
 def read_atoms_from_pdb(
     filename_or_url: str | pathlib.Path,
+    *,
     loads_b_factors: Literal[False],
     center: bool = True,
-    *,
     selection_string: str = "all",
     model_index: Optional[int] = None,
     standardizes_names: bool = True,
@@ -42,11 +42,11 @@ def read_atoms_from_pdb(
 
 
 @overload
-def read_atoms_from_pdb(
+def read_atoms_from_pdb(  # type: ignore
     filename_or_url: str | pathlib.Path,
+    *,
     loads_b_factors: Literal[True],
     center: bool = True,
-    *,
     selection_string: str = "all",
     model_index: Optional[int] = None,
     standardizes_names: bool = True,
@@ -61,21 +61,21 @@ def read_atoms_from_pdb(
 @overload
 def read_atoms_from_pdb(
     filename_or_url: str | pathlib.Path,
+    *,
     loads_b_factors: bool = False,
     center: bool = True,
-    *,
-    selection_string: str,
+    selection_string: str = "all",
     model_index: Optional[int] = None,
     standardizes_names: bool = True,
     topology: Optional[mdtraj.Topology] = None,
-): ...
+) -> tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, " n_atoms"]]: ...
 
 
 def read_atoms_from_pdb(
     filename_or_url: str | pathlib.Path,
+    *,
     loads_b_factors: bool = False,
     center: bool = True,
-    *,
     selection_string: str = "all",
     model_index: Optional[int] = None,
     standardizes_names: bool = True,
@@ -330,7 +330,7 @@ def _make_topology(
 
                 new_atom = topology.add_atom(
                     atom_name,
-                    element,
+                    element,  # type: ignore
                     r,
                     serial=atom.serial_number,
                     formal_charge=atom.formal_charge,
