@@ -5,7 +5,7 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
-from ...constants import convert_keV_to_angstroms
+from ...constants import wavelength_from_kilovolts
 from ...jax_util import error_if_negative
 from .common_functions import (
     compute_phase_shift_from_amplitude_contrast_ratio,
@@ -56,7 +56,9 @@ class AbstractCTF(eqx.Module, strict=True):
         """  # noqa: E501
         # Frequency-dependent phase shifts
         aberration_phase_shifts = self.compute_aberration_phase_shifts(
-            frequency_grid_in_angstroms, voltage_in_kilovolts=voltage_in_kilovolts
+            frequency_grid_in_angstroms,
+            voltage_in_kilovolts=voltage_in_kilovolts,
+            defocus_offset=defocus_offset,
         )
         # Constant phase shift, convert degrees to radians
         phase_shift = jnp.deg2rad(phase_shift)
@@ -149,7 +151,7 @@ class AberratedAstigmaticCTF(AbstractCTF, strict=True):
         # Convert spherical abberation coefficient to angstroms
         spherical_aberration_in_angstroms = self.spherical_aberration_in_mm * 1e7
         # Get the wavelength
-        wavelength_in_angstroms = convert_keV_to_angstroms(
+        wavelength_in_angstroms = wavelength_from_kilovolts(
             jnp.asarray(voltage_in_kilovolts)
         )
         # Compute phase shifts for CTF

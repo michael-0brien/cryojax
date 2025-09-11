@@ -37,16 +37,14 @@ def get_tabulated_scattering_factor_parameters(
     `scattering_factor_parameter_table` for `atom_types`.
     """  # noqa: E501
     if scattering_factor_parameter_table is None:
-        scattering_factor_parameter_table = (
-            read_peng_element_scattering_factor_parameter_table()
-        )
+        scattering_factor_parameter_table = read_peng_scattering_factor_parameter_table()
     return {
         str(k): np.asarray(v.data[np.asarray(atom_types), ...])
         for k, v in scattering_factor_parameter_table.items()
     }
 
 
-def read_peng_element_scattering_factor_parameter_table() -> xr.Dataset:
+def read_peng_scattering_factor_parameter_table() -> xr.Dataset:
     r"""Function to load the atomic scattering factor parameter
     table from "Robust Parameterization of Elastic and Absorptive
     Electron Atomic Scattering Factors" by Peng et al. (1996).

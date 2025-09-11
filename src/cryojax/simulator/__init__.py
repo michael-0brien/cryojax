@@ -1,8 +1,4 @@
 from ._api_utils import make_image_model as make_image_model
-from ._common_functions import (
-    apply_amplitude_contrast_ratio as apply_amplitude_contrast_ratio,
-    apply_interaction_constant as apply_interaction_constant,
-)
 from ._detector import (
     AbstractDetector as AbstractDetector,
     AbstractDQE as AbstractDQE,
