@@ -295,7 +295,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
         return self.pose
 
     @override
-    def get_image_config(self) -> AbstractImageConfig:
+    def get_image_config(self) -> DoseImageConfig:
         return self.image_config
 
     @override
