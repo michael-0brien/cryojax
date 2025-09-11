@@ -43,6 +43,7 @@ source = "vcs"
 version-file = "src/cryojax/cryojax_version.py"
 
 [tool.ruff]
+exclude = ["examples/old", "examples/dev"]
 extend-include = ["*.ipynb"]
 lint.fixable = ["I001", "F401"]
 line-length = 90
