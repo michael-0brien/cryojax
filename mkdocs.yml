@@ -67,6 +67,8 @@ nav:
             - Load cryo-EM images: 'examples/read-dataset.ipynb'
         - Your first program:
             - Write a STAR file of simulated data: 'examples/simulate-relion-dataset.ipynb'
+        - Advanced usage:
+            - Create custom image simulation methods: 'examples/extending-cryojax.ipynb'
     - API:
         - cryojax.simulator:
             - 'api/simulator/api.md'
