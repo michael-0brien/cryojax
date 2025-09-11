@@ -18,6 +18,7 @@ class AbstractNoiseModel(Module, strict=True):
     def log_likelihood(
         self,
         observed: Inexact[Array, "y_dim x_dim"],
+        *,
         mask: Optional[MaskLike] = None,
         filter: Optional[FilterLike] = None,
     ) -> Float[Array, ""]:
