@@ -9,7 +9,7 @@ import cryojax.simulator as cxs
 from cryojax.coordinates import cartesian_to_polar, make_frequency_grid
 from cryojax.io import read_array_from_mrc
 from cryojax.ndimage import compute_binned_powerspectrum, irfftn
-from cryojax.simulator import CTF, EulerAnglePose
+from cryojax.simulator import AstigmaticCTF, EulerAnglePose
 
 
 jax.config.update("jax_enable_x64", True)
@@ -49,7 +49,7 @@ def test_ctf_with_cistem(defocus1, defocus2, asti_angle, kV, cs, ac, pixel_size)
         freqs = make_frequency_grid(shape, pixel_size)
         k_sqr, theta = cartesian_to_polar(freqs, square=True)
         # Compute cryojax CTF
-        optics = CTF(
+        optics = AstigmaticCTF(
             defocus_in_angstroms=(defocus1 + defocus2) / 2,
             astigmatism_in_angstroms=defocus1 - defocus2,
             astigmatism_angle=asti_angle,

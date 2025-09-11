@@ -4,7 +4,7 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
-from ...jax_util import error_if_not_fractional
+from ...jax_util import NDArrayLike, error_if_not_fractional
 from ...ndimage.operators import FourierOperatorLike
 from .._image_config import AbstractImageConfig
 from .transfer_function import AbstractCTF
@@ -36,8 +36,8 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
         self,
         ctf: AbstractCTF,
         envelope: Optional[FourierOperatorLike] = None,
-        amplitude_contrast_ratio: float | Float[Array, ""] = 0.1,
-        phase_shift: float | Float[Array, ""] = 0.0,
+        amplitude_contrast_ratio: float | Float[NDArrayLike, ""] = 0.1,
+        phase_shift: float | Float[NDArrayLike, ""] = 0.0,
     ):
         """**Arguments:**
 
@@ -66,7 +66,7 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
         ),
         image_config: AbstractImageConfig,
         *,
-        defocus_offset: Optional[Float[Array, ""] | float] = None,
+        defocus_offset: Optional[Float[NDArrayLike, ""] | float] = None,
         is_projection_approximation: bool = True,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         """Apply the CTF directly to the phase shifts in the exit plane.
@@ -107,7 +107,7 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
             # the surface of the ewald sphere
             aberration_phase_shifts = self.ctf.compute_aberration_phase_shifts(
                 frequency_grid,
-                voltage_in_kilovolts=image_config.voltage_in_kilovolts,
+                wavelength_in_angstroms=image_config.wavelength_in_angstroms,
                 defocus_offset=defocus_offset,
             ) - jnp.deg2rad(self.phase_shift)
             contrast_spectrum = _compute_contrast_from_ewald_sphere(
@@ -146,7 +146,7 @@ class WaveTransferTheory(AbstractTransferTheory, strict=True):
         ],
         image_config: AbstractImageConfig,
         *,
-        defocus_offset: Optional[Float[Array, ""] | float] = None,
+        defocus_offset: Optional[Float[NDArrayLike, ""] | float] = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]:
         """Apply the wave transfer function to the wavefunction in the exit plane."""
         frequency_grid = image_config.padded_full_frequency_grid_in_angstroms

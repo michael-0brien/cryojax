@@ -87,7 +87,7 @@ def relion_parameters():
 
     pose = cxs.EulerAnglePose()
     transfer_theory = cxs.ContrastTransferTheory(
-        ctf=cxs.CTF(),
+        ctf=cxs.AstigmaticCTF(),
     )
     return dict(image_config=image_config, pose=pose, transfer_theory=transfer_theory)
 
@@ -261,7 +261,7 @@ def test_load_starfile_ctf_params(sample_starfile_path):
     assert parameters["transfer_theory"].envelope is None
 
     transfer_theory = parameters["transfer_theory"]
-    ctf = cast(cxs.AberratedAstigmaticCTF, transfer_theory.ctf)
+    ctf = cast(cxs.AstigmaticCTF, transfer_theory.ctf)
 
     particle_data = parameter_file.starfile_data["particles"]
     # check CTF parameters
@@ -551,7 +551,7 @@ def test_append_particle_parameters(index, loads_envelope):
 
         pose = cxs.EulerAnglePose()
         transfer_theory = cxs.ContrastTransferTheory(
-            ctf=cxs.CTF(),
+            ctf=cxs.AstigmaticCTF(),
             envelope=op.FourierGaussian() if loads_envelope else None,
         )
         return dict(
@@ -630,7 +630,7 @@ def test_set_particle_parameters(
             ),
             pose=pose,
             transfer_theory=cxs.ContrastTransferTheory(
-                cxs.CTF(defocus_in_angstroms=1234.0),
+                cxs.AstigmaticCTF(defocus_in_angstroms=1234.0),
                 amplitude_contrast_ratio=0.1234,
                 envelope=op.FourierGaussian(b_factor=12.34) if sets_envelope else None,
             ),
@@ -694,7 +694,7 @@ def test_file_exists_error():
             shape=(4, 4), pixel_size=1.1, voltage_in_kilovolts=300.0
         ),
         pose=cxs.EulerAnglePose(),
-        transfer_theory=cxs.ContrastTransferTheory(ctf=cxs.CTF()),
+        transfer_theory=cxs.ContrastTransferTheory(ctf=cxs.AstigmaticCTF()),
     )
     # Add to dataset
     path_to_starfile = "tests/outputs/starfile_writing/test_particle_parameters.star"
@@ -734,11 +734,11 @@ def test_set_wrong_parameters_error():
     # Wrong parameters
     wrong_pose = cxs.QuaternionPose()
     wrong_transfer_theory = cxs.ContrastTransferTheory(
-        ctf=cxs.CTF(), envelope=op.ZeroMode()
+        ctf=cxs.AstigmaticCTF(), envelope=op.ZeroMode()
     )
     # Right parameters
     right_pose = cxs.EulerAnglePose()
-    right_transfer_theory = cxs.ContrastTransferTheory(ctf=cxs.CTF())
+    right_transfer_theory = cxs.ContrastTransferTheory(ctf=cxs.AstigmaticCTF())
     image_config = cxs.BasicImageConfig(
         shape=(4, 4), pixel_size=1.1, voltage_in_kilovolts=300.0
     )
@@ -783,7 +783,7 @@ def test_bad_pytree_error():
         jnp.atleast_1d(3.0),
     )
     pose = eqx.tree_at(lambda x: x.offset_x_in_angstroms, pose, jnp.asarray((1.0, 2.0)))
-    transfer_theory = cxs.ContrastTransferTheory(ctf=cxs.CTF())
+    transfer_theory = cxs.ContrastTransferTheory(ctf=cxs.AstigmaticCTF())
     image_config = cxs.BasicImageConfig(
         shape=(4, 4), pixel_size=1.1, voltage_in_kilovolts=300.0
     )
@@ -877,7 +877,7 @@ def test_write_particle_batched_particle_parameters():
 
         pose = cxs.EulerAnglePose()
         transfer_theory = cxs.ContrastTransferTheory(
-            ctf=cxs.CTF(), envelope=op.FourierGaussian()
+            ctf=cxs.AstigmaticCTF(), envelope=op.FourierGaussian()
         )
         return {
             "image_config": image_config,
@@ -933,7 +933,7 @@ def test_write_starfile_different_envs():
 
         pose = cxs.EulerAnglePose()
         transfer_theory = cxs.ContrastTransferTheory(
-            ctf=cxs.CTF(),
+            ctf=cxs.AstigmaticCTF(),
             envelope=envelope,
         )
         return {
@@ -1197,7 +1197,7 @@ def test_load_multiple_mrcs():
 
         pose = cxs.EulerAnglePose()
         transfer_theory = cxs.ContrastTransferTheory(
-            ctf=cxs.CTF(), envelope=op.FourierGaussian()
+            ctf=cxs.AstigmaticCTF(), envelope=op.FourierGaussian()
         )
         return {
             "image_config": image_config,
@@ -1384,7 +1384,7 @@ def test_append_relion_stack_dataset():
 
         pose = cxs.EulerAnglePose()
         transfer_theory = cxs.ContrastTransferTheory(
-            ctf=cxs.CTF(), envelope=op.FourierGaussian()
+            ctf=cxs.AstigmaticCTF(), envelope=op.FourierGaussian()
         )
         return {
             "image_config": image_config,

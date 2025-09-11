@@ -44,7 +44,7 @@ def image_model(volume, basic_config):
         volume,
         basic_config,
         pose=cxs.EulerAnglePose(),
-        transfer_theory=cxs.ContrastTransferTheory(cxs.AberratedAstigmaticCTF()),
+        transfer_theory=cxs.ContrastTransferTheory(cxs.AstigmaticCTF()),
     )
 
 
@@ -84,7 +84,7 @@ def test_even_vs_odd_image_shape(extra_dim_y, extra_dim_x, volume_and_pixel_size
         test_shape, pixel_size=pixel_size, voltage_in_kilovolts=300.0
     )
     pose = cxs.EulerAnglePose()
-    transfer_theory = cxs.ContrastTransferTheory(cxs.AberratedAstigmaticCTF())
+    transfer_theory = cxs.ContrastTransferTheory(cxs.AstigmaticCTF())
     model_control = cxs.make_image_model(
         volume, config_control, pose=pose, transfer_theory=transfer_theory
     )

@@ -20,7 +20,7 @@ from ...io import read_starfile, write_image_stack_to_mrc, write_starfile
 from ...jax_util import NDArrayLike
 from ...ndimage.operators import Constant, FourierGaussian
 from ...simulator import (
-    AberratedAstigmaticCTF,
+    AstigmaticCTF,
     BasicImageConfig,
     ContrastTransferTheory,
     EulerAnglePose,
@@ -1188,7 +1188,7 @@ def _make_transfer_theory(defocus, astig, angle, sph, ac, ps, env=None):
             x.astigmatism_angle,
             x.spherical_aberration_in_mm,
         ),
-        AberratedAstigmaticCTF(),
+        AstigmaticCTF(),
         (defocus, astig, angle, sph),
     )
     transfer_theory = ContrastTransferTheory(
@@ -1402,7 +1402,7 @@ def _parameters_to_optics_data(
         pixel_size = parameters["image_config"].pixel_size
         voltage_in_kilovolts = parameters["image_config"].voltage_in_kilovolts
         amplitude_contrast_ratio = parameters["transfer_theory"].amplitude_contrast_ratio
-        if isinstance(parameters["transfer_theory"].ctf, AberratedAstigmaticCTF):
+        if isinstance(parameters["transfer_theory"].ctf, AstigmaticCTF):
             spherical_aberration_in_mm = getattr(
                 parameters["transfer_theory"].ctf, "spherical_aberration_in_mm"
             )
@@ -1410,7 +1410,7 @@ def _parameters_to_optics_data(
             raise ValueError(
                 "When adding optics group or particle to STAR file, "
                 "`transfer_theory.ctf` must be type "
-                "`AberratedAstigmaticCTF`. Instead, got type "
+                "`AstigmaticCTF`. Instead, got type "
                 f"{type(parameters['transfer_theory'].ctf).__name__}."
             )
         optics_group_dict = {
@@ -1496,7 +1496,7 @@ def _parameters_to_particle_data(
     # Fill CTF parameters
     if "transfer_theory" in parameters:
         transfer_theory = parameters["transfer_theory"]
-        if isinstance(transfer_theory.ctf, AberratedAstigmaticCTF):
+        if isinstance(transfer_theory.ctf, AstigmaticCTF):
             if pose.offset_z_in_angstroms is None:
                 defocus_offset = 0.0
             else:
@@ -1516,7 +1516,7 @@ def _parameters_to_particle_data(
             raise ValueError(
                 "When adding particle to STAR file, "
                 "`transfer_theory.ctf` must be type "
-                "`AberratedAstigmaticCTF`. Instead, got type "
+                "`AstigmaticCTF`. Instead, got type "
                 f"{type(parameters['transfer_theory'].ctf).__name__}."
             )
 
