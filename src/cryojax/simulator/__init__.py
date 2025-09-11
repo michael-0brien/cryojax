@@ -1,3 +1,6 @@
+# Deprecation warnings
+import warnings as _warnings
+
 from ._api_utils import make_image_model as make_image_model
 from ._common_functions import (
     apply_amplitude_contrast_ratio as apply_amplitude_contrast_ratio,
@@ -73,3 +76,24 @@ from ._volume_parametrisation import (
     PengScatteringFactorParameters as PengScatteringFactorParameters,
     RealVoxelGridVolume as RealVoxelGridVolume,
 )
+
+
+def __getattr__(name: str):
+    if name == "AberratedAstigmaticCTF":
+        _warnings.warn(
+            "'AberratedAstigmaticCTF' is deprecated and will be removed in "
+            "cryoJAX 0.6.0. Use 'AstigmaticCTF' instead.",
+            category=DeprecationWarning,
+            stacklevel=2,
+        )
+        return AstigmaticCTF
+    if name == "CTF":
+        _warnings.warn(
+            "Alias 'CTF' is deprecated and will be removed in "
+            "cryoJAX 0.6.0. Use 'AstigmaticCTF' instead.",
+            category=DeprecationWarning,
+            stacklevel=2,
+        )
+        return AstigmaticCTF
+
+    raise ImportError(f"cannot import name '{name}' from 'cryojax.simulator'")
