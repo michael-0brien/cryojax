@@ -69,6 +69,7 @@ nav:
             - Write a STAR file of simulated data: 'examples/simulate-relion-dataset.ipynb'
         - Advanced usage:
             - Create custom image simulation methods: 'examples/extending-cryojax.ipynb'
+            - Structural refinement via gradient descent: 'examples/structure-refinement.ipynb'
     - API:
         - cryojax.simulator:
             - 'api/simulator/api.md'
