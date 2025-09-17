@@ -52,7 +52,7 @@ class FFTMultisliceIntegrator(
             The volume to integrate to the exit plane. This is
             a real-valued voxel grid, which must be in physical units
             of a scattering potential. See rendering method
-            `PengIndependentAtomPotential.to_real_voxel_grid` for an example.
+            `PengAtomPotential.to_real_voxel_grid` for an example.
         - `image_config`:
             The configuration of the imaging instrument.
 
