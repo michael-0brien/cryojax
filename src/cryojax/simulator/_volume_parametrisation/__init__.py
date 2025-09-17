@@ -8,10 +8,11 @@ from .ensemble import DiscreteStructuralEnsemble as DiscreteStructuralEnsemble
 from .potential import (
     AbstractPengPotential as AbstractPengPotential,
     AbstractTabulatedPotential as AbstractTabulatedPotential,
-    PengIndependentAtomPotential as PengIndependentAtomPotential,
+    PengAtomPotential as PengAtomPotential,
     PengScatteringFactorParameters as PengScatteringFactorParameters,
 )
 from .representations import (
+    AbstractAtomVolume as AbstractAtomVolume,
     AbstractPointCloudVolume as AbstractPointCloudVolume,
     AbstractVoxelVolume as AbstractVoxelVolume,
     FourierVoxelGridVolume as FourierVoxelGridVolume,
