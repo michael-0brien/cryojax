@@ -29,9 +29,19 @@ class GaussianMixtureVolume(AbstractPointCloudVolume, strict=True):
 
     def __init__(
         self,
-        positions: Float[NDArrayLike, "n_gaussians 3"],
-        amplitudes: Float[NDArrayLike, "n_positions n_gaussians"],
-        variances: Float[NDArrayLike, "n_positions n_gaussians"],
+        positions: Float[NDArrayLike, "n_positions 3"],
+        amplitudes: (
+            float
+            | Float[NDArrayLike, ""]
+            | Float[NDArrayLike, " n_positions"]
+            | Float[NDArrayLike, "n_positions n_gaussians"]
+        ),
+        variances: (
+            float
+            | Float[NDArrayLike, ""]
+            | Float[NDArrayLike, " n_positions"]
+            | Float[NDArrayLike, "n_positions n_gaussians"]
+        ),
     ):
         """**Arguments:**
 
@@ -45,9 +55,67 @@ class GaussianMixtureVolume(AbstractPointCloudVolume, strict=True):
             The variance for each gaussian. This has units of angstroms
             squared.
         """
+        n_positions = positions.shape[0]
+        if isinstance(amplitudes, NDArrayLike):
+            if amplitudes.ndim == 2:
+                n_gaussians = amplitudes.shape[-1]
+            elif amplitudes.ndim == 1:
+                n_gaussians = 1
+                amplitudes = amplitudes[:, None]
+            elif amplitudes.ndim == 0:
+                n_gaussians = 1
+                amplitudes = amplitudes[None, None]
+            else:
+                raise ValueError(
+                    "Passed `amplitudes` to `GaussianMixtureVolume` "
+                    f"with shape {amplitudes.shape}, but must be of "
+                    "shape `()`, `(n_positions,)`, or "
+                    "`(n_positions, n_gaussians)`."
+                )
+        else:
+            n_gaussians = 1
+        if isinstance(variances, NDArrayLike):
+            if variances.ndim == 2:
+                n_gaussians = variances.shape[-1]
+            elif variances.ndim == 1:
+                variances = variances[:, None]
+            elif variances.ndim == 0:
+                variances = variances[None, None]
+            else:
+                raise ValueError(
+                    "Passed `variances` to `GaussianMixtureVolume` "
+                    f"with shape {variances.shape}, but must be of "
+                    "shape `()`, `(n_positions,)`, or "
+                    "`(n_positions, n_gaussians)`."
+                )
+
         self.positions = jnp.asarray(positions, dtype=float)
-        self.amplitudes = jnp.asarray(amplitudes, dtype=float)
-        self.variances = error_if_not_positive(jnp.asarray(variances, dtype=float))
+        self.amplitudes = jnp.broadcast_to(
+            jnp.asarray(amplitudes, dtype=float), (n_positions, n_gaussians)
+        )
+        self.variances = jnp.broadcast_to(
+            error_if_not_positive(jnp.asarray(variances, dtype=float)),
+            (n_positions, n_gaussians),
+        )
+
+    def __check_init__(self):
+        if not (
+            self.positions.shape[0] == self.amplitudes.shape[0] == self.variances.shape[0]
+        ):
+            raise ValueError(
+                "The number of positions in `GaussianMixtureVolume` was "
+                f"{self.positions.shape[0]}, but `amplitudes` shape was "
+                f"{self.amplitudes.shape} and `variances` shape was "
+                f"{self.variances.shape}. The first dimension must be equal "
+                "to the number of positions."
+            )
+        if not (self.amplitudes.shape == self.variances.shape):
+            raise ValueError(
+                "In `GaussianMixtureVolume`, `amplitudes` and "
+                f"`variances` shape must be equal. Found shapes "
+                f"{self.amplitudes.shape} and {self.variances.shape}, "
+                "respectively."
+            )
 
     @override
     def rotate_to_pose(self, pose: AbstractPose, inverse: bool = False) -> Self:

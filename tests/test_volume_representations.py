@@ -435,3 +435,56 @@ class TestRenderGMMToVoxels:
 
         integral = jnp.sum(real_voxel_grid) * voxel_size**3
         assert jnp.isclose(integral, jnp.sum(4 * jnp.pi * ff_a))
+
+
+def test_gmm_shape():
+    n_atoms, n_gaussians = 10, 2
+    pos = np.zeros((n_atoms, 3))
+    make_gmm = lambda amp, var: GaussianMixtureVolume(pos, amp, var)
+    gmm = make_gmm(1.0, 1.0)
+    assert gmm.variances.shape == gmm.amplitudes.shape == (n_atoms, 1)
+    gmm = make_gmm(np.ones((n_atoms,)), np.ones((n_atoms,)))
+    assert gmm.variances.shape == gmm.amplitudes.shape == (n_atoms, 1)
+    gmm = make_gmm(np.ones((n_atoms, n_gaussians)), np.ones((n_atoms, n_gaussians)))
+    assert gmm.variances.shape == gmm.amplitudes.shape == (n_atoms, n_gaussians)
+    gmm1, gmm2 = make_gmm(1.0, np.ones((n_atoms,))), make_gmm(np.ones((n_atoms,)), 1.0)
+    assert (
+        gmm1.variances.shape
+        == gmm1.amplitudes.shape
+        == gmm2.variances.shape
+        == gmm2.amplitudes.shape
+        == (n_atoms, 1)
+    )
+    gmm1, gmm2 = (
+        make_gmm(1.0, np.ones((n_atoms, n_gaussians))),
+        make_gmm(np.ones((n_atoms, n_gaussians)), 1.0),
+    )
+    assert (
+        gmm1.variances.shape
+        == gmm1.amplitudes.shape
+        == gmm2.variances.shape
+        == gmm2.amplitudes.shape
+        == (n_atoms, n_gaussians)
+    )
+    gmm1, gmm2 = (
+        make_gmm(np.asarray(1.0), np.ones((n_atoms, n_gaussians))),
+        make_gmm(np.ones((n_atoms, n_gaussians)), np.asarray(1.0)),
+    )
+    assert (
+        gmm1.variances.shape
+        == gmm1.amplitudes.shape
+        == gmm2.variances.shape
+        == gmm2.amplitudes.shape
+        == (n_atoms, n_gaussians)
+    )
+    gmm1, gmm2 = (
+        make_gmm(np.ones((n_atoms,)), np.ones((n_atoms, n_gaussians))),
+        make_gmm(np.ones((n_atoms, n_gaussians)), np.ones((n_atoms,))),
+    )
+    assert (
+        gmm1.variances.shape
+        == gmm1.amplitudes.shape
+        == gmm2.variances.shape
+        == gmm2.amplitudes.shape
+        == (n_atoms, n_gaussians)
+    )
