@@ -59,6 +59,7 @@ class CircularCosineMask(AbstractMask, strict=True):
         coordinate_grid: Float[Array, "y_dim x_dim 2"],
         radius: float | Float[NDArrayLike, ""],
         rolloff_width: float | Float[NDArrayLike, ""],
+        xy_offset: tuple[float, float] | Float[NDArrayLike, " 2"] = (0.0, 0.0),
     ):
         """**Arguments:**
 
@@ -73,6 +74,7 @@ class CircularCosineMask(AbstractMask, strict=True):
             coordinate_grid,
             jnp.asarray(radius),
             jnp.asarray(rolloff_width),
+            offset=jnp.asarray(xy_offset),
         )
 
 
@@ -102,6 +104,7 @@ class SphericalCosineMask(AbstractMask, strict=True):
             coordinate_grid,
             jnp.asarray(radius),
             jnp.asarray(rolloff_width),
+            offset=None,
         )
 
 
@@ -288,27 +291,14 @@ class InverseSincMask(AbstractMask, strict=True):
         )
 
 
-@overload
-def _compute_circular_or_spherical_mask(
-    coordinate_grid: Float[Array, "y_dim x_dim 2"],
-    radius: Float[Array, ""],
-    rolloff_width: Float[Array, ""],
-) -> Float[Array, "y_dim x_dim"]: ...
-
-
-@overload
-def _compute_circular_or_spherical_mask(  # type: ignore
-    coordinate_grid: Float[Array, "z_dim y_dim x_dim 3"],
-    radius: Float[Array, ""],
-    rolloff_width: Float[Array, ""],
-) -> Float[Array, "z_dim y_dim x_dim"]: ...
-
-
 def _compute_circular_or_spherical_mask(
     coordinate_grid: Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"],
     radius: Float[Array, ""],
     rolloff_width: Float[Array, ""],
+    offset: Optional[Float[Array, "2"] | Float[Array, "3"]] = None,
 ) -> Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]:
+    if offset is not None:
+        coordinate_grid -= offset[None, None, :]
     radial_coordinate_grid = jnp.linalg.norm(coordinate_grid, axis=-1)
 
     def compute_mask_at_coordinate(radial_coordinate):
