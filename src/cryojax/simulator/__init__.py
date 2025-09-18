@@ -60,18 +60,17 @@ from ._volume_integrator import (
     NufftProjection as NufftProjection,
 )
 from ._volume_parametrisation import (
-    AbstractEnsembleParametrisation as AbstractEnsembleParametrisation,
-    AbstractPengPotential as AbstractPengPotential,
+    AbstractAtomicVolume as AbstractAtomicVolume,
+    AbstractConformationalEnsemble as AbstractConformationalEnsemble,
     AbstractPointCloudVolume as AbstractPointCloudVolume,
-    AbstractPotentialParametrisation as AbstractPotentialParametrisation,
-    AbstractTabulatedPotential as AbstractTabulatedPotential,
+    AbstractTabulatedAtomicVolume as AbstractTabulatedAtomicVolume,
     AbstractVolumeParametrisation as AbstractVolumeParametrisation,
     AbstractVolumeRepresentation as AbstractVolumeRepresentation,
-    DiscreteStructuralEnsemble as DiscreteStructuralEnsemble,
+    DiscreteConformationalEnsemble as DiscreteConformationalEnsemble,
     FourierVoxelGridVolume as FourierVoxelGridVolume,
     FourierVoxelSplineVolume as FourierVoxelSplineVolume,
     GaussianMixtureVolume as GaussianMixtureVolume,
-    PengAtomPotential as PengAtomPotential,
+    PengAtomicVolume as PengAtomicVolume,
     PengScatteringFactorParameters as PengScatteringFactorParameters,
     RealVoxelGridVolume as RealVoxelGridVolume,
 )

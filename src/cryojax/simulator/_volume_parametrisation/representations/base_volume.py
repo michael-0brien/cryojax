@@ -67,7 +67,7 @@ class AbstractVoxelVolume(AbstractVolumeRepresentation, strict=True):
         raise NotImplementedError
 
 
-class AbstractAtomVolume(AbstractPointCloudVolume, strict=True):
+class AbstractAtomicVolume(AbstractPointCloudVolume, strict=True):
     """A molecular volume representation with atoms."""
 
     atom_positions: eqx.AbstractVar[Float[Array, "n_atoms 3"]]

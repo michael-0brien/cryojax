@@ -44,7 +44,7 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
         sample_pdb_path, center=True, loads_b_factors=True
     )
     scattering_factor_parameters = cxs.PengScatteringFactorParameters(atom_types)
-    base_volume = cxs.PengAtomPotential.from_tabulated_parameters(
+    base_volume = cxs.PengAtomicVolume.from_tabulated_parameters(
         atom_positions,
         scattering_factor_parameters,
         extra_b_factors=b_factors,

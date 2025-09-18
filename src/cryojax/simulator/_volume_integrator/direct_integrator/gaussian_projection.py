@@ -15,15 +15,12 @@ from ....ndimage import (
     rfftn,
 )
 from ..._image_config import AbstractImageConfig
-from ..._volume_parametrisation import (
-    GaussianMixtureVolume,
-    PengAtomPotential as PengAtomPotential,
-)
+from ..._volume_parametrisation import GaussianMixtureVolume, PengAtomicVolume
 from .base_direct_integrator import AbstractDirectIntegrator
 
 
 class GaussianMixtureProjection(
-    AbstractDirectIntegrator[GaussianMixtureVolume | PengAtomPotential],
+    AbstractDirectIntegrator[GaussianMixtureVolume | PengAtomicVolume],
     strict=True,
 ):
     upsampling_factor: Optional[int]
@@ -78,7 +75,7 @@ class GaussianMixtureProjection(
     @override
     def integrate(
         self,
-        volume_representation: GaussianMixtureVolume | PengAtomPotential,
+        volume_representation: GaussianMixtureVolume | PengAtomicVolume,
         image_config: AbstractImageConfig,
         outputs_real_space: bool = False,
     ) -> (
@@ -115,7 +112,7 @@ class GaussianMixtureProjection(
         else:
             upsampled_pixel_size, upsampled_shape = pixel_size, shape
         # Grab the gaussian amplitudes and widths
-        if isinstance(volume_representation, PengAtomPotential):
+        if isinstance(volume_representation, PengAtomicVolume):
             positions = volume_representation.atom_positions
             amplitudes = volume_representation.amplitudes
             b_factors = volume_representation.b_factors
@@ -126,7 +123,7 @@ class GaussianMixtureProjection(
         else:
             raise ValueError(
                 "Supported types for `volume_representation` are "
-                "`PengAtomPotential` and `GaussianMixtureVolume`."
+                "`PengAtomicVolume` and `GaussianMixtureVolume`."
             )
         # Compute the projection
         projection_integral = _gaussians_to_projection(

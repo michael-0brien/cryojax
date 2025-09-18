@@ -1,5 +1,5 @@
 import abc
-from typing import Any, Optional
+from typing import Any, Generic, Optional, TypeVar
 from typing_extensions import Self, override
 
 import equinox as eqx
@@ -12,9 +12,11 @@ from ....constants import (
     read_peng_scattering_factor_parameter_table,
 )
 from ....jax_util import NDArrayLike, error_if_negative
-from ..base_parametrisation import AbstractPotentialParametrisation
-from ..common_functions import gaussians_to_real_voxels
-from ..representations import AbstractAtomVolume
+from ..representations import AbstractAtomicVolume
+from .common_functions import gaussians_to_real_voxels
+
+
+T = TypeVar("T")
 
 
 class PengScatteringFactorParameters(eqx.Module, strict=True):
@@ -52,58 +54,44 @@ class PengScatteringFactorParameters(eqx.Module, strict=True):
         self.b = jnp.asarray(scattering_factor_parameter_dict["b"], dtype=float)
 
 
-class AbstractTabulatedPotential(AbstractPotentialParametrisation, strict=True):
+class AbstractTabulatedAtomicVolume(AbstractAtomicVolume, Generic[T], strict=True):
     """Abstract class for a scattering potential from tabulated
     electron scattering factors."""
 
     @classmethod
     @abc.abstractmethod
-    def from_tabulated_parameters(cls, *args: Any, **kwargs: Any) -> Self:
+    def from_tabulated_parameters(
+        cls,
+        atom_positions: Float[NDArrayLike, "n_atoms 3"],
+        parameters: T,
+        extra_b_factors: Optional[Float[NDArrayLike, " n_atoms"]] = None,
+    ) -> Self:
         """Construct a scattering potential parametrisation from
         tabulated electron scattering factors.
         """
         raise NotImplementedError
 
 
-class AbstractPengPotential(AbstractTabulatedPotential, strict=True):
-    """Abstract class for a scattering potential parametrised
-    as a mixture of five gaussians per atom (Peng et al. 1996).
-
-    **References:**
-
-    - Peng, L-M. "Electron atomic scattering factors and scattering potentials of crystals."
-        Micron 30.6 (1999): 625-648.
-    - Peng, L-M., et al. "Robust parameterization of elastic and absorptive electron atomic
-        scattering factors." Acta Crystallographica Section A: Foundations of Crystallography
-        52.2 (1996): 257-276.
-    """  # noqa: E501
-
-    amplitudes: eqx.AbstractVar[Float[Array, "n_atoms n_gaussians"]]
-    b_factors: eqx.AbstractVar[Float[Array, "n_atoms n_gaussians"]]
-
-
-class PengAtomPotential(
-    AbstractPengPotential,
-    AbstractAtomVolume,
-    strict=True,
+class PengAtomicVolume(
+    AbstractTabulatedAtomicVolume[PengScatteringFactorParameters], strict=True
 ):
     """The scattering potential parameterized as a mixture of five
     gaussians per atom (Peng et al. 1996).
 
     !!! info
-        Use the following to load a `PengAtomPotential`
+        Use the following to load a `PengAtomicVolume`
         from tabulated electron scattering factors
 
         ```python
         from cryojax.io import read_atoms_from_pdb
         from cryojax.simulator import (
-            PengAtomPotential, PengScatteringFactorParameters
+            PengAtomicVolume, PengScatteringFactorParameters
         )
 
         # Load positions of atoms and one-hot encoded atom names
         atom_positions, atom_types = read_atoms_from_pdb(...)
         parameters = PengScatteringFactorParameters(atom_types)
-        potential = PengAtomPotential.from_tabulated_parameters(
+        potential = PengAtomicVolume.from_tabulated_parameters(
             atom_positions, parameters
         )
         ```
@@ -152,7 +140,7 @@ class PengAtomPotential(
         parameters: PengScatteringFactorParameters,
         extra_b_factors: Optional[Float[NDArrayLike, " n_atoms"]] = None,
     ) -> Self:
-        """Initialize a `PengAtomPotential` with a
+        """Initialize a `PengAtomicVolume` with a
         convenience wrapper for the scattering factor parameters.
 
         **Arguments:**
@@ -186,8 +174,8 @@ class PengAtomPotential(
 
         $$f^{(e)}(\\mathbf{q}) = \\sum\\limits_{i = 1}^5 a_i \\exp(- b_i |\\mathbf{q}|^2),$$
 
-        where $a_i$ is stored as `PengAtomicPotential.scattering_factor_a` and $b_i$ is
-        stored as `PengAtomicPotential.scattering_factor_b` for the scattering vector $\\mathbf{q}$.
+        where $a_i$ is stored as `PengAtomicVolume.amplitudes` and $b_i$ is
+        stored as `PengAtomicVolume.b_factors` for the scattering vector $\\mathbf{q}$.
         Under usual scattering approximations (i.e. the first-born approximation),
         the rescaled electrostatic potential energy $U(\\mathbf{r})$ is then given by
         $4 \\pi \\mathcal{F}^{-1}[f^{(e)}(\\boldsymbol{\\xi} / 2)](\\mathbf{r})$, which is computed

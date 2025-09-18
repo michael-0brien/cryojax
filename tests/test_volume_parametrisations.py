@@ -1,9 +1,10 @@
+import jax
 import pytest
 
 import cryojax.simulator as cxs
 from cryojax.constants import b_factor_to_variance
 from cryojax.io import read_array_from_mrc, read_atoms_from_pdb
-from cryojax.simulator import DiscreteStructuralEnsemble
+from cryojax.simulator import DiscreteConformationalEnsemble
 
 
 @pytest.fixture
@@ -39,5 +40,16 @@ def gmm_volume(sample_pdb_path):
 def test_conformation(volume, request):
     volume = request.getfixturevalue(volume)
     conformational_space = tuple([volume for _ in range(3)])
-    volume = DiscreteStructuralEnsemble(conformational_space, conformation=0)
+    volume = DiscreteConformationalEnsemble(conformational_space, conformation=0)
     _ = volume.compute_volume_representation()
+
+
+@pytest.mark.parametrize(
+    "volume",
+    [("voxel_volume"), ("gmm_volume")],
+)
+def test_sample_conformation(volume, request):
+    volume = request.getfixturevalue(volume)
+    conformational_space = tuple([volume for _ in range(3)])
+    rng_key = jax.random.key(1234)
+    _ = DiscreteConformationalEnsemble.sample_conformation(rng_key, conformational_space)

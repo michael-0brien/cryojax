@@ -1,5 +1,5 @@
 import abc
-from typing import Any, Optional, TypeVar
+from typing import Optional, TypeVar
 from typing_extensions import Self, override
 
 import equinox as eqx
@@ -15,60 +15,9 @@ T = TypeVar("T")
 # Core base class for parametrising a volume
 #
 class AbstractVolumeParametrisation(eqx.Module, strict=True):
-    """Abstract interface for a parametrisation of a volume."""
-
-    @abc.abstractmethod
-    def compute_volume_representation(
-        self, rng_key: Optional[PRNGKeyArray] = None
-    ) -> "AbstractVolumeRepresentation":
-        """Core interface for computing the representation of
-        the volume.
-        """
-        raise NotImplementedError
-
-
-#
-# Interfaces that give core properties to volumes
-#
-class AbstractVolumeRepresentation(AbstractVolumeParametrisation, strict=True):
-    """Abstract interface for the representation of a volume, such
-    as atomic coordinates, voxels, or a neural network.
-    """
-
-    @abc.abstractmethod
-    def rotate_to_pose(self, pose: AbstractPose, inverse: bool = False) -> Self:
-        """Rotate the coordinate system of the volume."""
-        raise NotImplementedError
-
-    @override
-    def compute_volume_representation(
-        self, rng_key: Optional[PRNGKeyArray] = None
-    ) -> Self:
-        """Since this class is itself an implementation of an
-        `AbstractVolumeParametrisation`, this function maps to the identity.
-
-        **Arguments:**
-
-        - `rng_key`:
-            Not used in this implementation, but optionally
-            included for other implementations.
-        """
-        return self
-
-
-class AbstractEnsembleParametrisation(AbstractVolumeParametrisation, strict=True):
-    """Abstract interface for a volume with conformational
-    heterogeneity.
-    """
-
-    conformation: eqx.AbstractVar[Any]
-    """A variable for the ensemble's conformational state."""
-
-
-class AbstractPotentialParametrisation(
-    AbstractVolumeParametrisation, strict=eqx.StrictConfig(force_abstract=True)
-):
-    """Abstract interface for a scattering potential.
+    """Abstract interface for a parametrisation of a volume. Specifically,
+    the cryo-EM image formation process typically starts with a *scattering potential*.
+    "Volumes" and "scattering potentials" in cryoJAX are synonymous.
 
     !!! info
         In, `cryojax`, potentials should be built in units of *inverse length squared*,
@@ -110,3 +59,44 @@ class AbstractPotentialParametrisation(
         "Image formation modeling in cryo-electron microscopy." Journal of structural
         biology 183.1 (2013): 19-32.*
     """  # noqa: E501
+
+    @abc.abstractmethod
+    def compute_volume_representation(
+        self, rng_key: Optional[PRNGKeyArray] = None
+    ) -> "AbstractVolumeRepresentation":
+        """Core interface for computing the representation of
+        the volume.
+        """
+        raise NotImplementedError
+
+
+#
+# Interfaces that give core properties to volumes
+#
+class AbstractVolumeRepresentation(AbstractVolumeParametrisation, strict=True):
+    """Abstract interface for the representation of a volume, such
+    as atomic coordinates, voxels, or a neural network.
+
+    Volume representations contain information of coordinates and may be
+    passed to `AbstractVolumeIntegrator` classes for imaging.
+    """
+
+    @abc.abstractmethod
+    def rotate_to_pose(self, pose: AbstractPose, inverse: bool = False) -> Self:
+        """Rotate the coordinate system of the volume."""
+        raise NotImplementedError
+
+    @override
+    def compute_volume_representation(
+        self, rng_key: Optional[PRNGKeyArray] = None
+    ) -> Self:
+        """Since this class is itself an implementation of an
+        `AbstractVolumeParametrisation`, this function maps to the identity.
+
+        **Arguments:**
+
+        - `rng_key`:
+            Not used in this implementation, but optionally
+            included for other implementations.
+        """
+        return self
