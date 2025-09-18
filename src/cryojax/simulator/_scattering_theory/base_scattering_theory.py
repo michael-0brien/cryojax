@@ -43,7 +43,6 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
     """Base class for a wave-based scattering theory."""
 
     transfer_theory: eqx.AbstractVar[WaveTransferTheory]
-    amplitude_contrast_ratio: eqx.AbstractVar[Float[Array, ""]]
 
     @abstractmethod
     def compute_exit_wave(
