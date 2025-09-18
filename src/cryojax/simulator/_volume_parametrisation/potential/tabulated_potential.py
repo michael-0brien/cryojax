@@ -14,7 +14,7 @@ from ....constants import (
 from ....jax_util import NDArrayLike, error_if_negative
 from ..base_parametrisation import AbstractPotentialParametrisation
 from ..common_functions import gaussians_to_real_voxels
-from ..representations import AbstractIndependentAtomVolume
+from ..representations import AbstractAtomVolume
 
 
 class PengScatteringFactorParameters(eqx.Module, strict=True):
@@ -82,28 +82,28 @@ class AbstractPengPotential(AbstractTabulatedPotential, strict=True):
     b_factors: eqx.AbstractVar[Float[Array, "n_atoms n_gaussians"]]
 
 
-class PengIndependentAtomPotential(
+class PengAtomPotential(
     AbstractPengPotential,
-    AbstractIndependentAtomVolume,
+    AbstractAtomVolume,
     strict=True,
 ):
     """The scattering potential parameterized as a mixture of five
     gaussians per atom (Peng et al. 1996).
 
     !!! info
-        Use the following to load a `PengIndependentAtomPotential`
+        Use the following to load a `PengAtomPotential`
         from tabulated electron scattering factors
 
         ```python
         from cryojax.io import read_atoms_from_pdb
         from cryojax.simulator import (
-            PengIndependentAtomPotential, PengScatteringFactorParameters
+            PengAtomPotential, PengScatteringFactorParameters
         )
 
         # Load positions of atoms and one-hot encoded atom names
         atom_positions, atom_types = read_atoms_from_pdb(...)
         parameters = PengScatteringFactorParameters(atom_types)
-        potential = PengIndependentAtomPotential.from_tabulated_parameters(
+        potential = PengAtomPotential.from_tabulated_parameters(
             atom_positions, parameters
         )
         ```
@@ -152,7 +152,7 @@ class PengIndependentAtomPotential(
         parameters: PengScatteringFactorParameters,
         extra_b_factors: Optional[Float[NDArrayLike, " n_atoms"]] = None,
     ) -> Self:
-        """Initialize a `PengIndependentAtomPotential` with a
+        """Initialize a `PengAtomPotential` with a
         convenience wrapper for the scattering factor parameters.
 
         **Arguments:**

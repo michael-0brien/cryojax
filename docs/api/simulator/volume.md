@@ -38,7 +38,7 @@ There are many different volume representations of biological structures for cry
 
 ---
 
-::: cryojax.simulator.PengIndependentAtomPotential
+::: cryojax.simulator.PengAtomPotential
     options:
         members:
             - __init__

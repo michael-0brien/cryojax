@@ -1,5 +1,5 @@
 from .base_volume import (
-    AbstractIndependentAtomVolume as AbstractIndependentAtomVolume,
+    AbstractAtomVolume as AbstractAtomVolume,
     AbstractPointCloudVolume as AbstractPointCloudVolume,
     AbstractVoxelVolume as AbstractVoxelVolume,
 )

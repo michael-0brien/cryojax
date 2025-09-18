@@ -15,7 +15,7 @@ with install_import_hook("cryojax", "typeguard.typechecked"):
         FourierVoxelGridVolume,
         GaussianMixtureProjection,
         GaussianMixtureVolume,
-        PengIndependentAtomPotential,
+        PengAtomPotential,
         PengScatteringFactorParameters,
         RealVoxelGridVolume,
     )
@@ -61,7 +61,7 @@ def test_atom_integrator_shape(sample_pdb_path, shape):
         selection_string="not element H",
         loads_b_factors=True,
     )
-    atom_potential = PengIndependentAtomPotential.from_tabulated_parameters(
+    atom_potential = PengAtomPotential.from_tabulated_parameters(
         atom_positions,
         parameters=PengScatteringFactorParameters(atom_types),
         extra_b_factors=b_factors,
@@ -117,7 +117,7 @@ def test_fourier_vs_real_voxel_potential_agreement(sample_pdb_path):
         selection_string="not element H",
     )
     # Load atomistic potential
-    atom_potential = PengIndependentAtomPotential.from_tabulated_parameters(
+    atom_potential = PengAtomPotential.from_tabulated_parameters(
         atom_positions,
         parameters=PengScatteringFactorParameters(atom_types),
     )
@@ -160,7 +160,7 @@ def test_downsampled_voxel_potential_agreement(sample_pdb_path):
         selection_string="not element H",
     )
     # Load atomistic potential
-    atom_potential = PengIndependentAtomPotential.from_tabulated_parameters(
+    atom_potential = PengAtomPotential.from_tabulated_parameters(
         atom_positions,
         parameters=PengScatteringFactorParameters(atom_types),
     )
@@ -189,7 +189,7 @@ def test_downsampled_gmm_potential_agreement(sample_pdb_path):
         center=True,
         selection_string="not element H",
     )
-    atom_potential = PengIndependentAtomPotential.from_tabulated_parameters(
+    atom_potential = PengAtomPotential.from_tabulated_parameters(
         atom_positions,
         parameters=PengScatteringFactorParameters(atom_types),
     )
@@ -234,7 +234,7 @@ def test_peng_vs_gmm_agreement(sample_pdb_path):
         center=True,
         selection_string="not element H",
     )
-    atom_potential = PengIndependentAtomPotential.from_tabulated_parameters(
+    atom_potential = PengAtomPotential.from_tabulated_parameters(
         atom_positions,
         parameters=PengScatteringFactorParameters(atom_types),
     )
@@ -277,7 +277,7 @@ def test_compute_rectangular_voxel_grid(sample_pdb_path, shape):
         selection_string="not element H",
     )
     # Load atomistic potential
-    atom_potential = PengIndependentAtomPotential.from_tabulated_parameters(
+    atom_potential = PengAtomPotential.from_tabulated_parameters(
         atom_positions,
         parameters=PengScatteringFactorParameters(atom_types),
     )
@@ -304,7 +304,7 @@ def test_z_plane_batched_vs_non_batched_loop_agreement(
         selection_string="not element H",
     )
     # Load atomistic potential
-    atom_potential = PengIndependentAtomPotential.from_tabulated_parameters(
+    atom_potential = PengAtomPotential.from_tabulated_parameters(
         atom_positions,
         parameters=PengScatteringFactorParameters(atom_types),
     )
