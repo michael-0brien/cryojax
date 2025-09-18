@@ -1,1 +1,4 @@
-from .discrete_ensemble import DiscreteStructuralEnsemble as DiscreteStructuralEnsemble
+from .discrete_ensemble import (
+    AbstractConformationalEnsemble as AbstractConformationalEnsemble,
+    DiscreteConformationalEnsemble as DiscreteConformationalEnsemble,
+)

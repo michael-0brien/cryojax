@@ -8,8 +8,8 @@ from jaxtyping import Array, Float
 from ....constants import variance_to_b_factor
 from ....jax_util import NDArrayLike, error_if_not_positive
 from ..._pose import AbstractPose
-from ..common_functions import gaussians_to_real_voxels
 from .base_volume import AbstractPointCloudVolume
+from .common_functions import gaussians_to_real_voxels
 
 
 class GaussianMixtureVolume(AbstractPointCloudVolume, strict=True):

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Self
 from typing_extensions import override
 
 import jax
@@ -7,12 +7,17 @@ from jaxtyping import Array, Int, PRNGKeyArray
 
 from ....jax_util import error_if_negative
 from ..base_parametrisation import (
-    AbstractEnsembleParametrisation,
     AbstractVolumeRepresentation,
 )
+from .base_ensemble import AbstractConformationalEnsemble
 
 
-class DiscreteStructuralEnsemble(AbstractEnsembleParametrisation, strict=True):
+class DiscreteConformationalEnsemble(
+    AbstractConformationalEnsemble[
+        tuple[AbstractVolumeRepresentation, ...], Int[Array, ""]
+    ],
+    strict=True,
+):
     """Abstraction of an ensemble with discrete conformational
     heterogeneity.
     """
@@ -34,6 +39,10 @@ class DiscreteStructuralEnsemble(AbstractEnsembleParametrisation, strict=True):
         self.conformational_space = conformational_space
         self.conformation = jnp.asarray(error_if_negative(conformation), dtype=int)
 
+    @property
+    def n_conformations(self) -> int:
+        return len(self.conformational_space)
+
     @override
     def compute_volume_representation(
         self, rng_key: Optional[PRNGKeyArray] = None
@@ -53,3 +62,16 @@ class DiscreteStructuralEnsemble(AbstractEnsembleParametrisation, strict=True):
         volume = jax.lax.switch(self.conformation, funcs)
 
         return volume
+
+    @override
+    @classmethod
+    def sample_conformation(
+        cls,
+        rng_key: PRNGKeyArray,
+        conformational_space: tuple[AbstractVolumeRepresentation, ...],
+    ) -> Self:
+        n_conformations = len(conformational_space)
+        conformation = jax.random.randint(
+            rng_key, (), minval=0, maxval=n_conformations - 1
+        )
+        return cls(conformational_space=conformational_space, conformation=conformation)

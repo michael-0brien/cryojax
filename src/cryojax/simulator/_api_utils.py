@@ -27,7 +27,7 @@ from ._volume_parametrisation import (
     FourierVoxelGridVolume,
     FourierVoxelSplineVolume,
     GaussianMixtureVolume,
-    PengAtomPotential,
+    PengAtomicVolume,
     RealVoxelGridVolume,
 )
 
@@ -53,7 +53,7 @@ def make_image_model(
     - `volume_parametrisation`:
         The representation of the protein volume.
         Common choices are the `FourierVoxelGridVolume`
-        for fourier-space voxel grids or the `PengAtomPotential`
+        for fourier-space voxel grids or the `PengAtomicVolume`
         for gaussian mixtures of atoms parameterized by electron scattering factors.
     - `image_config`:
         The configuration for the image and imagining instrument. Unless using
@@ -198,7 +198,7 @@ def _select_default_integrator(
         integrator = FourierSliceExtraction(outputs_integral=simulates_quantity)
     elif isinstance(
         volume,
-        (PengAtomPotential, GaussianMixtureVolume),
+        (PengAtomicVolume, GaussianMixtureVolume),
     ):
         integrator = GaussianMixtureProjection(use_error_functions=True)
     elif isinstance(volume, RealVoxelGridVolume):

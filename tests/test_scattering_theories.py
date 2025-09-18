@@ -45,7 +45,7 @@ def test_scattering_theories_no_pose(
         selection_string="not element H",
         loads_b_factors=True,
     )
-    atom_potential = cxs.PengAtomPotential.from_tabulated_parameters(
+    atom_potential = cxs.PengAtomicVolume.from_tabulated_parameters(
         atom_positions,
         parameters=cxs.PengScatteringFactorParameters(atom_types),
         extra_b_factors=b_factors,
@@ -165,7 +165,7 @@ def test_scattering_theories_pose(
         loads_b_factors=True,
     )
 
-    atom_potential = cxs.PengAtomPotential.from_tabulated_parameters(
+    atom_potential = cxs.PengAtomicVolume.from_tabulated_parameters(
         atom_positions,
         parameters=cxs.PengScatteringFactorParameters(atom_types),
         extra_b_factors=b_factors,
