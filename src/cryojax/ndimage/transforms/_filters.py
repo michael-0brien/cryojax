@@ -2,8 +2,10 @@
 Filters to apply to images in Fourier space
 """
 
+import abc
 import math
-from typing import Optional, overload
+from typing import Optional
+from typing_extensions import override
 
 import jax
 import jax.numpy as jnp
@@ -21,20 +23,15 @@ from ._base_transform import AbstractImageTransform
 class AbstractFilter(AbstractImageTransform, strict=True):
     """Base class for computing and applying an image filter."""
 
-    @overload
-    def __call__(
-        self, image: Complex[Array, "y_dim x_dim"]
-    ) -> Complex[Array, "y_dim x_dim"]: ...
+    @abc.abstractmethod
+    def get(self) -> Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]:
+        raise NotImplementedError
 
-    @overload
-    def __call__(  # type: ignore
-        self, image: Complex[Array, "z_dim y_dim x_dim"]
-    ) -> Complex[Array, "z_dim y_dim x_dim"]: ...
-
+    @override
     def __call__(
         self, image: Complex[Array, "y_dim x_dim"] | Complex[Array, "z_dim y_dim x_dim"]
     ) -> Complex[Array, "y_dim x_dim"] | Complex[Array, "z_dim y_dim x_dim"]:
-        return image * jax.lax.stop_gradient(self.array)
+        return image * self.get()
 
 
 FilterLike = AbstractFilter | AbstractImageTransform
@@ -53,6 +50,10 @@ class CustomFilter(AbstractFilter, strict=True):
         ),
     ):
         self.array = jnp.asarray(filter)
+
+    @override
+    def get(self) -> Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"]:
+        return self.array
 
 
 class LowpassFilter(AbstractFilter, strict=True):
@@ -91,6 +92,10 @@ class LowpassFilter(AbstractFilter, strict=True):
             jnp.asarray(rolloff_width_fraction),
         )
 
+    @override
+    def get(self) -> Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"]:
+        return self.array
+
 
 class HighpassFilter(AbstractFilter, strict=True):
     """Apply a low-pass filter to an image or volume, with
@@ -127,6 +132,10 @@ class HighpassFilter(AbstractFilter, strict=True):
             jnp.asarray(frequency_cutoff_fraction),
             jnp.asarray(rolloff_width_fraction),
         )
+
+    @override
+    def get(self) -> Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"]:
+        return self.array
 
 
 class WhiteningFilter(AbstractFilter, strict=True):
@@ -176,6 +185,10 @@ class WhiteningFilter(AbstractFilter, strict=True):
             interpolation_mode=interpolation_mode,
             outputs_squared=outputs_squared,
         )
+
+    @override
+    def get(self) -> Inexact[Array, "y_dim x_dim"]:
+        return self.array
 
 
 def _compute_lowpass_filter(

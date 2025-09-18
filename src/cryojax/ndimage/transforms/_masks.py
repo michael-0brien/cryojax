@@ -2,9 +2,11 @@
 Masks to apply to images in real space.
 """
 
+import abc
 import functools
 import operator
-from typing import Optional, overload
+from typing import Optional
+from typing_extensions import override
 
 import jax
 import jax.numpy as jnp
@@ -17,20 +19,14 @@ from ._base_transform import AbstractImageTransform
 class AbstractMask(AbstractImageTransform, strict=True):
     """Base class for computing and applying an image mask."""
 
-    @overload
-    def __call__(
-        self, image: Float[Array, "y_dim x_dim"]
-    ) -> Float[Array, "y_dim x_dim"]: ...
-
-    @overload
-    def __call__(  # type: ignore
-        self, image: Float[Array, "z_dim y_dim x_dim"]
-    ) -> Float[Array, "z_dim y_dim x_dim"]: ...
+    @abc.abstractmethod
+    def get(self) -> Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]:
+        raise NotImplementedError
 
     def __call__(
         self, image: Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]
     ) -> Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]:
-        return image * jax.lax.stop_gradient(self.array)
+        return image * self.get()
 
 
 MaskLike = AbstractMask | AbstractImageTransform
@@ -45,6 +41,10 @@ class CustomMask(AbstractMask, strict=True):
         self, mask_array: Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]
     ):
         self.array = mask_array
+
+    @override
+    def get(self) -> Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]:
+        return self.array
 
 
 class CircularCosineMask(AbstractMask, strict=True):
@@ -77,6 +77,10 @@ class CircularCosineMask(AbstractMask, strict=True):
             offset=jnp.asarray(xy_offset),
         )
 
+    @override
+    def get(self) -> Float[Array, "y_dim x_dim"]:
+        return self.array
+
 
 class SphericalCosineMask(AbstractMask, strict=True):
     """Apply a spherical mask to a volume with a cosine
@@ -107,6 +111,10 @@ class SphericalCosineMask(AbstractMask, strict=True):
             offset=None,
         )
 
+    @override
+    def get(self) -> Float[Array, "z_dim y_dim x_dim"]:
+        return self.array
+
 
 class SquareCosineMask(AbstractMask, strict=True):
     """Apply a square mask to an image with a cosine
@@ -133,6 +141,10 @@ class SquareCosineMask(AbstractMask, strict=True):
         self.array = _compute_square_mask(
             coordinate_grid, jnp.asarray(side_length), jnp.asarray(rolloff_width)
         )
+
+    @override
+    def get(self) -> Float[Array, "y_dim x_dim"]:
+        return self.array
 
 
 class Cylindrical2DCosineMask(AbstractMask, strict=True):
@@ -182,6 +194,10 @@ class Cylindrical2DCosineMask(AbstractMask, strict=True):
                 jnp.asarray(rolloff_width),
             )
 
+    @override
+    def get(self) -> Float[Array, "y_dim x_dim"]:
+        return self.array
+
 
 class Rectangular2DCosineMask(AbstractMask, strict=True):
     """Apply a rectangular mask in 2D to an image with a cosine
@@ -220,6 +236,10 @@ class Rectangular2DCosineMask(AbstractMask, strict=True):
             jnp.asarray(rolloff_width),
         )
 
+    @override
+    def get(self) -> Float[Array, "y_dim x_dim"]:
+        return self.array
+
 
 class Rectangular3DCosineMask(AbstractMask, strict=True):
     """Apply a rectangular mask to a volume with a cosine
@@ -257,6 +277,10 @@ class Rectangular3DCosineMask(AbstractMask, strict=True):
             jnp.asarray(rolloff_width),
         )
 
+    @override
+    def get(self) -> Float[Array, "z_dim y_dim x_dim"]:
+        return self.array
+
 
 class InverseSincMask(AbstractMask, strict=True):
     """Apply sinc-correction to an image or volume.
@@ -289,6 +313,10 @@ class InverseSincMask(AbstractMask, strict=True):
                 ],
             )
         )
+
+    @override
+    def get(self) -> Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]:
+        return self.array
 
 
 def _compute_circular_or_spherical_mask(
