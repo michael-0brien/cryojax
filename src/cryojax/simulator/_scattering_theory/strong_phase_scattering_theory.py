@@ -14,8 +14,9 @@ from .._volume_parametrisation import AbstractVolumeRepresentation
 from .base_scattering_theory import AbstractWaveScatteringTheory
 
 
-class HighEnergyScatteringTheory(AbstractWaveScatteringTheory, strict=True):
-    """Scattering theory in the high-energy approximation (eikonal approximation).
+class StrongPhaseScatteringTheory(AbstractWaveScatteringTheory, strict=True):
+    """Scattering theory for strong phase objects. This is analogous to
+    a Moliere high-energy approximation in high-energy physics.
 
     This is the simplest model for multiple scattering events.
 
@@ -32,9 +33,11 @@ class HighEnergyScatteringTheory(AbstractWaveScatteringTheory, strict=True):
 
     **References:**
 
-    - For the definition of the exit wave in the eikonal approximation, see Chapter 69,
-      Page 2012, from *Hawkes, Peter W., and Erwin Kasper. Principles of Electron
-      Optics, Volume 4: Advanced Wave Optics. Academic Press, 2022.*
+    - See Chapter 69, Page 2012, from *Hawkes, Peter W., and Erwin Kasper.
+      Principles of Electron Optics, Volume 4: Advanced Wave Optics. Academic
+      Press, 2022.*
+    - See Section 3.4, Page 61, from *Spence, John CH. High-resolution electron
+      microscopy. OUP Oxford, 2013.*
     """
 
     volume_integrator: AbstractDirectIntegrator
@@ -67,7 +70,7 @@ class HighEnergyScatteringTheory(AbstractWaveScatteringTheory, strict=True):
                 raise AttributeError(
                     "If the `volume_integrator` is voxel-based, "
                     "it must have `volume_integrator.outputs_integral = True` "
-                    "to be passed to a `HighEnergyScatteringTheory`."
+                    "to be passed to a `StrongPhaseScatteringTheory`."
                 )
 
     @override
@@ -115,7 +118,7 @@ def _compute_complex_potential(
     ac = amplitude_contrast_ratio
     if jnp.iscomplexobj(in_plane_potential):
         raise NotImplementedError(
-            "You may have tried to use a `HighEnergyScatteringTheory` "
+            "You may have tried to use a `StrongPhaseScatteringTheory` "
             "together with `EwaldSphereExtraction` for simulating images. "
             "This is not implemented!"
         )

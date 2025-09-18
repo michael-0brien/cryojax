@@ -1,7 +1,6 @@
 import numpy as np
 import pytest
 
-import cryojax.experimental as cxe
 import cryojax.simulator as cxs
 from cryojax.io import read_atoms_from_pdb
 
@@ -79,9 +78,9 @@ def test_scattering_theories_no_pose(
     #     cxe.WaveTransferTheory(ctf),
     #     amplitude_contrast_ratio=ac,
     # )
-    high_energy_scattering_theory = cxe.HighEnergyScatteringTheory(
+    high_energy_scattering_theory = cxs.StrongPhaseScatteringTheory(
         cxs.GaussianMixtureProjection(use_error_functions=True),
-        cxe.WaveTransferTheory(ctf),
+        cxs.WaveTransferTheory(ctf),
         amplitude_contrast_ratio=ac,
     )
     weak_phase_scattering_theory = cxs.WeakPhaseScatteringTheory(
@@ -199,9 +198,9 @@ def test_scattering_theories_pose(
     #     cxe.WaveTransferTheory(ctf),
     #     amplitude_contrast_ratio=ac,
     # )
-    high_energy_scattering_theory = cxe.HighEnergyScatteringTheory(
+    high_energy_scattering_theory = cxs.StrongPhaseScatteringTheory(
         cxs.GaussianMixtureProjection(use_error_functions=True),
-        cxe.WaveTransferTheory(ctf),
+        cxs.WaveTransferTheory(ctf),
         amplitude_contrast_ratio=ac,
     )
     weak_phase_scattering_theory = cxs.WeakPhaseScatteringTheory(

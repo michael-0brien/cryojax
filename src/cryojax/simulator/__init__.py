@@ -39,7 +39,9 @@ from ._pose import (
 )
 from ._scattering_theory import (
     AbstractScatteringTheory as AbstractScatteringTheory,
+    AbstractWaveScatteringTheory as AbstractWaveScatteringTheory,
     AbstractWeakPhaseScatteringTheory as AbstractWeakPhaseScatteringTheory,
+    StrongPhaseScatteringTheory as StrongPhaseScatteringTheory,
     WeakPhaseScatteringTheory as WeakPhaseScatteringTheory,
 )
 from ._solvent_2d import AbstractRandomSolvent2D as AbstractRandomSolvent2D
@@ -48,6 +50,7 @@ from ._transfer_theory import (
     AbstractTransferTheory as AbstractTransferTheory,
     AstigmaticCTF as AstigmaticCTF,
     ContrastTransferTheory as ContrastTransferTheory,
+    WaveTransferTheory as WaveTransferTheory,
 )
 from ._volume_integrator import (
     AbstractDirectIntegrator as AbstractDirectIntegrator,
