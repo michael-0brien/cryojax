@@ -65,10 +65,10 @@ nav:
             - JAX transformations: 'examples/jax-transformations.ipynb'
             - Render a volume: 'examples/compute-potential.ipynb'
             - Load cryo-EM images: 'examples/read-dataset.ipynb'
+            - Create custom image simulation methods: 'examples/extending-cryojax.ipynb'
         - Your first program:
             - Write a STAR file of simulated data: 'examples/simulate-relion-dataset.ipynb'
         - Advanced usage:
-            - Create custom image simulation methods: 'examples/extending-cryojax.ipynb'
             - Structural refinement using gradient descent: 'examples/structure-refinement.ipynb'
     - API:
         - cryojax.simulator:

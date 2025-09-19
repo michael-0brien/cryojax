@@ -61,12 +61,10 @@ from ._volume_integrator import (
 )
 from ._volume_parametrisation import (
     AbstractAtomicVolume as AbstractAtomicVolume,
-    AbstractConformationalEnsemble as AbstractConformationalEnsemble,
     AbstractPointCloudVolume as AbstractPointCloudVolume,
     AbstractTabulatedAtomicVolume as AbstractTabulatedAtomicVolume,
     AbstractVolumeParametrisation as AbstractVolumeParametrisation,
     AbstractVolumeRepresentation as AbstractVolumeRepresentation,
-    DiscreteConformationalEnsemble as DiscreteConformationalEnsemble,
     FourierVoxelGridVolume as FourierVoxelGridVolume,
     FourierVoxelSplineVolume as FourierVoxelSplineVolume,
     GaussianMixtureVolume as GaussianMixtureVolume,

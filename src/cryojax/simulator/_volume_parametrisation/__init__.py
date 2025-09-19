@@ -2,10 +2,6 @@ from .base_parametrisation import (
     AbstractVolumeParametrisation as AbstractVolumeParametrisation,
     AbstractVolumeRepresentation as AbstractVolumeRepresentation,
 )
-from .ensemble import (
-    AbstractConformationalEnsemble as AbstractConformationalEnsemble,
-    DiscreteConformationalEnsemble as DiscreteConformationalEnsemble,
-)
 from .representations import (
     AbstractAtomicVolume as AbstractAtomicVolume,
     AbstractPointCloudVolume as AbstractPointCloudVolume,
