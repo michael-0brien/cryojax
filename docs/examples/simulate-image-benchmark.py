@@ -4,7 +4,7 @@ import cryojax.simulator as cxs
 from cryojax.io import read_array_from_mrc
 
 
-@profile  # noqa: F821
+# @profile  # noqa: F821
 def main():
     # Scattering potential stored in MRC format
     filename = "./data/groel_5w0s_scattering_potential.mrc"
@@ -49,4 +49,8 @@ def main():
 
 
 if __name__ == "__main__":
+    import jax.profiler
+
+    jax.profiler.start_trace("tb_profile")
     main()
+    jax.profiler.stop_trace()
