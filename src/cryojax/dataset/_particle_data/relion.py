@@ -113,10 +113,6 @@ class MrcfileSettings(TypedDict):
     compression: str | None
 
 
-def _default_make_config_fn(shape, pixel_size, voltage_in_kilovolts, **kwargs):
-    return BasicImageConfig(shape, pixel_size, voltage_in_kilovolts, **kwargs)
-
-
 class AbstractParticleStarFile(
     AbstractParticleParameterFile[ParticleParameterInfo, ParticleParameterLike]
 ):
@@ -222,10 +218,7 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
         loads_envelope: bool = False,
         updates_optics_group: bool = False,
         inverts_rotation: bool = False,
-        make_config_fn: Callable[
-            [tuple[int, int], Float[Array, "..."], Float[Array, "..."]],
-            BasicImageConfig,
-        ] = _default_make_config_fn,
+        pad_options: dict = {},
     ):
         """**Arguments:**
 
@@ -270,12 +263,12 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
             the image formation process used in `cryojax`, this may be necessary
             for matching to RELION convention. For example, set to `True` when
             using the fourier slice extraction and other voxel representations.
-        - `make_config_fn`:
-            A function used for `BasicImageConfig` initialization that returns
-            an `BasicImageConfig`.
+        - `pad_options`:
+            Padding options for image simulation, passed to the `BasicImageConfig`.
+            See `BasicImageConfig` for documentation.
         """
         # Private attributes
-        self._make_config_fn = make_config_fn
+        self._pad_options = pad_options
         self._mode = _validate_mode(mode)
         # The STAR file data
         self._path_to_starfile = pathlib.Path(path_to_starfile)
@@ -312,7 +305,7 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
             optics_group,
             self.broadcasts_image_config,
             self.loads_envelope,
-            self._make_config_fn,
+            self._pad_options,
             self._inverts_rotation,
         )
         if self.loads_metadata:
@@ -988,7 +981,7 @@ def _make_pytrees_from_starfile(
     optics_data,
     broadcasts_image_config,
     loads_envelope,
-    make_config_fn,
+    pad_options,
     inverts_rotation,
 ) -> tuple[BasicImageConfig, ContrastTransferTheory, EulerAnglePose]:
     float_dtype = jax.dtypes.canonicalize_dtype(float)
@@ -1003,12 +996,14 @@ def _make_pytrees_from_starfile(
     astigmatism_angle = np.asarray(particle_data["rlnDefocusAngle"], dtype=float_dtype)
     phase_shift = np.asarray(particle_data["rlnPhaseShift"], dtype=float_dtype)
     # Then from optics data
-    batch_dim = 0 if defocus_in_angstroms.ndim == 0 else defocus_in_angstroms.shape[0]
+    batch_shape = (
+        () if defocus_in_angstroms.ndim == 0 else (defocus_in_angstroms.shape[0],)
+    )
     spherical_aberration_in_mm = np.full(
-        (batch_dim,), np.asarray(optics_data["rlnSphericalAberration"], dtype=float_dtype)
+        batch_shape, np.asarray(optics_data["rlnSphericalAberration"], dtype=float_dtype)
     )
     amplitude_contrast_ratio = np.full(
-        (batch_dim,), np.asarray(optics_data["rlnAmplitudeContrast"], dtype=float_dtype)
+        batch_shape, np.asarray(optics_data["rlnAmplitudeContrast"], dtype=float_dtype)
     )
     ctf_params = (
         defocus_in_angstroms,
@@ -1037,9 +1032,9 @@ def _make_pytrees_from_starfile(
     # Image config parameters
     pixel_size = np.asarray(optics_data["rlnImagePixelSize"], dtype=float_dtype)
     voltage_in_kilovolts = np.asarray(optics_data["rlnVoltage"], dtype=float_dtype)
-    if broadcasts_image_config and batch_dim > 0:
-        pixel_size = np.full((batch_dim,), pixel_size)
-        voltage_in_kilovolts = np.full((batch_dim,), voltage_in_kilovolts)
+    if broadcasts_image_config and len(batch_shape) > 0:
+        pixel_size = np.full(batch_shape, pixel_size)
+        voltage_in_kilovolts = np.full(batch_shape, voltage_in_kilovolts)
     # Pose parameters. Values for the pose are optional,
     # so look to see if each key is present
     particle_keys = particle_data.keys()
@@ -1094,7 +1089,9 @@ def _make_pytrees_from_starfile(
     # RELION's convention thinks about the translation as "undoing" the translation
     # and rotation in the image
     maybe_make_full = lambda param: (
-        np.full((batch_dim,), param) if batch_dim > 0 and param.shape == () else param
+        np.full(batch_shape, param)
+        if len(batch_shape) > 0 and param.shape == ()
+        else param
     )
     pose_params = tuple(
         maybe_make_full(x)
@@ -1113,7 +1110,7 @@ def _make_pytrees_from_starfile(
         image_size = int(optics_data["rlnImageSize"])
         image_shape = (image_size, image_size)
         image_config = _make_config(
-            image_shape, pixel_size, voltage_in_kilovolts, make_config_fn
+            image_shape, pixel_size, voltage_in_kilovolts, pad_options
         )
         # ... now the `ContrastTransferTheory`
         envelope = (
@@ -1139,11 +1136,11 @@ def _make_config(
     image_shape,
     pixel_size,
     voltage_in_kilovolts,
-    make_config_fn,
+    pad_options,
 ):
     return eqx.tree_at(
         lambda x: (x.pixel_size, x.voltage_in_kilovolts),
-        make_config_fn(image_shape, 1.0, 1.0),
+        BasicImageConfig(image_shape, 1.0, 1.0, pad_options=pad_options),
         (pixel_size, voltage_in_kilovolts),
     )
 

@@ -179,14 +179,16 @@ class TestErrorRaisingForLoading:
             )
 
 
-def test_default_make_config_fn(sample_starfile_path):
-    """Test the default make_config_fn function."""
+def test_pad_options(sample_starfile_path):
+    """Test the pad_options argument to the parameter file."""
     # Test with a valid input
 
+    pad_options = dict(mode="constant", shape=(22, 22))
     parameter_file = RelionParticleParameterFile(
         path_to_starfile=sample_starfile_path,
         loads_envelope=True,
         loads_metadata=True,
+        pad_options=pad_options,
     )
     image_config = parameter_file[0]["image_config"]
 
@@ -194,7 +196,7 @@ def test_default_make_config_fn(sample_starfile_path):
         shape=(16, 16),
         pixel_size=12.0,
         voltage_in_kilovolts=300.0,
-        pad_options=dict(mode="constant", shape=(16, 16)),
+        pad_options=pad_options,
     )
     assert image_config.shape == ref_config.shape
     assert image_config.pixel_size == np.asarray(ref_config.pixel_size)
@@ -240,6 +242,11 @@ def test_load_starfile_envelope_params(sample_starfile_path):
 
 
 def test_load_starfile_ctf_params(sample_starfile_path):
+    is_shape = lambda shape, pytree: jax.tree.reduce(
+        lambda x, y: x and y,
+        jax.tree.map(lambda x: x.shape == shape, pytree),
+    )
+
     def compute_defocus(defU, defV):
         return 0.5 * (defU + defV)
 
@@ -254,11 +261,18 @@ def test_load_starfile_ctf_params(sample_starfile_path):
 
     assert parameter_file.loads_envelope is False
 
+    # Check loading 1 particle
     parameters = parameter_file[0]
     assert parameters["transfer_theory"].envelope is None
+    assert is_shape((), eqx.filter(parameters["transfer_theory"].ctf, eqx.is_array))
 
+    # Check loading >1 particles
     parameters = parameter_file[:]
     assert parameters["transfer_theory"].envelope is None
+    assert is_shape(
+        (len(parameter_file),),
+        eqx.filter(parameters["transfer_theory"].ctf, eqx.is_array),
+    )
 
     transfer_theory = parameters["transfer_theory"]
     ctf = cast(cxs.AstigmaticCTF, transfer_theory.ctf)
