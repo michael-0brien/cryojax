@@ -55,6 +55,7 @@ from ._transfer_theory import (
 from ._volume_integrator import (
     AbstractDirectIntegrator as AbstractDirectIntegrator,
     AbstractDirectVoxelIntegrator as AbstractDirectVoxelIntegrator,
+    AbstractVolumeIntegrator as AbstractVolumeIntegrator,
     FourierSliceExtraction as FourierSliceExtraction,
     GaussianMixtureProjection as GaussianMixtureProjection,
     NufftProjection as NufftProjection,

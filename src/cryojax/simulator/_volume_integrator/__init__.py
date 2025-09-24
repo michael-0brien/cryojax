@@ -1,3 +1,4 @@
+from .base_integrator import AbstractVolumeIntegrator as AbstractVolumeIntegrator
 from .direct_integrator import (
     AbstractDirectIntegrator as AbstractDirectIntegrator,
     AbstractDirectVoxelIntegrator as AbstractDirectVoxelIntegrator,
