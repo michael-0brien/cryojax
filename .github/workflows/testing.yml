@@ -53,8 +53,10 @@ jobs:
           color: green
           path: coverage.svg
 
-      - name: Commit badge to repo
-        if: github.ref == 'refs/heads/dev'
+      - name: Commit coverage badge
+        if: |
+          (github.ref == 'refs/heads/dev') ||
+          (github.event_name == 'pull_request' && github.base_ref == 'dev')
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
