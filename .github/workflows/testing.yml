@@ -1,4 +1,4 @@
-name: Tests
+name: Tests + Coverage Badge
 
 on:
   pull_request:
@@ -7,6 +7,9 @@ on:
       - main
       - dev
   workflow_dispatch:
+
+permissions:
+  contents: write   # needed to push badge back to repo
 
 jobs:
   build:
@@ -34,7 +37,30 @@ jobs:
         run: |
           pytest --cov=. --cov-report=xml --cov-report=term tests/
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+      - name: Extract coverage percentage
+        id: coverage
+        run: |
+          percent=$(grep -o 'line-rate="[^"]*"' coverage.xml | head -1 | cut -d'"' -f2)
+          echo "Raw coverage decimal: $percent"
+          COVERAGE=$(printf "%.0f" $(echo "$percent * 100" | bc))
+          echo "COVERAGE=$COVERAGE" >> $GITHUB_ENV
+
+      - name: Generate coverage badge
+        uses: emibcn/badge-action@v2
         with:
-          file: coverage.xml
+          label: coverage
+          status: ${{ env.COVERAGE }}%
+          color: green
+          path: badges/coverage.svg
+
+      - name: Commit badge to repo
+        if: github.ref == 'refs/heads/dev'
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch
+          git checkout $GITHUB_REF_NAME
+          mkdir -p badges
+          git add badges/coverage.svg
+          git commit -m "Update coverage badge [skip ci]" || echo "No changes to commit"
+          git push
