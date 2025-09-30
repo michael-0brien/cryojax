@@ -9,10 +9,10 @@ theme:
 site_name: cryoJAX
 site_description: The documentation for cryoJAX.
 site_author: Michael O'Brien
-site_url: https://mjo22.github.io/cryojax/
+site_url: https://michael-0brien.github.io/cryojax/
 
-repo_url: https://github.com/mjo22/cryojax
-repo_name: mjo22/cryojax
+repo_url: https://github.com/michael-0brien/cryojax
+repo_name: michael-0brien/cryojax
 edit_uri: ""
 
 strict: false

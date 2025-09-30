@@ -9,13 +9,13 @@ CryoJAX does not try to be a one-stop shop for cryo-EM analysis. Instead, it is 
 
 ### What belongs in the cryoJAX core library?
 
-Core functionality for image simulation should be common knowledge in the field and/or demonstrated in real experiments. A good metric of whether or not an image simulation model or algorithm belongs in cryoJAX could be but is not limited to the following: "has this been shown to increase resolution of 3D reconstructions in real experiments?". If you would like to discuss if something is appropriate for cryoJAX core, please make a feature request on the [issues](https://github.com/mjo22/cryojax/issues) page.
+Core functionality for image simulation should be common knowledge in the field and/or demonstrated in real experiments. A good metric of whether or not an image simulation model or algorithm belongs in cryoJAX could be but is not limited to the following: "has this been shown to increase resolution of 3D reconstructions in real experiments?". If you would like to discuss if something is appropriate for cryoJAX core, please make a feature request on the [issues](https://github.com/michael-0brien/cryojax/issues) page.
 
 ### What belongs in a separate library or workflow?
 
-If an image simulation model or algorithm is being prototyped, then it belongs downstream to cryoJAX. Further, if it is not common to many users---such as functionality for particular proteins---it also belongs downstream. If your application cannot be built downstream, it may be necessary to update the cryoJAX ABC interface. In this case, please also open an [issue](https://github.com/mjo22/cryojax/issues).
+If an image simulation model or algorithm is being prototyped, then it belongs downstream to cryoJAX. Further, if it is not common to many users---such as functionality for particular proteins---it also belongs downstream. If your application cannot be built downstream, it may be necessary to update the cryoJAX ABC interface. In this case, please also open an [issue](https://github.com/michael-0brien/cryojax/issues).
 
-After discussing the contribution and implementing it either in your local fork of cryoJAX or in an external repository, open a [pull request](https://github.com/mjo22/cryojax/pulls).
+After discussing the contribution and implementing it either in your local fork of cryoJAX or in an external repository, open a [pull request](https://github.com/michael-0brien/cryojax/pulls).
 
 ## Getting started
 
@@ -45,7 +45,7 @@ python -m pip install -r tests/requirements.txt
 python -m pytest
 ```
 
-**If you are using a non-linux OS, the [`pycistem`](https://github.com/jojoelfe/pycistem) testing dependency cannot be installed**. In this case, in order to run the tests against [`cisTEM`](https://github.com/timothygrant80/cisTEM), run the testing [workflow](https://github.com/mjo22/cryojax/actions/workflows/testing.yml). This can be done manually or will happen automatically when a PR is opened.
+**If you are using a non-linux OS, the [`pycistem`](https://github.com/jojoelfe/pycistem) testing dependency cannot be installed**. In this case, in order to run the tests against [`cisTEM`](https://github.com/timothygrant80/cisTEM), run the testing [workflow](https://github.com/michael-0brien/cryojax/actions/workflows/testing.yml). This can be done manually or will happen automatically when a PR is opened.
 
 ## Building documentation
 
@@ -65,7 +65,7 @@ git lfs install; git lfs pull
 
 ## How to submit changes
 
-Now, if the tests and documentation look okay, push your changes and open a [Pull Request](https://github.com/mjo22/cryojax/pulls)!
+Now, if the tests and documentation look okay, push your changes and open a [Pull Request](https://github.com/michael-0brien/cryojax/pulls)!
 
 ## Design principles
 
@@ -75,7 +75,7 @@ Equinox also provides a recommended pattern for writing `Module`s: https://docs.
 
 ## How to report a bug
 
-Report bugs on the [Issue Tracker](https://github.com/mjo22/cryojax/issues).
+Report bugs on the [Issue Tracker](https://github.com/michael-0brien/cryojax/issues).
 
 When filing an issue, here are some guidelines that may be helpful to know:
 
