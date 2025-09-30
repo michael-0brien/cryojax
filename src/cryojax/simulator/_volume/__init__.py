@@ -1,4 +1,4 @@
-from .base_parametrisation import (
+from .base_volume import (
     AbstractVolumeParametrisation as AbstractVolumeParametrisation,
     AbstractVolumeRepresentation as AbstractVolumeRepresentation,
 )

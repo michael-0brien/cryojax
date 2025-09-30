@@ -12,7 +12,7 @@ from ....constants import (
     read_peng_scattering_factor_parameter_table,
 )
 from ....jax_util import NDArrayLike, error_if_negative
-from ..representations import AbstractAtomicVolume
+from .base_representations import AbstractAtomicVolume
 from .common_functions import gaussians_to_real_voxels
 
 

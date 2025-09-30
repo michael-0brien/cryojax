@@ -15,7 +15,7 @@ classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
 ]
-urls = {repository = "https://github.com/mjo22/cryojax" }
+urls = {repository = "https://github.com/michael-0brien/cryojax" }
 dynamic = ["version"]
 dependencies = [
     "jax<0.7.0",

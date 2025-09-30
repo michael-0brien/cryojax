@@ -19,7 +19,7 @@ from ....ndimage import (
 )
 from ....ndimage.transforms import AbstractFilter
 from ..._pose import AbstractPose
-from .base_volume import AbstractVoxelVolume
+from .base_representations import AbstractVoxelVolume
 
 
 class AbstractFourierVoxelVolume(AbstractVoxelVolume, strict=True):

@@ -52,15 +52,7 @@ from ._transfer_theory import (
     ContrastTransferTheory as ContrastTransferTheory,
     WaveTransferTheory as WaveTransferTheory,
 )
-from ._volume_integrator import (
-    AbstractDirectIntegrator as AbstractDirectIntegrator,
-    AbstractDirectVoxelIntegrator as AbstractDirectVoxelIntegrator,
-    AbstractVolumeIntegrator as AbstractVolumeIntegrator,
-    FourierSliceExtraction as FourierSliceExtraction,
-    GaussianMixtureProjection as GaussianMixtureProjection,
-    NufftProjection as NufftProjection,
-)
-from ._volume_parametrisation import (
+from ._volume import (
     AbstractAtomicVolume as AbstractAtomicVolume,
     AbstractPointCloudVolume as AbstractPointCloudVolume,
     AbstractTabulatedAtomicVolume as AbstractTabulatedAtomicVolume,
@@ -72,6 +64,14 @@ from ._volume_parametrisation import (
     PengAtomicVolume as PengAtomicVolume,
     PengScatteringFactorParameters as PengScatteringFactorParameters,
     RealVoxelGridVolume as RealVoxelGridVolume,
+)
+from ._volume_integrator import (
+    AbstractDirectIntegrator as AbstractDirectIntegrator,
+    AbstractDirectVoxelIntegrator as AbstractDirectVoxelIntegrator,
+    AbstractVolumeIntegrator as AbstractVolumeIntegrator,
+    FourierSliceExtraction as FourierSliceExtraction,
+    GaussianMixtureProjection as GaussianMixtureProjection,
+    NufftProjection as NufftProjection,
 )
 
 

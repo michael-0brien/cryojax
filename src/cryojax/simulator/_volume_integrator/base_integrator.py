@@ -5,7 +5,7 @@ import equinox as eqx
 from jaxtyping import Array
 
 from .._image_config import AbstractImageConfig
-from .._volume_parametrisation import AbstractVolumeRepresentation
+from .._volume import AbstractVolumeRepresentation
 
 
 VolRepT = TypeVar("VolRepT", bound="AbstractVolumeRepresentation")

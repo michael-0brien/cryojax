@@ -20,7 +20,7 @@ from ....ndimage import (
 )
 from ....ndimage.transforms import InverseSincMask
 from ..._image_config import AbstractImageConfig
-from ..._volume_parametrisation import FourierVoxelGridVolume, FourierVoxelSplineVolume
+from ..._volume import FourierVoxelGridVolume, FourierVoxelSplineVolume
 from .base_direct_integrator import AbstractDirectVoxelIntegrator
 
 

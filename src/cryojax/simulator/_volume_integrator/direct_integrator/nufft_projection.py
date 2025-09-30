@@ -11,7 +11,7 @@ from jaxtyping import Array, Complex, Float
 
 from ....ndimage import convert_fftn_to_rfftn, irfftn
 from ..._image_config import AbstractImageConfig
-from ..._volume_parametrisation import RealVoxelGridVolume
+from ..._volume import RealVoxelGridVolume
 from .base_direct_integrator import AbstractDirectVoxelIntegrator
 
 

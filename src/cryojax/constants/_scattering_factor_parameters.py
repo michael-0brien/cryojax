@@ -29,7 +29,7 @@ def get_tabulated_scattering_factor_parameters(
         The table of scattering factors as an `xarray.Dataset`. By default, this
         is the tabulation from "Robust Parameterization of Elastic and
         Absorptive Electron Atomic Scattering Factors" by Peng et al. (1996),
-        given by [`read_peng_element_scattering_factor_parameter_table`](https://mjo22.github.io/cryojax/api/constants/scattering_factor_parameters/#cryojax.constants.read_peng_element_scattering_factor_parameter_table).
+        given by [`read_peng_element_scattering_factor_parameter_table`](https://michael-0brien.github.io/cryojax/api/constants/scattering_factor_parameters/#cryojax.constants.read_peng_element_scattering_factor_parameter_table).
 
     **Returns:**
 

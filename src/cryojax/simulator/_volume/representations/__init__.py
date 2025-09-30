@@ -1,4 +1,4 @@
-from .base_volume import (
+from .base_representations import (
     AbstractAtomicVolume as AbstractAtomicVolume,
     AbstractPointCloudVolume as AbstractPointCloudVolume,
     AbstractVoxelVolume as AbstractVoxelVolume,

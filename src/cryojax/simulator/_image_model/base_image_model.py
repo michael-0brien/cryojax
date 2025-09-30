@@ -17,8 +17,8 @@ from ...ndimage.transforms import FilterLike, MaskLike
 from .._image_config import AbstractImageConfig
 from .._pose import AbstractPose
 from .._transfer_theory import ContrastTransferTheory
+from .._volume import AbstractVolumeParametrisation
 from .._volume_integrator import AbstractDirectIntegrator
-from .._volume_parametrisation import AbstractVolumeParametrisation
 
 
 RealImageArray = Float[Array, "{self.image_config.y_dim} {self.image_config.x_dim}"]

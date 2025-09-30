@@ -9,8 +9,8 @@ from ...ndimage import ifftn, irfftn
 from .._image_config import AbstractImageConfig
 from .._solvent_2d import AbstractRandomSolvent2D
 from .._transfer_theory import WaveTransferTheory
+from .._volume import AbstractVolumeRepresentation
 from .._volume_integrator import AbstractDirectIntegrator, AbstractDirectVoxelIntegrator
-from .._volume_parametrisation import AbstractVolumeRepresentation
 from .base_scattering_theory import AbstractWaveScatteringTheory
 
 
