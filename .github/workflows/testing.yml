@@ -51,7 +51,7 @@ jobs:
           label: coverage
           status: ${{ env.COVERAGE }}%
           color: green
-          path: badges/coverage.svg
+          path: coverage.svg
 
       - name: Commit badge to repo
         if: github.ref == 'refs/heads/dev'
@@ -60,7 +60,6 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git fetch
           git checkout $GITHUB_REF_NAME
-          mkdir -p badges
-          git add badges/coverage.svg
+          git add coverage.svg
           git commit -m "Update coverage badge [skip ci]" || echo "No changes to commit"
           git push
