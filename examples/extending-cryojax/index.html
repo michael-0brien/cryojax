@@ -12,13 +12,13 @@
         <meta name="author" content="Michael O'Brien">
       
       
-        <link rel="canonical" href="https://mjo22.github.io/cryojax/examples/extending-cryojax/">
+        <link rel="canonical" href="https://michael-0brien.github.io/cryojax/examples/extending-cryojax/">
       
       
-        <link rel="prev" href="../simulate-relion-dataset/">
+        <link rel="prev" href="../read-dataset/">
       
       
-        <link rel="next" href="../structure-refinement/">
+        <link rel="next" href="../simulate-relion-dataset/">
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
@@ -123,13 +123,13 @@
     
     
       <div class="md-header__source">
-        <a href="https://github.com/mjo22/cryojax" title="Go to repository" class="md-source" data-md-component="source">
+        <a href="https://github.com/michael-0brien/cryojax" title="Go to repository" class="md-source" data-md-component="source">
   <div class="md-source__icon md-icon">
     
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
   </div>
   <div class="md-source__repository">
-    mjo22/cryojax
+    michael-0brien/cryojax
   </div>
 </a>
       </div>
@@ -171,13 +171,13 @@
   </label>
   
     <div class="md-nav__source">
-      <a href="https://github.com/mjo22/cryojax" title="Go to repository" class="md-source" data-md-component="source">
+      <a href="https://github.com/michael-0brien/cryojax" title="Go to repository" class="md-source" data-md-component="source">
   <div class="md-source__icon md-icon">
     
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
   </div>
   <div class="md-source__repository">
-    mjo22/cryojax
+    michael-0brien/cryojax
   </div>
 </a>
     </div>
@@ -255,6 +255,8 @@
                 
   
   
+    
+  
   
   
     
@@ -264,11 +266,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_1" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_1" checked>
         
           
           <label class="md-nav__link" for="__nav_2_1" id="__nav_2_1_label" tabindex="0">
@@ -284,7 +286,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_1_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_1_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2_1">
             <span class="md-nav__icon md-icon"></span>
             Getting started
@@ -383,6 +385,37 @@
 
               
             
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Create custom image simulation methods
+    
+  </span>
+  
+
+      </a>
+      
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -466,8 +499,6 @@
                 
   
   
-    
-  
   
   
     
@@ -477,11 +508,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_3" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_3" >
         
           
           <label class="md-nav__link" for="__nav_2_3" id="__nav_2_3_label" tabindex="0">
@@ -497,43 +528,12 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2_3">
             <span class="md-nav__icon md-icon"></span>
             Advanced usage
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-    
-  
-  
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
-        
-  
-  
-  <span class="md-ellipsis">
-    Create custom image simulation methods
-    
-  </span>
-  
-
-      </a>
-      
-    </li>
-  
-
-              
             
               
                 
@@ -1911,12 +1911,12 @@
 <td style="text-align: left;"><code>AbstractImageModel</code></td>
 </tr>
 <tr>
-<td style="text-align: left;">Parametrise and represent volumes</td>
-<td style="text-align: left;"><code>AbstractVolumeParametrisation</code></td>
+<td style="text-align: left;">Represent a volume for imaging</td>
+<td style="text-align: left;"><code>AbstractVolumeRepresentation</code></td>
 </tr>
 <tr>
-<td style="text-align: left;">Integrate volumes on imaging plane</td>
-<td style="text-align: left;"><code>AbstractVolumeIntegrator</code></td>
+<td style="text-align: left;">Project an <code>AbstractVolumeRepresentation</code> on imaging plane</td>
+<td style="text-align: left;"><code>AbstractDirectIntegrator</code></td>
 </tr>
 <tr>
 <td style="text-align: left;">Contrast transfer functions</td>
@@ -2127,7 +2127,7 @@
 <div class="cell border-box-sizing text_cell rendered">
 <div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>That was easy! Implementing abstract interfaces is the most important concept to know for extending cryoJAX, it is also possible to modify existing implemtations by wrapping <em>existing</em> implementations. To demonstrate this, we can modify the <code>CustomCTF</code> to also include a spherical aberration term.</p>
+<p>That was easy! Implementing abstract interfaces is the most important concept to know for extending cryoJAX, but it is also possible to modify existing implementations by wrapping <em>existing</em> implementations. To demonstrate this, we can modify the <code>CustomCTF</code> to also include a spherical aberration term.</p>
 </div>
 </div>
 </div>
@@ -2203,7 +2203,38 @@
 <div class="cell border-box-sizing text_cell rendered">
 <div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>While this is a toy example, the principle applies generally in cryoJAX and is meant to support an ecosystem of cryo-EM research projects. For example, one can implement custom volumes via the <code>AbstractVolumeParametrisation</code> interface to model particular proteins or parametrise conformational heterogeneity.</p>
+<p>While this is a toy example, the principle applies generally in cryoJAX and is meant to support an ecosystem of cryo-EM research projects. For example, one can implement custom volumes via the <code>AbstractVolumeRepresentation</code> and <code>AbstractDirectIntegrator</code> (a subclass of <code>AbstractVolumeIntegrator</code>) interfaces to model particular proteins or parametrise conformational heterogeneity.</p>
+<p>What next? There is a wide range of possible image formation modeling in cryoJAX to learn about. For example, other useful abstract interfaces include the following:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Modeling component</th>
+<th style="text-align: left;">Abstract base class</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Function returning an <code>AbstractVolumeRepresentation</code></td>
+<td style="text-align: left;"><code>AbstractVolumeParametrisation</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">Noise models</td>
+<td style="text-align: left;"><code>AbstractNoiseModel</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">Filters and masks</td>
+<td style="text-align: left;"><code>AbstractFilter</code> and <code>AbstractMask</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">Scattering approximations</td>
+<td style="text-align: left;"><code>AbstractScatteringTheory</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">Detectors and DQEs</td>
+<td style="text-align: left;"><code>AbstractDetector</code> and <code>AbstractDQE</code></td>
+</tr>
+</tbody>
+</table>
 </div>
 </div>
 </div>
