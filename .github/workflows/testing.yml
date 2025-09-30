@@ -31,7 +31,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install .
           pip install -r tests/requirements.txt
-          pip install pytest-cov
+          pip install pytest-cov emibcn-badge-action
 
       - name: Run tests with coverage
         run: |
@@ -55,13 +55,15 @@ jobs:
 
       - name: Commit coverage badge
         if: |
-          (github.ref == 'refs/heads/dev') ||
-          (github.event_name == 'pull_request' && github.base_ref == 'dev')
+          github.event_name == 'pull_request' && github.base_ref == 'dev' ||
+          github.ref == 'refs/heads/dev'
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git fetch
-          git checkout $GITHUB_REF_NAME
           git add coverage.svg
           git commit -m "Update coverage badge [skip ci]" || echo "No changes to commit"
-          git push
+          # Push to feature branch for PRs or to dev for direct pushes
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            git push origin HEAD:${{ github.head_ref }}
+          else
+            git push origin dev
