@@ -34,8 +34,9 @@ jobs:
         run: |
           pytest --cov=. --cov-report=xml --cov-report=term tests/
 
-      - name: Upload coverage artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
         with:
-          name: coverage-report
-          path: coverage.xml
+          file: coverage.xml
+          # token not needed for public repos
+          token: ${{ secrets.CODECOV_TOKEN }}
