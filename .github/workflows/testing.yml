@@ -1,25 +1,26 @@
-name: Tests + Coverage Badge
+name: Tests + Code Coverage
 
 on:
   pull_request:
+    branches:
+      - dev
+      - main
   push:
     branches:
-      - main
       - dev
+      - main
   workflow_dispatch:
 
-permissions:
-  contents: write   # needed to push badge back to repo
-
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: ["3.11"]
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
@@ -31,39 +32,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install .
           pip install -r tests/requirements.txt
-          pip install pytest-cov emibcn-badge-action
+          pip install pytest-cov
 
       - name: Run tests with coverage
         run: |
-          pytest --cov=. --cov-report=xml --cov-report=term tests/
+          pytest --cov=. --cov-report term --cov-report xml:coverage.xml tests/
 
-      - name: Extract coverage percentage
-        id: coverage
-        run: |
-          percent=$(grep -o 'line-rate="[^"]*"' coverage.xml | head -1 | cut -d'"' -f2)
-          echo "Raw coverage decimal: $percent"
-          COVERAGE=$(printf "%.0f" $(echo "$percent * 100" | bc))
-          echo "COVERAGE=$COVERAGE" >> $GITHUB_ENV
-
-      - name: Generate coverage badge
-        uses: emibcn/badge-action@v2
-        with:
-          label: coverage
-          status: ${{ env.COVERAGE }}%
-          color: green
-          path: coverage.svg
-
-      - name: Commit coverage badge
-        if: |
-          github.event_name == 'pull_request' && github.base_ref == 'dev' ||
-          github.ref == 'refs/heads/dev'
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add coverage.svg
-          git commit -m "Update coverage badge [skip ci]" || echo "No changes to commit"
-          # Push to feature branch for PRs or to dev for direct pushes
-          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
-            git push origin HEAD:${{ github.head_ref }}
-          else
-            git push origin dev
+      # - name: Upload coverage to Codecov
+      #   uses: codecov/codecov-action@v4
+      #   with:
+      #     files: coverage.xml
+      #     # For public repos on unprotected branches, token is optional
+      #     token: ${{ secrets.CODECOV_TOKEN }}
+      #     fail_ci_if_error: true
