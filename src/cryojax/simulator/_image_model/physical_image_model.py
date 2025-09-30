@@ -15,7 +15,7 @@ from .._detector import AbstractDetector
 from .._image_config import AbstractImageConfig, DoseImageConfig
 from .._pose import AbstractPose
 from .._scattering_theory import AbstractScatteringTheory
-from .._volume_parametrisation import AbstractVolumeParametrisation
+from .._volume import AbstractVolumeParametrisation
 from .base_image_model import AbstractImageModel, PaddedFourierImageArray
 
 

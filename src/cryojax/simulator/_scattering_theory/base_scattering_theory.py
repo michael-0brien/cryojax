@@ -12,7 +12,7 @@ from .._transfer_theory import (
     ContrastTransferTheory,
     WaveTransferTheory,
 )
-from .._volume_parametrisation import AbstractVolumeRepresentation
+from .._volume import AbstractVolumeRepresentation
 
 
 class AbstractScatteringTheory(eqx.Module, strict=True):

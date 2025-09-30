@@ -11,7 +11,7 @@ from equinox import AbstractClassVar
 from jaxtyping import Array, Complex, Float
 
 from ..._image_config import AbstractImageConfig
-from ..._volume_parametrisation import AbstractVoxelVolume
+from ..._volume import AbstractVoxelVolume
 from ..base_integrator import AbstractVolumeIntegrator, VolRepT
 
 

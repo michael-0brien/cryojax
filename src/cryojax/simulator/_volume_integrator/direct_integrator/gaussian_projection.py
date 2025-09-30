@@ -15,7 +15,7 @@ from ....ndimage import (
     rfftn,
 )
 from ..._image_config import AbstractImageConfig
-from ..._volume_parametrisation import GaussianMixtureVolume, PengAtomicVolume
+from ..._volume import GaussianMixtureVolume, PengAtomicVolume
 from .base_direct_integrator import AbstractDirectIntegrator
 
 

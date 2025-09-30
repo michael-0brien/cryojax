@@ -16,19 +16,19 @@ from ._image_model import (
 from ._pose import AbstractPose
 from ._scattering_theory import WeakPhaseScatteringTheory
 from ._transfer_theory import ContrastTransferTheory
-from ._volume_integrator import (
-    AbstractDirectIntegrator,
-    FourierSliceExtraction,
-    GaussianMixtureProjection,
-    NufftProjection,
-)
-from ._volume_parametrisation import (
+from ._volume import (
     AbstractVolumeParametrisation,
     FourierVoxelGridVolume,
     FourierVoxelSplineVolume,
     GaussianMixtureVolume,
     PengAtomicVolume,
     RealVoxelGridVolume,
+)
+from ._volume_integrator import (
+    AbstractDirectIntegrator,
+    FourierSliceExtraction,
+    GaussianMixtureProjection,
+    NufftProjection,
 )
 
 
