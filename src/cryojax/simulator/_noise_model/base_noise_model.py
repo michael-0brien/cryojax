@@ -52,6 +52,7 @@ class AbstractNoiseModel(Module, strict=True):
     def compute_signal(
         self,
         *,
+        rng_key: Optional[PRNGKeyArray] = None,
         outputs_real_space: bool = True,
         mask: Optional[MaskLike] = None,
         filter: Optional[FilterLike] = None,

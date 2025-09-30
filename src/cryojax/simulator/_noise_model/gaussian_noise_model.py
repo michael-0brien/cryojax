@@ -53,6 +53,12 @@ class AbstractGaussianNoiseModel(AbstractNoiseModel, strict=True):
     ) -> ImageArray:
         """Sample a noisy image from the gaussian noise model.
 
+        !!! info
+            If the `AbstractImageModel` has stochastic elements to it,
+            a random number generator key will also be passed to
+            `AbstractImageModel.simulate`. Therefore, this method is
+            not compatible with the `AbstractDetector` class.
+
         **Arguments:**
 
         - `outputs_real_space`:
@@ -63,12 +69,14 @@ class AbstractGaussianNoiseModel(AbstractNoiseModel, strict=True):
         - `filter`:
             A filter to apply to the final image.
         """
+        noise_rng_key, signal_rng_key = jr.split(rng_key, 2)
         return self.compute_signal(
+            rng_key=signal_rng_key,
             outputs_real_space=outputs_real_space,
             mask=mask,
             filter=filter,
         ) + self.compute_noise(
-            rng_key,
+            noise_rng_key,
             outputs_real_space=outputs_real_space,
             mask=mask,
             filter=filter,
@@ -78,6 +86,7 @@ class AbstractGaussianNoiseModel(AbstractNoiseModel, strict=True):
     def compute_signal(
         self,
         *,
+        rng_key: Optional[PRNGKeyArray] = None,
         outputs_real_space: bool = True,
         mask: Optional[MaskLike] = None,
         filter: Optional[FilterLike] = None,
@@ -86,6 +95,9 @@ class AbstractGaussianNoiseModel(AbstractNoiseModel, strict=True):
 
         **Arguments:**
 
+        - `rng_key`:
+            An random number generator key to be passed to
+            the `AbstractImageModel.simulate` method.
         - `outputs_real_space`:
             If `True`, return the signal in real space.
         - `mask`:
@@ -95,7 +107,7 @@ class AbstractGaussianNoiseModel(AbstractNoiseModel, strict=True):
             A filter to apply to the final image.
         """
         simulated_image = self.image_model.simulate(
-            outputs_real_space=True, mask=None, filter=filter
+            rng_key=rng_key, outputs_real_space=True, mask=None, filter=filter
         )
         simulated_image = self.signal_scale_factor * simulated_image + self.signal_offset
         if mask is not None:

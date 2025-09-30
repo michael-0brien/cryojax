@@ -64,8 +64,8 @@ def simulate_particle_stack(
     # parameters and writes images
     dataset = RelionParticleStackDataset(..., mode='w')
 
-    # Write your `compute_image_fn` function, building a
-    # `ContrastImageModel` (see tutorials for details)
+    # Write your `compute_image_fn` function, building an
+    # `AbstractImageModel` (see tutorials for details)
 
     def compute_image_fn(
         parameters: RelionParticleParameters,
@@ -74,18 +74,18 @@ def simulate_particle_stack(
     ) -> jax.Array:
         # `constant_args` do not change between images. For
         # example, include the method of taking projections
-        potential_integrator, ... = constant_args
+        integrator, ... = constant_args
         # Using the pose, CTF, and image config from the
         # `parameters`, build image simulation model
-        image_model = cxs.ContrastImageModel(...)
+        image_model = cxs.make_image_model(...)
         # ... and compute
-        return image_model.render()
+        return image_model.simulate()
 
     # Simulate images and write to disk
-    write_simulated_image_stack(
+    simulate_particle_stack(
         dataset,
         compute_image_fn,
-        constant_args=(potential_integrator, ...)
+        constant_args=(integrator, ...)
         per_particle_args=None, # default
         batch_size=10,
     )
@@ -116,7 +116,7 @@ def simulate_particle_stack(
     scaling_params = jax.random.uniform(subkey, shape=(n_images,))
 
     # Now write your `compute_image_fn` function, building a
-    # `cryojax.distributions.IndependentGaussianPixels` to
+    # `cryojax.simulator.UncorrelationGaussianNoiseModel` to
     # simulate images with white noise (see tutorials for details)
 
     def compute_image_fn(
@@ -128,12 +128,12 @@ def simulate_particle_stack(
         key, scale = per_particle_args
 
         # Combine two previously split PyTrees
-        image_model = cxs.ContrastImageModel(...)
-        distribution = cxs.IndependentGaussianPixels(image_model, ...)
+        image_model = cxs.make_image_model(...)
+        distribution = cxs.UncorrelatedGaussianNoiseModel(image_model, ...)
 
         return scale * distribution.sample(key)
 
-    write_simulated_image_stack(
+    simulate_particle_stack(
         dataset,
         compute_image_fn,
         constant_args=(...)

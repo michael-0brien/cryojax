@@ -81,7 +81,28 @@ def filter_bscan(
 
     As `jax.lax.scan`.
     """
-    batch_dim = jax.tree.leaves(xs)[0].shape[0]
+    tree_leaves = jax.tree.leaves(eqx.filter(xs, eqx.is_array))
+    if len(tree_leaves) == 0:
+        raise ValueError(
+            "Called `cryojax.jax_util.filter_bscan` with `xs` "
+            "containing no JAX/numpy arrays. Unlike regular `jax.lax.scan` "
+            "`xs` is not optional."
+        )
+    if any((leaf.shape == () for leaf in tree_leaves)):
+        raise ValueError(
+            "Called `cryojax.jax_util.filter_bscan` with `xs` "
+            "containing JAX/numpy array scalars (i.e. `shape = ()`). "
+            "All JAX/numpy arrays in `xs` must have "
+            "a leading dimension that are equal to one another."
+        )
+    batch_dim = tree_leaves[0].shape[0]
+    if not all((leaf.shape[0] == batch_dim for leaf in tree_leaves)):
+        raise ValueError(
+            "Called `cryojax.jax_util.filter_bscan` with `xs` "
+            "containing JAX/numpy arrays with different leading "
+            "dimensions. All JAX/numpy arrays in `xs` must have "
+            "the same leading dimension."
+        )
     n_batches = batch_dim // batch_size
     # Filter
     xs_dynamic, xs_static = eqx.partition(xs, eqx.is_array)

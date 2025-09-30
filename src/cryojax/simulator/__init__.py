@@ -55,18 +55,17 @@ from ._transfer_theory import (
 from ._volume_integrator import (
     AbstractDirectIntegrator as AbstractDirectIntegrator,
     AbstractDirectVoxelIntegrator as AbstractDirectVoxelIntegrator,
+    AbstractVolumeIntegrator as AbstractVolumeIntegrator,
     FourierSliceExtraction as FourierSliceExtraction,
     GaussianMixtureProjection as GaussianMixtureProjection,
     NufftProjection as NufftProjection,
 )
 from ._volume_parametrisation import (
     AbstractAtomicVolume as AbstractAtomicVolume,
-    AbstractConformationalEnsemble as AbstractConformationalEnsemble,
     AbstractPointCloudVolume as AbstractPointCloudVolume,
     AbstractTabulatedAtomicVolume as AbstractTabulatedAtomicVolume,
     AbstractVolumeParametrisation as AbstractVolumeParametrisation,
     AbstractVolumeRepresentation as AbstractVolumeRepresentation,
-    DiscreteConformationalEnsemble as DiscreteConformationalEnsemble,
     FourierVoxelGridVolume as FourierVoxelGridVolume,
     FourierVoxelSplineVolume as FourierVoxelSplineVolume,
     GaussianMixtureVolume as GaussianMixtureVolume,

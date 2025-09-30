@@ -107,9 +107,10 @@ def make_image_model(
     ```
     """
     # Select default integrator
-    volume_integrator = _select_default_integrator(
-        volume_parametrisation, simulates_quantity
-    )
+    if volume_integrator is None:
+        volume_integrator = _select_default_integrator(
+            volume_parametrisation, simulates_quantity
+        )
     if transfer_theory is None:
         # Image model for projections
         image_model = ProjectionImageModel(
