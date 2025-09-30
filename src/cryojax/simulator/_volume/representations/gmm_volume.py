@@ -8,7 +8,7 @@ from jaxtyping import Array, Float
 from ....constants import variance_to_b_factor
 from ....jax_util import NDArrayLike, error_if_not_positive
 from ..._pose import AbstractPose
-from .base_volume import AbstractPointCloudVolume
+from .base_representations import AbstractPointCloudVolume
 from .common_functions import gaussians_to_real_voxels
 
 

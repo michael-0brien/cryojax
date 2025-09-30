@@ -12,7 +12,7 @@ from jaxtyping import Array, Float
 
 from ....jax_util import NDArrayLike
 from ..._pose import AbstractPose
-from ..base_parametrisation import AbstractVolumeRepresentation
+from ..base_volume import AbstractVolumeRepresentation
 
 
 T = TypeVar("T")
