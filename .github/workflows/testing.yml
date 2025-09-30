@@ -38,5 +38,3 @@ jobs:
         uses: codecov/codecov-action@v4
         with:
           file: coverage.xml
-          # token not needed for public repos
-          token: ${{ secrets.CODECOV_TOKEN }}
