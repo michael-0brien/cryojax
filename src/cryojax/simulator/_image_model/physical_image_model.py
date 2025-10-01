@@ -103,15 +103,11 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
         # Get the volume representation. Its data should be a scattering potential
         # to simulate in physical units
         if rng_key is None:
-            volume_representation = (
-                self.volume_parametrisation.compute_volume_representation()
-            )
+            volume_representation = self.volume_parametrisation.compute_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            volume_representation = (
-                self.volume_parametrisation.compute_volume_representation(
-                    rng_key=this_key
-                )
+            volume_representation = self.volume_parametrisation.compute_representation(
+                rng_key=this_key
             )
         # Rotate it to the lab frame
         volume_representation = volume_representation.rotate_to_pose(self.pose)
@@ -205,15 +201,11 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
         # Get the volume representation. Its data should be a scattering potential
         # to simulate in physical units
         if rng_key is None:
-            volume_representation = (
-                self.volume_parametrisation.compute_volume_representation()
-            )
+            volume_representation = self.volume_parametrisation.compute_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            volume_representation = (
-                self.volume_parametrisation.compute_volume_representation(
-                    rng_key=this_key
-                )
+            volume_representation = self.volume_parametrisation.compute_representation(
+                rng_key=this_key
             )
         # Rotate it to the lab frame
         volume_representation = volume_representation.rotate_to_pose(self.pose)
@@ -309,9 +301,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
         if rng_key is None:
             # Get the volume representation. Its data should be a scattering potential
             # to simulate in physical units
-            volume_representation = (
-                self.volume_parametrisation.compute_volume_representation()
-            )
+            volume_representation = self.volume_parametrisation.compute_representation()
             # Rotate it to the lab frame
             volume_representation = volume_representation.rotate_to_pose(self.pose)
             # Compute the intensity
@@ -334,8 +324,8 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
             keys = jr.split(rng_key, 3)
             # Get the volume representation. Its data should be a scattering potential
             # to simulate in physical units
-            volume_representation = (
-                self.volume_parametrisation.compute_volume_representation(keys[0])
+            volume_representation = self.volume_parametrisation.compute_representation(
+                keys[0]
             )
             # Rotate it to the lab frame
             volume_representation = volume_representation.rotate_to_pose(self.pose)

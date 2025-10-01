@@ -213,8 +213,7 @@ class UncorrelatedGaussianNoiseModel(AbstractGaussianNoiseModel, strict=True):
         self,
         observed: Float[
             Array,
-            "{self.image_model.image_config.y_dim} "
-            "{self.image_model.image_config.x_dim}",
+            "{self.image_model.image_config.y_dim} {self.image_model.image_config.x_dim}",
         ],
         *,
         mask: Optional[MaskLike] = None,
