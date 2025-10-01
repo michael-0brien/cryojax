@@ -13,8 +13,18 @@ from jaxtyping import Array, Float
 @overload
 def read_array_from_mrc(
     filename: str | pathlib.Path,
-    loads_spacing: Literal[True],
     *,
+    loads_grid_spacing: Literal[False],
+    mmap: bool = False,
+    permissive: bool = False,
+) -> Float[np.ndarray, "..."]: ...
+
+
+@overload
+def read_array_from_mrc(  # type: ignore
+    filename: str | pathlib.Path,
+    *,
+    loads_grid_spacing: Literal[True],
     mmap: bool = False,
     permissive: bool = False,
 ) -> tuple[Float[np.ndarray, "..."], float]: ...
@@ -23,27 +33,17 @@ def read_array_from_mrc(
 @overload
 def read_array_from_mrc(
     filename: str | pathlib.Path,
-    loads_spacing: Literal[False],
     *,
+    loads_grid_spacing: bool = False,
     mmap: bool = False,
     permissive: bool = False,
 ) -> Float[np.ndarray, "..."]: ...
 
 
-@overload
 def read_array_from_mrc(
     filename: str | pathlib.Path,
-    loads_spacing: bool = False,
     *,
-    mmap: bool = False,
-    permissive: bool = False,
-): ...
-
-
-def read_array_from_mrc(
-    filename: str | pathlib.Path,
-    loads_spacing: bool = False,
-    *,
+    loads_grid_spacing: bool = False,
     mmap: bool = False,
     permissive: bool = False,
 ) -> Float[np.ndarray, "..."] | tuple[Float[np.ndarray, "..."], float]:
@@ -53,7 +53,7 @@ def read_array_from_mrc(
 
     - `filename` : Path to data.
     - `mmap`: Whether or not to open the data as a `numpy.memmap` array.
-    - `loads_spacing`: If `True`, load the pixel or voxel size of the array.
+    - `loads_grid_spacing`: If `True`, load the pixel or voxel size of the array.
 
     **Returns:**
 
@@ -93,7 +93,7 @@ def read_array_from_mrc(
         if not mmap:
             array = array.astype(np.float64)
 
-        if loads_spacing:
+        if loads_grid_spacing:
             # Only allow the same spacing in each direction
             assert all(
                 grid_spacing_per_dimension != np.zeros(grid_spacing_per_dimension.shape)
@@ -177,7 +177,7 @@ def write_image_stack_to_mrc(
     with mrcfile.new(filename, compression=compression, overwrite=overwrite) as mrc:
         mrc.set_data(image_stack_as_numpy)
         mrc.set_image_stack()
-        mrc.voxel_size = (1.0, pixel_size_as_numpy, pixel_size_as_numpy)
+        mrc.voxel_size = pixel_size_as_numpy
 
 
 def write_volume_to_mrc(
@@ -214,7 +214,7 @@ def write_volume_to_mrc(
     with mrcfile.new(filename, compression=compression, overwrite=overwrite) as mrc:
         mrc.set_data(voxel_grid_as_numpy)
         mrc.set_volume()
-        mrc.voxel_size = (voxel_size_as_numpy, voxel_size_as_numpy, voxel_size_as_numpy)
+        mrc.voxel_size = voxel_size_as_numpy
 
 
 def _validate_filename_and_return_suffix(filename: str | pathlib.Path):

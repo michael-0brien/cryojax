@@ -15,7 +15,7 @@ from typing_extensions import override
 import jax.numpy as jnp
 from jaxtyping import Array, Float, Inexact
 
-from ...internal import error_if_negative, error_if_not_positive
+from ...jax_util import error_if_negative, error_if_not_positive
 from ._base_operator import AbstractImageOperator
 
 

@@ -1,6 +1,6 @@
-# Scattering potential integration methods
+# Volume integration methods
 
-`cryojax` provides different methods for integrating [scattering potentials](./potential.md#scattering-potential-representations) onto a plane.
+`cryojax` provides different methods for integrating [volumes](./volume.md#volume-representations) onto a plane to generate an image.
 
 ???+ abstract "`cryojax.simulator.AbstractDirectIntegrator`"
     ::: cryojax.simulator.AbstractDirectIntegrator
@@ -8,15 +8,21 @@
             members:
                 - integrate
 
-## Integration methods for voxel-based potentials
+## Integration methods for voxel-based structures
+
+???+ abstract "`cryojax.simulator.AbstractDirectVoxelIntegrator`"
+    ::: cryojax.simulator.AbstractDirectIntegrator
+        options:
+            members:
+                - outputs_integral
 
 ::: cryojax.simulator.FourierSliceExtraction
         options:
             members:
                 - __init__
                 - integrate
-                - extract_fourier_slice_from_spline_coefficients
-                - extract_fourier_slice_from_grid_points
+                - extract_fourier_slice_from_spline
+                - extract_fourier_slice_from_grid
 
 ---
 
@@ -27,7 +33,7 @@
                 - integrate
                 - project_voxel_cloud_with_nufft
 
-## Integration methods for atom-based potentials
+## Integration methods for point-cloud based structures
 
 ::: cryojax.simulator.GaussianMixtureProjection
         options:

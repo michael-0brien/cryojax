@@ -3,7 +3,7 @@ import numpy as np
 from jaxtyping import Array, Float
 
 
-def convert_b_factor_to_variance(
+def b_factor_to_variance(
     b_factor: Float[Array | np.ndarray, "..."] | float,
 ) -> Float[Array, "..."]:
     """From the B-factor of a gaussian, return the corresponding
@@ -27,7 +27,7 @@ def convert_b_factor_to_variance(
     return jnp.asarray(b_factor / (8 * np.pi**2))
 
 
-def convert_variance_to_b_factor(
+def variance_to_b_factor(
     variance: Float[Array | np.ndarray, "..."] | float,
 ) -> Float[Array, "..."]:
     """From the variance of a gaussian, return the corresponding

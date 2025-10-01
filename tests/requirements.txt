@@ -1,3 +1,0 @@
-pytest
-pycistem; sys_platform == "linux"
-typeguard==2.13.3

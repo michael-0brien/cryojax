@@ -31,9 +31,9 @@ _VALID_URLS.discard("")
 @overload
 def read_atoms_from_pdb(
     filename_or_url: str | pathlib.Path,
+    *,
     loads_b_factors: Literal[False],
     center: bool = True,
-    *,
     selection_string: str = "all",
     model_index: Optional[int] = None,
     standardizes_names: bool = True,
@@ -42,11 +42,11 @@ def read_atoms_from_pdb(
 
 
 @overload
-def read_atoms_from_pdb(
+def read_atoms_from_pdb(  # type: ignore
     filename_or_url: str | pathlib.Path,
+    *,
     loads_b_factors: Literal[True],
     center: bool = True,
-    *,
     selection_string: str = "all",
     model_index: Optional[int] = None,
     standardizes_names: bool = True,
@@ -61,21 +61,21 @@ def read_atoms_from_pdb(
 @overload
 def read_atoms_from_pdb(
     filename_or_url: str | pathlib.Path,
+    *,
     loads_b_factors: bool = False,
     center: bool = True,
-    *,
-    selection_string: str,
+    selection_string: str = "all",
     model_index: Optional[int] = None,
     standardizes_names: bool = True,
     topology: Optional[mdtraj.Topology] = None,
-): ...
+) -> tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, " n_atoms"]]: ...
 
 
 def read_atoms_from_pdb(
     filename_or_url: str | pathlib.Path,
+    *,
     loads_b_factors: bool = False,
     center: bool = True,
-    *,
     selection_string: str = "all",
     model_index: Optional[int] = None,
     standardizes_names: bool = True,
@@ -120,14 +120,14 @@ def read_atoms_from_pdb(
     numbers. To be clear,
 
     ```python
-    atom_positons, atom_identities = read_atoms_from_pdb(...)
+    atom_positons, atom_types = read_atoms_from_pdb(...)
     ```
 
     !!! info
 
         If your PDB has multiple models, `atom_positions` by
         default with a leading dimension that indexes each model.
-        On the other hand, `atom_identities` (and `b_factors`, if loaded)
+        On the other hand, `atom_types` (and `b_factors`, if loaded)
         do not have this leading dimension and are constant across
         models.
     """
@@ -147,7 +147,7 @@ def read_atoms_from_pdb(
     atom_properties = jax.tree.map(
         lambda arr: arr[selected_indices], atom_info["properties"]
     )
-    atom_identities = atom_properties["identities"]
+    atom_types = atom_properties["identities"]
     # Center by mass
     if center:
         atom_masses = cast(np.ndarray, atom_properties["masses"])
@@ -158,9 +158,9 @@ def read_atoms_from_pdb(
         atom_positions = np.squeeze(atom_positions, axis=0)
     if loads_b_factors:
         b_factors = cast(np.ndarray, atom_properties["b_factors"])
-        return atom_positions, atom_identities, b_factors
+        return atom_positions, atom_types, b_factors
     else:
-        return atom_positions, atom_identities
+        return atom_positions, atom_types
 
 
 def _center_atom_coordinates(atom_positions, atom_masses):
@@ -330,7 +330,7 @@ def _make_topology(
 
                 new_atom = topology.add_atom(
                     atom_name,
-                    element,
+                    element,  # type: ignore
                     r,
                     serial=atom.serial_number,
                     formal_charge=atom.formal_charge,

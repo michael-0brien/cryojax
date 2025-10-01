@@ -1,13 +1,15 @@
 # Configuring an image
 
-The `AbstractConfig` is an object at the core of simulating images in `cryojax`. It stores a configuration for the simulated image and the electron microscope, such as the shape of the desired image and the wavelength of the incident electron beam.
+The `AbstractImageConfig` is an object at the core of simulating images in `cryojax`. It stores a configuration for the simulated image and the electron microscope, such as the shape of the desired image and the wavelength of the incident electron beam.
 
-::: cryojax.simulator.AbstractConfig
+::: cryojax.simulator.AbstractImageConfig
         options:
             members:
                 - __init__
                 - wavelength_in_angstroms
                 - wavenumber_in_inverse_angstroms
+                - lorentz_factor
+                - interaction_constant
                 - n_pixels
                 - y_dim
                 - x_dim

@@ -15,7 +15,7 @@ classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
 ]
-urls = {repository = "https://github.com/mjo22/cryojax" }
+urls = {repository = "https://github.com/michael-0brien/cryojax" }
 dynamic = ["version"]
 dependencies = [
     "jax",
@@ -32,6 +32,28 @@ dependencies = [
     "mdtraj",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pre-commit"
+]
+docs = [
+    "mkdocs",
+    "mkdocs-material",
+    "pymdown-extensions",
+    "mkdocstrings-python",
+    "mknotebooks",
+    "mkdocs-gen-files",
+    "mkdocs-same-dir",
+    "mkdocs-pymdownx-material-extras",
+    "mkdocs-autorefs",
+    "mkdocs-simple-plugin"
+]
+tests = [
+    "pytest",
+    "pycistem; sys_platform == 'linux'",
+    "typeguard==2.13.3"
+]
+
 [build-system]
 requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
@@ -43,6 +65,7 @@ source = "vcs"
 version-file = "src/cryojax/cryojax_version.py"
 
 [tool.ruff]
+exclude = ["old", "dev"]
 extend-include = ["*.ipynb"]
 lint.fixable = ["I001", "F401"]
 line-length = 90

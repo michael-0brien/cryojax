@@ -9,10 +9,10 @@ theme:
 site_name: cryoJAX
 site_description: The documentation for cryoJAX.
 site_author: Michael O'Brien
-site_url: https://mjo22.github.io/cryojax/
+site_url: https://michael-0brien.github.io/cryojax/
 
-repo_url: https://github.com/mjo22/cryojax
-repo_name: mjo22/cryojax
+repo_url: https://github.com/michael-0brien/cryojax
+repo_name: michael-0brien/cryojax
 edit_uri: ""
 
 strict: false
@@ -65,15 +65,17 @@ nav:
             - JAX transformations: 'examples/jax-transformations.ipynb'
             - Render a volume: 'examples/compute-potential.ipynb'
             - Load cryo-EM images: 'examples/read-dataset.ipynb'
+            - Create custom image simulation methods: 'examples/extending-cryojax.ipynb'
         - Your first program:
             - Write a STAR file of simulated data: 'examples/simulate-relion-dataset.ipynb'
+        - Advanced usage:
+            - Structural refinement using gradient descent: 'examples/structure-refinement.ipynb'
     - API:
         - cryojax.simulator:
             - 'api/simulator/api.md'
             - Representing volumes:
-                - 'api/simulator/potential.md'
                 - 'api/simulator/pose.md'
-                - 'api/simulator/structure.md'
+                - 'api/simulator/volume.md'
             - Image formation:
                 - 'api/simulator/integrator.md'
                 - 'api/simulator/transfer_theory.md'
@@ -81,7 +83,7 @@ nav:
             - Putting it all together:
                 - 'api/simulator/config.md'
                 - 'api/simulator/image_model.md'
-                - 'api/simulator/distribution.md'
+                - 'api/simulator/noise_model.md'
         - cryojax.dataset:
             - 'api/dataset/relion.md'
         - cryojax.io:
@@ -102,6 +104,7 @@ nav:
         - cryojax.constants:
             - 'api/constants/units.md'
             - 'api/constants/scattering_factor_parameters.md'
+            - 'api/constants/conventions.md'
         - cryojax.jax_util:
             - 'api/jax_util/filter_specs.md'
             - 'api/jax_util/grid_search.md'

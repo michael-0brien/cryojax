@@ -2,34 +2,31 @@
 Masks to apply to images in real space.
 """
 
+import abc
 import functools
 import operator
-from typing import Optional, overload
+from typing import Optional
+from typing_extensions import override
 
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, Bool, Float
+from jaxtyping import Array, Float
 
+from ...jax_util import NDArrayLike
 from ._base_transform import AbstractImageTransform
 
 
 class AbstractMask(AbstractImageTransform, strict=True):
     """Base class for computing and applying an image mask."""
 
-    @overload
-    def __call__(
-        self, image: Float[Array, "y_dim x_dim"]
-    ) -> Float[Array, "y_dim x_dim"]: ...
-
-    @overload
-    def __call__(  # type: ignore
-        self, image: Float[Array, "z_dim y_dim x_dim"]
-    ) -> Float[Array, "z_dim y_dim x_dim"]: ...
+    @abc.abstractmethod
+    def get(self) -> Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]:
+        raise NotImplementedError
 
     def __call__(
         self, image: Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]
     ) -> Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]:
-        return image * jax.lax.stop_gradient(self.array)
+        return image * self.get()
 
 
 MaskLike = AbstractMask | AbstractImageTransform
@@ -45,6 +42,10 @@ class CustomMask(AbstractMask, strict=True):
     ):
         self.array = mask_array
 
+    @override
+    def get(self) -> Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]:
+        return self.array
+
 
 class CircularCosineMask(AbstractMask, strict=True):
     """Apply a circular mask to an image with a cosine
@@ -56,8 +57,9 @@ class CircularCosineMask(AbstractMask, strict=True):
     def __init__(
         self,
         coordinate_grid: Float[Array, "y_dim x_dim 2"],
-        radius: float | Float[Array, ""],
-        rolloff_width: float | Float[Array, ""],
+        radius: float | Float[NDArrayLike, ""],
+        rolloff_width: float | Float[NDArrayLike, ""],
+        xy_offset: tuple[float, float] | Float[NDArrayLike, " 2"] = (0.0, 0.0),
     ):
         """**Arguments:**
 
@@ -72,7 +74,12 @@ class CircularCosineMask(AbstractMask, strict=True):
             coordinate_grid,
             jnp.asarray(radius),
             jnp.asarray(rolloff_width),
+            offset=jnp.asarray(xy_offset),
         )
+
+    @override
+    def get(self) -> Float[Array, "y_dim x_dim"]:
+        return self.array
 
 
 class SphericalCosineMask(AbstractMask, strict=True):
@@ -85,8 +92,8 @@ class SphericalCosineMask(AbstractMask, strict=True):
     def __init__(
         self,
         coordinate_grid: Float[Array, "z_dim y_dim x_dim 3"],
-        radius: float | Float[Array, ""],
-        rolloff_width: float | Float[Array, ""],
+        radius: float | Float[NDArrayLike, ""],
+        rolloff_width: float | Float[NDArrayLike, ""],
     ):
         """**Arguments:**
 
@@ -101,7 +108,12 @@ class SphericalCosineMask(AbstractMask, strict=True):
             coordinate_grid,
             jnp.asarray(radius),
             jnp.asarray(rolloff_width),
+            offset=None,
         )
+
+    @override
+    def get(self) -> Float[Array, "z_dim y_dim x_dim"]:
+        return self.array
 
 
 class SquareCosineMask(AbstractMask, strict=True):
@@ -114,8 +126,8 @@ class SquareCosineMask(AbstractMask, strict=True):
     def __init__(
         self,
         coordinate_grid: Float[Array, "y_dim x_dim 2"],
-        side_length: float | Float[Array, ""],
-        rolloff_width: float | Float[Array, ""],
+        side_length: float | Float[NDArrayLike, ""],
+        rolloff_width: float | Float[NDArrayLike, ""],
     ):
         """**Arguments:**
 
@@ -130,6 +142,10 @@ class SquareCosineMask(AbstractMask, strict=True):
             coordinate_grid, jnp.asarray(side_length), jnp.asarray(rolloff_width)
         )
 
+    @override
+    def get(self) -> Float[Array, "y_dim x_dim"]:
+        return self.array
+
 
 class Cylindrical2DCosineMask(AbstractMask, strict=True):
     """Apply a cylindrical mask to an image with a cosine
@@ -142,10 +158,10 @@ class Cylindrical2DCosineMask(AbstractMask, strict=True):
     def __init__(
         self,
         coordinate_grid: Float[Array, "y_dim x_dim 2"],
-        radius: float | Float[Array, ""],
-        rolloff_width: float | Float[Array, ""],
-        in_plane_rotation_angle: float | Float[Array, ""] = 0.0,
-        length: Optional[float | Float[Array, ""]] = None,
+        radius: float | Float[NDArrayLike, ""],
+        rolloff_width: float | Float[NDArrayLike, ""],
+        in_plane_rotation_angle: float | Float[NDArrayLike, ""] = 0.0,
+        length: Optional[float | Float[NDArrayLike, ""]] = None,
     ):
         """**Arguments:**
 
@@ -178,6 +194,10 @@ class Cylindrical2DCosineMask(AbstractMask, strict=True):
                 jnp.asarray(rolloff_width),
             )
 
+    @override
+    def get(self) -> Float[Array, "y_dim x_dim"]:
+        return self.array
+
 
 class Rectangular2DCosineMask(AbstractMask, strict=True):
     """Apply a rectangular mask in 2D to an image with a cosine
@@ -189,10 +209,10 @@ class Rectangular2DCosineMask(AbstractMask, strict=True):
     def __init__(
         self,
         coordinate_grid: Float[Array, "y_dim x_dim 2"],
-        x_width: float | Float[Array, ""],
-        y_width: float | Float[Array, ""],
-        rolloff_width: float | Float[Array, ""],
-        in_plane_rotation_angle: float | Float[Array, ""] = 0.0,
+        x_width: float | Float[NDArrayLike, ""],
+        y_width: float | Float[NDArrayLike, ""],
+        rolloff_width: float | Float[NDArrayLike, ""],
+        in_plane_rotation_angle: float | Float[NDArrayLike, ""] = 0.0,
     ):
         """**Arguments:**
 
@@ -216,6 +236,10 @@ class Rectangular2DCosineMask(AbstractMask, strict=True):
             jnp.asarray(rolloff_width),
         )
 
+    @override
+    def get(self) -> Float[Array, "y_dim x_dim"]:
+        return self.array
+
 
 class Rectangular3DCosineMask(AbstractMask, strict=True):
     """Apply a rectangular mask to a volume with a cosine
@@ -223,15 +247,14 @@ class Rectangular3DCosineMask(AbstractMask, strict=True):
     """
 
     array: Float[Array, "z_dim y_dim x_dim"]
-    is_not_masked: Bool[Array, "z_dim y_dim x_dim"]
 
     def __init__(
         self,
         coordinate_grid: Float[Array, "z_dim y_dim x_dim 3"],
-        x_width: float | Float[Array, ""],
-        y_width: float | Float[Array, ""],
-        z_width: float | Float[Array, ""],
-        rolloff_width: float | Float[Array, ""],
+        x_width: float | Float[NDArrayLike, ""],
+        y_width: float | Float[NDArrayLike, ""],
+        z_width: float | Float[NDArrayLike, ""],
+        rolloff_width: float | Float[NDArrayLike, ""],
     ):
         """**Arguments:**
 
@@ -253,6 +276,10 @@ class Rectangular3DCosineMask(AbstractMask, strict=True):
             jnp.asarray(z_width),
             jnp.asarray(rolloff_width),
         )
+
+    @override
+    def get(self) -> Float[Array, "z_dim y_dim x_dim"]:
+        return self.array
 
 
 class InverseSincMask(AbstractMask, strict=True):
@@ -287,28 +314,19 @@ class InverseSincMask(AbstractMask, strict=True):
             )
         )
 
-
-@overload
-def _compute_circular_or_spherical_mask(
-    coordinate_grid: Float[Array, "y_dim x_dim 2"],
-    radius: Float[Array, ""],
-    rolloff_width: Float[Array, ""],
-) -> Float[Array, "y_dim x_dim"]: ...
-
-
-@overload
-def _compute_circular_or_spherical_mask(  # type: ignore
-    coordinate_grid: Float[Array, "z_dim y_dim x_dim 3"],
-    radius: Float[Array, ""],
-    rolloff_width: Float[Array, ""],
-) -> Float[Array, "z_dim y_dim x_dim"]: ...
+    @override
+    def get(self) -> Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]:
+        return self.array
 
 
 def _compute_circular_or_spherical_mask(
     coordinate_grid: Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"],
     radius: Float[Array, ""],
     rolloff_width: Float[Array, ""],
+    offset: Optional[Float[Array, "2"] | Float[Array, "3"]] = None,
 ) -> Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]:
+    if offset is not None:
+        coordinate_grid -= offset[None, None, :]
     radial_coordinate_grid = jnp.linalg.norm(coordinate_grid, axis=-1)
 
     def compute_mask_at_coordinate(radial_coordinate):

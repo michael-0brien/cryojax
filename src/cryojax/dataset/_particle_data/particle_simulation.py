@@ -5,8 +5,7 @@ import jax
 import numpy as np
 from jaxtyping import Array, Float, Int, PyTree
 
-from ...internal import NDArrayLike
-from ...jax_util import batched_scan
+from ...jax_util import NDArrayLike, filter_bscan
 from .base_particle_dataset import (
     AbstractParticleParameterFile,
     AbstractParticleStackDataset,
@@ -65,8 +64,8 @@ def simulate_particle_stack(
     # parameters and writes images
     dataset = RelionParticleStackDataset(..., mode='w')
 
-    # Write your `compute_image_fn` function, building a
-    # `ContrastImageModel` (see tutorials for details)
+    # Write your `compute_image_fn` function, building an
+    # `AbstractImageModel` (see tutorials for details)
 
     def compute_image_fn(
         parameters: RelionParticleParameters,
@@ -75,18 +74,18 @@ def simulate_particle_stack(
     ) -> jax.Array:
         # `constant_args` do not change between images. For
         # example, include the method of taking projections
-        potential_integrator, ... = constant_args
-        # Using the pose, CTF, and config from the
+        integrator, ... = constant_args
+        # Using the pose, CTF, and image config from the
         # `parameters`, build image simulation model
-        image_model = cxs.ContrastImageModel(...)
+        image_model = cxs.make_image_model(...)
         # ... and compute
-        return image_model.render()
+        return image_model.simulate()
 
     # Simulate images and write to disk
-    write_simulated_image_stack(
+    simulate_particle_stack(
         dataset,
         compute_image_fn,
-        constant_args=(potential_integrator, ...)
+        constant_args=(integrator, ...)
         per_particle_args=None, # default
         batch_size=10,
     )
@@ -117,7 +116,7 @@ def simulate_particle_stack(
     scaling_params = jax.random.uniform(subkey, shape=(n_images,))
 
     # Now write your `compute_image_fn` function, building a
-    # `cryojax.distributions.IndependentGaussianPixels` to
+    # `cryojax.simulator.UncorrelationGaussianNoiseModel` to
     # simulate images with white noise (see tutorials for details)
 
     def compute_image_fn(
@@ -129,12 +128,12 @@ def simulate_particle_stack(
         key, scale = per_particle_args
 
         # Combine two previously split PyTrees
-        image_model = cxs.ContrastImageModel(...)
-        distribution = cxs.IndependentGaussianPixels(image_model, ...)
+        image_model = cxs.make_image_model(...)
+        distribution = cxs.UncorrelatedGaussianNoiseModel(image_model, ...)
 
         return scale * distribution.sample(key)
 
-    write_simulated_image_stack(
+    simulate_particle_stack(
         dataset,
         compute_image_fn,
         constant_args=(...)
@@ -251,7 +250,7 @@ def _configure_simulation_fn(
     if batch_size is None:
 
         def compute_image_stack_fn(parameters, constant_args, per_particle_args):  # type: ignore
-            shape = parameters["config"].shape
+            shape = parameters["image_config"].shape
             image_stack = np.empty((images_per_file, *shape))
             for i in range(images_per_file):
                 parameters_at_i = _index_pytree(i, parameters)
@@ -273,31 +272,19 @@ def _configure_simulation_fn(
 
             @eqx.filter_jit
             def compute_image_stack_fn(parameters, constant_args, per_particle_args):
-                # Compute with `jax.lax.scan`
-                params_dynamic, params_static = eqx.partition(parameters, eqx.is_array)
-                const_dynamic, const_static = eqx.partition(constant_args, eqx.is_array)
-                per_particle_dynamic, per_particle_static = eqx.partition(
-                    per_particle_args, eqx.is_array
-                )
-                # ... prepare for scan
-                init = const_dynamic
-                xs = (params_dynamic, per_particle_dynamic)
+                # Compute with `jax.lax.scan` via `cryojax.jax_util.filter_bscan`
+                init = constant_args
+                xs = (parameters, per_particle_args)
 
                 def f_scan(carry, xs):
-                    params_dynamic, per_particle_dynamic = xs
-                    parameters = eqx.combine(params_dynamic, params_static)
-                    per_particle_args = eqx.combine(
-                        per_particle_dynamic, per_particle_static
-                    )
-                    constant_args = eqx.combine(carry, const_static)
-
+                    _constant_args = carry
+                    _parameters, _per_particle_args = xs
                     image_stack = compute_vmap(
-                        parameters, constant_args, per_particle_args
+                        _parameters, _constant_args, _per_particle_args
                     )
-
                     return carry, image_stack
 
-                _, image_stack = batched_scan(f_scan, init, xs, batch_size=batch_size)
+                _, image_stack = filter_bscan(f_scan, init, xs, batch_size=batch_size)
 
                 return image_stack
 

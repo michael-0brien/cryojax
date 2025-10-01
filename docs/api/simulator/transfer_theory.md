@@ -1,6 +1,6 @@
 # Contrast transfer functions
 
-Applying a contrast transfer function (CTF) to an image in `cryojax` is layered into two classes. The most important class is the `AberratedAstigmaticCTF`, which is a function that takes in a grid of in-plane frequency vectors and returns a JAX array of the CTF. This class also has an alias called `CTF`, which is used in the below example:
+Applying a contrast transfer function (CTF) to an image in `cryojax` is layered into two classes. The most important class is the `AstigmaticCTF`, which is a function that takes in a grid of in-plane frequency vectors and returns a JAX array of the CTF. This class also has an alias called `CTF`, which is used in the below example:
 
 ```python
 import cryojax.simulator as cxs
@@ -43,16 +43,11 @@ This documentation describes the elements of transfer theory in `cryojax`. More 
                 - compute_aberration_phase_shifts
                 - __call__
 
-::: cryojax.simulator.AberratedAstigmaticCTF
+::: cryojax.simulator.AstigmaticCTF
         options:
             members:
                 - __init__
-                - __call__
-
-::: cryojax.simulator.NullCTF
-        options:
-            members:
-                - __init__
+                - compute_aberration_phase_shifts
                 - __call__
 
 ## Transfer Theories
@@ -61,4 +56,4 @@ This documentation describes the elements of transfer theory in `cryojax`. More 
         options:
             members:
                 - __init__
-                - propagate_object_to_detector_plane
+                - propagate_object

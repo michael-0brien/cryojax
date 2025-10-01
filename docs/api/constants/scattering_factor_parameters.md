@@ -8,4 +8,4 @@ Modeling the electron scattering amplitudes of individual atoms is an important 
 
 ## Lookup tables
 
-::: cryojax.constants.read_peng_element_scattering_factor_parameter_table
+::: cryojax.constants.read_peng_scattering_factor_parameter_table

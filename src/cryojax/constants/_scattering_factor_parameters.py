@@ -14,11 +14,11 @@ from jaxtyping import Float, Int
 
 
 def get_tabulated_scattering_factor_parameters(
-    atom_identities: Int[np.ndarray, " n_atoms"],
+    atom_types: Int[np.ndarray, " n_atoms"],
     scattering_factor_parameter_table: Optional[xr.Dataset] = None,
 ) -> dict[str, Float[np.ndarray, " n_atoms n_scattering_factors"]]:
     """Gets the parameters for the scattering factor for each atom in
-    `atom_identities`.
+    `atom_types`.
 
     **Arguments:**
 
@@ -29,24 +29,22 @@ def get_tabulated_scattering_factor_parameters(
         The table of scattering factors as an `xarray.Dataset`. By default, this
         is the tabulation from "Robust Parameterization of Elastic and
         Absorptive Electron Atomic Scattering Factors" by Peng et al. (1996),
-        given by [`read_peng_element_scattering_factor_parameter_table`](https://mjo22.github.io/cryojax/api/constants/scattering_factor_parameters/#cryojax.constants.read_peng_element_scattering_factor_parameter_table).
+        given by [`read_peng_element_scattering_factor_parameter_table`](https://michael-0brien.github.io/cryojax/api/constants/scattering_factor_parameters/#cryojax.constants.read_peng_element_scattering_factor_parameter_table).
 
     **Returns:**
 
     The particular scattering factor parameters stored in
-    `scattering_factor_parameter_table` for `atom_identities`.
+    `scattering_factor_parameter_table` for `atom_types`.
     """  # noqa: E501
     if scattering_factor_parameter_table is None:
-        scattering_factor_parameter_table = (
-            read_peng_element_scattering_factor_parameter_table()
-        )
+        scattering_factor_parameter_table = read_peng_scattering_factor_parameter_table()
     return {
-        str(k): np.asarray(v.data[np.asarray(atom_identities), ...])
+        str(k): np.asarray(v.data[np.asarray(atom_types), ...])
         for k, v in scattering_factor_parameter_table.items()
     }
 
 
-def read_peng_element_scattering_factor_parameter_table() -> xr.Dataset:
+def read_peng_scattering_factor_parameter_table() -> xr.Dataset:
     r"""Function to load the atomic scattering factor parameter
     table from "Robust Parameterization of Elastic and Absorptive
     Electron Atomic Scattering Factors" by Peng et al. (1996).

@@ -3,8 +3,14 @@ for Equinox filtered transformations and Equinox recommendations for creating cu
 per-leaf behavior for pytrees.
 """
 
-from ._batched_loop import batched_map as batched_map, batched_scan as batched_scan
-from ._filter_specs import get_filter_spec as get_filter_spec
+from ._batched_loop import filter_bmap as filter_bmap, filter_bscan as filter_bscan
+from ._errors import (
+    error_if_negative as error_if_negative,
+    error_if_not_fractional as error_if_not_fractional,
+    error_if_not_positive as error_if_not_positive,
+    error_if_zero as error_if_zero,
+)
+from ._filter_specs import make_filter_spec as make_filter_spec
 from ._grid_search import (
     AbstractGridSearchMethod as AbstractGridSearchMethod,
     MinimumSearchMethod as MinimumSearchMethod,
@@ -18,6 +24,8 @@ from ._grid_search import (
 from ._pytree_transforms import (
     AbstractPyTreeTransform as AbstractPyTreeTransform,
     CustomTransform as CustomTransform,
+    NonArrayStaticTransform as NonArrayStaticTransform,
     StopGradientTransform as StopGradientTransform,
     resolve_transforms as resolve_transforms,
 )
+from ._typing import NDArrayLike as NDArrayLike
