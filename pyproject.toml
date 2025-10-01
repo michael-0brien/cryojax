@@ -51,7 +51,7 @@ docs = [
 tests = [
     "pytest",
     "pytest-cov",
-    "pycistem; sys_platform == 'linux'",
+    "pycistem; sys_platform == 'linux' and python_version < '3.12'",
     "typeguard==2.13.3"
 ]
 
