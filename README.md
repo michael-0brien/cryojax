@@ -3,6 +3,7 @@
 ![Tests](https://github.com/michael-0brien/cryojax/actions/workflows/testing.yml/badge.svg)
 ![Lint](https://github.com/michael-0brien/cryojax/actions/workflows/ruff.yml/badge.svg)
 
+
 ## Summary
 
 CryoJAX is a library that simulates cryo-electron microscopy (cryo-EM) images in [JAX](https://jax.readthedocs.io/en/latest/). Its purpose is to provide the tools for building downstream data analysis in external workflows and libraries that leverage the statistical inference and machine learning resources of the JAX scientific computing ecosystem. To achieve this, image simulation in cryoJAX is built for reliability and flexibility; it implements a variety of established models and algorithms as well as a framework for implementing new models and algorithms downstream. If your application uses cryo-EM image simulation and it cannot be built downstream, open a [pull request](https://github.com/michael-0brien/cryojax/pulls).

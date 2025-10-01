@@ -19,12 +19,12 @@ After discussing the contribution and implementing it either in your local fork 
 
 ## Getting started
 
-First, fork the library on GitHub. Then clone and install the library in development mode:
+First, fork the library on GitHub. Then clone and install the library with dependencies for development:
 
 ```
 git clone https://github.com/your-username-here/cryojax.git
 cd cryojax
-python -m pip install -e .
+python -m pip install -e '.[dev, tests]'
 ```
 
 Next, install the pre-commit hooks:
@@ -41,7 +41,6 @@ This uses `ruff` to format and lint the code.
 After making changes, make sure that the tests pass. In the `cryojax` base directory, run
 
 ```
-python -m pip install -r tests/requirements.txt
 python -m pytest
 ```
 
@@ -49,10 +48,10 @@ python -m pytest
 
 ## Building documentation
 
-Again in the `cryojax` base directory, build the documentation by installing dependencies using [`mkdocs`](https://www.mkdocs.org/getting-started/#getting-started-with-mkdocs).
+Again in the `cryojax` base directory, the documentation is easily built using [`mkdocs`](https://www.mkdocs.org/getting-started/#getting-started-with-mkdocs):
 
 ```
-python -m pip install -r docs/requirements.txt
+python -m pip install -e '.[docs]'
 mkdocs serve
 ```
 
