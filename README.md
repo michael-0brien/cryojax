@@ -1,7 +1,8 @@
 <h1 align='center'>cryoJAX</h1>
 
-![Tests](https://github.com/michael-0brien/cryojax/actions/workflows/testing.yml/badge.svg)
-![Lint](https://github.com/michael-0brien/cryojax/actions/workflows/ruff.yml/badge.svg)
+[![Tests](https://github.com/michael-0brien/cryojax/actions/workflows/testing.yml/badge.svg)](https://github.com/michael-0brien/cryojax/actions/workflows/testing.yml)
+[![codecov](https://codecov.io/gh/michael-0brien/cryojax/branch/dev/graph/badge.svg)](https://codecov.io/gh/michael-0brien/cryojax)
+
 
 ## Summary
 
