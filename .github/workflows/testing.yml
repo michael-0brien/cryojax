@@ -29,6 +29,10 @@ jobs:
           python -m pip install '.[dev,docs,tests]'
           python -m pip install pytest-cov
 
+      - name: Checks with pre-commit
+        run: |
+          pre-commit run --all-files
+
       - name: Run tests with coverage
         run: |
           pytest --cov=. --cov-report term --cov-report xml:coverage.xml tests/
