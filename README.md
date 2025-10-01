@@ -2,7 +2,6 @@
 
 ![Tests](https://github.com/michael-0brien/cryojax/actions/workflows/testing.yml/badge.svg)
 ![Lint](https://github.com/michael-0brien/cryojax/actions/workflows/ruff.yml/badge.svg)
-![Coverage](https://raw.githubusercontent.com/michael-0brien/cryojax/dev/badges/coverage.svg)
 
 
 ## Summary
