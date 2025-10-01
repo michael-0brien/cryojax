@@ -21,16 +21,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v6
-        with:
-          python-version: ${{ matrix.python-version }}
-
       - name: Set up uv
         uses: astral-sh/setup-uv@v6
 
       - name: Install dependencies
         run: |
+          uv venv --python=${{ matrix.python-version }}
           uv pip install --upgrade pip
           uv pip install '.[dev,docs,tests]'
 
@@ -40,7 +36,7 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          uv run --active --no-sync pytest --cov --cov-branch --cov-report=xml
+          uv run --no-sync pytest --cov --cov-branch --cov-report=xml
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
