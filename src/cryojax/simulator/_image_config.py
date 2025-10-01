@@ -55,7 +55,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
     def __check_init__(self):
         if self.padded_shape[0] < self.shape[0] or self.padded_shape[1] < self.shape[1]:
             raise AttributeError(
-                "`padded_shape` is less than `shape` in one or " "more dimensions."
+                "`padded_shape` is less than `shape` in one or more dimensions."
             )
 
     @property
