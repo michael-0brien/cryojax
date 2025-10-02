@@ -24,13 +24,12 @@ First, fork the library on GitHub. Then clone and install the library with depen
 ```
 git clone https://github.com/your-username-here/cryojax.git
 cd cryojax
-python -m pip install -e '.[dev, tests]'
+python -m pip install -e '.[dev]'
 ```
 
 Next, install the pre-commit hooks:
 
 ```
-python -m pip install pre-commit
 pre-commit install
 ```
 
@@ -38,13 +37,14 @@ This uses `ruff` to format and lint the code.
 
 ## Running tests
 
-After making changes, make sure that the tests pass. In the `cryojax` base directory, run
+After making changes, make sure that the tests pass. In the `cryojax` base directory, install testing dependencies and run
 
 ```
+python -m pip install -e '.[tests]'
 python -m pytest
 ```
 
-**If you are using a non-linux OS, the [`pycistem`](https://github.com/jojoelfe/pycistem) testing dependency cannot be installed**. In this case, in order to run the tests against [`cisTEM`](https://github.com/timothygrant80/cisTEM), run the testing [workflow](https://github.com/michael-0brien/cryojax/actions/workflows/testing.yml). This can be done manually or will happen automatically when a PR is opened.
+**If you are using a non-linux OS, the [`pycistem`](https://github.com/jojoelfe/pycistem) testing dependency cannot be installed**. In this case, in order to run the tests against [`cisTEM`](https://github.com/timothygrant80/cisTEM), run the testing [workflow](https://github.com/michael-0brien/cryojax/actions/workflows/ci_build.yml). This can be done manually or will happen automatically when a PR is opened.
 
 ## Building documentation
 
