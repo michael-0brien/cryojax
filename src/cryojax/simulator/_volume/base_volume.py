@@ -82,8 +82,8 @@ class AbstractVolumeRepresentation(AbstractVolumeParametrisation, strict=True):
 
     @override
     def compute_representation(self, rng_key: Optional[PRNGKeyArray] = None) -> Self:
-        """Since this class is itself an implementation of an
-        `AbstractVolumeParametrisation`, this function maps to the identity.
+        """Since this class is itself an
+        `AbstractVolumeRepresentation`, this function maps to the identity.
 
         **Arguments:**
 
