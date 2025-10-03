@@ -11,9 +11,6 @@ from .._pose import AbstractPose
 T = TypeVar("T")
 
 
-#
-# Core base class for parametrising a volume
-#
 class AbstractVolumeParametrisation(eqx.Module, strict=True):
     """Abstract interface for a parametrisation of a volume. Specifically,
     the cryo-EM image formation process typically starts with a *scattering potential*.
@@ -70,9 +67,6 @@ class AbstractVolumeParametrisation(eqx.Module, strict=True):
         raise NotImplementedError
 
 
-#
-# Interfaces that give core properties to volumes
-#
 class AbstractVolumeRepresentation(AbstractVolumeParametrisation, strict=True):
     """Abstract interface for the representation of a volume, such
     as atomic coordinates, voxels, or a neural network.
@@ -88,8 +82,8 @@ class AbstractVolumeRepresentation(AbstractVolumeParametrisation, strict=True):
 
     @override
     def compute_representation(self, rng_key: Optional[PRNGKeyArray] = None) -> Self:
-        """Since this class is itself an implementation of an
-        `AbstractVolumeParametrisation`, this function maps to the identity.
+        """Since this class is itself an
+        `AbstractVolumeRepresentation`, this function maps to the identity.
 
         **Arguments:**
 
