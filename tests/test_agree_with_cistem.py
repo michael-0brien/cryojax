@@ -1,11 +1,10 @@
 import warnings
 
+import cryojax.simulator as cxs
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-
-import cryojax.simulator as cxs
 from cryojax.coordinates import cartesian_to_polar, make_frequency_grid
 from cryojax.io import read_array_from_mrc
 from cryojax.ndimage import compute_binned_powerspectrum, irfftn

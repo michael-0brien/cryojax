@@ -1,7 +1,6 @@
 import jax
 import jax.numpy as jnp
 import pytest
-
 from cryojax.coordinates import make_coordinate_grid, make_frequency_grid
 from cryojax.ndimage import transforms as tf
 

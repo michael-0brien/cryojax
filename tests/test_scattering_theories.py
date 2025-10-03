@@ -1,7 +1,6 @@
+import cryojax.simulator as cxs
 import numpy as np
 import pytest
-
-import cryojax.simulator as cxs
 from cryojax.io import read_atoms_from_pdb
 
 

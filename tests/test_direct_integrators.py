@@ -1,15 +1,14 @@
 import warnings
 
+import cryojax.simulator as cxs
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from jaxtyping import Array
-
-import cryojax.simulator as cxs
 from cryojax.io import read_atoms_from_pdb
 from cryojax.ndimage import crop_to_shape, irfftn
+from jaxtyping import Array
 
 
 jax.config.update("jax_enable_x64", True)

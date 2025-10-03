@@ -1,8 +1,7 @@
+import cryojax.simulator as cxs
 import jax
 import numpy as np
 import pytest
-
-import cryojax.simulator as cxs
 from cryojax.io import read_array_from_mrc
 from cryojax.ndimage import crop_to_shape
 

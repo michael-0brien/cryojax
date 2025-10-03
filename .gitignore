@@ -2,7 +2,7 @@
 docs/examples/outputs/
 .coverage
 tests/outputs/
-
+.venv/
 .vscode/settings.json
 .DS_STORE
 *.swp

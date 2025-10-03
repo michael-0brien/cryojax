@@ -1,6 +1,5 @@
-import pytest
-
 import cryojax.simulator as cxs
+import pytest
 
 
 def test_deprecated():

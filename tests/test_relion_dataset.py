@@ -8,6 +8,7 @@ import shutil
 from functools import partial
 from typing import cast
 
+import cryojax.simulator as cxs
 import equinox as eqx
 import jax
 import jax.numpy as jnp
@@ -15,9 +16,6 @@ import jax.random as jr
 import numpy as np
 import pandas as pd
 import pytest
-from jaxtyping import TypeCheckError
-
-import cryojax.simulator as cxs
 from cryojax.dataset import (
     RelionParticleParameterFile,
     RelionParticleStackDataset,
@@ -29,6 +27,7 @@ from cryojax.dataset._particle_data.relion import (
 from cryojax.io import read_array_from_mrc
 from cryojax.ndimage import operators as op
 from cryojax.rotations import SO3
+from jaxtyping import TypeCheckError
 
 
 jax.config.update("jax_enable_x64", True)

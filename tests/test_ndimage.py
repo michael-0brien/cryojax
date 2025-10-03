@@ -1,10 +1,9 @@
+import cryojax.ndimage as cxi
 import jax
 import jax.numpy as jnp
 import jax.random as jr
 import numpy as np
 import pytest
-
-import cryojax.ndimage as cxi
 from cryojax.coordinates import make_frequency_grid, make_radial_frequency_grid
 
 

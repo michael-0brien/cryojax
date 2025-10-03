@@ -63,7 +63,7 @@ build-backend = "hatchling.build"
 source = "vcs"
 
 [tool.hatch.build.hooks.vcs]
-version-file = "src/cryojax/cryojax_version.py"
+version-file = "cryojax/cryojax_version.py"
 
 [tool.ruff]
 exclude = ["old", "dev"]
@@ -72,7 +72,7 @@ lint.fixable = ["I001", "F401"]
 line-length = 90
 lint.ignore = ["E402", "E721", "E731", "E741", "F722"]
 lint.select = ["E", "F", "I001"]
-src = ["src"]
+src = []
 
 [tool.ruff.lint.isort]
 combine-as-imports = true
