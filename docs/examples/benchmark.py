@@ -1,15 +1,14 @@
 from time import time
 
+import cryojax.simulator as cxs
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jaxtyping import PRNGKeyArray
-
-import cryojax.simulator as cxs
 from cryojax.dataset import RelionParticleParameterFile
 from cryojax.io import read_atoms_from_pdb
 from cryojax.ndimage import transforms as tf
 from cryojax.rotations import SO3
+from jaxtyping import PRNGKeyArray
 
 
 def setup(path_to_pdb, path_to_starfile):
