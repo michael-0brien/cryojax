@@ -77,7 +77,7 @@ def setup(path_to_pdb, path_to_starfile):
         pad_options=pad_options,
     )
     # ... RNG keys
-    number_of_images = 100
+    number_of_images = 10
     keys = jax.random.split(jax.random.key(0), number_of_images)
     # ... make parameters
     particle_parameters = make_particle_parameters(keys, config)
@@ -109,7 +109,7 @@ def setup(path_to_pdb, path_to_starfile):
         real_voxel_grid, pad_scale=2
     )
 
-    return parameter_file, volume_gmm, volume_fourier_grid
+    return particle_parameters, parameter_file, volume_gmm, volume_fourier_grid
 
 
 def compute_image(particle_parameters, volume, volume_integrator, rng_key):
@@ -148,8 +148,12 @@ def compute_image(particle_parameters, volume, volume_integrator, rng_key):
     return noise_model.sample(rng_key=simulator_rng_key)
 
 
-def benchmark(n_iterations, path_to_pdb, path_to_starfile):
-    parameter_file, volume_gmm, volume_fourier_grid = setup(path_to_pdb, path_to_starfile)
+def benchmark_projection_microscope_noise_no_vmap(
+    n_iterations, path_to_pdb, path_to_starfile
+):
+    _, parameter_file, volume_gmm, volume_fourier_grid = setup(
+        path_to_pdb, path_to_starfile
+    )
 
     time_list = []
     for _ in range(n_iterations + 1):
@@ -220,10 +224,105 @@ def benchmark(n_iterations, path_to_pdb, path_to_starfile):
     return gmm_avg_time, gmm_std_time, fs_avg_time, fs_std_time, gmm_image, fs_image
 
 
+@eqx.filter_vmap(in_axes=(eqx.if_array(0), eqx.if_array(0), eqx.if_array(0), None, None))
+def simulate_image(image_config, pose, transfer_theory, potential, volume_integrator):
+    image_model = cxs.make_image_model(
+        volume_parametrisation=potential,
+        image_config=image_config,
+        pose=pose,
+        transfer_theory=transfer_theory,
+        volume_integrator=volume_integrator,
+    )
+    return image_model.simulate()
+
+
+def benchmark_only_projection_no_vmap(n_iterations, path_to_pdb, path_to_starfile):
+    particle_parameters, _, volume_gmm, volume_fourier_grid = setup(
+        path_to_pdb, path_to_starfile
+    )
+    image_config, pose, transfer_theory = (
+        particle_parameters["image_config"],
+        particle_parameters["pose"],
+        particle_parameters["transfer_theory"],
+    )
+
+    time_list = []
+    for _ in range(n_iterations + 1):
+        start_time = time()
+        gmm_image = simulate_image(
+            image_config,
+            pose,
+            transfer_theory,
+            volume_gmm,
+            cxs.GaussianMixtureProjection(),
+        )
+        gmm_image.block_until_ready()
+        end_time = time()
+        time_list.append(end_time - start_time)
+    gmm_avg_time = jnp.mean(jnp.array(time_list[1:]))
+    gmm_std_time = jnp.std(jnp.array(time_list[1:]))
+    print(f"GMM: {n_iterations}: {gmm_avg_time:.4f} +/- {gmm_std_time:.4f} s")
+
+    time_list = []
+    for _ in range(n_iterations + 1):
+        start_time = time()
+        gmm_image = eqx.filter_jit(simulate_image)(
+            image_config,
+            pose,
+            transfer_theory,
+            volume_gmm,
+            cxs.GaussianMixtureProjection(),
+        )
+        gmm_image.block_until_ready()
+        end_time = time()
+        time_list.append(end_time - start_time)
+    jit_gmm_avg_time = jnp.mean(jnp.array(time_list[1:]))
+    jit_gmm_std_time = jnp.std(jnp.array(time_list[1:]))
+    print(
+        f"JIT, GMM: {n_iterations}: {jit_gmm_avg_time:.4f} +/- {jit_gmm_std_time:.4f} s"
+    )
+
+    time_list = []
+    for _ in range(n_iterations + 1):
+        start_time = time()
+        fs_image = simulate_image(
+            image_config,
+            pose,
+            transfer_theory,
+            volume_fourier_grid,
+            cxs.FourierSliceExtraction(),
+        )
+        fs_image.block_until_ready()
+        end_time = time()
+        time_list.append(end_time - start_time)
+    fs_avg_time = jnp.mean(jnp.array(time_list[1:]))
+    fs_std_time = jnp.std(jnp.array(time_list[1:]))
+    print(f"Fourier Slice: {n_iterations}: {fs_avg_time:.4f} +/- {fs_std_time:.4f} s")
+
+    time_list = []
+    for _ in range(n_iterations + 1):
+        start_time = time()
+        fs_image = eqx.filter_jit(simulate_image)(
+            image_config,
+            pose,
+            transfer_theory,
+            volume_fourier_grid,
+            cxs.FourierSliceExtraction(),
+        )
+        fs_image.block_until_ready()
+        end_time = time()
+        time_list.append(end_time - start_time)
+    fs_avg_time = jnp.mean(jnp.array(time_list[1:]))
+    fs_std_time = jnp.std(jnp.array(time_list[1:]))
+    print(f"Fourier Slice: {n_iterations}  it: {fs_avg_time:.4f} +/- {fs_std_time:.4f} s")
+
+    return gmm_avg_time, gmm_std_time, fs_avg_time, fs_std_time, gmm_image, fs_image
+
+
 if __name__ == "__main__":
     n_iterations = 30
     path_to_pdb = "data/thyroglobulin_initial.pdb"
     path_to_starfile = "outputs/particles.star"
-    gmm_avg_time, gmm_std_time, fs_avg_time, fs_std_time, gmm_image, fs_image = benchmark(
-        n_iterations, path_to_pdb, path_to_starfile
+    gmm_avg_time, gmm_std_time, fs_avg_time, fs_std_time, gmm_image, fs_image = (
+        benchmark_only_projection_no_vmap(n_iterations, path_to_pdb, path_to_starfile)
     )
