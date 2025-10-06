@@ -840,9 +840,9 @@ def test_write_particle_batched_particle_parameters():
 
     loaded_params = parameter_file[:]
     for key in particle_params:
-        assert compare_pytrees(
-            loaded_params[key], particle_params[key]
-        ), f"Mismatch for {key}"
+        assert compare_pytrees(loaded_params[key], particle_params[key]), (
+            f"Mismatch for {key}"
+        )
     # Clean up
     shutil.rmtree("tests/outputs/starfile_writing/")
 

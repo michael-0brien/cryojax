@@ -99,9 +99,9 @@ def read_array_from_mrc(
                 grid_spacing_per_dimension != np.zeros(grid_spacing_per_dimension.shape)
             ), "Mrcfile.voxel_size must be set if reading the grid spacing. Found that "
             "Mrcfile.voxel_size = (0.0, 0.0, 0.0)"
-            assert all(
-                grid_spacing_per_dimension == grid_spacing_per_dimension[0]
-            ), "Mrcfile.voxel_size must be same in all dimensions."
+            assert all(grid_spacing_per_dimension == grid_spacing_per_dimension[0]), (
+                "Mrcfile.voxel_size must be same in all dimensions."
+            )
             grid_spacing = grid_spacing_per_dimension[0]
 
             return cast(np.ndarray, array), float(grid_spacing)

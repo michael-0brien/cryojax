@@ -22,11 +22,11 @@ RealImageArray = Float[Array, "{self.config.y_dim} {self.config.x_dim}"]
 FourierImageArray = Complex[Array, "{self.config.y_dim} {self.config.x_dim//2+1}"]
 PaddedRealImageArray = Float[
     Array,
-    "{self.config.padded_y_dim} " "{self.config.padded_x_dim}",
+    "{self.config.padded_y_dim} {self.config.padded_x_dim}",
 ]
 PaddedFourierImageArray = Complex[
     Array,
-    "{self.config.padded_y_dim} " "{self.config.padded_x_dim//2+1}",
+    "{self.config.padded_y_dim} {self.config.padded_x_dim//2+1}",
 ]
 
 ImageArray = RealImageArray | FourierImageArray

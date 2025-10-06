@@ -201,7 +201,7 @@ class IndependentGaussianPixels(AbstractGaussianDistribution, strict=True):
         self,
         observed: Float[
             Array,
-            "{self.image_model.config.y_dim} " "{self.image_model.config.x_dim}",
+            "{self.image_model.config.y_dim} {self.image_model.config.x_dim}",
         ],
         *,
         mask: Optional[MaskLike] = None,
@@ -329,7 +329,7 @@ class IndependentGaussianFourierModes(AbstractGaussianDistribution, strict=True)
         self,
         observed: Complex[
             Array,
-            "{self.image_model.config.y_dim} " "{self.image_model.config.x_dim//2+1}",
+            "{self.image_model.config.y_dim} {self.image_model.config.x_dim//2+1}",
         ],
         *,
         mask: Optional[MaskLike] = None,

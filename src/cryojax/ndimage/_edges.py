@@ -166,8 +166,7 @@ def pad_to_shape(
         padding = (z_padding, y_padding, x_padding)
     else:
         raise ValueError(
-            "pad_to_shape can only pad images and volumes. Got desired shape of "
-            f"{shape}."
+            f"pad_to_shape can only pad images and volumes. Got desired shape of {shape}."
         )
     return jnp.pad(image_or_volume, padding, **kwargs)
 
