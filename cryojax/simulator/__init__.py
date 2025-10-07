@@ -101,4 +101,4 @@ def __getattr__(name: str):
             "https://michael-0brien.github.io/cryojax/examples/simulate-relion-dataset/.",
         )
 
-    raise ImportError(f"cannot import name '{name}' from 'cryojax.simulator'")
+    raise AttributeError(f"cannot import name '{name}' from 'cryojax.simulator'")
