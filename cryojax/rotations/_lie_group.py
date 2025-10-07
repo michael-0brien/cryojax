@@ -9,8 +9,10 @@ from typing_extensions import Self, override
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from equinox import AbstractClassVar, field
+from equinox import AbstractClassVar
 from jaxtyping import Array, Float, PRNGKeyArray
+
+from cryojax.jax_util._typing import NDArrayLike
 
 from ._rotation import AbstractRotation
 
@@ -81,7 +83,15 @@ class SO3(AbstractMatrixLieGroup, strict=True):
     tangent_dimension: ClassVar[int] = 3
     matrix_dimension: ClassVar[int] = 3
 
-    wxyz: Float[Array, "4"] = field(converter=jnp.asarray)
+    wxyz: Float[Array, "4"]
+
+    def __init__(self, wxyz: Float[NDArrayLike, "4"]):
+        """**Arguments:**
+
+        - `wxyz`:
+            A quaternion represented as $(q_w, q_x, q_y, q_z)$.
+        """
+        self.wxyz = jnp.asarray(wxyz, dtype=float)
 
     @override
     def apply(self, target: Float[Array, "3"]) -> Float[Array, "3"]:
@@ -329,14 +339,6 @@ class SO3(AbstractMatrixLieGroup, strict=True):
                 ]
             )
         )
-
-
-SO3.__init__.__doc__ = """**Arguments:**
-
-- `wxyz` - A quaternion represented as $(q_w, q_x, q_y, q_z)$.
-            This is the internal parameterization of the
-            rotation.
-"""
 
 
 class SE3(AbstractMatrixLieGroup, strict=True):

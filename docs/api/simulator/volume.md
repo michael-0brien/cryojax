@@ -45,6 +45,11 @@ There are many different volume representations of biological structures for cry
                 - atom_positions
                 - from_tabulated_parameters
 
+::: cryojax.simulator.PengScatteringFactorParameters
+    options:
+        members:
+            - __init__
+
 ::: cryojax.simulator.PengAtomicVolume
     options:
         members:

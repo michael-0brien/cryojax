@@ -15,7 +15,7 @@ repo_url: https://github.com/michael-0brien/cryojax
 repo_name: michael-0brien/cryojax
 edit_uri: ""
 
-strict: false
+strict: true
 
 extra_javascript:
   - javascripts/mathjax.js
@@ -36,26 +36,32 @@ markdown_extensions:
         toc_depth: 4
 
 plugins:
-    - autorefs  # Cross-links to headings
-    - mknotebooks
+    # - autorefs  # Cross-links to headings
+    - include_exclude_files:
+        exclude:
+            - "examples/.ipynb_checkpoints/"
+            - "examples/old"
+            - "examples/data"
+    - ipynb
+    - hippogriffe:
+        extra_public_objects:
+            - xarray.core.dataset.Dataset
     - mkdocstrings:
         handlers:
           python:
-            paths: [src]  # search packages in the src folder
             options:
-              annotations_path: full
-              group_by_category: false
-              inherited_members: true
-              show_root_heading: true
-              show_root_members_full_path: true
-              show_root_full_path: true
-              show_if_no_docstring: true
-              show_signature_annotations: true
-              signature_crossrefs: true
-              show_source: false
-              show_bases: false
-              members_order: source
-              heading_level: 4
+                force_inspection: true
+                heading_level: 4
+                inherited_members: true
+                members_order: source
+                show_bases: false
+                show_if_no_docstring: true
+                show_overloads: false
+                show_root_heading: true
+                show_signature_annotations: true
+                show_source: false
+                show_symbol_type_heading: true
+                show_symbol_type_toc: true
 
 nav:
     - 'index.md'

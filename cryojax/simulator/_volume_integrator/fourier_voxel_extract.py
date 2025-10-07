@@ -36,8 +36,8 @@ class FourierSliceExtraction(AbstractFourierSurfaceExtraction, strict=True):
     projection-slice theorem.
 
     This extracts slices using interpolation methods housed in
-    `cryojax.image.map_coordinates` and
-    `cryojax.image.map_coordinates_spline`.
+    `cryojax.ndimage.map_coordinates` and
+    `cryojax.ndimage.map_coordinates_spline`.
     """
 
     outputs_integral: bool
@@ -62,13 +62,13 @@ class FourierSliceExtraction(AbstractFourierSurfaceExtraction, strict=True):
             projection multiplied by the voxel size. This is necessary
             for simulating in physical units.
         - `correction_mask`:
-            A `cryojax.image.operators.SincCorrectionMask` for performing
+            A `cryojax.ndimage.transforms.InverseSincMask` for performing
             sinc-correction on the linear-interpolated projections. This
             should be computed on a coordinate grid with shape matching
             the `FourierVoxelGridVolume.shape`.
         - `out_of_bounds_mode`:
             Specify how to handle out of bounds indexing. See
-            `cryojax.image.map_coordinates` for documentation.
+            `cryojax.ndimage.map_coordinates` for documentation.
         - `fill_value`:
             Value for filling out-of-bounds indices. Used only when
             `out_of_bounds_mode = "fill"`.

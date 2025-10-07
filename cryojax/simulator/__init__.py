@@ -75,6 +75,7 @@ from ._volume_integrator import (
 
 
 def __getattr__(name: str):
+    # Future deprecations
     if name == "AberratedAstigmaticCTF":
         _warnings.warn(
             "'AberratedAstigmaticCTF' is deprecated and will be removed in "
@@ -91,5 +92,13 @@ def __getattr__(name: str):
             stacklevel=2,
         )
         return AstigmaticCTF
+    # Deprecated in previous versions
+    if name == "DiscreteStructuralEnsemble":
+        raise ValueError(
+            "'DiscreteStructuralEnsemble' was deprecated in cryoJAX 0.5.0. "
+            "To achieve similar functionality, see the examples section "
+            "of the documentation: "
+            "https://michael-0brien.github.io/cryojax/examples/simulate-relion-dataset/.",
+        )
 
     raise ImportError(f"cannot import name '{name}' from 'cryojax.simulator'")

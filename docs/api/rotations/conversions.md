@@ -1,1 +1,1 @@
-# Helpers for converting angular parameterizations
+# Utilities for converting between angular parametrizations
