@@ -8,6 +8,7 @@ import shutil
 from functools import partial
 from typing import cast
 
+import cryojax.simulator as cxs
 import equinox as eqx
 import jax
 import jax.numpy as jnp
@@ -15,9 +16,6 @@ import jax.random as jr
 import numpy as np
 import pandas as pd
 import pytest
-from jaxtyping import TypeCheckError
-
-import cryojax.simulator as cxs
 from cryojax.dataset import (
     RelionParticleParameterFile,
     RelionParticleStackDataset,
@@ -29,6 +27,7 @@ from cryojax.dataset._particle_data.relion import (
 from cryojax.io import read_array_from_mrc
 from cryojax.ndimage import operators as op
 from cryojax.rotations import SO3
+from jaxtyping import TypeCheckError
 
 
 jax.config.update("jax_enable_x64", True)
@@ -78,7 +77,7 @@ def parameter_file(sample_starfile_path):
 
 @pytest.fixture
 def relion_parameters():
-    config = cxs.BasicConfig(
+    image_config = cxs.BasicImageConfig(
         shape=(4, 4),
         pixel_size=1.5,
         voltage_in_kilovolts=300.0,
@@ -87,9 +86,9 @@ def relion_parameters():
 
     pose = cxs.EulerAnglePose()
     transfer_theory = cxs.ContrastTransferTheory(
-        ctf=cxs.CTF(),
+        ctf=cxs.AstigmaticCTF(),
     )
-    return dict(config=config, pose=pose, transfer_theory=transfer_theory)
+    return dict(image_config=image_config, pose=pose, transfer_theory=transfer_theory)
 
 
 #
@@ -179,30 +178,33 @@ class TestErrorRaisingForLoading:
             )
 
 
-def test_default_make_config_fn(sample_starfile_path):
-    """Test the default make_config_fn function."""
+def test_pad_options(sample_starfile_path):
+    """Test the pad_options argument to the parameter file."""
     # Test with a valid input
 
+    pad_options = dict(mode="constant", shape=(22, 22))
     parameter_file = RelionParticleParameterFile(
         path_to_starfile=sample_starfile_path,
         loads_envelope=True,
         loads_metadata=True,
+        pad_options=pad_options,
     )
-    config = parameter_file[0]["config"]
+    image_config = parameter_file[0]["image_config"]
 
-    ref_config = cxs.BasicConfig(
+    ref_config = cxs.BasicImageConfig(
         shape=(16, 16),
         pixel_size=12.0,
         voltage_in_kilovolts=300.0,
-        pad_options=dict(mode="constant", shape=(16, 16)),
+        pad_options=pad_options,
+    )
+    assert image_config.shape == ref_config.shape
+    assert image_config.pixel_size == np.asarray(ref_config.pixel_size)
+    assert image_config.voltage_in_kilovolts == np.asarray(
+        ref_config.voltage_in_kilovolts
     )
 
-    assert config.shape == ref_config.shape
-    assert config.pixel_size == ref_config.pixel_size
-    assert config.voltage_in_kilovolts == ref_config.voltage_in_kilovolts
-
-    assert config.padded_shape == ref_config.padded_shape
-    assert config.pad_mode == ref_config.pad_mode
+    assert image_config.padded_shape == ref_config.padded_shape
+    assert image_config.pad_mode == ref_config.pad_mode
 
 
 def test_load_starfile_envelope_params(sample_starfile_path):
@@ -239,6 +241,11 @@ def test_load_starfile_envelope_params(sample_starfile_path):
 
 
 def test_load_starfile_ctf_params(sample_starfile_path):
+    is_shape = lambda shape, pytree: jax.tree.reduce(
+        lambda x, y: x and y,
+        jax.tree.map(lambda x: x.shape == shape, pytree),
+    )
+
     def compute_defocus(defU, defV):
         return 0.5 * (defU + defV)
 
@@ -253,14 +260,21 @@ def test_load_starfile_ctf_params(sample_starfile_path):
 
     assert parameter_file.loads_envelope is False
 
+    # Check loading 1 particle
     parameters = parameter_file[0]
     assert parameters["transfer_theory"].envelope is None
+    assert is_shape((), eqx.filter(parameters["transfer_theory"].ctf, eqx.is_array))
 
+    # Check loading >1 particles
     parameters = parameter_file[:]
     assert parameters["transfer_theory"].envelope is None
+    assert is_shape(
+        (len(parameter_file),),
+        eqx.filter(parameters["transfer_theory"].ctf, eqx.is_array),
+    )
 
     transfer_theory = parameters["transfer_theory"]
-    ctf = cast(cxs.AberratedAstigmaticCTF, transfer_theory.ctf)
+    ctf = cast(cxs.AstigmaticCTF, transfer_theory.ctf)
 
     particle_data = parameter_file.starfile_data["particles"]
     # check CTF parameters
@@ -307,13 +321,14 @@ def test_load_starfile_pose_params(sample_starfile_path):
         path_to_starfile=sample_starfile_path,
         loads_envelope=False,
         loads_metadata=True,
+        inverts_rotation=False,
     )
 
     parameters = parameter_file[:]
     pose = parameters["pose"]
 
     particle_data = parameter_file.starfile_data["particles"]
-    # check pose parameters
+    # Check pose parameters
     for i in range(len(parameter_file)):
         # offset x
         np.testing.assert_allclose(
@@ -351,6 +366,45 @@ def test_load_starfile_pose_params(sample_starfile_path):
         )
 
 
+def test_load_starfile_pose_inverse(sample_starfile_path):
+    parameter_file = RelionParticleParameterFile(
+        path_to_starfile=sample_starfile_path,
+        loads_envelope=False,
+        loads_metadata=True,
+        inverts_rotation=False,
+    )
+    parameter_file_inverse = RelionParticleParameterFile(
+        path_to_starfile=sample_starfile_path,
+        loads_envelope=False,
+        loads_metadata=True,
+        inverts_rotation=True,
+    )
+
+    # Without batch dim
+    parameters = parameter_file[0]
+    pose = parameters["pose"]
+    parameters_inverse = parameter_file_inverse[0]
+    pose_inverse = parameters_inverse["pose"]
+
+    get_rotation = lambda p: p.rotation
+    rotation = get_rotation(pose)
+    rotation_inverse = get_rotation(pose_inverse)
+
+    np.testing.assert_allclose(rotation.wxyz, rotation_inverse.wxyz.at[1:].mul(-1))
+
+    # With batch dim
+    parameters = parameter_file[:]
+    pose = parameters["pose"]
+    parameters_inverse = parameter_file_inverse[:]
+    pose_inverse = parameters_inverse["pose"]
+
+    get_rotation = eqx.filter_vmap(lambda p: p.rotation)
+    rotation = get_rotation(pose)
+    rotation_inverse = get_rotation(pose_inverse)
+
+    np.testing.assert_allclose(rotation.wxyz, rotation_inverse.wxyz.at[:, 1:].mul(-1))
+
+
 def test_load_starfile_wo_metadata(sample_starfile_path):
     """Test loading a starfile without metadata."""
     parameter_file = RelionParticleParameterFile(
@@ -371,26 +425,26 @@ def test_load_optics_group_broadcasting(sample_starfile_path):
         path_to_starfile=sample_starfile_path,
         loads_envelope=False,
         loads_metadata=True,
-        broadcasts_optics_group=True,
+        broadcasts_image_config=True,
     )
 
     parameters = parameter_file[:]
-    config = parameters["config"]
-    assert config.voltage_in_kilovolts.ndim > 0
-    assert config.pixel_size.ndim > 0
-    assert parameter_file.broadcasts_optics_group is True
+    image_config = parameters["image_config"]
+    assert image_config.voltage_in_kilovolts.ndim > 0
+    assert image_config.pixel_size.ndim > 0
+    assert parameter_file.broadcasts_image_config is True
 
     parameter_file = RelionParticleParameterFile(
         path_to_starfile=sample_starfile_path,
         loads_envelope=False,
         loads_metadata=True,
-        broadcasts_optics_group=False,
+        broadcasts_image_config=False,
     )
     parameters = parameter_file[:]
-    config = parameters["config"]
-    assert config.voltage_in_kilovolts.ndim == 0
-    assert config.pixel_size.ndim == 0
-    assert parameter_file.broadcasts_optics_group is False
+    image_config = parameters["image_config"]
+    assert image_config.voltage_in_kilovolts.ndim == 0
+    assert image_config.pixel_size.ndim == 0
+    assert parameter_file.broadcasts_image_config is False
 
     return
 
@@ -400,7 +454,7 @@ def test_parameter_file_setters(sample_starfile_path):
         path_to_starfile=sample_starfile_path,
         loads_envelope=False,
         loads_metadata=False,
-        broadcasts_optics_group=False,
+        broadcasts_image_config=False,
         updates_optics_group=False,
     )
 
@@ -410,8 +464,8 @@ def test_parameter_file_setters(sample_starfile_path):
     parameter_file.loads_envelope = True
     assert parameter_file.loads_envelope
 
-    parameter_file.broadcasts_optics_group = True
-    assert parameter_file.broadcasts_optics_group
+    parameter_file.broadcasts_image_config = True
+    assert parameter_file.broadcasts_image_config
 
     parameter_file.updates_optics_group = True
     assert parameter_file.updates_optics_group
@@ -423,26 +477,62 @@ def test_load_starfile_vs_mrcs_shape(sample_starfile_path, sample_relion_project
         path_to_starfile=sample_starfile_path,
         loads_envelope=False,
         loads_metadata=False,
-        broadcasts_optics_group=False,
+        broadcasts_image_config=False,
     )
-    dataset = RelionParticleStackDataset(parameter_file, sample_relion_project_path)
+    dataset = RelionParticleStackDataset(
+        parameter_file, sample_relion_project_path, loads_parameters=True
+    )
 
     particle_stack = dataset[:]
-    config = particle_stack["parameters"]["config"]
+    parameters = particle_stack["parameters"]
+    assert parameters is not None
+    image_config = parameters["image_config"]
     assert particle_stack["images"].shape == (
         len(parameter_file),
-        *config.shape,
+        *image_config.shape,
     )
 
     particle_stack = dataset[0]
-    config = particle_stack["parameters"]["config"]
-    assert particle_stack["images"].shape == config.shape
+    image_config = parameters["image_config"]
+    assert particle_stack["images"].shape == image_config.shape
 
     particle_stack = dataset[0:2]
-    config = particle_stack["parameters"]["config"]
-    assert particle_stack["images"].shape == (2, *config.shape)
+    image_config = parameters["image_config"]
+    assert particle_stack["images"].shape == (2, *image_config.shape)
 
     assert len(dataset) == len(parameter_file)
+
+    return
+
+
+def test_no_load_parameters(sample_starfile_path, sample_relion_project_path):
+    """Test loading a starfile with mrcs."""
+    parameter_file = RelionParticleParameterFile(path_to_starfile=sample_starfile_path)
+    dataset = RelionParticleStackDataset(
+        parameter_file, sample_relion_project_path, loads_parameters=True
+    )
+
+    # For particle stack with leading dim
+    dataset.loads_parameters = True
+    particle_stack_params = dataset[:]
+    dataset.loads_parameters = False
+    particle_stack_noparams = dataset[:]
+
+    assert particle_stack_noparams["parameters"] is None
+    assert (
+        particle_stack_params["images"].shape == particle_stack_noparams["images"].shape
+    )
+    assert isinstance(particle_stack_params["images"], np.ndarray)
+
+    # For particle stack with no leading dim
+    dataset.loads_parameters = True
+    particle_stack_params = dataset[0]
+    dataset.loads_parameters = False
+    particle_stack_noparams = dataset[0]
+    assert (
+        particle_stack_params["images"].shape == particle_stack_noparams["images"].shape
+    )
+    assert isinstance(particle_stack_noparams["images"], np.ndarray)
 
     return
 
@@ -466,7 +556,7 @@ def test_append_particle_parameters(index, loads_envelope):
 
     @eqx.filter_vmap
     def make_particle_params(dummy_idx):
-        config = cxs.BasicConfig(
+        image_config = cxs.BasicImageConfig(
             shape=(4, 4),
             pixel_size=1.5,
             voltage_in_kilovolts=300.0,
@@ -474,11 +564,11 @@ def test_append_particle_parameters(index, loads_envelope):
 
         pose = cxs.EulerAnglePose()
         transfer_theory = cxs.ContrastTransferTheory(
-            ctf=cxs.CTF(),
+            ctf=cxs.AstigmaticCTF(),
             envelope=op.FourierGaussian() if loads_envelope else None,
         )
         return dict(
-            config=config,
+            image_config=image_config,
             pose=pose,
             transfer_theory=transfer_theory,
         )
@@ -548,12 +638,12 @@ def test_set_particle_parameters(
         )
         pose = make_pose(rng_keys)
         return dict(
-            config=cxs.BasicConfig(
+            image_config=cxs.BasicImageConfig(
                 shape=(4, 4), pixel_size=3.324, voltage_in_kilovolts=121.3
             ),
             pose=pose,
             transfer_theory=cxs.ContrastTransferTheory(
-                cxs.CTF(defocus_in_angstroms=1234.0),
+                cxs.AstigmaticCTF(defocus_in_angstroms=1234.0),
                 amplitude_contrast_ratio=0.1234,
                 envelope=op.FourierGaussian(b_factor=12.34) if sets_envelope else None,
             ),
@@ -613,9 +703,11 @@ def test_set_particle_parameters(
 def test_file_exists_error():
     # Create pytrees
     parameters = dict(
-        config=cxs.BasicConfig(shape=(4, 4), pixel_size=1.1, voltage_in_kilovolts=300.0),
+        image_config=cxs.BasicImageConfig(
+            shape=(4, 4), pixel_size=1.1, voltage_in_kilovolts=300.0
+        ),
         pose=cxs.EulerAnglePose(),
-        transfer_theory=cxs.ContrastTransferTheory(ctf=cxs.CTF()),
+        transfer_theory=cxs.ContrastTransferTheory(ctf=cxs.AstigmaticCTF()),
     )
     # Add to dataset
     path_to_starfile = "tests/outputs/starfile_writing/test_particle_parameters.star"
@@ -654,31 +746,27 @@ def test_file_not_found_error():
 def test_set_wrong_parameters_error():
     # Wrong parameters
     wrong_pose = cxs.QuaternionPose()
-    wrong_transfer_theory_1 = cxs.ContrastTransferTheory(ctf=cxs.NullCTF())
-    wrong_transfer_theory_2 = cxs.ContrastTransferTheory(
-        ctf=cxs.CTF(), envelope=op.ZeroMode()
+    wrong_transfer_theory = cxs.ContrastTransferTheory(
+        ctf=cxs.AstigmaticCTF(), envelope=op.ZeroMode()
     )
     # Right parameters
     right_pose = cxs.EulerAnglePose()
-    right_transfer_theory = cxs.ContrastTransferTheory(ctf=cxs.CTF())
-    config = cxs.BasicConfig(shape=(4, 4), pixel_size=1.1, voltage_in_kilovolts=300.0)
+    right_transfer_theory = cxs.ContrastTransferTheory(ctf=cxs.AstigmaticCTF())
+    image_config = cxs.BasicImageConfig(
+        shape=(4, 4), pixel_size=1.1, voltage_in_kilovolts=300.0
+    )
     # Create pytrees
     wrong_parameters_1 = dict(
-        config=config,
+        image_config=image_config,
         pose=right_pose,
-        transfer_theory=wrong_transfer_theory_1,
-    )
-    wrong_parameters_2 = dict(
-        config=config,
-        pose=right_pose,
-        transfer_theory=wrong_transfer_theory_2,
+        transfer_theory=wrong_transfer_theory,
     )
     temp = dict(
-        config=config,
+        image_config=image_config,
         pose=right_pose,
         transfer_theory=right_transfer_theory,
     )
-    wrong_parameters_3 = eqx.tree_at(lambda x: x["pose"], temp, wrong_pose)
+    wrong_parameters_2 = eqx.tree_at(lambda x: x["pose"], temp, wrong_pose)
     # Now the parameter dataset
     # Add to dataset
     path_to_starfile = "path/to/dummy/project/and/starfile.star"
@@ -691,11 +779,8 @@ def test_set_wrong_parameters_error():
     with pytest.raises(ValueError):
         parameter_file.append(wrong_parameters_1)
 
-    with pytest.raises(ValueError):
-        parameter_file.append(wrong_parameters_2)
-
     with pytest.raises(TypeError):
-        parameter_file.append(wrong_parameters_3)
+        parameter_file.append(wrong_parameters_2)
 
 
 def test_bad_pytree_error():
@@ -711,11 +796,13 @@ def test_bad_pytree_error():
         jnp.atleast_1d(3.0),
     )
     pose = eqx.tree_at(lambda x: x.offset_x_in_angstroms, pose, jnp.asarray((1.0, 2.0)))
-    transfer_theory = cxs.ContrastTransferTheory(ctf=cxs.CTF())
-    config = cxs.BasicConfig(shape=(4, 4), pixel_size=1.1, voltage_in_kilovolts=300.0)
+    transfer_theory = cxs.ContrastTransferTheory(ctf=cxs.AstigmaticCTF())
+    image_config = cxs.BasicImageConfig(
+        shape=(4, 4), pixel_size=1.1, voltage_in_kilovolts=300.0
+    )
     # Create pytrees
     parameters = dict(
-        config=config,
+        image_config=image_config,
         pose=pose,
         transfer_theory=transfer_theory,
     )
@@ -754,7 +841,7 @@ def test_write_image(
     starfile_data = dataset.parameter_file.starfile_data
     assert starfile_data["particles"]["rlnImageName"].isna().all()
 
-    shape = relion_parameters["config"].shape
+    shape = relion_parameters["image_config"].shape
     particle = dict(
         parameters=relion_parameters,
         images=jnp.zeros(shape, dtype=np.float32),
@@ -795,7 +882,7 @@ def test_write_image(
 def test_write_particle_batched_particle_parameters():
     @partial(eqx.filter_vmap, in_axes=(0), out_axes=eqx.if_array(0))
     def _make_particle_params(dummy_idx):
-        config = cxs.BasicConfig(
+        image_config = cxs.BasicImageConfig(
             shape=(4, 4),
             pixel_size=1.5,
             voltage_in_kilovolts=300.0,
@@ -803,10 +890,10 @@ def test_write_particle_batched_particle_parameters():
 
         pose = cxs.EulerAnglePose()
         transfer_theory = cxs.ContrastTransferTheory(
-            ctf=cxs.CTF(), envelope=op.FourierGaussian()
+            ctf=cxs.AstigmaticCTF(), envelope=op.FourierGaussian()
         )
         return {
-            "config": config,
+            "image_config": image_config,
             "pose": pose,
             "transfer_theory": transfer_theory,
             "metadata": None,
@@ -840,9 +927,9 @@ def test_write_particle_batched_particle_parameters():
 
     loaded_params = parameter_file[:]
     for key in particle_params:
-        assert compare_pytrees(
-            loaded_params[key], particle_params[key]
-        ), f"Mismatch for {key}"
+        assert compare_pytrees(loaded_params[key], particle_params[key]), (
+            f"Mismatch for {key}"
+        )
     # Clean up
     shutil.rmtree("tests/outputs/starfile_writing/")
 
@@ -851,7 +938,7 @@ def test_write_particle_batched_particle_parameters():
 
 def test_write_starfile_different_envs():
     def _make_particle_params(envelope):
-        config = cxs.BasicConfig(
+        image_config = cxs.BasicImageConfig(
             shape=(4, 4),
             pixel_size=1.5,
             voltage_in_kilovolts=300.0,
@@ -859,11 +946,11 @@ def test_write_starfile_different_envs():
 
         pose = cxs.EulerAnglePose()
         transfer_theory = cxs.ContrastTransferTheory(
-            ctf=cxs.CTF(),
+            ctf=cxs.AstigmaticCTF(),
             envelope=envelope,
         )
         return {
-            "config": config,
+            "image_config": image_config,
             "pose": pose,
             "transfer_theory": transfer_theory,
             "metadata": None,
@@ -935,7 +1022,7 @@ def test_write_simulated_image_stack_from_starfile_jit(sample_starfile_path):
     )
 
     n_images = len(parameter_file)
-    shape = parameter_file[0]["config"].shape
+    shape = parameter_file[0]["image_config"].shape
     true_images = jax.random.normal(
         jax.random.key(0), shape=(n_images, *shape), dtype=jnp.float32
     )
@@ -1016,7 +1103,7 @@ def test_write_simulated_image_stack_from_starfile_nojit(sample_starfile_path):
     )
 
     n_images = len(parameter_file)
-    shape = parameter_file[0]["config"].shape
+    shape = parameter_file[0]["image_config"].shape
     true_images = jax.random.normal(
         jax.random.key(0), shape=(n_images, *shape), dtype=jnp.float32
     )
@@ -1059,7 +1146,7 @@ def test_write_single_image(sample_starfile_path):
         # Mock the image computation
         c1, c2 = constant_args
         p1, p2 = per_particle_args
-        image = jnp.ones(particle_parameters["config"].shape, dtype=jnp.float32)
+        image = jnp.ones(particle_parameters["image_config"].shape, dtype=jnp.float32)
         return image / np.linalg.norm(image)
 
     selection_filter = {
@@ -1115,7 +1202,7 @@ def test_write_single_image(sample_starfile_path):
 def test_load_multiple_mrcs():
     @partial(eqx.filter_vmap, in_axes=(0), out_axes=eqx.if_array(0))
     def _make_particle_params(dummy_idx):
-        config = cxs.BasicConfig(
+        image_config = cxs.BasicImageConfig(
             shape=(4, 4),
             pixel_size=1.5,
             voltage_in_kilovolts=300.0,
@@ -1123,10 +1210,10 @@ def test_load_multiple_mrcs():
 
         pose = cxs.EulerAnglePose()
         transfer_theory = cxs.ContrastTransferTheory(
-            ctf=cxs.CTF(), envelope=op.FourierGaussian()
+            ctf=cxs.AstigmaticCTF(), envelope=op.FourierGaussian()
         )
         return {
-            "config": config,
+            "image_config": image_config,
             "pose": pose,
             "transfer_theory": transfer_theory,
         }
@@ -1146,8 +1233,8 @@ def test_load_multiple_mrcs():
     parameters_file.append(particle_params)
 
     n_images = len(parameters_file)
-    print(f"Number of images: {n_images}")
-    shape = parameters_file[0]["config"].shape
+    # print(f"Number of images: {n_images}")
+    shape = parameters_file[0]["image_config"].shape
     true_images = jax.random.normal(
         jax.random.key(0), shape=(n_images, *shape), dtype=jnp.float32
     )
@@ -1266,7 +1353,7 @@ def test_raise_errors_stack_dataset(sample_starfile_path, sample_relion_project_
     )
 
     parameters = parameter_file[0]
-    image_shape = parameters["config"].shape
+    image_shape = parameters["image_config"].shape
 
     particle_stack = {
         "parameters": parameters,
@@ -1302,7 +1389,7 @@ def test_raise_errors_stack_dataset(sample_starfile_path, sample_relion_project_
 def test_append_relion_stack_dataset():
     @partial(eqx.filter_vmap, in_axes=(0), out_axes=eqx.if_array(0))
     def _make_particle_params(dummy_idx):
-        config = cxs.BasicConfig(
+        image_config = cxs.BasicImageConfig(
             shape=(4, 4),
             pixel_size=1.5,
             voltage_in_kilovolts=300.0,
@@ -1310,10 +1397,10 @@ def test_append_relion_stack_dataset():
 
         pose = cxs.EulerAnglePose()
         transfer_theory = cxs.ContrastTransferTheory(
-            ctf=cxs.CTF(), envelope=op.FourierGaussian()
+            ctf=cxs.AstigmaticCTF(), envelope=op.FourierGaussian()
         )
         return {
-            "config": config,
+            "image_config": image_config,
             "pose": pose,
             "transfer_theory": transfer_theory,
             "metadata": None,
@@ -1340,7 +1427,7 @@ def test_append_relion_stack_dataset():
 
     n_images = 10
     particle_params = _make_particle_params(jnp.ones(n_images))
-    shape = particle_params["config"].shape
+    shape = particle_params["image_config"].shape
     images = jax.random.normal(
         jax.random.key(0), shape=(n_images, *shape), dtype=jnp.float32
     )

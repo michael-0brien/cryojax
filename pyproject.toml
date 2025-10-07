@@ -15,7 +15,7 @@ classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
 ]
-urls = {repository = "https://github.com/mjo22/cryojax" }
+urls = {repository = "https://github.com/michael-0brien/cryojax" }
 dynamic = ["version"]
 dependencies = [
     "jax",
@@ -32,6 +32,28 @@ dependencies = [
     "mdtraj",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pre-commit"
+]
+docs = [
+    "hippogriffe==0.2.2", # following Equinox documentation
+    "griffe==1.7.3",
+    "mkdocs==1.6.1",
+    "mkdocs-include-exclude-files==0.1.0",
+    "mkdocs-ipynb==0.1.1",
+    "mkdocs-material==9.6.7",
+    "mkdocstrings==0.28.3",
+    "mkdocstrings-python==1.16.8",
+    "pymdown-extensions==10.14.3"
+]
+tests = [
+    "pytest",
+    "pytest-cov",
+    "pycistem; sys_platform == 'linux' and python_version < '3.12'",
+    "typeguard==2.13.3"
+]
+
 [build-system]
 requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
@@ -40,15 +62,18 @@ build-backend = "hatchling.build"
 source = "vcs"
 
 [tool.hatch.build.hooks.vcs]
-version-file = "src/cryojax/cryojax_version.py"
+version-file = "cryojax/cryojax_version.py"
 
 [tool.ruff]
+exclude = ["old"]
 extend-include = ["*.ipynb"]
-lint.fixable = ["I001", "F401"]
 line-length = 90
-lint.ignore = ["E402", "E721", "E731", "E741", "F722"]
-lint.select = ["E", "F", "I001"]
-src = ["src"]
+src = []
+
+[tool.ruff.lint]
+fixable = ["I001", "F401", "UP"]
+ignore = ["E402", "E721", "E731", "E741", "F722"]
+select = ["E", "F", "I001", "UP"]
 
 [tool.ruff.lint.isort]
 combine-as-imports = true

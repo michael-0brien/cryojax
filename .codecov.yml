@@ -1,0 +1,10 @@
+# Target dev branch
+codecov:
+  branch: dev
+
+# Disable PR comments
+comment: false
+
+# Ignore patterns
+ignore:
+  - "docs"

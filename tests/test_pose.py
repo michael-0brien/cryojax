@@ -1,10 +1,9 @@
+import cryojax.simulator as cs
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from jax import config
-
-import cryojax.simulator as cs
 from cryojax.rotations import SO3
+from jax import config
 
 
 config.update("jax_enable_x64", True)
@@ -37,6 +36,16 @@ def test_pose_conversion():
     axis_angle = cs.AxisAnglePose.from_rotation(rotation)
     np.testing.assert_allclose(quat.rotation.as_matrix(), euler.rotation.as_matrix())
     np.testing.assert_allclose(quat.rotation.as_matrix(), axis_angle.rotation.as_matrix())
+
+
+def test_invert_pose():
+    wxyz = jnp.asarray((1.0, 2.0, 3.0, 0.5))
+    offset = jnp.asarray((-1.0, 1.0))
+    rotation = SO3(wxyz).normalize()
+    quat = cs.QuaternionPose.from_rotation_and_translation(rotation, offset)
+    quat_inverse = quat.to_inverse_rotation()
+    np.testing.assert_allclose(quat.wxyz, quat_inverse.wxyz.at[1:].mul(-1))
+    np.testing.assert_allclose(quat.offset_in_angstroms, quat_inverse.offset_in_angstroms)
 
 
 def test_axis_angle_euler_agreement():
