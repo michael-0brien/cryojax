@@ -7,20 +7,23 @@ from .._image_config import AbstractImageConfig
 from .._solvent_2d import AbstractRandomSolvent2D
 from .._transfer_theory import ContrastTransferTheory
 from .._volume import AbstractVolumeRepresentation
-from .._volume_integrator import AbstractDirectIntegrator, AbstractDirectVoxelIntegrator
+from .._volume_integrator import (
+    AbstractVolumeIntegrator,
+    AbstractVoxelVolumeIntegrator,
+)
 from .base_scattering_theory import AbstractWeakPhaseScatteringTheory
 
 
 class WeakPhaseScatteringTheory(AbstractWeakPhaseScatteringTheory, strict=True):
     """Base linear image formation theory."""
 
-    volume_integrator: AbstractDirectIntegrator
+    volume_integrator: AbstractVolumeIntegrator
     transfer_theory: ContrastTransferTheory
     solvent: Optional[AbstractRandomSolvent2D] = None
 
     def __init__(
         self,
-        volume_integrator: AbstractDirectIntegrator,
+        volume_integrator: AbstractVolumeIntegrator,
         transfer_theory: ContrastTransferTheory,
         solvent: Optional[AbstractRandomSolvent2D] = None,
     ):
@@ -35,7 +38,7 @@ class WeakPhaseScatteringTheory(AbstractWeakPhaseScatteringTheory, strict=True):
         self.solvent = solvent
 
     def __check_init__(self):
-        if isinstance(self.volume_integrator, AbstractDirectVoxelIntegrator):
+        if isinstance(self.volume_integrator, AbstractVoxelVolumeIntegrator):
             if not self.volume_integrator.outputs_integral:
                 raise AttributeError(
                     "If the `volume_integrator` is voxel-based, "

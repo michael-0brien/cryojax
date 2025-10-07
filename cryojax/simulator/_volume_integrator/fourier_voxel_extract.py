@@ -9,7 +9,7 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
-from ....ndimage import (
+from ...ndimage import (
     convert_fftn_to_rfftn,
     fftn,
     ifftn,
@@ -18,14 +18,14 @@ from ....ndimage import (
     map_coordinates_spline,
     rfftn,
 )
-from ....ndimage.transforms import InverseSincMask
-from ..._image_config import AbstractImageConfig
-from ..._volume import FourierVoxelGridVolume, FourierVoxelSplineVolume
-from .base_direct_integrator import AbstractDirectVoxelIntegrator
+from ...ndimage.transforms import InverseSincMask
+from .._image_config import AbstractImageConfig
+from .._volume import FourierVoxelGridVolume, FourierVoxelSplineVolume
+from .base_integrator import AbstractVoxelVolumeIntegrator
 
 
 class AbstractFourierSurfaceExtraction(
-    AbstractDirectVoxelIntegrator[FourierVoxelGridVolume | FourierVoxelSplineVolume],
+    AbstractVoxelVolumeIntegrator[FourierVoxelGridVolume | FourierVoxelSplineVolume],
     strict=True,
 ):
     correction_mask: eqx.AbstractVar[Optional[InverseSincMask]]

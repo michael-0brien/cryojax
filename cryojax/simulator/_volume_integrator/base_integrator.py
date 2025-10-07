@@ -1,25 +1,47 @@
-import abc
-from typing import Any, Generic, TypeVar
+"""
+Methods for integrating the volume directly onto the exit plane.
+"""
+
+from abc import abstractmethod
+from typing import Generic, TypeVar
 
 import equinox as eqx
-from jaxtyping import Array
+from equinox import AbstractClassVar
+from jaxtyping import Array, Complex, Float
 
 from .._image_config import AbstractImageConfig
-from .._volume import AbstractVolumeRepresentation
+from .._volume import AbstractVolumeRepresentation, AbstractVoxelVolume
 
 
 VolRepT = TypeVar("VolRepT", bound="AbstractVolumeRepresentation")
+VoxelVolT = TypeVar("VoxelVolT", bound="AbstractVoxelVolume")
 
 
 class AbstractVolumeIntegrator(eqx.Module, Generic[VolRepT], strict=True):
-    """Base class for a method of integrating a volume into an image."""
+    """Base class for a method of integrating a volume onto
+    the exit plane.
+    """
 
-    @abc.abstractmethod
+    is_projection_approximation: AbstractClassVar[bool]
+
+    @abstractmethod
     def integrate(
         self,
         volume_representation: VolRepT,
         image_config: AbstractImageConfig,
-        *args: Any,
-        **kwargs: Any,
-    ) -> Array:
+        outputs_real_space: bool = False,
+    ) -> (
+        Complex[
+            Array,
+            "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}",
+        ]
+        | Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
+        | Float[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
+    ):
         raise NotImplementedError
+
+
+class AbstractVoxelVolumeIntegrator(
+    AbstractVolumeIntegrator[VoxelVolT], Generic[VoxelVolT], strict=True
+):
+    outputs_integral: eqx.AbstractVar[bool]

@@ -4,8 +4,8 @@ There are many different volume representations of biological structures for cry
 
 ## Core base classes
 
-???+ abstract "`cryojax.simulator.AbstractVolumeParametrisation`"
-    ::: cryojax.simulator.AbstractVolumeParametrisation
+???+ abstract "`cryojax.simulator.AbstractVolumeParametrization`"
+    ::: cryojax.simulator.AbstractVolumeParametrization
         options:
             members:
                 - compute_representation

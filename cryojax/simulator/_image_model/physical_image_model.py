@@ -15,7 +15,7 @@ from .._detector import AbstractDetector
 from .._image_config import AbstractImageConfig, DoseImageConfig
 from .._pose import AbstractPose
 from .._scattering_theory import AbstractScatteringTheory
-from .._volume import AbstractVolumeParametrisation
+from .._volume import AbstractVolumeParametrization
 from .base_image_model import AbstractImageModel, PaddedFourierImageArray
 
 
@@ -32,7 +32,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
     scattering theory.
     """
 
-    volume_parametrisation: AbstractVolumeParametrisation
+    volume_parametrisation: AbstractVolumeParametrization
     pose: AbstractPose
     image_config: AbstractImageConfig
     scattering_theory: AbstractScatteringTheory
@@ -43,7 +43,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
 
     def __init__(
         self,
-        volume_parametrisation: AbstractVolumeParametrisation,
+        volume_parametrisation: AbstractVolumeParametrization,
         pose: AbstractPose,
         image_config: AbstractImageConfig,
         scattering_theory: AbstractScatteringTheory,
@@ -130,7 +130,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
     words a squared wavefunction.
     """
 
-    volume_parametrisation: AbstractVolumeParametrisation
+    volume_parametrisation: AbstractVolumeParametrization
     pose: AbstractPose
     image_config: AbstractImageConfig
     scattering_theory: AbstractScatteringTheory
@@ -141,7 +141,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
 
     def __init__(
         self,
-        volume_parametrisation: AbstractVolumeParametrisation,
+        volume_parametrisation: AbstractVolumeParametrization,
         pose: AbstractPose,
         image_config: AbstractImageConfig,
         scattering_theory: AbstractScatteringTheory,
@@ -227,7 +227,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
     model for the detector.
     """
 
-    volume_parametrisation: AbstractVolumeParametrisation
+    volume_parametrisation: AbstractVolumeParametrization
     pose: AbstractPose
     image_config: DoseImageConfig
     scattering_theory: AbstractScatteringTheory
@@ -239,7 +239,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
 
     def __init__(
         self,
-        volume_parametrisation: AbstractVolumeParametrisation,
+        volume_parametrisation: AbstractVolumeParametrization,
         pose: AbstractPose,
         image_config: DoseImageConfig,
         scattering_theory: AbstractScatteringTheory,

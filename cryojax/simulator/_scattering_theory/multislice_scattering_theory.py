@@ -5,9 +5,9 @@ from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
 from ...jax_util import error_if_not_fractional
 from .._image_config import AbstractImageConfig
+from .._multislice_integrator import AbstractMultisliceIntegrator
 from .._transfer_theory import WaveTransferTheory
 from .._volume import AbstractVolumeRepresentation
-from .._volume_integrator import AbstractMultisliceIntegrator
 from .base_scattering_theory import AbstractWaveScatteringTheory
 
 

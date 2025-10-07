@@ -11,8 +11,8 @@ from .._pose import AbstractPose
 T = TypeVar("T")
 
 
-class AbstractVolumeParametrisation(eqx.Module, strict=True):
-    """Abstract interface for a parametrisation of a volume. Specifically,
+class AbstractVolumeParametrization(eqx.Module, strict=True):
+    """Abstract interface for a parametrization of a volume. Specifically,
     the cryo-EM image formation process typically starts with a *scattering potential*.
     "Volumes" and "scattering potentials" in cryoJAX are synonymous.
 
@@ -67,7 +67,7 @@ class AbstractVolumeParametrisation(eqx.Module, strict=True):
         raise NotImplementedError
 
 
-class AbstractVolumeRepresentation(AbstractVolumeParametrisation, strict=True):
+class AbstractVolumeRepresentation(AbstractVolumeParametrization, strict=True):
     """Abstract interface for the representation of a volume, such
     as atomic coordinates, voxels, or a neural network.
 

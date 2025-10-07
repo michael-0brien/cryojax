@@ -56,7 +56,7 @@ from ._volume import (
     AbstractAtomicVolume as AbstractAtomicVolume,
     AbstractPointCloudVolume as AbstractPointCloudVolume,
     AbstractTabulatedAtomicVolume as AbstractTabulatedAtomicVolume,
-    AbstractVolumeParametrisation as AbstractVolumeParametrisation,
+    AbstractVolumeParametrization as AbstractVolumeParametrization,
     AbstractVolumeRepresentation as AbstractVolumeRepresentation,
     FourierVoxelGridVolume as FourierVoxelGridVolume,
     FourierVoxelSplineVolume as FourierVoxelSplineVolume,
@@ -66,9 +66,8 @@ from ._volume import (
     RealVoxelGridVolume as RealVoxelGridVolume,
 )
 from ._volume_integrator import (
-    AbstractDirectIntegrator as AbstractDirectIntegrator,
-    AbstractDirectVoxelIntegrator as AbstractDirectVoxelIntegrator,
     AbstractVolumeIntegrator as AbstractVolumeIntegrator,
+    AbstractVoxelVolumeIntegrator as AbstractVoxelVolumeIntegrator,
     FourierSliceExtraction as FourierSliceExtraction,
     GaussianMixtureProjection as GaussianMixtureProjection,
     NufftProjection as NufftProjection,

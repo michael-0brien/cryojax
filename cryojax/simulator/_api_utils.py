@@ -17,7 +17,7 @@ from ._pose import AbstractPose
 from ._scattering_theory import WeakPhaseScatteringTheory
 from ._transfer_theory import ContrastTransferTheory
 from ._volume import (
-    AbstractVolumeParametrisation,
+    AbstractVolumeParametrization,
     FourierVoxelGridVolume,
     FourierVoxelSplineVolume,
     GaussianMixtureVolume,
@@ -25,7 +25,7 @@ from ._volume import (
     RealVoxelGridVolume,
 )
 from ._volume_integrator import (
-    AbstractDirectIntegrator,
+    AbstractVolumeIntegrator,
     FourierSliceExtraction,
     GaussianMixtureProjection,
     NufftProjection,
@@ -33,11 +33,11 @@ from ._volume_integrator import (
 
 
 def make_image_model(
-    volume_parametrisation: AbstractVolumeParametrisation,
+    volume_parametrization: AbstractVolumeParametrization,
     image_config: AbstractImageConfig,
     pose: AbstractPose,
     transfer_theory: Optional[ContrastTransferTheory] = None,
-    volume_integrator: Optional[AbstractDirectIntegrator] = None,
+    volume_integrator: Optional[AbstractVolumeIntegrator] = None,
     detector: Optional[AbstractDetector] = None,
     *,
     applies_translation: bool = True,
@@ -50,7 +50,7 @@ def make_image_model(
 
     **Arguments:**
 
-    - `volume_parametrisation`:
+    - `volume_parametrization`:
         The representation of the protein volume.
         Common choices are the `FourierVoxelGridVolume`
         for fourier-space voxel grids or the `PengAtomicVolume`
@@ -109,12 +109,12 @@ def make_image_model(
     # Select default integrator
     if volume_integrator is None:
         volume_integrator = _select_default_integrator(
-            volume_parametrisation, simulates_quantity
+            volume_parametrization, simulates_quantity
         )
     if transfer_theory is None:
         # Image model for projections
         image_model = ProjectionImageModel(
-            volume_parametrisation,
+            volume_parametrization,
             pose,
             image_config,
             volume_integrator,
@@ -141,7 +141,7 @@ def make_image_model(
                         "counts, an `AbstractDetector` must be passed."
                     )
                 image_model = ElectronCountsImageModel(
-                    volume_parametrisation,
+                    volume_parametrization,
                     pose,
                     image_config,
                     scattering_theory,
@@ -152,7 +152,7 @@ def make_image_model(
                 )
             elif quantity_mode == "contrast":
                 image_model = ContrastImageModel(
-                    volume_parametrisation,
+                    volume_parametrization,
                     pose,
                     image_config,
                     scattering_theory,
@@ -162,7 +162,7 @@ def make_image_model(
                 )
             elif quantity_mode == "intensity":
                 image_model = IntensityImageModel(
-                    volume_parametrisation,
+                    volume_parametrization,
                     pose,
                     image_config,
                     scattering_theory,
@@ -179,7 +179,7 @@ def make_image_model(
         else:
             # Linear image model
             image_model = LinearImageModel(
-                volume_parametrisation,
+                volume_parametrization,
                 pose,
                 image_config,
                 volume_integrator,
@@ -193,8 +193,8 @@ def make_image_model(
 
 
 def _select_default_integrator(
-    volume: AbstractVolumeParametrisation, simulates_quantity: bool
-) -> AbstractDirectIntegrator:
+    volume: AbstractVolumeParametrization, simulates_quantity: bool
+) -> AbstractVolumeIntegrator:
     if isinstance(volume, (FourierVoxelGridVolume, FourierVoxelSplineVolume)):
         integrator = FourierSliceExtraction(outputs_integral=simulates_quantity)
     elif isinstance(

@@ -1,5 +1,5 @@
 from .base_volume import (
-    AbstractVolumeParametrisation as AbstractVolumeParametrisation,
+    AbstractVolumeParametrization as AbstractVolumeParametrization,
     AbstractVolumeRepresentation as AbstractVolumeRepresentation,
 )
 from .representations import (

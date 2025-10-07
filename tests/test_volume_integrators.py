@@ -187,7 +187,7 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
 @eqx.filter_jit
 def compute_projection(
     volume: cxs.AbstractVolumeRepresentation,
-    integrator: cxs.AbstractDirectIntegrator,
+    integrator: cxs.AbstractVolumeIntegrator,
     image_config: cxs.BasicImageConfig,
 ) -> Array:
     fourier_projection = integrator.integrate(
@@ -205,7 +205,7 @@ def compute_projection(
 @eqx.filter_jit
 def compute_projection_at_pose(
     volume: cxs.AbstractVolumeRepresentation,
-    integrator: cxs.AbstractDirectIntegrator,
+    integrator: cxs.AbstractVolumeIntegrator,
     pose: cxs.AbstractPose,
     image_config: cxs.BasicImageConfig,
 ) -> Array:

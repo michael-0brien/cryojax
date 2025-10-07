@@ -4,9 +4,9 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
-from ....ndimage import fftn, ifftn, map_coordinates
-from ..._image_config import AbstractImageConfig
-from ..._volume import RealVoxelGridVolume
+from ...ndimage import fftn, ifftn, map_coordinates
+from .._image_config import AbstractImageConfig
+from .._volume import RealVoxelGridVolume
 from .base_multislice_integrator import AbstractMultisliceIntegrator
 
 

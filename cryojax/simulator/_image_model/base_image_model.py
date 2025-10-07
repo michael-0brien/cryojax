@@ -17,8 +17,8 @@ from ...ndimage.transforms import FilterLike, MaskLike
 from .._image_config import AbstractImageConfig
 from .._pose import AbstractPose
 from .._transfer_theory import ContrastTransferTheory
-from .._volume import AbstractVolumeParametrisation
-from .._volume_integrator import AbstractDirectIntegrator
+from .._volume import AbstractVolumeParametrization
+from .._volume_integrator import AbstractVolumeIntegrator
 
 
 RealImageArray = Float[Array, "{self.image_config.y_dim} {self.image_config.x_dim}"]
@@ -204,9 +204,9 @@ class AbstractImageModel(eqx.Module, strict=True):
 class LinearImageModel(AbstractImageModel, strict=True):
     """An simple image model in linear image formation theory."""
 
-    volume_parametrisation: AbstractVolumeParametrisation
+    volume_parametrization: AbstractVolumeParametrization
     pose: AbstractPose
-    volume_integrator: AbstractDirectIntegrator
+    volume_integrator: AbstractVolumeIntegrator
     transfer_theory: ContrastTransferTheory
     image_config: AbstractImageConfig
 
@@ -216,10 +216,10 @@ class LinearImageModel(AbstractImageModel, strict=True):
 
     def __init__(
         self,
-        volume_parametrisation: AbstractVolumeParametrisation,
+        volume_parametrization: AbstractVolumeParametrization,
         pose: AbstractPose,
         image_config: AbstractImageConfig,
-        volume_integrator: AbstractDirectIntegrator,
+        volume_integrator: AbstractVolumeIntegrator,
         transfer_theory: ContrastTransferTheory,
         *,
         applies_translation: bool = True,
@@ -228,8 +228,8 @@ class LinearImageModel(AbstractImageModel, strict=True):
     ):
         """**Arguments:**
 
-        - `volume_parametrisation`:
-            The parametrisation of an imaging volume.
+        - `volume_parametrization`:
+            The parametrization of an imaging volume.
         - `pose`:
             The pose of the volume.
         - `image_config`:
@@ -248,7 +248,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
             Must have shape equal to `AbstractImageConfig.shape`.
         """
         # Simulator components
-        self.volume_parametrisation = volume_parametrisation
+        self.volume_parametrization = volume_parametrization
         self.pose = pose
         self.image_config = image_config
         self.volume_integrator = volume_integrator
@@ -279,10 +279,10 @@ class LinearImageModel(AbstractImageModel, strict=True):
     ) -> PaddedFourierImageArray:
         # Get the representation of the volume
         if rng_key is None:
-            volume_representation = self.volume_parametrisation.compute_representation()
+            volume_representation = self.volume_parametrization.compute_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            volume_representation = self.volume_parametrisation.compute_representation(
+            volume_representation = self.volume_parametrization.compute_representation(
                 rng_key=this_key
             )
         # Rotate it to the lab frame
@@ -308,9 +308,9 @@ class LinearImageModel(AbstractImageModel, strict=True):
 class ProjectionImageModel(AbstractImageModel, strict=True):
     """An simple image model for computing a projection."""
 
-    volume_parametrisation: AbstractVolumeParametrisation
+    volume_parametrization: AbstractVolumeParametrization
     pose: AbstractPose
-    volume_integrator: AbstractDirectIntegrator
+    volume_integrator: AbstractVolumeIntegrator
     image_config: AbstractImageConfig
 
     applies_translation: bool
@@ -319,10 +319,10 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
 
     def __init__(
         self,
-        volume_parametrisation: AbstractVolumeParametrisation,
+        volume_parametrization: AbstractVolumeParametrization,
         pose: AbstractPose,
         image_config: AbstractImageConfig,
-        volume_integrator: AbstractDirectIntegrator,
+        volume_integrator: AbstractVolumeIntegrator,
         *,
         applies_translation: bool = True,
         normalizes_signal: bool = False,
@@ -330,8 +330,8 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
     ):
         """**Arguments:**
 
-        - `volume_parametrisation`:
-            The parametrisation of the imaging volume
+        - `volume_parametrization`:
+            The parametrization of the imaging volume
         - `pose`:
             The pose of the volume.
         - `image_config`:
@@ -349,7 +349,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
             Must have shape equal to `AbstractImageConfig.shape`.
         """
         # Simulator components
-        self.volume_parametrisation = volume_parametrisation
+        self.volume_parametrization = volume_parametrization
         self.pose = pose
         self.image_config = image_config
         self.volume_integrator = volume_integrator
@@ -379,10 +379,10 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
     ) -> ImageArray | PaddedImageArray:
         # Get the representation of the volume
         if rng_key is None:
-            volume_representation = self.volume_parametrisation.compute_representation()
+            volume_representation = self.volume_parametrization.compute_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            volume_representation = self.volume_parametrisation.compute_representation(
+            volume_representation = self.volume_parametrization.compute_representation(
                 rng_key=this_key
             )
         # Rotate it to the lab frame

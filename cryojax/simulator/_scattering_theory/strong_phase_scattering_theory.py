@@ -10,7 +10,10 @@ from .._image_config import AbstractImageConfig
 from .._solvent_2d import AbstractRandomSolvent2D
 from .._transfer_theory import WaveTransferTheory
 from .._volume import AbstractVolumeRepresentation
-from .._volume_integrator import AbstractDirectIntegrator, AbstractDirectVoxelIntegrator
+from .._volume_integrator import (
+    AbstractVolumeIntegrator,
+    AbstractVoxelVolumeIntegrator,
+)
 from .base_scattering_theory import AbstractWaveScatteringTheory
 
 
@@ -40,14 +43,14 @@ class StrongPhaseScatteringTheory(AbstractWaveScatteringTheory, strict=True):
       microscopy. OUP Oxford, 2013.*
     """
 
-    volume_integrator: AbstractDirectIntegrator
+    volume_integrator: AbstractVolumeIntegrator
     transfer_theory: WaveTransferTheory
     solvent: Optional[AbstractRandomSolvent2D]
     amplitude_contrast_ratio: Float[Array, ""]
 
     def __init__(
         self,
-        volume_integrator: AbstractDirectIntegrator,
+        volume_integrator: AbstractVolumeIntegrator,
         transfer_theory: WaveTransferTheory,
         solvent: Optional[AbstractRandomSolvent2D] = None,
         amplitude_contrast_ratio: float | Float[Array, ""] = 0.1,
@@ -65,7 +68,7 @@ class StrongPhaseScatteringTheory(AbstractWaveScatteringTheory, strict=True):
         self.amplitude_contrast_ratio = error_if_not_fractional(amplitude_contrast_ratio)
 
     def __check_init__(self):
-        if isinstance(self.volume_integrator, AbstractDirectVoxelIntegrator):
+        if isinstance(self.volume_integrator, AbstractVoxelVolumeIntegrator):
             if not self.volume_integrator.outputs_integral:
                 raise AttributeError(
                     "If the `volume_integrator` is voxel-based, "

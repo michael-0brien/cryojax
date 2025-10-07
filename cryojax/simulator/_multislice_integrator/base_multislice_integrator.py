@@ -1,20 +1,20 @@
 from abc import abstractmethod
-from typing import Generic
-from typing_extensions import override
+from typing import Generic, TypeVar
 
+import equinox as eqx
 from jaxtyping import Array, Complex, Float
 
-from ..._image_config import AbstractImageConfig
-from ..base_integrator import AbstractVolumeIntegrator, VolRepT
+from .._image_config import AbstractImageConfig
+from .._volume import AbstractVolumeRepresentation
 
 
-class AbstractMultisliceIntegrator(
-    AbstractVolumeIntegrator[VolRepT], Generic[VolRepT], strict=True
-):
+VolRepT = TypeVar("VolRepT", bound="AbstractVolumeRepresentation")
+
+
+class AbstractMultisliceIntegrator(eqx.Module, Generic[VolRepT], strict=True):
     """Base class for a multislice integration scheme."""
 
     @abstractmethod
-    @override
     def integrate(
         self,
         volume_representation: VolRepT,

@@ -1,13 +1,14 @@
-from .base_integrator import AbstractVolumeIntegrator as AbstractVolumeIntegrator
-from .direct_integrator import (
-    AbstractDirectIntegrator as AbstractDirectIntegrator,
-    AbstractDirectVoxelIntegrator as AbstractDirectVoxelIntegrator,
+from .base_integrator import (
+    AbstractVolumeIntegrator as AbstractVolumeIntegrator,
+    AbstractVoxelVolumeIntegrator as AbstractVoxelVolumeIntegrator,
+)
+from .fourier_voxel_extract import (
     EwaldSphereExtraction as EwaldSphereExtraction,
     FourierSliceExtraction as FourierSliceExtraction,
-    GaussianMixtureProjection as GaussianMixtureProjection,
-    NufftProjection as NufftProjection,
 )
-from .multislice_integrator import (
-    AbstractMultisliceIntegrator as AbstractMultisliceIntegrator,
-    FFTMultisliceIntegrator as FFTMultisliceIntegrator,
+from .gaussian_projection import (
+    GaussianMixtureProjection as GaussianMixtureProjection,
+)
+from .nufft_projection import (
+    NufftProjection as NufftProjection,
 )

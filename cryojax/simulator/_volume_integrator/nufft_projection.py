@@ -9,14 +9,14 @@ from typing_extensions import override
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
-from ....ndimage import convert_fftn_to_rfftn, irfftn
-from ..._image_config import AbstractImageConfig
-from ..._volume import RealVoxelGridVolume
-from .base_direct_integrator import AbstractDirectVoxelIntegrator
+from ...ndimage import convert_fftn_to_rfftn, irfftn
+from .._image_config import AbstractImageConfig
+from .._volume import RealVoxelGridVolume
+from .base_integrator import AbstractVoxelVolumeIntegrator
 
 
 class NufftProjection(
-    AbstractDirectVoxelIntegrator[RealVoxelGridVolume],
+    AbstractVoxelVolumeIntegrator[RealVoxelGridVolume],
     strict=True,
 ):
     """Integrate points onto the exit plane using non-uniform FFTs."""
