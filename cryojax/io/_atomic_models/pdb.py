@@ -10,7 +10,7 @@ import os
 import pathlib
 from copy import copy
 from io import StringIO
-from typing import Literal, Optional, TypedDict, cast, overload
+from typing import Literal, TypedDict, cast, overload
 from urllib.parse import urlparse, uses_netloc, uses_params, uses_relative
 from urllib.request import urlopen
 from xml.etree import ElementTree
@@ -35,9 +35,9 @@ def read_atoms_from_pdb(
     loads_b_factors: Literal[False],
     center: bool = True,
     selection_string: str = "all",
-    model_index: Optional[int] = None,
+    model_index: int | None = None,
     standardizes_names: bool = True,
-    topology: Optional[mdtraj.Topology] = None,
+    topology: mdtraj.Topology | None = None,
 ) -> tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, " n_atoms"]]: ...
 
 
@@ -48,9 +48,9 @@ def read_atoms_from_pdb(  # type: ignore
     loads_b_factors: Literal[True],
     center: bool = True,
     selection_string: str = "all",
-    model_index: Optional[int] = None,
+    model_index: int | None = None,
     standardizes_names: bool = True,
-    topology: Optional[mdtraj.Topology] = None,
+    topology: mdtraj.Topology | None = None,
 ) -> tuple[
     Float[np.ndarray, "... n_atoms 3"],
     Int[np.ndarray, " n_atoms"],
@@ -65,9 +65,9 @@ def read_atoms_from_pdb(
     loads_b_factors: bool = False,
     center: bool = True,
     selection_string: str = "all",
-    model_index: Optional[int] = None,
+    model_index: int | None = None,
     standardizes_names: bool = True,
-    topology: Optional[mdtraj.Topology] = None,
+    topology: mdtraj.Topology | None = None,
 ) -> tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, " n_atoms"]]: ...
 
 
@@ -77,9 +77,9 @@ def read_atoms_from_pdb(
     loads_b_factors: bool = False,
     center: bool = True,
     selection_string: str = "all",
-    model_index: Optional[int] = None,
+    model_index: int | None = None,
     standardizes_names: bool = True,
-    topology: Optional[mdtraj.Topology] = None,
+    topology: mdtraj.Topology | None = None,
 ) -> (
     tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, " n_atoms"]]
     | tuple[
@@ -181,8 +181,8 @@ class AtomProperties(TypedDict):
     """
 
     identities: Int[np.ndarray, " N"]
-    masses: Optional[Float[np.ndarray, " N"]]
-    b_factors: Optional[Float[np.ndarray, " N"]]
+    masses: Float[np.ndarray, " N"] | None
+    b_factors: Float[np.ndarray, " N"] | None
 
 
 class AtomicModelInfo(TypedDict):
@@ -238,8 +238,8 @@ class AtomicModelFile:
         self,
         *,
         standardizes_names: bool = True,
-        topology: Optional[Topology] = None,
-        model_index: Optional[int] = None,
+        topology: Topology | None = None,
+        model_index: int | None = None,
         loads_b_factors: bool = True,
         loads_masses: bool = True,
     ) -> tuple[AtomicModelInfo, Topology]:
@@ -295,7 +295,7 @@ def _make_topology(
     pdb: PdbStructure,
     atom_positions: list,
     standardizes_names: bool,
-    model_index: Optional[int],
+    model_index: int | None,
 ) -> Topology:
     topology = Topology()
     if standardizes_names:
@@ -345,8 +345,8 @@ def _make_topology(
 
 def _load_atom_info(
     pdb: PdbStructure,
-    topology: Optional[Topology],
-    model_index: Optional[int],
+    topology: Topology | None,
+    model_index: int | None,
     standardizes_names: bool,
     loads_b_factors: bool,
     loads_masses: bool,
@@ -556,7 +556,7 @@ def _open_maybe_zipped(filename, mode, force_overwrite=True):
             return open(filename)
     elif mode == "w":
         if os.path.exists(filename) and not force_overwrite:
-            raise OSError('"%s" already exists' % filename)
+            raise OSError(f"{filename} already exists")
         if extension == ".gz":
             binary_fh = gzip.GzipFile(filename, "wb")
             return io.TextIOWrapper(binary_fh, encoding="utf-8")

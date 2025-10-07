@@ -31,7 +31,7 @@ def write_starfile(starfile_data, filename: str | pathlib.Path, **kwargs: Any):
 def _validate_filename(filename: str | pathlib.Path, mode: Literal["r", "w"]):
     suffixes = pathlib.Path(filename).suffixes
     if not (len(suffixes) == 1 and suffixes[0] == ".star"):
-        raise IOError(
+        raise OSError(
             f"Tried to {('write' if mode == 'w' else 'read')} STAR file, "
             "but the filename does not include a '.star' "
             f"suffix. Got filename '{filename}'."

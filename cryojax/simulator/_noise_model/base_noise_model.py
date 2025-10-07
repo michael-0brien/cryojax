@@ -3,7 +3,6 @@ Base class for a cryojax distribution.
 """
 
 from abc import abstractmethod
-from typing import Optional
 
 from equinox import Module
 from jaxtyping import Array, Float, Inexact, PRNGKeyArray
@@ -19,8 +18,8 @@ class AbstractNoiseModel(Module, strict=True):
         self,
         observed: Inexact[Array, "y_dim x_dim"],
         *,
-        mask: Optional[MaskLike] = None,
-        filter: Optional[FilterLike] = None,
+        mask: MaskLike | None = None,
+        filter: FilterLike | None = None,
     ) -> Float[Array, ""]:
         """Evaluate the log likelihood.
 
@@ -36,8 +35,8 @@ class AbstractNoiseModel(Module, strict=True):
         rng_key: PRNGKeyArray,
         *,
         outputs_real_space: bool = True,
-        mask: Optional[MaskLike] = None,
-        filter: Optional[FilterLike] = None,
+        mask: MaskLike | None = None,
+        filter: FilterLike | None = None,
     ) -> Inexact[Array, "y_dim x_dim"]:
         """Sample from the distribution.
 
@@ -52,10 +51,10 @@ class AbstractNoiseModel(Module, strict=True):
     def compute_signal(
         self,
         *,
-        rng_key: Optional[PRNGKeyArray] = None,
+        rng_key: PRNGKeyArray | None = None,
         outputs_real_space: bool = True,
-        mask: Optional[MaskLike] = None,
-        filter: Optional[FilterLike] = None,
+        mask: MaskLike | None = None,
+        filter: FilterLike | None = None,
     ) -> Inexact[Array, "y_dim x_dim"]:
         """Render the image formation model."""
         raise NotImplementedError

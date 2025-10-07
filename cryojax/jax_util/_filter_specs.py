@@ -2,7 +2,8 @@
 Utilities for creating equinox filter_specs.
 """
 
-from typing import Any, Callable, Optional, Sequence, Union
+from collections.abc import Callable, Sequence
+from typing import Any
 
 import equinox as eqx
 import jax.tree_util as jtu
@@ -11,10 +12,10 @@ from jaxtyping import PyTree
 
 def make_filter_spec(
     pytree: PyTree,
-    where: Callable[[PyTree], Union[Any, Sequence[Any]]],
+    where: Callable[[PyTree], Any | Sequence[Any]],
     *,
     inverse: bool = False,
-    is_leaf: Optional[Callable[[Any], bool]] = None,
+    is_leaf: Callable[[Any], bool] | None = None,
 ) -> PyTree[bool]:
     """A lightweight wrapper around `equinox` for creating a "filter specification".
 

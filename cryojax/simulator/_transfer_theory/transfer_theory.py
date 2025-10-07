@@ -1,5 +1,3 @@
-from typing import Optional
-
 import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
@@ -28,14 +26,14 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
     """
 
     ctf: AbstractCTF
-    envelope: Optional[FourierOperatorLike]
+    envelope: FourierOperatorLike | None
     amplitude_contrast_ratio: Float[Array, ""]
     phase_shift: Float[Array, ""]
 
     def __init__(
         self,
         ctf: AbstractCTF,
-        envelope: Optional[FourierOperatorLike] = None,
+        envelope: FourierOperatorLike | None = None,
         amplitude_contrast_ratio: float | Float[NDArrayLike, ""] = 0.1,
         phase_shift: float | Float[NDArrayLike, ""] = 0.0,
     ):
@@ -66,7 +64,7 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
         ),
         image_config: AbstractImageConfig,
         *,
-        defocus_offset: Optional[Float[NDArrayLike, ""] | float] = None,
+        defocus_offset: Float[NDArrayLike, ""] | float | None = None,
         is_projection_approximation: bool = True,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         """Apply the CTF directly to the phase shifts in the exit plane.
@@ -146,7 +144,7 @@ class WaveTransferTheory(AbstractTransferTheory, strict=True):
         ],
         image_config: AbstractImageConfig,
         *,
-        defocus_offset: Optional[Float[NDArrayLike, ""] | float] = None,
+        defocus_offset: Float[NDArrayLike, ""] | float | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]:
         """Apply the wave transfer function to the wavefunction in the exit plane."""
         frequency_grid = image_config.padded_full_frequency_grid_in_angstroms

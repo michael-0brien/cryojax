@@ -1,5 +1,5 @@
 import math
-from typing import ClassVar, Optional
+from typing import ClassVar
 from typing_extensions import override
 
 import jax
@@ -23,8 +23,8 @@ class GaussianMixtureProjection(
     AbstractVolumeIntegrator[GaussianMixtureVolume | PengAtomicVolume],
     strict=True,
 ):
-    upsampling_factor: Optional[int]
-    shape: Optional[tuple[int, int]]
+    upsampling_factor: int | None
+    shape: tuple[int, int] | None
     use_error_functions: bool
     n_batches: int
 
@@ -33,8 +33,8 @@ class GaussianMixtureProjection(
     def __init__(
         self,
         *,
-        upsampling_factor: Optional[int] = None,
-        shape: Optional[tuple[int, int]] = None,
+        upsampling_factor: int | None = None,
+        shape: tuple[int, int] | None = None,
         use_error_functions: bool = True,
         n_batches: int = 1,
     ):

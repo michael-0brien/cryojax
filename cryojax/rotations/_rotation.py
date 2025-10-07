@@ -3,7 +3,7 @@ Abstraction of a rotation.
 """
 
 from abc import abstractmethod
-from typing import Type, overload
+from typing import overload
 from typing_extensions import Self
 
 from equinox import AbstractClassVar, Module
@@ -60,12 +60,12 @@ class AbstractRotation(Module, strict=True):
 
     @classmethod
     @abstractmethod
-    def identity(cls: Type[Self]) -> Self:
+    def identity(cls: type[Self]) -> Self:
         """Return the identity element."""
         raise NotImplementedError
 
     @classmethod
     @abstractmethod
-    def sample_uniform(cls: Type[Self], key: PRNGKeyArray) -> Self:
+    def sample_uniform(cls: type[Self], key: PRNGKeyArray) -> Self:
         """Draw a uniform sample."""
         raise NotImplementedError

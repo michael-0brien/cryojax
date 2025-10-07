@@ -2,7 +2,6 @@
 Image formation models.
 """
 
-from typing import Optional
 from typing_extensions import override
 
 import equinox as eqx
@@ -39,7 +38,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
 
     applies_translation: bool
     normalizes_signal: bool
-    signal_region: Optional[Bool[Array, "_ _"]]
+    signal_region: Bool[Array, "_ _"] | None
 
     def __init__(
         self,
@@ -50,7 +49,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
         *,
         applies_translation: bool = True,
         normalizes_signal: bool = False,
-        signal_region: Optional[Bool[NDArrayLike, "_ _"]] = None,
+        signal_region: Bool[NDArrayLike, "_ _"] | None = None,
     ):
         """**Arguments:**
 
@@ -93,12 +92,12 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
         return self.image_config
 
     @override
-    def get_signal_region(self) -> Optional[Bool[Array, "_ _"]]:
+    def get_signal_region(self) -> Bool[Array, "_ _"] | None:
         return self.signal_region
 
     @override
     def compute_fourier_image(
-        self, rng_key: Optional[PRNGKeyArray] = None
+        self, rng_key: PRNGKeyArray | None = None
     ) -> PaddedFourierImageArray:
         # Get the volume representation. Its data should be a scattering potential
         # to simulate in physical units
@@ -137,7 +136,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
 
     applies_translation: bool
     normalizes_signal: bool
-    signal_region: Optional[Bool[Array, "_ _"]]
+    signal_region: Bool[Array, "_ _"] | None
 
     def __init__(
         self,
@@ -148,7 +147,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
         *,
         applies_translation: bool = True,
         normalizes_signal: bool = False,
-        signal_region: Optional[Bool[NDArrayLike, "_ _"]] = None,
+        signal_region: Bool[NDArrayLike, "_ _"] | None = None,
     ):
         """**Arguments:**
 
@@ -191,12 +190,12 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
         return self.image_config
 
     @override
-    def get_signal_region(self) -> Optional[Bool[Array, "_ _"]]:
+    def get_signal_region(self) -> Bool[Array, "_ _"] | None:
         return self.signal_region
 
     @override
     def compute_fourier_image(
-        self, rng_key: Optional[PRNGKeyArray] = None
+        self, rng_key: PRNGKeyArray | None = None
     ) -> PaddedFourierImageArray:
         # Get the volume representation. Its data should be a scattering potential
         # to simulate in physical units
@@ -235,7 +234,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
 
     applies_translation: bool
     normalizes_signal: bool
-    signal_region: Optional[Bool[Array, "_ _"]]
+    signal_region: Bool[Array, "_ _"] | None
 
     def __init__(
         self,
@@ -247,7 +246,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
         *,
         applies_translation: bool = True,
         normalizes_signal: bool = False,
-        signal_region: Optional[Bool[NDArrayLike, "_ _"]] = None,
+        signal_region: Bool[NDArrayLike, "_ _"] | None = None,
     ):
         """**Arguments:**
 
@@ -291,12 +290,12 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
         return self.image_config
 
     @override
-    def get_signal_region(self) -> Optional[Bool[Array, "_ _"]]:
+    def get_signal_region(self) -> Bool[Array, "_ _"] | None:
         return self.signal_region
 
     @override
     def compute_fourier_image(
-        self, rng_key: Optional[PRNGKeyArray] = None
+        self, rng_key: PRNGKeyArray | None = None
     ) -> PaddedFourierImageArray:
         if rng_key is None:
             # Get the volume representation. Its data should be a scattering potential

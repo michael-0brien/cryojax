@@ -1,4 +1,5 @@
-from typing import Any, Callable, Optional, TypeVar
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 import equinox as eqx
 import jax
@@ -26,8 +27,8 @@ def simulate_particle_stack(
     ],
     constant_args: ConstantT = None,
     per_particle_args: PerParticleT = None,
-    batch_size: Optional[int] = None,
-    images_per_file: Optional[int] = None,
+    batch_size: int | None = None,
+    images_per_file: int | None = None,
     **kwargs: Any,
 ):
     """Write a stack of images from parameters contained in an

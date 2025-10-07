@@ -1,4 +1,3 @@
-from typing import Optional
 from typing_extensions import override
 
 import jax.numpy as jnp
@@ -45,14 +44,14 @@ class StrongPhaseScatteringTheory(AbstractWaveScatteringTheory, strict=True):
 
     volume_integrator: AbstractVolumeIntegrator
     transfer_theory: WaveTransferTheory
-    solvent: Optional[AbstractRandomSolvent2D]
+    solvent: AbstractRandomSolvent2D | None
     amplitude_contrast_ratio: Float[Array, ""]
 
     def __init__(
         self,
         volume_integrator: AbstractVolumeIntegrator,
         transfer_theory: WaveTransferTheory,
-        solvent: Optional[AbstractRandomSolvent2D] = None,
+        solvent: AbstractRandomSolvent2D | None = None,
         amplitude_contrast_ratio: float | Float[Array, ""] = 0.1,
     ):
         """**Arguments:**
@@ -81,7 +80,7 @@ class StrongPhaseScatteringTheory(AbstractWaveScatteringTheory, strict=True):
         self,
         volume_representation: AbstractVolumeRepresentation,
         image_config: AbstractImageConfig,
-        rng_key: Optional[PRNGKeyArray] = None,
+        rng_key: PRNGKeyArray | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]:
         # Compute the integrated potential in the exit plane
         fourier_in_plane_potential = self.volume_integrator.integrate(

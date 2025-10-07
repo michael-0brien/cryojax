@@ -4,7 +4,6 @@ Filters to apply to images in Fourier space
 
 import abc
 import math
-from typing import Optional
 from typing_extensions import override
 
 import jax
@@ -155,7 +154,7 @@ class WhiteningFilter(AbstractFilter, strict=True):
             Float[NDArrayLike, "image_y_dim image_x_dim"]
             | Float[NDArrayLike, "n_images image_y_dim image_x_dim"]
         ),
-        shape: Optional[tuple[int, int]] = None,
+        shape: tuple[int, int] | None = None,
         *,
         interpolation_mode: str = "linear",
         outputs_squared: bool = False,
@@ -229,7 +228,7 @@ def _compute_lowpass_filter(
 
 def _compute_whitening_filter(
     image_stack: Float[Array, "n_images y_dim x_dim"],
-    shape: Optional[tuple[int, int]] = None,
+    shape: tuple[int, int] | None = None,
     interpolation_mode: str = "linear",
     outputs_squared: bool = False,
 ) -> Float[Array, "{shape[0]} {shape[1]}"]:

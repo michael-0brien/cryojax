@@ -4,8 +4,9 @@ import abc
 import pathlib
 import re
 import warnings
+from collections.abc import Callable
 from copy import deepcopy
-from typing import Any, Callable, Literal, Optional, TypedDict, cast
+from typing import Any, Literal, TypedDict, cast
 from typing_extensions import Self, override
 
 import equinox as eqx
@@ -85,13 +86,13 @@ class ParticleParameterInfo(TypedDict):
     pose: EulerAnglePose
     transfer_theory: ContrastTransferTheory
 
-    metadata: Optional[pd.DataFrame]
+    metadata: pd.DataFrame | None
 
 
 class ParticleStackInfo(TypedDict):
     """Particle stack info from RELION."""
 
-    parameters: Optional[ParticleParameterInfo]
+    parameters: ParticleParameterInfo | None
     images: Float[np.ndarray, "... y_dim x_dim"]
 
 
@@ -211,7 +212,7 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
         path_to_starfile: str | pathlib.Path,
         mode: Literal["r", "w"] = "r",
         exists_ok: bool = False,
-        selection_filter: Optional[dict[str, Callable]] = None,
+        selection_filter: dict[str, Callable] | None = None,
         *,
         loads_metadata: bool = False,
         broadcasts_image_config: bool = True,
@@ -623,7 +624,7 @@ class RelionParticleStackDataset(
                 self.path_to_relion_project.mkdir(parents=True, exist_ok=False)
         else:
             if not images_exist:
-                raise IOError(
+                raise OSError(
                     "Could not find column 'rlnImageName' in the STAR file. "
                     "When using `mode = 'r'`, the STAR file must have this "
                     "column. To write images in a STAR file, "
@@ -758,7 +759,7 @@ class RelionParticleStackDataset(
         self,
         index_array: Int[np.ndarray, " _"],
         images: Float[NDArrayLike, "... _ _"],
-        parameters: Optional[ParticleParameterLike] = None,
+        parameters: ParticleParameterLike | None = None,
     ):
         # Get relevant metadata
         particle_data = self.parameter_file.starfile_data["particles"]
@@ -823,7 +824,7 @@ class RelionParticleStackDataset(
                 compression=self.mrcfile_settings["compression"],
             )
         except Exception as err:
-            raise IOError(
+            raise OSError(
                 "Error occurred when writing image stack to MRC "
                 "file. Most likely, the filename the writer "
                 f"chose ({str(path_to_filename)}) already "
@@ -1319,7 +1320,7 @@ def _validate_starfile_data(starfile_data: dict[str, pd.DataFrame]):
 
 def _validate_rln_image_name_exists(particle_data, index):
     if "rlnImageName" not in particle_data.columns:
-        raise IOError(
+        raise OSError(
             "Tried to read STAR file for "
             f"`RelionParticleStackDataset` index = {index}, "
             "but no entry found for 'rlnImageName'."
@@ -1448,7 +1449,7 @@ def _parameters_to_optics_data(
 
 def _parameters_to_particle_data(
     parameters: ParticleParameterLike,
-    optics_group_index: Optional[int] = None,
+    optics_group_index: int | None = None,
 ) -> pd.DataFrame:
     particles_dict = {}
     if "pose" in parameters:
@@ -1645,7 +1646,7 @@ def _make_image_filename(
         else:
             last_filename = particle_data["rlnImageName"].iloc[last_index].split("@")[1]
             if pd.isna(last_filename):
-                raise IOError(
+                raise OSError(
                     "Tried to assign a number to the MRC file while writing "
                     "images, but could not grab the previous file number at "
                     f"index {int(last_index)}. At this index, found that the "
@@ -1686,7 +1687,7 @@ def _parse_filename_for_number(filename: str) -> int:
     try:
         file_number = int(match.group(1))  # type: ignore
     except Exception as err:
-        raise IOError(
+        raise OSError(
             f"Could not get the file number from file {filename} "
             "Files must be enumerated with the trailing part of the "
             "filename as the file number, like so: '/path/to/file-0000.txt'. "

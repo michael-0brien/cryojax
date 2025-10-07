@@ -1,5 +1,4 @@
 from abc import abstractmethod
-from typing import Optional
 from typing_extensions import override
 
 import equinox as eqx
@@ -23,8 +22,8 @@ class AbstractScatteringTheory(eqx.Module, strict=True):
         self,
         volume_representation: AbstractVolumeRepresentation,
         image_config: AbstractImageConfig,
-        rng_key: Optional[PRNGKeyArray] = None,
-        defocus_offset: Optional[float | Float[Array, ""]] = None,
+        rng_key: PRNGKeyArray | None = None,
+        defocus_offset: float | Float[Array, ""] | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         raise NotImplementedError
 
@@ -33,8 +32,8 @@ class AbstractScatteringTheory(eqx.Module, strict=True):
         self,
         volume_representation: AbstractVolumeRepresentation,
         image_config: AbstractImageConfig,
-        rng_key: Optional[PRNGKeyArray] = None,
-        defocus_offset: Optional[float | Float[Array, ""]] = None,
+        rng_key: PRNGKeyArray | None = None,
+        defocus_offset: float | Float[Array, ""] | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         raise NotImplementedError
 
@@ -49,7 +48,7 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
         self,
         volume_representation: AbstractVolumeRepresentation,
         image_config: AbstractImageConfig,
-        rng_key: Optional[PRNGKeyArray] = None,
+        rng_key: PRNGKeyArray | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]:
         raise NotImplementedError
 
@@ -58,8 +57,8 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
         self,
         volume_representation: AbstractVolumeRepresentation,
         image_config: AbstractImageConfig,
-        rng_key: Optional[PRNGKeyArray] = None,
-        defocus_offset: Optional[float | Float[Array, ""]] = None,
+        rng_key: PRNGKeyArray | None = None,
+        defocus_offset: float | Float[Array, ""] | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         # ... compute the exit wave
         fourier_wavefunction = fftn(
@@ -82,8 +81,8 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
         self,
         volume_representation: AbstractVolumeRepresentation,
         image_config: AbstractImageConfig,
-        rng_key: Optional[PRNGKeyArray] = None,
-        defocus_offset: Optional[float | Float[Array, ""]] = None,
+        rng_key: PRNGKeyArray | None = None,
+        defocus_offset: float | Float[Array, ""] | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         """Compute the contrast at the detector plane, given the squared wavefunction."""
         # ... compute the exit wave
@@ -120,7 +119,7 @@ class AbstractWeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
         self,
         volume_representation: AbstractVolumeRepresentation,
         image_config: AbstractImageConfig,
-        rng_key: Optional[PRNGKeyArray] = None,
+        rng_key: PRNGKeyArray | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         raise NotImplementedError
 
@@ -129,8 +128,8 @@ class AbstractWeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
         self,
         volume_representation: AbstractVolumeRepresentation,
         image_config: AbstractImageConfig,
-        rng_key: Optional[PRNGKeyArray] = None,
-        defocus_offset: Optional[float | Float[Array, ""]] = None,
+        rng_key: PRNGKeyArray | None = None,
+        defocus_offset: float | Float[Array, ""] | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         """Compute the squared wavefunction at the detector plane, given the
         contrast.

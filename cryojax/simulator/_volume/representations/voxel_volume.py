@@ -2,7 +2,7 @@
 Voxel-based representations of a volume.
 """
 
-from typing import Optional, cast
+from typing import cast
 from typing_extensions import Self, override
 
 import equinox as eqx
@@ -72,7 +72,7 @@ class FourierVoxelGridVolume(AbstractFourierVoxelVolume, strict=True):
         *,
         pad_scale: float = 1.0,
         pad_mode: str = "constant",
-        filter: Optional[AbstractFilter] = None,
+        filter: AbstractFilter | None = None,
     ) -> Self:
         """Load from a real-valued 3D voxel grid.
 
@@ -162,7 +162,7 @@ class FourierVoxelSplineVolume(AbstractFourierVoxelVolume, strict=True):
         *,
         pad_scale: float = 1.0,
         pad_mode: str = "constant",
-        filter: Optional[AbstractFilter] = None,
+        filter: AbstractFilter | None = None,
     ) -> Self:
         """Load from a real-valued 3D voxel grid.
 
@@ -259,8 +259,8 @@ class RealVoxelGridVolume(AbstractRealVoxelVolume, strict=True):
         cls,
         real_voxel_grid: Float[NDArrayLike, "dim dim dim"],
         *,
-        coordinate_grid_in_pixels: Optional[Float[Array, "dim dim dim 3"]] = None,
-        crop_scale: Optional[float] = None,
+        coordinate_grid_in_pixels: Float[Array, "dim dim dim 3"] | None = None,
+        crop_scale: float | None = None,
     ) -> Self:
         """Load a `RealVoxelGridVolume` from a real-valued 3D voxel grid.
 

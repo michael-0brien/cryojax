@@ -1,8 +1,9 @@
 """The image configuration and utility manager."""
 
 import math
+from collections.abc import Callable
 from functools import cached_property
-from typing import Any, Callable, Optional, TypedDict
+from typing import Any, TypedDict
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -25,7 +26,7 @@ from ..ndimage import (
 class GridHelper(eqx.Module, strict=True):
     coordinate_grid: Float[Array, "y_dim x_dim 2"]
     frequency_grid: Float[Array, "y_dim x_dim//2+1 2"]
-    full_frequency_grid: Optional[Float[Array, "y_dim x_dim 2"]]
+    full_frequency_grid: Float[Array, "y_dim x_dim 2"] | None
 
     def __init__(self, shape: tuple[int, int], only_rfft: bool = True):
         self.coordinate_grid = make_coordinate_grid(shape)
@@ -38,7 +39,7 @@ class GridHelper(eqx.Module, strict=True):
 
 class PadOptions(TypedDict):
     shape: tuple[int, int]
-    grid_helper: Optional[GridHelper]
+    grid_helper: GridHelper | None
     mode: str | Callable
 
 
@@ -49,7 +50,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
     pixel_size: eqx.AbstractVar[Float[Array, ""]]
     voltage_in_kilovolts: eqx.AbstractVar[Float[Array, ""]]
 
-    grid_helper: eqx.AbstractVar[Optional[GridHelper]]
+    grid_helper: eqx.AbstractVar[GridHelper | None]
     pad_options: eqx.AbstractVar[PadOptions]
 
     def __check_init__(self):
@@ -285,7 +286,7 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
     pixel_size: Float[Array, ""]
     voltage_in_kilovolts: Float[Array, ""]
 
-    grid_helper: Optional[GridHelper]
+    grid_helper: GridHelper | None
     pad_options: PadOptions
 
     def __init__(
@@ -294,7 +295,7 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
         pixel_size: float | Float[Array, ""],
         voltage_in_kilovolts: float | Float[Array, ""],
         *,
-        grid_helper: Optional[GridHelper] = None,
+        grid_helper: GridHelper | None = None,
         pad_options: dict[str, Any] = {},
     ):
         """**Arguments:**
@@ -346,7 +347,7 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
     voltage_in_kilovolts: Float[Array, ""]
     electrons_per_angstrom_squared: Float[Array, ""]
 
-    grid_helper: Optional[GridHelper]
+    grid_helper: GridHelper | None
     pad_options: PadOptions
 
     def __init__(
@@ -356,7 +357,7 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
         voltage_in_kilovolts: float | Float[Array, ""],
         electrons_per_angstrom_squared: float | Float[Array, ""],
         *,
-        grid_helper: Optional[GridHelper] = None,
+        grid_helper: GridHelper | None = None,
         pad_options: dict[str, Any] = {},
     ):
         """**Arguments:**

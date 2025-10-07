@@ -5,7 +5,6 @@ Large amounts of the code are adapted from the ioSPI package
 
 import importlib.resources as pkg_resources
 import os
-from typing import Optional
 
 import jax.numpy as jnp
 import numpy as np
@@ -15,7 +14,7 @@ from jaxtyping import Float, Int
 
 def get_tabulated_scattering_factor_parameters(
     atom_types: Int[np.ndarray, " n_atoms"],
-    scattering_factor_parameter_table: Optional[xr.Dataset] = None,
+    scattering_factor_parameter_table: xr.Dataset | None = None,
 ) -> dict[str, Float[np.ndarray, " n_atoms n_scattering_factors"]]:
     """Gets the parameters for the scattering factor for each atom in
     `atom_types`.

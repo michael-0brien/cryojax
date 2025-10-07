@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from typing import Any, Optional
+from typing import Any
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -12,7 +12,7 @@ from .custom_types import PyTreeGrid, PyTreeGridIndex, PyTreeGridPoint
 def tree_grid_shape(
     tree_grid: PyTreeGrid,
     *,
-    is_leaf: Optional[Callable[[Any], bool]] = None,
+    is_leaf: Callable[[Any], bool] | None = None,
 ) -> tuple[int, ...]:
     """Get the shape of a pytree grid.
 
@@ -79,7 +79,7 @@ def tree_grid_unravel_index(
     raveled_index: int | Int[Array, ""] | Int[Array, " _"],
     tree_grid: PyTreeGrid,
     *,
-    is_leaf: Optional[Callable[[Any], bool]] = None,
+    is_leaf: Callable[[Any], bool] | None = None,
 ) -> PyTreeGridIndex:
     """Get a "grid index" for a pytree grid.
 
@@ -161,9 +161,9 @@ def tree_grid_take(
 def _tree_take(
     pytree_of_arrays: PyTree[Array],
     pytree_of_indices: PyTree[Int[Array, "..."]],
-    axis: Optional[int] = None,
-    mode: Optional[str] = None,
-    fill_value: Optional[Array] = None,
+    axis: int | None = None,
+    mode: str | None = None,
+    fill_value: Array | None = None,
 ) -> PyTree[Array]:
     return jtu.tree_map(
         lambda i, l: _leaf_take(i, l, axis=axis, mode=mode, fill_value=fill_value),

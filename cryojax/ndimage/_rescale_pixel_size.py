@@ -2,8 +2,6 @@
 Routines for rescaling image pixel size.
 """
 
-from typing import Optional
-
 import jax
 import jax.numpy as jnp
 from jax.image import scale_and_translate
@@ -78,7 +76,7 @@ def maybe_rescale_pixel_size(
     new_pixel_size: Float[Array, ""] | float,
     input_is_real: bool = True,
     input_is_rfft: bool = True,
-    shape_in_real_space: Optional[tuple[int, int]] = None,
+    shape_in_real_space: tuple[int, int] | None = None,
     method: str = "bicubic",
 ) -> (
     Inexact[Array, "padded_y_dim padded_x_dim"]

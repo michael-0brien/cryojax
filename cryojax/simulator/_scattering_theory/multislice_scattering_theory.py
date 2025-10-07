@@ -1,4 +1,3 @@
-from typing import Optional
 from typing_extensions import override
 
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
@@ -39,7 +38,7 @@ class MultisliceScatteringTheory(AbstractWaveScatteringTheory, strict=True):
         self,
         volume_representation: AbstractVolumeRepresentation,
         image_config: AbstractImageConfig,
-        rng_key: Optional[PRNGKeyArray] = None,
+        rng_key: PRNGKeyArray | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]:
         # Compute the wavefunction in the exit plane
         wavefunction = self.volume_integrator.integrate(

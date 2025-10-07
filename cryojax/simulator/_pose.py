@@ -4,7 +4,6 @@ Representations of rigid body rotations and translations of 3D coordinate system
 
 from abc import abstractmethod
 from functools import cached_property
-from typing import Optional
 from typing_extensions import Self, override
 
 import equinox as eqx
@@ -26,7 +25,7 @@ class AbstractPose(Module, strict=True):
 
     offset_x_in_angstroms: AbstractVar[Float[Array, ""]]
     offset_y_in_angstroms: AbstractVar[Float[Array, ""]]
-    offset_z_in_angstroms: AbstractVar[Optional[Float[Array, ""]]]
+    offset_z_in_angstroms: AbstractVar[Float[Array, ""] | None]
 
     def rotate_coordinates(
         self,
@@ -219,7 +218,7 @@ class EulerAnglePose(AbstractPose, strict=True):
 
     offset_x_in_angstroms: Float[Array, ""]
     offset_y_in_angstroms: Float[Array, ""]
-    offset_z_in_angstroms: Optional[Float[Array, ""]]
+    offset_z_in_angstroms: Float[Array, ""] | None
 
     phi_angle: Float[Array, ""]
     theta_angle: Float[Array, ""]
@@ -233,7 +232,7 @@ class EulerAnglePose(AbstractPose, strict=True):
         theta_angle: float | Float[NDArrayLike, ""] = 0.0,
         psi_angle: float | Float[NDArrayLike, ""] = 0.0,
         *,
-        offset_z_in_angstroms: Optional[float | Float[NDArrayLike, ""]] = None,
+        offset_z_in_angstroms: float | Float[NDArrayLike, ""] | None = None,
     ):
         """**Arguments:**
 
@@ -286,7 +285,7 @@ class QuaternionPose(AbstractPose, strict=True):
 
     offset_x_in_angstroms: Float[Array, ""]
     offset_y_in_angstroms: Float[Array, ""]
-    offset_z_in_angstroms: Optional[Float[Array, ""]]
+    offset_z_in_angstroms: Float[Array, ""] | None
 
     wxyz: Float[Array, "4"]
 
@@ -301,7 +300,7 @@ class QuaternionPose(AbstractPose, strict=True):
             0.0,
         ),
         *,
-        offset_z_in_angstroms: Optional[float | Float[NDArrayLike, ""]] = None,
+        offset_z_in_angstroms: float | Float[NDArrayLike, ""] | None = None,
     ):
         """**Arguments:**
 
@@ -350,7 +349,7 @@ class AxisAnglePose(AbstractPose, strict=True):
 
     offset_x_in_angstroms: Float[Array, ""]
     offset_y_in_angstroms: Float[Array, ""]
-    offset_z_in_angstroms: Optional[Float[Array, ""]]
+    offset_z_in_angstroms: Float[Array, ""] | None
 
     euler_vector: Float[Array, "3"]
 
@@ -364,7 +363,7 @@ class AxisAnglePose(AbstractPose, strict=True):
             0.0,
         ),
         *,
-        offset_z_in_angstroms: Optional[float | Float[NDArrayLike, ""]] = None,
+        offset_z_in_angstroms: float | Float[NDArrayLike, ""] | None = None,
     ):
         """**Arguments:**
 

@@ -2,7 +2,7 @@
 
 import math
 from collections.abc import Callable
-from typing import Any, Optional
+from typing import Any
 
 import equinox as eqx
 import equinox.internal as eqxi
@@ -28,7 +28,7 @@ def run_grid_search(
     tree_grid: PyTreeGrid,
     args: Any,
     *,
-    is_leaf: Optional[Callable[[Any], bool]] = None,
+    is_leaf: Callable[[Any], bool] | None = None,
     progress_bar: bool = False,
     total_progress_bar_updates: int = 20,
 ) -> PyTree[Any]:

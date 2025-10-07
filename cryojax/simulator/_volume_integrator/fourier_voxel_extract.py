@@ -2,7 +2,7 @@
 Using the fourier slice theorem for computing volume projections.
 """
 
-from typing import ClassVar, Optional
+from typing import ClassVar
 from typing_extensions import override
 
 import equinox as eqx
@@ -28,7 +28,7 @@ class AbstractFourierSurfaceExtraction(
     AbstractVoxelVolumeIntegrator[FourierVoxelGridVolume | FourierVoxelSplineVolume],
     strict=True,
 ):
-    correction_mask: eqx.AbstractVar[Optional[InverseSincMask]]
+    correction_mask: eqx.AbstractVar[InverseSincMask | None]
 
 
 class FourierSliceExtraction(AbstractFourierSurfaceExtraction, strict=True):
@@ -41,7 +41,7 @@ class FourierSliceExtraction(AbstractFourierSurfaceExtraction, strict=True):
     """
 
     outputs_integral: bool
-    correction_mask: Optional[InverseSincMask]
+    correction_mask: InverseSincMask | None
     out_of_bounds_mode: str
     fill_value: complex
 
@@ -51,7 +51,7 @@ class FourierSliceExtraction(AbstractFourierSurfaceExtraction, strict=True):
         self,
         *,
         outputs_integral: bool = True,
-        correction_mask: Optional[InverseSincMask] = None,
+        correction_mask: InverseSincMask | None = None,
         out_of_bounds_mode: str = "fill",
         fill_value: complex = 0.0 + 0.0j,
     ):
@@ -231,7 +231,7 @@ class EwaldSphereExtraction(AbstractFourierSurfaceExtraction, strict=True):
     """
 
     outputs_integral: bool
-    correction_mask: Optional[InverseSincMask]
+    correction_mask: InverseSincMask | None
     out_of_bounds_mode: str
     fill_value: complex
 
@@ -241,7 +241,7 @@ class EwaldSphereExtraction(AbstractFourierSurfaceExtraction, strict=True):
         self,
         *,
         outputs_integral: bool = True,
-        correction_mask: Optional[InverseSincMask] = None,
+        correction_mask: InverseSincMask | None = None,
         out_of_bounds_mode: str = "fill",
         fill_value: complex = 0.0 + 0.0j,
     ):

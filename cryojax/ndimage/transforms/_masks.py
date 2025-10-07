@@ -5,7 +5,6 @@ Masks to apply to images in real space.
 import abc
 import functools
 import operator
-from typing import Optional
 from typing_extensions import override
 
 import jax
@@ -161,7 +160,7 @@ class Cylindrical2DCosineMask(AbstractMask, strict=True):
         radius: float | Float[NDArrayLike, ""],
         rolloff_width: float | Float[NDArrayLike, ""],
         in_plane_rotation_angle: float | Float[NDArrayLike, ""] = 0.0,
-        length: Optional[float | Float[NDArrayLike, ""]] = None,
+        length: float | Float[NDArrayLike, ""] | None = None,
     ):
         """**Arguments:**
 
@@ -323,7 +322,7 @@ def _compute_circular_or_spherical_mask(
     coordinate_grid: Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"],
     radius: Float[Array, ""],
     rolloff_width: Float[Array, ""],
-    offset: Optional[Float[Array, "2"] | Float[Array, "3"]] = None,
+    offset: Float[Array, "2"] | Float[Array, "3"] | None = None,
 ) -> Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]:
     if offset is not None:
         coordinate_grid -= offset[None, None, :]

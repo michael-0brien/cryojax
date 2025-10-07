@@ -2,7 +2,8 @@
 
 import math
 from abc import abstractmethod
-from typing import Any, Callable, Generic, Optional
+from collections.abc import Callable
+from typing import Any, Generic
 
 import equinox as eqx
 import jax
@@ -25,7 +26,7 @@ class AbstractGridSearchMethod(
     search.
     """
 
-    batch_size: eqx.AbstractVar[Optional[int]]
+    batch_size: eqx.AbstractVar[int | None]
 
     @abstractmethod
     def init(
@@ -33,7 +34,7 @@ class AbstractGridSearchMethod(
         tree_grid: PyTreeGrid,
         f_struct: PyTree[jax.ShapeDtypeStruct],
         *,
-        is_leaf: Optional[Callable[[Any], bool]] = None,
+        is_leaf: Callable[[Any], bool] | None = None,
     ) -> SearchState:
         """Initialize the state of the search method.
 
@@ -113,7 +114,7 @@ class AbstractGridSearchMethod(
         final_state: SearchState,
         f_struct: PyTree[jax.ShapeDtypeStruct],
         *,
-        is_leaf: Optional[Callable[[Any], bool]] = None,
+        is_leaf: Callable[[Any], bool] | None = None,
     ) -> SearchSolution:
         """Post-process the final state of the grid search into a
         solution.
@@ -136,11 +137,11 @@ class AbstractGridSearchMethod(
 class MinimumState(eqx.Module, strict=True):
     current_minimum_eval: Array
     current_best_raveled_index: Array
-    current_eval: Optional[Array] = None
+    current_eval: Array | None = None
 
 
 class MinimumSolution(eqx.Module, strict=True):
-    value: Optional[PyTreeGridPoint]
+    value: PyTreeGridPoint | None
     stats: dict[str, Any]
     state: MinimumState
 
@@ -157,14 +158,14 @@ class MinimumSearchMethod(
 
     stores_solution_value: bool
     stores_current_eval: bool
-    batch_size: Optional[int]
+    batch_size: int | None
 
     def __init__(
         self,
         *,
         stores_solution_value: bool = True,
         stores_current_eval: bool = False,
-        batch_size: Optional[int] = None,
+        batch_size: int | None = None,
     ):
         """**Arguments:**
 
@@ -188,7 +189,7 @@ class MinimumSearchMethod(
         tree_grid: PyTreeGrid,
         f_struct: PyTree[jax.ShapeDtypeStruct],
         *,
-        is_leaf: Optional[Callable[[Any], bool]] = None,
+        is_leaf: Callable[[Any], bool] | None = None,
     ) -> MinimumState:
         # Initialize the state, just keeping track of the best function values
         # and their respective grid index
@@ -269,7 +270,7 @@ class MinimumSearchMethod(
         final_state: MinimumState,
         f_struct: PyTree[jax.ShapeDtypeStruct],
         *,
-        is_leaf: Optional[Callable[[Any], bool]] = None,
+        is_leaf: Callable[[Any], bool] | None = None,
     ) -> MinimumSolution:
         # Make sure that shapes did not get modified during loop
         if final_state.current_best_raveled_index.shape != f_struct.shape:

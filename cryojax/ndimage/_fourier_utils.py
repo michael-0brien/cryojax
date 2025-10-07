@@ -1,11 +1,9 @@
-from typing import Optional
-
 from jaxtyping import Array, Complex
 
 
 def convert_fftn_to_rfftn(
     fftn_array: Complex[Array, "y_dim x_dim"],
-    mode: Optional[str] = "zero",
+    mode: str | None = "zero",
 ) -> Complex[Array, "y_dim x_dim//2+1"]:
     """Converts the output of a call to `jax.numpy.fft.fftn` to
     an `jax.numpy.fft.rfftn`.

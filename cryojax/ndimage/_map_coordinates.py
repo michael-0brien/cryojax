@@ -8,7 +8,7 @@ This code was developed for the project [`dLux`](https://louisdesdoigts.github.i
 import functools
 import itertools
 import operator
-from typing import List, Sequence, Tuple
+from collections.abc import Sequence
 
 import jax.numpy as jnp
 import lineax as lx
@@ -94,9 +94,8 @@ def _map_coordinates_nn_or_linear(
 
     if len(coordinates) != input_arr.ndim:
         raise ValueError(
-            "coordinates must be a sequence of length input.ndim, but {} != {}".format(
-                len(coordinates), input_arr.ndim
-            )
+            f"Coordinates must be a sequence of length {input_arr.ndim}, "
+            f"but found that it was equal to {len(coordinates)}."
         )
 
     if order == 0:
@@ -134,7 +133,7 @@ def _map_coordinates_with_cubic_spline(
     if len(coordinates) != coefficients.ndim:
         raise ValueError(
             "coordinates must be a sequence of length coefficients.ndim, but "
-            "{} != {}".format(len(coordinates), coefficients.ndim)
+            f"{len(coordinates)} != {coefficients.ndim}"
         )
     # Stack coordinates along one axis
     coords = jnp.stack([jnp.asarray(c) for c in coordinates], axis=0)
@@ -160,7 +159,7 @@ def _round_half_away_from_zero(a: Array) -> Array:
 
 def _nearest_indices_and_weights(
     coordinate: Array,
-) -> List[Tuple[Array, ArrayLike]]:
+) -> list[tuple[Array, ArrayLike]]:
     index = _round_half_away_from_zero(coordinate).astype(jnp.int32)
     weight = coordinate.dtype.type(1)
     return [(index, weight)]
@@ -168,7 +167,7 @@ def _nearest_indices_and_weights(
 
 def _linear_indices_and_weights(
     coordinate: Array,
-) -> List[Tuple[Array, ArrayLike]]:
+) -> list[tuple[Array, ArrayLike]]:
     lower = jnp.floor(coordinate)
     upper_weight = coordinate - lower
     lower_weight = 1 - upper_weight

@@ -2,8 +2,6 @@
 Functions for creating coordinate systems.
 """
 
-from typing import Optional
-
 import jax.numpy as jnp
 import numpy as np
 from jaxtyping import Array, Float
@@ -304,7 +302,7 @@ def _make_coordinates_or_frequencies_1d(
     size: int,
     grid_spacing: float | Float[np.ndarray, ""] | Float[Array, ""],
     outputs_real_space: bool = False,
-    outputs_rfftfreqs: Optional[bool] = None,
+    outputs_rfftfreqs: bool | None = None,
 ) -> Float[Array, " size"]:
     """One-dimensional coordinates in real or fourier space"""
     if outputs_real_space:

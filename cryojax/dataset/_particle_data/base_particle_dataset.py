@@ -1,6 +1,6 @@
 import abc
 import pathlib
-from typing import Generic, Literal, Optional, TypeVar
+from typing import Generic, Literal, TypeVar
 
 import numpy as np
 from jaxtyping import Float, Int, PyTree
@@ -60,7 +60,7 @@ class AbstractParticleStackDataset(AbstractDataset[T1], Generic[T1, T2]):
         self,
         index_array: Int[np.ndarray, " _"],
         images: Float[NDArrayLike, "... _ _"],
-        parameters: Optional[PyTree] = None,
+        parameters: PyTree | None = None,
     ):
         raise NotImplementedError
 

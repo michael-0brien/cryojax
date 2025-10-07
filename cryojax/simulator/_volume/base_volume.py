@@ -1,5 +1,5 @@
 import abc
-from typing import Optional, TypeVar
+from typing import TypeVar
 from typing_extensions import Self, override
 
 import equinox as eqx
@@ -59,7 +59,7 @@ class AbstractVolumeParametrization(eqx.Module, strict=True):
 
     @abc.abstractmethod
     def compute_representation(
-        self, rng_key: Optional[PRNGKeyArray] = None
+        self, rng_key: PRNGKeyArray | None = None
     ) -> "AbstractVolumeRepresentation":
         """Core interface for computing the representation of
         the volume.
@@ -81,7 +81,7 @@ class AbstractVolumeRepresentation(AbstractVolumeParametrization, strict=True):
         raise NotImplementedError
 
     @override
-    def compute_representation(self, rng_key: Optional[PRNGKeyArray] = None) -> Self:
+    def compute_representation(self, rng_key: PRNGKeyArray | None = None) -> Self:
         """Since this class is itself an
         `AbstractVolumeRepresentation`, this function maps to the identity.
 

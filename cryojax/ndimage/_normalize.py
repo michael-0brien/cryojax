@@ -3,7 +3,6 @@ Image normalization routines.
 """
 
 import math
-from typing import Optional
 
 import jax.numpy as jnp
 from jaxtyping import Array, Bool, Float, Inexact
@@ -13,9 +12,9 @@ def normalize_image(
     image: Inexact[Array, "y_dim x_dim"],
     *,
     input_is_real_space: bool = True,
-    where: Optional[Bool[Array, "y_dim x_dim"]] = None,
+    where: Bool[Array, "y_dim x_dim"] | None = None,
     input_is_rfft: bool = True,
-    shape_in_real_space: Optional[tuple[int, int]] = None,
+    shape_in_real_space: tuple[int, int] | None = None,
 ) -> Inexact[Array, "y_dim x_dim"]:
     """Normalize so that the image is mean 0 and standard deviation 1 in real space."""
     return rescale_image(
@@ -35,9 +34,9 @@ def rescale_image(
     mean: float | Float[Array, ""],
     *,
     input_is_real_space: bool = True,
-    where: Optional[Bool[Array, "y_dim x_dim"]] = None,
+    where: Bool[Array, "y_dim x_dim"] | None = None,
     input_is_rfft: bool = True,
-    shape_in_real_space: Optional[tuple[int, int]] = None,
+    shape_in_real_space: tuple[int, int] | None = None,
 ) -> Inexact[Array, "y_dim x_dim"]:
     """Normalize so that the image is mean `mean`
     and standard deviation `std` in real space.

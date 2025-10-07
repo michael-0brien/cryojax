@@ -1,4 +1,3 @@
-from typing import Optional
 from typing_extensions import override
 
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
@@ -19,13 +18,13 @@ class WeakPhaseScatteringTheory(AbstractWeakPhaseScatteringTheory, strict=True):
 
     volume_integrator: AbstractVolumeIntegrator
     transfer_theory: ContrastTransferTheory
-    solvent: Optional[AbstractRandomSolvent2D] = None
+    solvent: AbstractRandomSolvent2D | None = None
 
     def __init__(
         self,
         volume_integrator: AbstractVolumeIntegrator,
         transfer_theory: ContrastTransferTheory,
-        solvent: Optional[AbstractRandomSolvent2D] = None,
+        solvent: AbstractRandomSolvent2D | None = None,
     ):
         """**Arguments:**
 
@@ -51,7 +50,7 @@ class WeakPhaseScatteringTheory(AbstractWeakPhaseScatteringTheory, strict=True):
         self,
         volume_representation: AbstractVolumeRepresentation,
         image_config: AbstractImageConfig,
-        rng_key: Optional[PRNGKeyArray] = None,
+        rng_key: PRNGKeyArray | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         # Compute the integrated potential
         fourier_in_plane_potential = self.volume_integrator.integrate(
@@ -77,8 +76,8 @@ class WeakPhaseScatteringTheory(AbstractWeakPhaseScatteringTheory, strict=True):
         self,
         volume_representation: AbstractVolumeRepresentation,
         image_config: AbstractImageConfig,
-        rng_key: Optional[PRNGKeyArray] = None,
-        defocus_offset: Optional[float | Float[Array, ""]] = None,
+        rng_key: PRNGKeyArray | None = None,
+        defocus_offset: float | Float[Array, ""] | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         object_spectrum = self.compute_object_spectrum(
             volume_representation, image_config, rng_key

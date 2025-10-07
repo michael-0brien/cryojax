@@ -1,5 +1,4 @@
 from abc import abstractmethod
-from typing import Optional
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -21,7 +20,7 @@ class AbstractCTF(eqx.Module, strict=True):
         self,
         frequency_grid_in_angstroms: Float[Array, "y_dim x_dim 2"],
         wavelength_in_angstroms: Float[NDArrayLike, ""] | float,
-        defocus_offset: Optional[Float[NDArrayLike, ""] | float] = None,
+        defocus_offset: Float[NDArrayLike, ""] | float | None = None,
     ) -> Float[Array, "y_dim x_dim"]:
         raise NotImplementedError
 
@@ -32,7 +31,7 @@ class AbstractCTF(eqx.Module, strict=True):
         amplitude_contrast_ratio: Float[NDArrayLike, ""] | float = 0.1,
         phase_shift: Float[NDArrayLike, ""] | float = 0.0,
         outputs_exp: bool = False,
-        defocus_offset: Optional[Float[NDArrayLike, ""] | float] = None,
+        defocus_offset: Float[NDArrayLike, ""] | float | None = None,
     ) -> Float[Array, "y_dim x_dim"] | Complex[Array, "y_dim x_dim"]:
         """Compute the CTF as a JAX array.
 
@@ -132,7 +131,7 @@ class AstigmaticCTF(AbstractCTF, strict=True):
         self,
         frequency_grid_in_angstroms: Float[Array, "y_dim x_dim 2"],
         wavelength_in_angstroms: Float[NDArrayLike, ""] | float,
-        defocus_offset: Optional[Float[NDArrayLike, ""] | float] = None,
+        defocus_offset: Float[NDArrayLike, ""] | float | None = None,
     ) -> Float[Array, "y_dim x_dim"]:
         """Compute the frequency-dependent phase shifts due to wave aberration.
 

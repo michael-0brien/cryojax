@@ -3,7 +3,8 @@ Base classes for image operators.
 """
 
 from abc import abstractmethod
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 from typing_extensions import override
 
 import equinox as eqx

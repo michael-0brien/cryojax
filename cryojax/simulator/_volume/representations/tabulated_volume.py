@@ -1,5 +1,5 @@
 import abc
-from typing import Any, Generic, Optional, TypeVar
+from typing import Any, Generic, TypeVar
 from typing_extensions import Self, override
 
 import equinox as eqx
@@ -64,7 +64,7 @@ class AbstractTabulatedAtomicVolume(AbstractAtomicVolume, Generic[T], strict=Tru
         cls,
         atom_positions: Float[NDArrayLike, "n_atoms 3"],
         parameters: T,
-        extra_b_factors: Optional[Float[NDArrayLike, " n_atoms"]] = None,
+        extra_b_factors: Float[NDArrayLike, " n_atoms"] | None = None,
     ) -> Self:
         """Construct a scattering potential parametrisation from
         tabulated electron scattering factors.
@@ -138,7 +138,7 @@ class PengAtomicVolume(
         cls,
         atom_positions: Float[NDArrayLike, "n_atoms 3"],
         parameters: PengScatteringFactorParameters,
-        extra_b_factors: Optional[Float[NDArrayLike, " n_atoms"]] = None,
+        extra_b_factors: Float[NDArrayLike, " n_atoms"] | None = None,
     ) -> Self:
         """Initialize a `PengAtomicVolume` with a
         convenience wrapper for the scattering factor parameters.

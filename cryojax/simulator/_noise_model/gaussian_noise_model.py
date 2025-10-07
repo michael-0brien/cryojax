@@ -3,7 +3,6 @@ Image formation models simulated from gaussian noise distributions.
 """
 
 from abc import abstractmethod
-from typing import Optional
 from typing_extensions import override
 
 import jax.numpy as jnp
@@ -48,8 +47,8 @@ class AbstractGaussianNoiseModel(AbstractNoiseModel, strict=True):
         rng_key: PRNGKeyArray,
         *,
         outputs_real_space: bool = True,
-        mask: Optional[MaskLike] = None,
-        filter: Optional[FilterLike] = None,
+        mask: MaskLike | None = None,
+        filter: FilterLike | None = None,
     ) -> ImageArray:
         """Sample a noisy image from the gaussian noise model.
 
@@ -86,10 +85,10 @@ class AbstractGaussianNoiseModel(AbstractNoiseModel, strict=True):
     def compute_signal(
         self,
         *,
-        rng_key: Optional[PRNGKeyArray] = None,
+        rng_key: PRNGKeyArray | None = None,
         outputs_real_space: bool = True,
-        mask: Optional[MaskLike] = None,
-        filter: Optional[FilterLike] = None,
+        mask: MaskLike | None = None,
+        filter: FilterLike | None = None,
     ) -> ImageArray:
         """Render the signal from the image formation model.
 
@@ -120,8 +119,8 @@ class AbstractGaussianNoiseModel(AbstractNoiseModel, strict=True):
         rng_key: PRNGKeyArray,
         *,
         outputs_real_space: bool = True,
-        mask: Optional[MaskLike] = None,
-        filter: Optional[FilterLike] = None,
+        mask: MaskLike | None = None,
+        filter: FilterLike | None = None,
     ) -> ImageArray:
         """Draw a realization from the gaussian noise model and return either in
         real or fourier space.
@@ -174,8 +173,8 @@ class UncorrelatedGaussianNoiseModel(AbstractGaussianNoiseModel, strict=True):
         rng_key: PRNGKeyArray,
         *,
         outputs_real_space: bool = True,
-        mask: Optional[MaskLike] = None,
-        filter: Optional[FilterLike] = None,
+        mask: MaskLike | None = None,
+        filter: FilterLike | None = None,
     ) -> ImageArray:
         """Sample a realization of the noise from the distribution.
 
@@ -216,8 +215,8 @@ class UncorrelatedGaussianNoiseModel(AbstractGaussianNoiseModel, strict=True):
             "{self.image_model.image_config.y_dim} {self.image_model.image_config.x_dim}",
         ],
         *,
-        mask: Optional[MaskLike] = None,
-        filter: Optional[FilterLike] = None,
+        mask: MaskLike | None = None,
+        filter: FilterLike | None = None,
     ) -> Float[Array, ""]:
         """Evaluate the log-likelihood of the gaussian noise model.
 
@@ -275,7 +274,7 @@ class CorrelatedGaussianNoiseModel(AbstractGaussianNoiseModel, strict=True):
     def __init__(
         self,
         image_model: AbstractImageModel,
-        variance_function: Optional[FourierOperatorLike] = None,
+        variance_function: FourierOperatorLike | None = None,
         signal_scale_factor: float | Float[NDArrayLike, ""] = 1.0,
         signal_offset: float | Float[NDArrayLike, ""] = 0.0,
     ):
@@ -303,8 +302,8 @@ class CorrelatedGaussianNoiseModel(AbstractGaussianNoiseModel, strict=True):
         rng_key: PRNGKeyArray,
         *,
         outputs_real_space: bool = True,
-        mask: Optional[MaskLike] = None,
-        filter: Optional[FilterLike] = None,
+        mask: MaskLike | None = None,
+        filter: FilterLike | None = None,
     ) -> ImageArray:
         """Sample a realization of the noise from the distribution.
 
@@ -346,8 +345,8 @@ class CorrelatedGaussianNoiseModel(AbstractGaussianNoiseModel, strict=True):
             "{self.image_model.image_config.x_dim//2+1}",
         ],
         *,
-        mask: Optional[MaskLike] = None,
-        filter: Optional[FilterLike] = None,
+        mask: MaskLike | None = None,
+        filter: FilterLike | None = None,
     ) -> Float[Array, ""]:
         """Evaluate the log-likelihood of the gaussian noise model.
 

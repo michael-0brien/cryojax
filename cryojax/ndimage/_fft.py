@@ -2,8 +2,6 @@
 Routines to compute FFTs, in cryojax conventions.
 """
 
-from typing import Optional
-
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float, Inexact
 
@@ -12,8 +10,8 @@ from ..jax_util import NDArrayLike
 
 def ifftn(
     ft: Inexact[NDArrayLike, "..."],
-    s: Optional[tuple[int, ...]] = None,
-    axes: Optional[tuple[int, ...]] = None,
+    s: tuple[int, ...] | None = None,
+    axes: tuple[int, ...] | None = None,
 ) -> Complex[Array, "..."]:
     """The equivalent of `jax.numpy.fft.ifftn` in `cryojax` conventions.
 
@@ -35,8 +33,8 @@ def ifftn(
 
 def fftn(
     ift: Inexact[NDArrayLike, "..."],
-    s: Optional[tuple[int, ...]] = None,
-    axes: Optional[tuple[int, ...]] = None,
+    s: tuple[int, ...] | None = None,
+    axes: tuple[int, ...] | None = None,
 ) -> Complex[Array, "..."]:
     """The equivalent of `jax.numpy.fft.fftn` in `cryojax` conventions.
 
@@ -58,8 +56,8 @@ def fftn(
 
 def irfftn(
     ft: Inexact[NDArrayLike, "..."],
-    s: Optional[tuple[int, ...]] = None,
-    axes: Optional[tuple[int, ...]] = None,
+    s: tuple[int, ...] | None = None,
+    axes: tuple[int, ...] | None = None,
 ) -> Float[Array, "..."]:
     """The equivalent of `jax.numpy.fft.irfftn` in `cryojax` conventions.
 
@@ -81,8 +79,8 @@ def irfftn(
 
 def rfftn(
     ift: Float[NDArrayLike, "..."],
-    s: Optional[tuple[int, ...]] = None,
-    axes: Optional[tuple[int, ...]] = None,
+    s: tuple[int, ...] | None = None,
+    axes: tuple[int, ...] | None = None,
 ) -> Complex[Array, "..."]:
     """The equivalent of `jax.numpy.fft.rfftn` in `cryojax` conventions.
 

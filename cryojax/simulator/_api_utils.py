@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import Literal
 
 from jaxtyping import Bool
 
@@ -36,13 +36,13 @@ def make_image_model(
     volume_parametrization: AbstractVolumeParametrization,
     image_config: AbstractImageConfig,
     pose: AbstractPose,
-    transfer_theory: Optional[ContrastTransferTheory] = None,
-    volume_integrator: Optional[AbstractVolumeIntegrator] = None,
-    detector: Optional[AbstractDetector] = None,
+    transfer_theory: ContrastTransferTheory | None = None,
+    volume_integrator: AbstractVolumeIntegrator | None = None,
+    detector: AbstractDetector | None = None,
     *,
     applies_translation: bool = True,
     normalizes_signal: bool = False,
-    signal_region: Optional[Bool[NDArrayLike, "_ _"]] = None,
+    signal_region: Bool[NDArrayLike, "_ _"] | None = None,
     simulates_quantity: bool = False,
     quantity_mode: Literal["contrast", "intensity", "counts"] = "contrast",
 ) -> AbstractImageModel:

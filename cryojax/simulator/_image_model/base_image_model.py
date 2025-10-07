@@ -3,7 +3,6 @@ Image formation models.
 """
 
 from abc import abstractmethod
-from typing import Optional
 from typing_extensions import override
 
 import equinox as eqx
@@ -56,22 +55,22 @@ class AbstractImageModel(eqx.Module, strict=True):
         raise NotImplementedError
 
     @abstractmethod
-    def get_signal_region(self) -> Optional[Bool[Array, "_ _"]]:
+    def get_signal_region(self) -> Bool[Array, "_ _"] | None:
         raise NotImplementedError
 
     @abstractmethod
-    def compute_fourier_image(self, rng_key: Optional[PRNGKeyArray] = None) -> Array:
+    def compute_fourier_image(self, rng_key: PRNGKeyArray | None = None) -> Array:
         """Render an image without postprocessing."""
         raise NotImplementedError
 
     def simulate(
         self,
-        rng_key: Optional[PRNGKeyArray] = None,
+        rng_key: PRNGKeyArray | None = None,
         *,
         removes_padding: bool = True,
         outputs_real_space: bool = True,
-        mask: Optional[MaskLike] = None,
-        filter: Optional[FilterLike] = None,
+        mask: MaskLike | None = None,
+        filter: FilterLike | None = None,
     ) -> Array:
         """Render an image.
 
@@ -108,8 +107,8 @@ class AbstractImageModel(eqx.Module, strict=True):
         fourier_image: Array,
         *,
         outputs_real_space: bool = True,
-        mask: Optional[MaskLike] = None,
-        filter: Optional[FilterLike] = None,
+        mask: MaskLike | None = None,
+        filter: FilterLike | None = None,
     ) -> Array:
         """Return an image postprocessed with filters, cropping, masking,
         and normalization in either real or fourier space.
@@ -185,8 +184,8 @@ class AbstractImageModel(eqx.Module, strict=True):
         *,
         removes_padding: bool = True,
         outputs_real_space: bool = True,
-        mask: Optional[MaskLike] = None,
-        filter: Optional[FilterLike] = None,
+        mask: MaskLike | None = None,
+        filter: FilterLike | None = None,
     ) -> Array:
         image_config = self.get_image_config()
         if removes_padding:
@@ -212,7 +211,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
 
     applies_translation: bool
     normalizes_signal: bool
-    signal_region: Optional[Bool[Array, "_ _"]]
+    signal_region: Bool[Array, "_ _"] | None
 
     def __init__(
         self,
@@ -224,7 +223,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
         *,
         applies_translation: bool = True,
         normalizes_signal: bool = False,
-        signal_region: Optional[Bool[NDArrayLike, "_ _"]] = None,
+        signal_region: Bool[NDArrayLike, "_ _"] | None = None,
     ):
         """**Arguments:**
 
@@ -270,12 +269,12 @@ class LinearImageModel(AbstractImageModel, strict=True):
         return self.image_config
 
     @override
-    def get_signal_region(self) -> Optional[Bool[Array, "_ _"]]:
+    def get_signal_region(self) -> Bool[Array, "_ _"] | None:
         return self.signal_region
 
     @override
     def compute_fourier_image(
-        self, rng_key: Optional[PRNGKeyArray] = None
+        self, rng_key: PRNGKeyArray | None = None
     ) -> PaddedFourierImageArray:
         # Get the representation of the volume
         if rng_key is None:
@@ -315,7 +314,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
 
     applies_translation: bool
     normalizes_signal: bool
-    signal_region: Optional[Bool[Array, "_ _"]]
+    signal_region: Bool[Array, "_ _"] | None
 
     def __init__(
         self,
@@ -326,7 +325,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
         *,
         applies_translation: bool = True,
         normalizes_signal: bool = False,
-        signal_region: Optional[Bool[NDArrayLike, "_ _"]] = None,
+        signal_region: Bool[NDArrayLike, "_ _"] | None = None,
     ):
         """**Arguments:**
 
@@ -370,12 +369,12 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
         return self.image_config
 
     @override
-    def get_signal_region(self) -> Optional[Bool[Array, "_ _"]]:
+    def get_signal_region(self) -> Bool[Array, "_ _"] | None:
         return self.signal_region
 
     @override
     def compute_fourier_image(
-        self, rng_key: Optional[PRNGKeyArray] = None
+        self, rng_key: PRNGKeyArray | None = None
     ) -> ImageArray | PaddedImageArray:
         # Get the representation of the volume
         if rng_key is None:

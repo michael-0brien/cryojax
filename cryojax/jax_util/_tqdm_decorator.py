@@ -1,5 +1,4 @@
 from collections.abc import Callable
-from typing import Optional
 
 import jax
 import tqdm.auto
@@ -10,7 +9,7 @@ from jax.debug import callback
 
 def fori_loop_tqdm_decorator(
     n_iterations: int,
-    print_every: Optional[int] = None,
+    print_every: int | None = None,
     **kwargs,
 ) -> Callable:
     """Add a tqdm progress bar to `body_fun` used in `jax.lax.fori_loop`.
@@ -33,7 +32,7 @@ def fori_loop_tqdm_decorator(
 
 def _build_tqdm(
     n: int,
-    print_rate: Optional[int] = None,
+    print_rate: int | None = None,
     tqdm_type: str = "auto",
     **kwargs,
 ) -> tuple[Callable, Callable]:

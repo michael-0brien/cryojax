@@ -3,7 +3,6 @@ Abstraction of electron detectors in a cryo-EM image.
 """
 
 from abc import abstractmethod
-from typing import Optional
 from typing_extensions import override
 
 import equinox as eqx
@@ -28,7 +27,7 @@ class AbstractDQE(eqx.Module, strict=True):
         self,
         frequency_grid_in_angstroms_or_pixels: Float[Array, "y_dim x_dim 2"],
         *,
-        pixel_size: Optional[Float[Array, ""]] = None,
+        pixel_size: Float[Array, ""] | None = None,
     ) -> Float[Array, "y_dim x_dim"]:
         """**Arguments:**
 
@@ -61,7 +60,7 @@ class CountingDQE(AbstractDQE, strict=True):
         self,
         frequency_grid_in_angstroms_or_pixels: Float[Array, "y_dim x_dim 2"],
         *,
-        pixel_size: Optional[Float[Array, ""]] = None,
+        pixel_size: Float[Array, ""] | None = None,
     ) -> Float[Array, "y_dim x_dim"]:
         if pixel_size is None:
             frequency_grid_in_nyquist_units = frequency_grid_in_angstroms_or_pixels / 0.5
@@ -91,7 +90,7 @@ class NullDQE(AbstractDQE, strict=True):
         self,
         frequency_grid_in_angstroms_or_pixels: Float[Array, "y_dim x_dim 2"],
         *,
-        pixel_size: Optional[Float[Array, ""]] = None,
+        pixel_size: Float[Array, ""] | None = None,
     ) -> Float[Array, "y_dim x_dim"]:
         return jnp.full(
             frequency_grid_in_angstroms_or_pixels.shape[0:2],
@@ -158,7 +157,7 @@ class AbstractDetector(Module, strict=True):
             "{config.padded_y_dim} {config.padded_x_dim//2+1}",
         ],
         config: DoseImageConfig,
-        key: Optional[PRNGKeyArray] = None,
+        key: PRNGKeyArray | None = None,
     ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim//2+1}"]:
         """Pass the image through the detector model."""
         N_pix = np.prod(config.padded_shape)

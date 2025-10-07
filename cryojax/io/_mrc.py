@@ -3,7 +3,7 @@ Routines for working with MRC files.
 """
 
 import pathlib
-from typing import Literal, Optional, cast, overload
+from typing import Literal, cast, overload
 
 import mrcfile
 import numpy as np
@@ -115,7 +115,7 @@ def write_image_to_mrc(
     pixel_size: Float[Array, ""] | Float[np.ndarray, ""] | float,
     filename: str | pathlib.Path,
     overwrite: bool = False,
-    compression: Optional[str] = None,
+    compression: str | None = None,
 ):
     """Write an image stack to an MRC file.
 
@@ -130,7 +130,7 @@ def write_image_to_mrc(
     # Validate filename as MRC path and get suffix
     suffix = _validate_filename_and_return_suffix(filename)
     if suffix != ".mrc":
-        raise IOError(
+        raise OSError(
             f"The suffix for an image in MRC format must be .mrc. Instead, got {suffix}."
         )
     if image.ndim != 2:
@@ -149,7 +149,7 @@ def write_image_stack_to_mrc(
     pixel_size: Float[Array, ""] | Float[np.ndarray, ""] | float,
     filename: str | pathlib.Path,
     overwrite: bool = False,
-    compression: Optional[str] = None,
+    compression: str | None = None,
 ):
     """Write an image stack to an MRC file.
 
@@ -164,7 +164,7 @@ def write_image_stack_to_mrc(
     # Validate filename as MRC path and get suffix
     suffix = _validate_filename_and_return_suffix(filename)
     if suffix != ".mrcs":
-        raise IOError(
+        raise OSError(
             "The suffix for an image stack in MRC format must be .mrcs. "
             f"Instead, got {suffix}."
         )
@@ -187,7 +187,7 @@ def write_volume_to_mrc(
     voxel_size: Float[Array, ""] | Float[np.ndarray, ""] | float,
     filename: str | pathlib.Path,
     overwrite: bool = False,
-    compression: Optional[str] = None,
+    compression: str | None = None,
 ):
     """Write a voxel grid to an MRC file.
 
@@ -202,7 +202,7 @@ def write_volume_to_mrc(
     # Validate filename as MRC path and get suffix
     suffix = _validate_filename_and_return_suffix(filename)
     if suffix != ".mrc":
-        raise IOError(
+        raise OSError(
             f"The suffix for a volume in MRC format must be .mrc. Instead, got {suffix}."
         )
     if voxel_grid.ndim != 3:
@@ -222,7 +222,7 @@ def _validate_filename_and_return_suffix(filename: str | pathlib.Path):
     suffixes = pathlib.Path(filename).suffixes
     # Make sure that leading suffix is valid MRC suffix
     if len(suffixes) == 0 or suffixes[0] not in [".mrc", ".mrcs"]:
-        raise IOError(
+        raise OSError(
             f"Filename should include .mrc or .mrcs suffix. Got filename {filename}."
         )
     return suffixes[0]
