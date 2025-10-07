@@ -219,10 +219,9 @@ def setup(num_images, path_to_pdb, path_to_starfile):
 #     print(f"JIT, Fourier Slice: {fs_avg_time:.4f} +/- {fs_std_time:.4f} s")
 
 
+@eqx.filter_jit
 @eqx.filter_vmap(in_axes=(eqx.if_array(0), eqx.if_array(0), eqx.if_array(0), None, None))
-def simulate_image_nojit(
-    image_config, pose, transfer_theory, potential, volume_integrator
-):
+def simulate_image(image_config, pose, transfer_theory, potential, volume_integrator):
     image_model = cxs.make_image_model(
         volume_parametrization=potential,
         image_config=image_config,
@@ -231,14 +230,6 @@ def simulate_image_nojit(
         volume_integrator=volume_integrator,
     )
     return image_model.simulate()
-
-
-@eqx.filter_jit
-def simulate_image_jit(image_config, pose, transfer_theory, potential, volume_integrator):
-    print("JIT compiling...")
-    return simulate_image_nojit(
-        image_config, pose, transfer_theory, potential, volume_integrator
-    )
 
 
 def benchmark_fourier_slice_vs_gmm(
@@ -255,16 +246,17 @@ def benchmark_fourier_slice_vs_gmm(
 
     time_list = []
     for _ in range(n_iterations + 1):
-        start_time = time()
-        gmm_image = simulate_image_nojit(
-            image_config,
-            pose,
-            transfer_theory,
-            volume_gmm,
-            cxs.GaussianMixtureProjection(),
-        )
-        gmm_image.block_until_ready()
-        end_time = time()
+        with jax.disable_jit():
+            start_time = time()
+            gmm_image = simulate_image(
+                image_config,
+                pose,
+                transfer_theory,
+                volume_gmm,
+                cxs.GaussianMixtureProjection(),
+            )
+            gmm_image.block_until_ready()
+            end_time = time()
         time_list.append(end_time - start_time)
     gmm_avg_time = jnp.mean(jnp.array(time_list[1:]))
     gmm_std_time = jnp.std(jnp.array(time_list[1:]))
@@ -273,7 +265,7 @@ def benchmark_fourier_slice_vs_gmm(
     time_list = []
     for _ in range(n_iterations + 1):
         start_time = time()
-        gmm_image = simulate_image_jit(
+        gmm_image = simulate_image(
             image_config,
             pose,
             transfer_theory,
@@ -291,28 +283,29 @@ def benchmark_fourier_slice_vs_gmm(
 
     time_list = []
     for _ in range(n_iterations + 1):
-        start_time = time()
-        fs_image = simulate_image_nojit(
-            image_config,
-            pose,
-            transfer_theory,
-            volume_fourier_grid,
-            cxs.FourierSliceExtraction(),
-        )
-        fs_image.block_until_ready()
-        end_time = time()
+        with jax.disable_jit():
+            start_time = time()
+            fs_image = simulate_image(
+                image_config,
+                pose,
+                transfer_theory,
+                volume_fourier_grid,
+                cxs.FourierSliceExtraction(),
+            )
+            fs_image.block_until_ready()
+            end_time = time()
         time_list.append(end_time - start_time)
     fs_avg_time = jnp.mean(jnp.array(time_list[1:]))
     fs_std_time = jnp.std(jnp.array(time_list[1:]))
     print(
         f"Fourier Slice (no JIT): {1000 * fs_avg_time:.2f} "
-        "+/- {1000 * fs_std_time:.2f} ms"
+        f"+/- {1000 * fs_std_time:.2f} ms"
     )
 
     time_list = []
     for _ in range(n_iterations + 1):
         start_time = time()
-        fs_image = simulate_image_jit(
+        fs_image = simulate_image(
             image_config,
             pose,
             transfer_theory,
