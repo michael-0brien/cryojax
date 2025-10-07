@@ -219,10 +219,9 @@ def setup(num_images, path_to_pdb, path_to_starfile):
 #     print(f"JIT, Fourier Slice: {fs_avg_time:.4f} +/- {fs_std_time:.4f} s")
 
 
+@eqx.filter_jit
 @eqx.filter_vmap(in_axes=(eqx.if_array(0), eqx.if_array(0), eqx.if_array(0), None, None))
-def simulate_image_vmap(
-    image_config, pose, transfer_theory, potential, volume_integrator
-):
+def simulate_image(image_config, pose, transfer_theory, potential, volume_integrator):
     image_model = cxs.make_image_model(
         volume_parametrization=potential,
         image_config=image_config,
@@ -247,25 +246,26 @@ def benchmark_fourier_slice_vs_gmm(
 
     time_list = []
     for _ in range(n_iterations + 1):
-        start_time = time()
-        gmm_image = simulate_image_vmap(
-            image_config,
-            pose,
-            transfer_theory,
-            volume_gmm,
-            cxs.GaussianMixtureProjection(),
-        )
-        gmm_image.block_until_ready()
-        end_time = time()
+        with jax.disable_jit():
+            start_time = time()
+            gmm_image = simulate_image(
+                image_config,
+                pose,
+                transfer_theory,
+                volume_gmm,
+                cxs.GaussianMixtureProjection(),
+            )
+            gmm_image.block_until_ready()
+            end_time = time()
         time_list.append(end_time - start_time)
     gmm_avg_time = jnp.mean(jnp.array(time_list[1:]))
     gmm_std_time = jnp.std(jnp.array(time_list[1:]))
-    print(f"GMM (no JIT): {gmm_avg_time:.4f} +/- {gmm_std_time:.4f} s")
+    print(f"GMM (no JIT): {1000 * gmm_avg_time:.2f} +/- {1000 * gmm_std_time:.2f} ms")
 
     time_list = []
     for _ in range(n_iterations + 1):
         start_time = time()
-        gmm_image = eqx.filter_jit(simulate_image_vmap)(
+        gmm_image = simulate_image(
             image_config,
             pose,
             transfer_theory,
@@ -277,12 +277,35 @@ def benchmark_fourier_slice_vs_gmm(
         time_list.append(end_time - start_time)
     jit_gmm_avg_time = jnp.mean(jnp.array(time_list[1:]))
     jit_gmm_std_time = jnp.std(jnp.array(time_list[1:]))
-    print(f"GMM (JIT): {jit_gmm_avg_time:.4f} +/- {jit_gmm_std_time:.4f} s")
+    print(
+        f"GMM (JIT): {1000 * jit_gmm_avg_time:.2f} +/- {1000 * jit_gmm_std_time:.2f} ms"
+    )
+
+    time_list = []
+    for _ in range(n_iterations + 1):
+        with jax.disable_jit():
+            start_time = time()
+            fs_image = simulate_image(
+                image_config,
+                pose,
+                transfer_theory,
+                volume_fourier_grid,
+                cxs.FourierSliceExtraction(),
+            )
+            fs_image.block_until_ready()
+            end_time = time()
+        time_list.append(end_time - start_time)
+    fs_avg_time = jnp.mean(jnp.array(time_list[1:]))
+    fs_std_time = jnp.std(jnp.array(time_list[1:]))
+    print(
+        f"Fourier Slice (no JIT): {1000 * fs_avg_time:.2f} "
+        f"+/- {1000 * fs_std_time:.2f} ms"
+    )
 
     time_list = []
     for _ in range(n_iterations + 1):
         start_time = time()
-        fs_image = simulate_image_vmap(
+        fs_image = simulate_image(
             image_config,
             pose,
             transfer_theory,
@@ -294,28 +317,13 @@ def benchmark_fourier_slice_vs_gmm(
         time_list.append(end_time - start_time)
     fs_avg_time = jnp.mean(jnp.array(time_list[1:]))
     fs_std_time = jnp.std(jnp.array(time_list[1:]))
-    print(f"Fourier Slice (no JIT): {fs_avg_time:.4f} +/- {fs_std_time:.4f} s")
-
-    time_list = []
-    for _ in range(n_iterations + 1):
-        start_time = time()
-        fs_image = eqx.filter_jit(simulate_image_vmap)(
-            image_config,
-            pose,
-            transfer_theory,
-            volume_fourier_grid,
-            cxs.FourierSliceExtraction(),
-        )
-        fs_image.block_until_ready()
-        end_time = time()
-        time_list.append(end_time - start_time)
-    fs_avg_time = jnp.mean(jnp.array(time_list[1:]))
-    fs_std_time = jnp.std(jnp.array(time_list[1:]))
-    print(f"Fourier Slice (JIT): {fs_avg_time:.4f} +/- {fs_std_time:.4f} s")
+    print(
+        f"Fourier Slice (JIT): {1000 * fs_avg_time:.2f} +/- {1000 * fs_std_time:.2f} ms"
+    )
 
 
 if __name__ == "__main__":
-    n_iterations, n_images = 30, 10
+    n_iterations, n_images = 10, 100
     print(
         f"Benchmarking image simulation of {n_images} images "
         f"averaged over {n_iterations} iterations"

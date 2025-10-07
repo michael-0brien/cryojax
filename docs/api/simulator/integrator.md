@@ -2,16 +2,16 @@
 
 `cryojax` provides different methods for integrating [volumes](./volume.md#volume-representations) onto a plane to generate an image.
 
-???+ abstract "`cryojax.simulator.AbstractDirectIntegrator`"
-    ::: cryojax.simulator.AbstractDirectIntegrator
+???+ abstract "`cryojax.simulator.AbstractVolumeIntegrator`"
+    ::: cryojax.simulator.AbstractVolumeIntegrator
         options:
             members:
                 - integrate
 
 ## Integration methods for voxel-based structures
 
-???+ abstract "`cryojax.simulator.AbstractDirectVoxelIntegrator`"
-    ::: cryojax.simulator.AbstractDirectIntegrator
+???+ abstract "`cryojax.simulator.AbstractVoxelVolumeIntegrator`"
+    ::: cryojax.simulator.AbstractVoxelVolumeIntegrator
         options:
             members:
                 - outputs_integral
