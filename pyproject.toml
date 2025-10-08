@@ -53,6 +53,9 @@ tests = [
     "pycistem; sys_platform == 'linux' and python_version < '3.12'",
     "typeguard==2.13.3"
 ]
+extras = [
+    "jax-finufft"
+]
 
 [build-system]
 requires = ["hatchling", "hatch-vcs"]

@@ -77,10 +77,10 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
                 projection_by_other_method = compute_projection(
                     volume, projection_method, image_config
                 )
-            except Exception as err:
+            except RuntimeError as err:
                 warnings.warn(
-                    "Could not test projection method `NufftProjection` "
-                    "This is most likely because `jax_finufft` is not installed. "
+                    "Could not test projection method `NufftProjection`, "
+                    "most likely because `jax_finufft` is not installed. "
                     f"Error traceback is:\n{err}"
                 )
                 continue
