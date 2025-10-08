@@ -115,7 +115,15 @@ class NufftProjection(
 
 
 def _project_with_nufft(weights, coordinate_list, shape, eps=1e-6):
-    from jax_finufft import nufft1
+    try:
+        from jax_finufft import nufft1  # type: ignore
+    except ModuleNotFoundError as err:
+        raise RuntimeError(
+            "Tried to compute a projection using the `NufftProjection` "
+            "class, but `jax-finufft` is not installed. "
+            "See https://github.com/flatironinstitute/jax-finufft "
+            "for installation instructions."
+        ) from err
 
     weights, coordinate_list = (
         jnp.asarray(weights, dtype=complex),
