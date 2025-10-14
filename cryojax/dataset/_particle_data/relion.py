@@ -601,9 +601,6 @@ class RelionParticleStackDataset(
             parameter_file.starfile_data["particles"],
             parameter_file.starfile_data["optics"],
         )
-        images_exist = "rlnImageName" in particle_data.columns
-        if mode == "w" and images_exist:
-            parameter_file = parameter_file.copy()
         self._parameter_file = parameter_file
         # ... properties common to reading and writing images
         self._path_to_relion_project = pathlib.Path(path_to_relion_project)
@@ -612,6 +609,7 @@ class RelionParticleStackDataset(
         # ... properties for writing images
         self._mrcfile_settings = _dict_to_mrcfile_settings(mrcfile_settings)
         # Now, initialize for `mode = 'r'` vs `mode = 'w'`
+        images_exist = "rlnImageName" in particle_data.columns
         project_exists = self.path_to_relion_project.exists()
         if mode == "w":
             # Write empty "rlnImageName" column (defaults to NaN values)
