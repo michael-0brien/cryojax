@@ -1,5 +1,4 @@
 from ._atomic_models import (
-    AtomicModelFile as AtomicModelFile,
     read_atoms_from_pdb as read_atoms_from_pdb,
 )
 from ._mrc import (

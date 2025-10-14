@@ -77,47 +77,12 @@ def test_read_pdb_at_structure(pdb_multiple_structures_path):
     assert atom_positions.shape[0] == 138
 
 
-# def test_read_full_assembly_pdb(sample_pdb_path_assembly):
-#     atom_positions, atom_types, b_factors = read_atoms_from_pdb(
-#         sample_pdb_path_assembly,
-#         center=True,
-#         selection_string="all",
-#         is_assembly=True,
-#         i_model=None,
-#         loads_b_factors=True,
-#     )
-
-#     assert atom_positions.ndim == 2
-#     assert atom_types.shape == b_factors.shape
-#     assert atom_positions.shape[0] == atom_types.shape[0]
-
-#     assert atom_positions.shape[1] == 3
-#     assert atom_positions.shape[0] == 1380
-
-
-# def test_read_cif(sample_cif_path):
-#     atom_positions, atom_types, b_factors = read_atoms_from_pdb(
-#         sample_cif_path,
-#         center=True,
-#         selection_string="all",
-#         is_assembly=False,
-#         i_model=None,
-#         loads_b_factors=True,
-#     )
-
-#     assert atom_positions.ndim == 2
-#     assert atom_types.shape == b_factors.shape
-#     assert atom_positions.shape[0] == atom_types.shape[0]
-
-#     assert atom_positions.shape[1] == 3
-#     assert atom_positions.shape[0] == 3222
-
-
-def test_read_from_url(sample_pdb_url):
+def test_read_cif(sample_cif_path):
     atom_positions, atom_types, b_factors = read_atoms_from_pdb(
-        sample_pdb_url,
+        sample_cif_path,
         center=True,
         selection_string="all",
+        model_index=None,
         loads_b_factors=True,
     )
 
@@ -126,7 +91,7 @@ def test_read_from_url(sample_pdb_url):
     assert atom_positions.shape[0] == atom_types.shape[0]
 
     assert atom_positions.shape[1] == 3
-    assert atom_positions.shape[0] == 1973
+    assert atom_positions.shape[0] == 3222
 
 
 def test_center_waterbox(sample_waterbox_pdb):

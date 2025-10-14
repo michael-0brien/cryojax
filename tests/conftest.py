@@ -29,10 +29,5 @@ def sample_cif_path():
 
 
 @pytest.fixture
-def sample_pdb_url():
-    return "https://files.rcsb.org/download/2XJX.pdb"
-
-
-@pytest.fixture
 def sample_waterbox_pdb():
     return os.path.join(os.path.dirname(__file__), "data", "relaxed_small_box_tip3p.pdb")

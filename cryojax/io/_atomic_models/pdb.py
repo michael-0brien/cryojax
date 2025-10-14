@@ -3,34 +3,25 @@ Read atomic information from a PDB file. Functions and objects are
 adapted from `mdtraj`.
 """
 
-import bz2
-import gzip
-import io
 import os
 import pathlib
 from copy import copy
-from io import StringIO
 from typing import Literal, TypedDict, cast, overload
-from urllib.parse import urlparse, uses_netloc, uses_params, uses_relative
-from urllib.request import urlopen
 from xml.etree import ElementTree
 
 import jax
 import mdtraj
+import mmdf
 import numpy as np
+import pandas as pd
 from jaxtyping import Float, Int
 from mdtraj.core import element as elem
 from mdtraj.core.topology import Topology
-from mdtraj.formats.pdb.pdbstructure import PdbStructure
-
-
-_VALID_URLS = set(uses_relative + uses_netloc + uses_params)
-_VALID_URLS.discard("")
 
 
 @overload
 def read_atoms_from_pdb(
-    filename_or_url: str | pathlib.Path,
+    filename: str | pathlib.Path,
     *,
     loads_b_factors: Literal[False],
     center: bool = True,
@@ -43,7 +34,7 @@ def read_atoms_from_pdb(
 
 @overload
 def read_atoms_from_pdb(  # type: ignore
-    filename_or_url: str | pathlib.Path,
+    filename: str | pathlib.Path,
     *,
     loads_b_factors: Literal[True],
     center: bool = True,
@@ -60,7 +51,7 @@ def read_atoms_from_pdb(  # type: ignore
 
 @overload
 def read_atoms_from_pdb(
-    filename_or_url: str | pathlib.Path,
+    filename: str | pathlib.Path,
     *,
     loads_b_factors: bool = False,
     center: bool = True,
@@ -72,7 +63,7 @@ def read_atoms_from_pdb(
 
 
 def read_atoms_from_pdb(
-    filename_or_url: str | pathlib.Path,
+    filename: str | pathlib.Path,
     *,
     loads_b_factors: bool = False,
     center: bool = True,
@@ -131,16 +122,16 @@ def read_atoms_from_pdb(
         do not have this leading dimension and are constant across
         models.
     """
-    # Load all atoms
-    with AtomicModelFile(filename_or_url) as pdb_file:
-        # Read file
-        atom_info, topology = pdb_file.read_atoms(
-            standardizes_names=standardizes_names,
-            topology=topology,
-            model_index=model_index,
-            loads_masses=center,
-            loads_b_factors=loads_b_factors,
-        )
+    # Load `mmdf` dataframe
+    df = mmdf.read(pathlib.Path(filename))
+    atom_info, topology = _load_atom_info(
+        df,
+        standardizes_names=standardizes_names,
+        topology=topology,
+        model_index=model_index,
+        loads_masses=center,
+        loads_b_factors=loads_b_factors,
+    )
     # Filter atoms and grab positions and identities
     selected_indices = topology.select(selection_string)
     atom_positions = atom_info["positions"][:, selected_indices]
@@ -171,128 +162,18 @@ def _center_atom_coordinates(atom_positions, atom_masses):
 
 
 class AtomProperties(TypedDict):
-    """A struct for the info of individual atoms.
-
-    **Attributes:**
-
-    - `identities`: The atomic numbers of all of the atoms.
-    - `masses`: The mass of each atom.
-    - `b_factors`: The B-factors of all of the atoms.
-    """
-
     identities: Int[np.ndarray, " N"]
     masses: Float[np.ndarray, " N"] | None
     b_factors: Float[np.ndarray, " N"] | None
 
 
 class AtomicModelInfo(TypedDict):
-    """A struct for the info of individual atoms.
-
-    **Keys:**
-
-    - `positions`:
-        The cartesian coordinates of all of the atoms.
-    - `properties`:
-        The static properties of the individual atom, i.e.
-        that do not change between frames.
-    """
-
     positions: Float[np.ndarray, "M N 3"]
     properties: AtomProperties
 
 
-class AtomicModelFile:
-    """A PDB file loader that loads the necessary information for
-    cryo-EM. This object is based on the `PDBTrajectoryFile`
-    from `mdtraj`.
-    """
-
-    def __init__(self, filename_or_url: str | pathlib.Path):
-        """**Arguments:**
-
-        - `filename_or_url`:
-            The name of the PDB file to open. Can be a URL.
-        """
-        # Set field that says we are reading the file
-        self._is_open = True
-        # Setup I/O
-        if _is_url(filename_or_url):
-            filename_or_url = str(filename_or_url)
-            file_obj = urlopen(filename_or_url)
-            if filename_or_url.lower().endswith(".gz"):
-                file_obj = gzip.GzipFile(fileobj=file_obj)
-            self._file = StringIO(file_obj.read().decode("utf-8"))
-
-        else:
-            filename_or_url = pathlib.Path(filename_or_url)
-            _validate_pdb_file(filename_or_url)
-            self._file = _open_maybe_zipped(filename_or_url, "r")
-        # Create the PDB structure via `mdtraj`
-        self._pdb_structure = PdbStructure(self._file, load_all_models=True)
-
-    @property
-    def pdb_structure(self) -> PdbStructure:
-        return self._pdb_structure
-
-    def read_atoms(
-        self,
-        *,
-        standardizes_names: bool = True,
-        topology: Topology | None = None,
-        model_index: int | None = None,
-        loads_b_factors: bool = True,
-        loads_masses: bool = True,
-    ) -> tuple[AtomicModelInfo, Topology]:
-        """Load properties from the PDB reader.
-
-        **Arguments:**
-
-        - `standardizes_names`:
-            If `True`, non-standard atom names and residue names are standardized to
-            conform with the current PDB format version. If `False`, this step is skipped.
-        - `topology`:
-            If the `topology` is passed as input, it won't be parsed from the PDB file.
-            This saves time if you have to parse a big number of files.
-
-        **Returns:**
-
-        A tuple of the `AtomicModelInfo` dataclass and the `mdtraj.Topology`.
-        """
-        atom_info, topology = _load_atom_info(
-            self._pdb_structure,
-            topology,
-            model_index,
-            standardizes_names,
-            loads_b_factors,
-            loads_masses,
-        )
-
-        return atom_info, topology
-
-    @property
-    def is_open(self):
-        return self._is_open
-
-    def close(self):
-        """Close the PDB file"""
-        if self._is_open:
-            if hasattr(self, "_file"):
-                self._file.close()
-        self._is_open = False
-
-    def __del__(self):
-        self.close()
-        del self
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *exc_info):
-        self.close()
-
-
 def _make_topology(
-    pdb: PdbStructure,
+    df: pd.DataFrame,
     atom_positions: list,
     standardizes_names: bool,
     model_index: int | None,
@@ -304,38 +185,41 @@ def _make_topology(
         )
     else:
         residue_name_replacements, atom_name_replacements = {}, {}
-    atom_by_number = {}
     if model_index is None:
-        model_index = 0
-    model = pdb.models_by_number[model_index]
-    for chain in model.iter_chains():
-        c = topology.add_chain(chain.chain_id)
-        for residue in chain.iter_residues():
-            residue_name = residue.get_name()
-            if residue_name in residue_name_replacements and standardizes_names:
-                residue_name = residue_name_replacements[residue_name]
-            r = topology.add_residue(residue_name, c, residue.number, residue.segment_id)
-            if residue_name in atom_name_replacements and standardizes_names:
-                atom_replacements = atom_name_replacements[residue_name]
-            else:
-                atom_replacements = {}
-            for atom in residue.atoms:
-                atom_name = atom.get_name()
-                if atom_name in atom_replacements:
-                    atom_name = atom_replacements[atom_name]
-                atom_name = atom_name.strip()
-                element = atom.element
-                if element is None:
-                    element = _guess_element(atom_name, residue.name, len(residue))
-
-                new_atom = topology.add_atom(
-                    atom_name,
-                    element,  # type: ignore
-                    r,
-                    serial=atom.serial_number,
-                    formal_charge=atom.formal_charge,
-                )
-                atom_by_number[atom.serial_number] = new_atom
+        model_index = df["model"].unique().tolist()[0]
+    df_at_model = df[df["model"] == model_index]
+    for atom_index in range(len(df_at_model)):
+        chain_id = df_at_model["chain"].iloc[atom_index]
+        residue_name = df_at_model["residue"].iloc[atom_index]
+        residue_id = df_at_model["residue_id"].iloc[atom_index]
+        c = topology.add_chain(chain_id)
+        if residue_name in residue_name_replacements and standardizes_names:
+            residue_name = residue_name_replacements[residue_name]
+        # TODO: is it necessary to have `segment_id`, as is parsed in `mdtraj`?
+        r = topology.add_residue(residue_name, c, residue_id, segment_id="")
+        if residue_name in atom_name_replacements and standardizes_names:
+            atom_replacements = atom_name_replacements[residue_name]
+        else:
+            atom_replacements = {}
+        atom_name = df_at_model["atom"].iloc[atom_index]
+        if atom_name in atom_replacements:
+            atom_name = atom_replacements[atom_name]
+        atom_name = atom_name.strip()
+        residue_ids = df_at_model[df_at_model["residue_id"] == residue_id]
+        element = _guess_element(
+            atom_name,
+            residue_name,
+            residue_length=len(residue_ids),
+        )
+        charge = df_at_model["charge"].iloc[atom_index]
+        # TODO: ok to remove serial number?
+        _ = topology.add_atom(
+            atom_name,
+            element,  # type: ignore
+            r,
+            # serial=atom.serial_number,
+            formal_charge=charge,
+        )
 
     topology.create_standard_bonds()
     topology.create_disulfide_bonds(atom_positions[0])
@@ -344,76 +228,58 @@ def _make_topology(
 
 
 def _load_atom_info(
-    pdb: PdbStructure,
+    df: pd.DataFrame,
     topology: Topology | None,
     model_index: int | None,
     standardizes_names: bool,
     loads_b_factors: bool,
     loads_masses: bool,
 ):
-    # Load atom info
-    if model_index is None:
-        # ... with multiple models
-        n_models = len(pdb.model_numbers())
-        temp = dict(
-            positions=[*([] for _ in range(n_models))],
-            identities=[],
-            b_factors=[],
-            masses=[],
+    if df.size == 0:
+        raise ValueError(
+            "When loading an atomic model using `mmdf`, found that "
+            "the dataframe was empty."
         )
-        for index, model_index in enumerate(pdb.model_numbers()):  # type: ignore
-            model = pdb.models_by_number[model_index]
-            for chain in model.iter_chains():
-                for residue in chain.iter_residues():
-                    for atom in residue.atoms:
-                        # ... make sure this is read in angstroms?
-                        temp["positions"][index].append(atom.get_position())
-                        if index == 0:
-                            # Assume atom properties don't change between models
-                            temp["identities"].append(atom.element.atomic_number)
-                            if loads_masses:
-                                temp["masses"].append(atom.element.mass)
-                            if loads_b_factors:
-                                temp["b_factors"].append(atom.get_temperature_factor())
-    else:
-        # ... with a model at one index
-        n_models = 1
-        temp = dict(positions=[[]], identities=[], b_factors=[], masses=[])
-        try:
-            model = pdb.models_by_number[model_index]
-        except Exception as err:
+    # Load atom info
+    if model_index is not None:
+        df = df[df["model"] == model_index]
+        if df.size == 0:
             raise ValueError(
-                "Caught exception indexing atomic model with "
-                f"index {model_index}. Found that the PDB "
-                f"contained model numbers {pdb.model_numbers()} "
-                f"available for indexing. Traceback was:\n{err}"
+                f"Found no atoms matching `model_index = {model_index}`. "
+                "Model numbers available for indexing are "
+                f"{df['model'].unique().tolist()}. "
             )
-        for chain in model.iter_chains():
-            for residue in chain.iter_residues():
-                for atom in residue.atoms:
-                    # ... make sure this is read in angstroms?
-                    temp["positions"][0].append(atom.get_position())
-                    # Assume atom properties don't change between models
-                    temp["identities"].append(atom.element.atomic_number)
-                    if loads_masses:
-                        temp["masses"].append(atom.element.mass)
-                    if loads_b_factors:
-                        temp["b_factors"].append(atom.get_temperature_factor())
+    model_numbers = df["model"].unique().tolist()
+    atom_positions = []
+    atomic_numbers, atomic_mass, b_factors = None, None, None
+    for index, model_index in enumerate(model_numbers):
+        df_at_index = df[df["model"] == model_index]
+        atom_positions.append(df_at_index[["x", "y", "z"]].to_numpy())
+        if index == 0:
+            # Assume atom properties don't change between models
+            atomic_numbers = df_at_index["atomic_number"].to_numpy()
+            if loads_masses:
+                atomic_mass = df_at_index["atomic_weight"].to_numpy()
+            if loads_b_factors:
+                b_factors = df_at_index["b_isotropic"].to_numpy()
+    assert atomic_numbers is not None
+    if loads_masses:
+        assert atomic_mass is not None
+    if loads_b_factors:
+        assert b_factors is not None
 
     # Load the topology if None is given
     if topology is None:
-        topology = _make_topology(pdb, temp["positions"], standardizes_names, model_index)
+        topology = _make_topology(df, atom_positions, standardizes_names, model_index)
 
     # Gather atom info and return
     properties = AtomProperties(
-        identities=np.asarray(temp["identities"], dtype=int),
-        b_factors=(
-            np.asarray(temp["b_factors"], dtype=float) if loads_b_factors else None
-        ),
-        masses=(np.asarray(temp["masses"], dtype=float) if loads_masses else None),
+        identities=np.asarray(atomic_numbers, dtype=int),
+        b_factors=(b_factors if loads_b_factors else None),
+        masses=(atomic_mass if loads_masses else None),
     )
     atom_info = AtomicModelInfo(
-        positions=np.asarray(temp["positions"], dtype=float),
+        positions=np.asarray(atom_positions, dtype=float),
         properties=properties,
     )
 
@@ -518,52 +384,3 @@ def _parse_residue(residue, map):
         name = atom.attrib["name"]
         for id in atom.attrib:
             map[atom.attrib[id]] = name
-
-
-def _validate_pdb_file(filename):
-    if filename.suffixes not in [[".pdb"], [".pdb", ".gz"]]:  # , [".cif"]]:
-        raise ValueError(
-            "PDB filename must have suffix `.pdb` or `.pdb.gz`"  # , or 'cif'. "
-            f"Got filename {filename}."
-        )
-
-
-def _is_url(url):
-    """Check to see if a URL has a valid protocol.
-    Originally pandas/io.common.py, sourced from `mdtraj`.
-    Copyright 2014 Pandas Developers, used under the BSD licence.
-    """
-    try:
-        return urlparse(url).scheme in _VALID_URLS
-    except (AttributeError, TypeError):
-        return False
-
-
-def _open_maybe_zipped(filename, mode, force_overwrite=True):
-    """Open a file in text (not binary) mode, transparently handling
-    .gz or .bz2 compresssion, with utf-8 encoding.
-    Closely follows `mdtraj.utils.open_maybe_zipped`.
-    """
-    _, extension = os.path.splitext(str(filename).lower())
-    if mode == "r":
-        if extension == ".gz":
-            with gzip.GzipFile(filename, "r") as gz_f:
-                return StringIO(gz_f.read().decode("utf-8"))
-        elif extension == ".bz2":
-            with bz2.BZ2File(filename, "r") as bz2_f:
-                return StringIO(bz2_f.read().decode("utf-8"))
-        else:
-            return open(filename)
-    elif mode == "w":
-        if os.path.exists(filename) and not force_overwrite:
-            raise OSError(f"{filename} already exists")
-        if extension == ".gz":
-            binary_fh = gzip.GzipFile(filename, "wb")
-            return io.TextIOWrapper(binary_fh, encoding="utf-8")
-        elif extension == ".bz2":
-            binary_fh = bz2.BZ2File(filename, "wb")
-            return io.TextIOWrapper(binary_fh, encoding="utf-8")
-        else:
-            return open(filename, "w")
-    else:
-        raise Exception(f"Internal error opening file {filename}. Invalid mode {mode}.")
