@@ -613,7 +613,8 @@ class RelionParticleStackDataset(
         project_exists = self.path_to_relion_project.exists()
         if mode == "w":
             # Write empty "rlnImageName" column (defaults to NaN values)
-            particle_data["rlnImageName"] = pd.Series(dtype=str)
+            if not images_exist:
+                particle_data["rlnImageName"] = pd.Series(dtype=str)
             self.parameter_file.starfile_data = dict(
                 optics=optics_data, particles=particle_data
             )
