@@ -345,6 +345,44 @@ def make_mdtraj_topology(
     return topology
 
 
+def read_topology_from_pdb(
+    filename: str | pathlib.Path,
+    model_index: int | None = None,
+    standardizes_names: bool = True,
+) -> mdtraj.Topology:
+    """Load relevant atomic information for simulating cryo-EM
+    images from a PDB or mmCIF file. This function wraps the function
+    `read_atoms_from_mmdf`.
+
+    Generate an `mdtraj.Topology` from a PDB or mmCIF file.
+    This function wraps the function `make_mdtraj_topology`.
+
+    !!! info
+        Since we use `mmdf` to parse the PDB/mmCIF file, the
+        atom ordering in some of our functions, e.g., `read_atoms_from_pdb`
+        may differ from that of `mdtraj.load`. We recommend using this function
+        if you need a topology that is consistent with that of `read_atoms_from_pdb`.
+
+    **Arguments:**
+
+    - `df`:
+        The dataframe loaded from or formatted as in
+        [`mmdf`](https://github.com/teamtomo/mmdf).
+    - `standardizes_names`:
+        If `True`, non-standard atom names and residue names are
+        standardized.
+    - `model_index`:
+        The model index from which to build the topology. Possible
+        indicies are captured in `df["model"]`.
+
+    **Returns:**
+
+    An `mdtraj.Topology` object.
+    """
+    df = mmdf.read(pathlib.Path(filename))
+    return make_mdtraj_topology(df, standardizes_names, model_index)
+
+
 def _center_atom_coordinates(atom_positions, atom_masses):
     com_position = (
         np.sum(atom_positions * atom_masses[..., None], axis=1)
