@@ -6,10 +6,7 @@ from .._image_config import AbstractImageConfig
 from .._solvent_2d import AbstractRandomSolvent2D
 from .._transfer_theory import ContrastTransferTheory
 from .._volume import AbstractVolumeRepresentation
-from .._volume_integrator import (
-    AbstractVolumeIntegrator,
-    AbstractVoxelVolumeIntegrator,
-)
+from .._volume_integrator import AbstractVolumeIntegrator
 from .base_scattering_theory import AbstractWeakPhaseScatteringTheory
 
 
@@ -35,15 +32,6 @@ class WeakPhaseScatteringTheory(AbstractWeakPhaseScatteringTheory, strict=True):
         self.volume_integrator = volume_integrator
         self.transfer_theory = transfer_theory
         self.solvent = solvent
-
-    def __check_init__(self):
-        if isinstance(self.volume_integrator, AbstractVoxelVolumeIntegrator):
-            if not self.volume_integrator.outputs_integral:
-                raise AttributeError(
-                    "If the `volume_integrator` is voxel-based, "
-                    "it must have `volume_integrator.outputs_integral = True` "
-                    "to be passed to a `HighEnergyScatteringTheory`."
-                )
 
     @override
     def compute_object_spectrum(

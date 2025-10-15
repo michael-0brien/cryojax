@@ -1,6 +1,5 @@
 from .base_integrator import (
     AbstractVolumeIntegrator as AbstractVolumeIntegrator,
-    AbstractVoxelVolumeIntegrator as AbstractVoxelVolumeIntegrator,
 )
 from .fourier_voxel_extract import (
     EwaldSphereExtraction as EwaldSphereExtraction,

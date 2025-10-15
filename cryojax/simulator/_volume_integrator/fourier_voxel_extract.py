@@ -21,13 +21,14 @@ from ...ndimage import (
 from ...ndimage.transforms import InverseSincMask
 from .._image_config import AbstractImageConfig
 from .._volume import FourierVoxelGridVolume, FourierVoxelSplineVolume
-from .base_integrator import AbstractVoxelVolumeIntegrator
+from .base_integrator import AbstractVolumeIntegrator
 
 
 class AbstractFourierSurfaceExtraction(
-    AbstractVoxelVolumeIntegrator[FourierVoxelGridVolume | FourierVoxelSplineVolume],
+    AbstractVolumeIntegrator[FourierVoxelGridVolume | FourierVoxelSplineVolume],
     strict=True,
 ):
+    outputs_integral: eqx.AbstractVar[bool]
     correction_mask: eqx.AbstractVar[InverseSincMask | None]
 
 

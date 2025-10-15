@@ -10,11 +10,10 @@ from equinox import AbstractClassVar
 from jaxtyping import Array, Complex, Float
 
 from .._image_config import AbstractImageConfig
-from .._volume import AbstractVolumeRepresentation, AbstractVoxelVolume
+from .._volume import AbstractVolumeRepresentation
 
 
 VolRepT = TypeVar("VolRepT", bound="AbstractVolumeRepresentation")
-VoxelVolT = TypeVar("VoxelVolT", bound="AbstractVoxelVolume")
 
 
 class AbstractVolumeIntegrator(eqx.Module, Generic[VolRepT], strict=True):
@@ -39,9 +38,3 @@ class AbstractVolumeIntegrator(eqx.Module, Generic[VolRepT], strict=True):
         | Float[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
     ):
         raise NotImplementedError
-
-
-class AbstractVoxelVolumeIntegrator(
-    AbstractVolumeIntegrator[VoxelVolT], Generic[VoxelVolT], strict=True
-):
-    outputs_integral: eqx.AbstractVar[bool]

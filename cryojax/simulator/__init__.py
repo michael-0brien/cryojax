@@ -67,7 +67,6 @@ from ._volume import (
 )
 from ._volume_integrator import (
     AbstractVolumeIntegrator as AbstractVolumeIntegrator,
-    AbstractVoxelVolumeIntegrator as AbstractVoxelVolumeIntegrator,
     FourierSliceExtraction as FourierSliceExtraction,
     GaussianMixtureProjection as GaussianMixtureProjection,
     NufftProjection as NufftProjection,
