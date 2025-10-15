@@ -5,8 +5,9 @@ adapted from `mdtraj`.
 
 import os
 import pathlib
+import warnings
 from copy import copy
-from typing import Literal, TypedDict, cast, overload
+from typing import Literal, TypedDict, overload
 from xml.etree import ElementTree
 
 import jax
@@ -19,11 +20,18 @@ from mdtraj.core import element as elem
 from mdtraj.core.topology import Topology
 
 
+class AtomProperties(TypedDict):
+    masses: Float[np.ndarray, "... n_atoms"]
+    b_factors: Float[np.ndarray, "... n_atoms"]
+    charges: Float[np.ndarray, "... n_atoms"]
+
+
 @overload
 def read_atoms_from_pdb(
     filename: str | pathlib.Path,
     *,
-    loads_b_factors: Literal[False],
+    loads_properties: Literal[False],
+    loads_b_factors: bool = False,
     center: bool = True,
     selection_string: str = "all",
     model_index: int | None = None,
@@ -36,7 +44,8 @@ def read_atoms_from_pdb(
 def read_atoms_from_pdb(  # type: ignore
     filename: str | pathlib.Path,
     *,
-    loads_b_factors: Literal[True],
+    loads_properties: Literal[True],
+    loads_b_factors: bool = False,
     center: bool = True,
     selection_string: str = "all",
     model_index: int | None = None,
@@ -45,7 +54,7 @@ def read_atoms_from_pdb(  # type: ignore
 ) -> tuple[
     Float[np.ndarray, "... n_atoms 3"],
     Int[np.ndarray, "... n_atoms"],
-    Float[np.ndarray, "... n_atoms"],
+    AtomProperties,
 ]: ...
 
 
@@ -53,6 +62,7 @@ def read_atoms_from_pdb(  # type: ignore
 def read_atoms_from_pdb(
     filename: str | pathlib.Path,
     *,
+    loads_properties: bool = False,
     loads_b_factors: bool = False,
     center: bool = True,
     selection_string: str = "all",
@@ -65,6 +75,7 @@ def read_atoms_from_pdb(
 def read_atoms_from_pdb(
     filename: str | pathlib.Path,
     *,
+    loads_properties: bool = False,
     loads_b_factors: bool = False,
     center: bool = True,
     selection_string: str = "all",
@@ -76,7 +87,7 @@ def read_atoms_from_pdb(
     | tuple[
         Float[np.ndarray, "... n_atoms 3"],
         Int[np.ndarray, "... n_atoms"],
-        Float[np.ndarray, "... n_atoms"],
+        AtomProperties | np.ndarray,  # Included for `loads_b_factors=True`
     ]
 ):
     """Load relevant atomic information for simulating cryo-EM
@@ -103,8 +114,8 @@ def read_atoms_from_pdb(
     - `center`:
         If `True`, center the model so that its center of mass coincides
         with the origin.
-    - `loads_b_factors`:
-        If `True`, return the B-factors of the atoms.
+    - `loads_properties`:
+        If `True`, return a dictionary of the atom properties.
     - `selection_string`:
         A selection string in `mdtraj`'s format.
     - `model_index`:
@@ -124,7 +135,7 @@ def read_atoms_from_pdb(
     numbers. To be clear,
 
     ```python
-    atom_positons, atom_types = read_atoms_from_pdb(...)
+    atom_positons, atom_numbers = read_atoms_from_pdb(...)
     ```
 
     !!! info
@@ -135,13 +146,14 @@ def read_atoms_from_pdb(
         model at index 0,
 
         ```python
-        atom_positons, atom_types = read_atoms_from_pdb(..., model_index=0)
+        atom_positons, atom_numbers = read_atoms_from_pdb(..., model_index=0)
         ```
     """
     # Load `mmdf` dataframe forward the `read_atoms_from_mmdf` method
     df = mmdf.read(pathlib.Path(filename))
     return read_atoms_from_mmdf(
         df,
+        loads_properties=loads_properties,
         loads_b_factors=loads_b_factors,
         center=center,
         selection_string=selection_string,
@@ -155,7 +167,8 @@ def read_atoms_from_pdb(
 def read_atoms_from_mmdf(
     df: pd.DataFrame,
     *,
-    loads_b_factors: Literal[False],
+    loads_properties: Literal[False],
+    loads_b_factors: bool = False,
     center: bool = True,
     selection_string: str = "all",
     model_index: int | None = None,
@@ -168,7 +181,8 @@ def read_atoms_from_mmdf(
 def read_atoms_from_mmdf(  # type: ignore
     df: pd.DataFrame,
     *,
-    loads_b_factors: Literal[True],
+    loads_properties: Literal[True],
+    loads_b_factors: bool = False,
     center: bool = True,
     selection_string: str = "all",
     model_index: int | None = None,
@@ -177,7 +191,7 @@ def read_atoms_from_mmdf(  # type: ignore
 ) -> tuple[
     Float[np.ndarray, "... n_atoms 3"],
     Int[np.ndarray, "... n_atoms"],
-    Float[np.ndarray, "... n_atoms"],
+    AtomProperties,
 ]: ...
 
 
@@ -185,6 +199,7 @@ def read_atoms_from_mmdf(  # type: ignore
 def read_atoms_from_mmdf(
     df: pd.DataFrame,
     *,
+    loads_properties: bool = False,
     loads_b_factors: bool = False,
     center: bool = True,
     selection_string: str = "all",
@@ -197,6 +212,7 @@ def read_atoms_from_mmdf(
 def read_atoms_from_mmdf(
     df: pd.DataFrame,
     *,
+    loads_properties: bool = False,
     loads_b_factors: bool = False,
     center: bool = True,
     selection_string: str = "all",
@@ -208,7 +224,7 @@ def read_atoms_from_mmdf(
     | tuple[
         Float[np.ndarray, "... n_atoms 3"],
         Int[np.ndarray, "... n_atoms"],
-        Float[np.ndarray, "... n_atoms"],
+        AtomProperties | np.ndarray,
     ]
 ):
     """Load relevant atomic information for simulating cryo-EM
@@ -226,47 +242,45 @@ def read_atoms_from_mmdf(
     ```
     """
     # Load atom info from `mmdf` dataframe
-    atom_info = _load_atom_info(
-        df,
-        model_index=model_index,
-        loads_masses=center,
-        loads_b_factors=loads_b_factors,
-    )
+    atom_info = _load_atom_info(df, model_index=model_index)
     if selection_string != "all":
         if topology is None:
             topology = make_mdtraj_topology(df, standardizes_names, model_index)
-        # Filter atoms and grab positions and identities
+        # Filter atoms and grab atomic positions and numbers
         selected_indices = topology.select(selection_string)
         atom_positions = atom_info["positions"][:, selected_indices]
+        atom_numbers = atom_info["numbers"][:, selected_indices]
         atom_properties = jax.tree.map(
             lambda arr: arr[:, selected_indices], atom_info["properties"]
         )
     else:
         atom_positions = atom_info["positions"]
+        atom_numbers = atom_info["numbers"]
         atom_properties = atom_info["properties"]
-    atom_types = atom_properties["identities"]
     # Center by mass
     if center:
-        atom_masses = cast(np.ndarray, atom_properties["masses"])
+        atom_masses = atom_properties["masses"]
         atom_positions = _center_atom_coordinates(atom_positions, atom_masses)
-    # Return, optionally with b-factors and without leading dimensions
-    # if there is only one structure
-    atom_positions = (
-        np.squeeze(atom_positions, axis=0)
-        if atom_positions.shape[0] == 1
-        else atom_positions
-    )
-    atom_types = (
-        np.squeeze(atom_types, axis=0) if atom_types.shape[0] == 1 else atom_types
-    )
-    if loads_b_factors:
-        b_factors = cast(np.ndarray, atom_properties["b_factors"])
-        b_factors = (
-            np.squeeze(b_factors, axis=0) if b_factors.shape[0] == 1 else b_factors
+    # Return, without leading dimensions if there is only one structure
+    atom_positions = atom_positions[0] if atom_positions.shape[0] == 1 else atom_positions
+    atom_numbers = atom_numbers[0] if atom_numbers.shape[0] == 1 else atom_numbers
+    if loads_properties or loads_b_factors:
+        # Optionally return atom properties
+        atom_properties = jax.tree.map(
+            lambda arr: (arr[0] if arr.shape[0] == 1 else arr), atom_properties
         )
-        return atom_positions, atom_types, b_factors
+        if loads_b_factors:
+            warnings.warn(
+                "`loads_b_factor` option is deprecated and will be removed in "
+                "cryoJAX 0.6.0. Use `loads_properties` instead.",
+                category=DeprecationWarning,
+                stacklevel=2,
+            )
+            return atom_positions, atom_numbers, atom_properties["b_factors"]
+        else:
+            return atom_positions, atom_numbers, atom_properties
     else:
-        return atom_positions, atom_types
+        return atom_positions, atom_numbers
 
 
 def make_mdtraj_topology(
@@ -323,14 +337,14 @@ def make_mdtraj_topology(
             atom_name = atom_replacements[atom_name]
         atom_name = atom_name.strip()
         element = elem.Element.getByAtomicNumber(df_at_index["atomic_number"])
-        charge = df_at_index["charge"]
+        charges = df_at_index["charge"]
         # TODO: ok to remove serial number?
         _ = topology.add_atom(
             atom_name,
             element,
             r,
             serial=atom_index,  # atom.serial_number,
-            formal_charge=charge,
+            formal_charge=charges,
         )
     # Generate bonds
     atom_positions = df_at_model[["x", "y", "z"]].to_numpy()
@@ -386,23 +400,13 @@ def _center_atom_coordinates(atom_positions, atom_masses):
     return atom_positions - com_position[:, None, :]
 
 
-class _AtomProperties(TypedDict):
-    identities: Int[np.ndarray, " N"]
-    masses: Float[np.ndarray, " N"] | None
-    b_factors: Float[np.ndarray, " N"] | None
-
-
 class _AtomicModelInfo(TypedDict):
     positions: Float[np.ndarray, "M N 3"]
-    properties: _AtomProperties
+    numbers: Int[np.ndarray, "M N 3"]
+    properties: AtomProperties
 
 
-def _load_atom_info(
-    df: pd.DataFrame,
-    model_index: int | None,
-    loads_b_factors: bool,
-    loads_masses: bool,
-):
+def _load_atom_info(df: pd.DataFrame, model_index: int | None):
     if df.size == 0:
         raise ValueError(
             "When loading an atomic model using `mmdf`, found that "
@@ -418,24 +422,24 @@ def _load_atom_info(
                 f"{df['model'].unique().tolist()}. "
             )
     model_numbers = df["model"].unique().tolist()
-    atom_positions, atomic_numbers, atomic_mass, b_factors = [], [], [], []
+    atom_positions, atomic_numbers, atomic_masses, b_factors, charges = [], [], [], [], []
     for model_index in model_numbers:
         df_at_index = df[df["model"] == model_index]
         atom_positions.append(df_at_index[["x", "y", "z"]].to_numpy())
         atomic_numbers.append(df_at_index["atomic_number"].to_numpy())
-        if loads_masses:
-            atomic_mass.append(df_at_index["atomic_weight"].to_numpy())
-        if loads_b_factors:
-            b_factors.append(df_at_index["b_isotropic"].to_numpy())
+        atomic_masses.append(df_at_index["atomic_weight"].to_numpy())
+        b_factors.append(df_at_index["b_isotropic"].to_numpy())
+        charges.append(df_at_index["charge"].to_numpy())
 
     # Gather atom info and return
-    properties = _AtomProperties(
-        identities=np.asarray(atomic_numbers, dtype=int),
-        b_factors=(np.asarray(b_factors, dtype=float) if loads_b_factors else None),
-        masses=(np.asarray(atomic_mass, dtype=float) if loads_masses else None),
+    properties = AtomProperties(
+        charges=np.asarray(charges, dtype=int),
+        b_factors=np.asarray(b_factors, dtype=float),
+        masses=np.asarray(atomic_masses, dtype=float),
     )
     atom_info = _AtomicModelInfo(
         positions=np.asarray(atom_positions, dtype=float),
+        numbers=np.asarray(atomic_numbers, dtype=int),
         properties=properties,
     )
 
