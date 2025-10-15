@@ -31,7 +31,7 @@ def test_future_deprecated(sample_pdb_path):
         assert not should_be_removed(record)
 
     with pytest.warns(DeprecationWarning) as record:
-        atom_positions, atom_types, b_factors = cryojax.io.read_atoms_from_pdb(
+        _ = cryojax.io.read_atoms_from_pdb(
             sample_pdb_path,
             loads_b_factors=True,
         )

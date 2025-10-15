@@ -92,7 +92,7 @@ def read_atoms_from_pdb(
 ):
     """Load relevant atomic information for simulating cryo-EM
     images from a PDB or mmCIF file. This function wraps the function
-    `read_atoms_from_mmdf`.
+    `mmdf_to_atoms`.
 
     !!! info
 
@@ -149,9 +149,9 @@ def read_atoms_from_pdb(
         atom_positons, atom_numbers = read_atoms_from_pdb(..., model_index=0)
         ```
     """
-    # Load `mmdf` dataframe forward the `read_atoms_from_mmdf` method
+    # Load `mmdf` dataframe forward the `mmdf_to_atoms` method
     df = mmdf.read(pathlib.Path(filename))
-    return read_atoms_from_mmdf(
+    return mmdf_to_atoms(
         df,
         loads_properties=loads_properties,
         loads_b_factors=loads_b_factors,
@@ -164,7 +164,7 @@ def read_atoms_from_pdb(
 
 
 @overload
-def read_atoms_from_mmdf(
+def mmdf_to_atoms(
     df: pd.DataFrame,
     *,
     loads_properties: Literal[False],
@@ -178,7 +178,7 @@ def read_atoms_from_mmdf(
 
 
 @overload
-def read_atoms_from_mmdf(  # type: ignore
+def mmdf_to_atoms(  # type: ignore
     df: pd.DataFrame,
     *,
     loads_properties: Literal[True],
@@ -196,7 +196,7 @@ def read_atoms_from_mmdf(  # type: ignore
 
 
 @overload
-def read_atoms_from_mmdf(
+def mmdf_to_atoms(
     df: pd.DataFrame,
     *,
     loads_properties: bool = False,
@@ -209,7 +209,7 @@ def read_atoms_from_mmdf(
 ) -> tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, "... n_atoms"]]: ...
 
 
-def read_atoms_from_mmdf(
+def mmdf_to_atoms(
     df: pd.DataFrame,
     *,
     loads_properties: bool = False,
@@ -245,7 +245,7 @@ def read_atoms_from_mmdf(
     atom_info = _load_atom_info(df, model_index=model_index)
     if selection_string != "all":
         if topology is None:
-            topology = make_mdtraj_topology(df, standardizes_names, model_index)
+            topology = mmdf_to_topology(df, standardizes_names, model_index)
         # Filter atoms and grab atomic positions and numbers
         selected_indices = topology.select(selection_string)
         atom_positions = atom_info["positions"][:, selected_indices]
@@ -283,7 +283,7 @@ def read_atoms_from_mmdf(
         return atom_positions, atom_numbers
 
 
-def make_mdtraj_topology(
+def mmdf_to_topology(
     df: pd.DataFrame,
     standardizes_names: bool = True,
     model_index: int | None = None,
@@ -359,12 +359,8 @@ def read_topology_from_pdb(
     model_index: int | None = None,
     standardizes_names: bool = True,
 ) -> mdtraj.Topology:
-    """Load relevant atomic information for simulating cryo-EM
-    images from a PDB or mmCIF file. This function wraps the function
-    `read_atoms_from_mmdf`.
-
-    Generate an `mdtraj.Topology` from a PDB or mmCIF file.
-    This function wraps the function `make_mdtraj_topology`.
+    """Generate an `mdtraj.Topology` from a PDB or mmCIF file.
+    This function wraps the function `mmdf_to_topology`.
 
     !!! info
         Since we use `mmdf` to parse the PDB/mmCIF file, the
@@ -389,7 +385,7 @@ def read_topology_from_pdb(
     An `mdtraj.Topology` object.
     """
     df = mmdf.read(pathlib.Path(filename))
-    return make_mdtraj_topology(df, standardizes_names, model_index)
+    return mmdf_to_topology(df, standardizes_names, model_index)
 
 
 def _center_atom_coordinates(atom_positions, atom_masses):
