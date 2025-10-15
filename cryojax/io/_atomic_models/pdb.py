@@ -79,27 +79,40 @@ def read_atoms_from_pdb(
         Float[np.ndarray, " n_atoms"],
     ]
 ):
-    """Read atomic information from a PDB file. This object
-    wraps the `cryojax.io.AtomicModelReader` class into a function
-    interface to accomodate most use cases in cryo-EM.
+    """Load relevant atomic information for simulating cryo-EM
+    images from a PDB or mmCIF file. This function wraps the function
+    `read_atoms_from_mmdf`.
+
+    !!! info
+
+        The `selection_string` argument enables usage of
+        [`mdtraj`](https://www.mdtraj.org/) atom selection syntax.
+
+    !!! warning
+
+        Using `mdtraj` atom selection requires also passing a `topology`
+        or this function will generate one on-the-fly. If `model_index = None`
+        and there are multiple models in the PDB/mmCIF, the topology is
+        generated *only* using the first model index, yet will be used to
+        select atoms across all models.
 
     **Arguments:**
 
-    - `filename_or_url`:
-        The name of the PDB/mmCIF file to open. Can be a URL.
+    - `filename`:
+        The name of the PDB/mmCIF file to open.
     - `center`:
         If `True`, center the model so that its center of mass coincides
         with the origin.
     - `loads_b_factors`:
         If `True`, return the B-factors of the atoms.
     - `selection_string`:
-        A selection string in `mdtraj`'s format. See `mdtraj` for documentation.
+        A selection string in `mdtraj`'s format.
     - `model_index`:
         An optional index for grabbing a particular model stored in the PDB. If `None`,
         grab all models, where `atom_positions` has a leading dimension for the model.
     - `standardizes_names`:
-        If `True`, non-standard atom names and residue names are standardized to conform
-        with the current PDB format version. If set to `False`, this step is skipped.
+        If `True`, non-standard atom names and residue names are standardized.
+        If set to `False`, this step is skipped.
     - `topology`:
         If you give a topology as input, the topology won't be parsed from the pdb file
         it saves time if you have to parse a big number of files
@@ -116,68 +129,171 @@ def read_atoms_from_pdb(
 
     !!! info
 
-        If your PDB has multiple models, `atom_positions` by
-        default with a leading dimension that indexes each model.
-        On the other hand, `atom_types` (and `b_factors`, if loaded)
-        do not have this leading dimension and are constant across
-        models.
+        If your PDB has multiple models, arrays such as the
+        atom positions are loaded with a
+        leading dimension for each model. To load a single
+        model at index 0,
+
+        ```python
+        atom_positons, atom_types = read_atoms_from_pdb(..., model_index=0)
+        ```
     """
-    # Load `mmdf` dataframe
+    # Load `mmdf` dataframe forward the `read_atoms_from_mmdf` method
     df = mmdf.read(pathlib.Path(filename))
-    atom_info, topology = _load_atom_info(
+    return read_atoms_from_mmdf(
         df,
+        loads_b_factors=loads_b_factors,
+        center=center,
+        selection_string=selection_string,
+        model_index=model_index,
         standardizes_names=standardizes_names,
         topology=topology,
+    )
+
+
+@overload
+def read_atoms_from_mmdf(
+    df: pd.DataFrame,
+    *,
+    loads_b_factors: Literal[False],
+    center: bool = True,
+    selection_string: str = "all",
+    model_index: int | None = None,
+    standardizes_names: bool = True,
+    topology: mdtraj.Topology | None = None,
+) -> tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, " n_atoms"]]: ...
+
+
+@overload
+def read_atoms_from_mmdf(  # type: ignore
+    df: pd.DataFrame,
+    *,
+    loads_b_factors: Literal[True],
+    center: bool = True,
+    selection_string: str = "all",
+    model_index: int | None = None,
+    standardizes_names: bool = True,
+    topology: mdtraj.Topology | None = None,
+) -> tuple[
+    Float[np.ndarray, "... n_atoms 3"],
+    Int[np.ndarray, " n_atoms"],
+    Float[np.ndarray, " n_atoms"],
+]: ...
+
+
+@overload
+def read_atoms_from_mmdf(
+    df: pd.DataFrame,
+    *,
+    loads_b_factors: bool = False,
+    center: bool = True,
+    selection_string: str = "all",
+    model_index: int | None = None,
+    standardizes_names: bool = True,
+    topology: mdtraj.Topology | None = None,
+) -> tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, " n_atoms"]]: ...
+
+
+def read_atoms_from_mmdf(
+    df: pd.DataFrame,
+    *,
+    loads_b_factors: bool = False,
+    center: bool = True,
+    selection_string: str = "all",
+    model_index: int | None = None,
+    standardizes_names: bool = True,
+    topology: mdtraj.Topology | None = None,
+) -> (
+    tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, " n_atoms"]]
+    | tuple[
+        Float[np.ndarray, "... n_atoms 3"],
+        Int[np.ndarray, " n_atoms"],
+        Float[np.ndarray, " n_atoms"],
+    ]
+):
+    """Load relevant atomic information for simulating cryo-EM
+    images from a `pandas.DataFrame` loaded from the package
+    [`mmdf`](https://github.com/teamtomo/mmdf).
+
+    **Arguments:**
+
+    - `df`:
+        The dataframe loaded from or formatted as in
+        [`mmdf`](https://github.com/teamtomo/mmdf).
+
+    For documentation of other arguments and return value,
+    see the function `read_atoms_from_pdb`.
+    ```
+    """
+    # Load atom info from `mmdf` dataframe
+    atom_info = _load_atom_info(
+        df,
         model_index=model_index,
         loads_masses=center,
         loads_b_factors=loads_b_factors,
     )
-    # Filter atoms and grab positions and identities
-    selected_indices = topology.select(selection_string)
-    atom_positions = atom_info["positions"][:, selected_indices]
-    atom_properties = jax.tree.map(
-        lambda arr: arr[selected_indices], atom_info["properties"]
-    )
+    if selection_string != "all":
+        if topology is None:
+            topology = make_mdtraj_topology(df, standardizes_names, model_index)
+        # Filter atoms and grab positions and identities
+        selected_indices = topology.select(selection_string)
+        atom_positions = atom_info["positions"][:, selected_indices]
+        atom_properties = jax.tree.map(
+            lambda arr: arr[:, selected_indices], atom_info["properties"]
+        )
+    else:
+        atom_positions = atom_info["positions"]
+        atom_properties = atom_info["properties"]
     atom_types = atom_properties["identities"]
     # Center by mass
     if center:
         atom_masses = cast(np.ndarray, atom_properties["masses"])
         atom_positions = _center_atom_coordinates(atom_positions, atom_masses)
-    # Return, optionality with b-factors and without a leading dimension for the
-    # positions if there is only one structure
-    if atom_positions.shape[0] == 1:
-        atom_positions = np.squeeze(atom_positions, axis=0)
+    # Return, optionally with b-factors and without leading dimensions
+    # if there is only one structure
+    atom_positions = (
+        np.squeeze(atom_positions, axis=0)
+        if atom_positions.shape[0] == 1
+        else atom_positions
+    )
+    atom_types = (
+        np.squeeze(atom_types, axis=0) if atom_types.shape[0] == 1 else atom_types
+    )
     if loads_b_factors:
         b_factors = cast(np.ndarray, atom_properties["b_factors"])
+        b_factors = (
+            np.squeeze(b_factors, axis=0) if b_factors.shape[0] == 1 else b_factors
+        )
         return atom_positions, atom_types, b_factors
     else:
         return atom_positions, atom_types
 
 
-def _center_atom_coordinates(atom_positions, atom_masses):
-    com_position = np.transpose(atom_positions, axes=[0, 2, 1]).dot(
-        atom_masses / atom_masses.sum()
-    )
-    return atom_positions - com_position[:, None, :]
-
-
-class AtomProperties(TypedDict):
-    identities: Int[np.ndarray, " N"]
-    masses: Float[np.ndarray, " N"] | None
-    b_factors: Float[np.ndarray, " N"] | None
-
-
-class AtomicModelInfo(TypedDict):
-    positions: Float[np.ndarray, "M N 3"]
-    properties: AtomProperties
-
-
-def _make_topology(
+def make_mdtraj_topology(
     df: pd.DataFrame,
-    atom_positions: list,
-    standardizes_names: bool,
-    model_index: int | None,
-) -> Topology:
+    standardizes_names: bool = True,
+    model_index: int | None = None,
+) -> mdtraj.Topology:
+    """Generate an `mdtraj.Topology` using an array of atom
+    positions and a `pandas.DataFrame` loaded from the package
+    [`mmdf`](https://github.com/teamtomo/mmdf).
+
+    **Arguments:**
+
+    - `df`:
+        The dataframe loaded from or formatted as in
+        [`mmdf`](https://github.com/teamtomo/mmdf).
+    - `standardizes_names`:
+        If `True`, non-standard atom names and residue names are
+        standardized.
+    - `model_index`:
+        The model index from which to build the topology. Possible
+        indicies are captured in `df["model"]`.
+
+    **Returns:**
+
+    An `mdtraj.Topology` object.
+    """
     topology = Topology()
     if standardizes_names:
         residue_name_replacements, atom_name_replacements = (
@@ -189,9 +305,10 @@ def _make_topology(
         model_index = df["model"].unique().tolist()[0]
     df_at_model = df[df["model"] == model_index]
     for atom_index in range(len(df_at_model)):
-        chain_id = df_at_model["chain"].iloc[atom_index]
-        residue_name = df_at_model["residue"].iloc[atom_index]
-        residue_id = df_at_model["residue_id"].iloc[atom_index]
+        df_at_index = df_at_model.iloc[atom_index]
+        chain_id = df_at_index["chain"]
+        residue_name = df_at_index["residue"]
+        residue_id = df_at_index["residue_id"]
         c = topology.add_chain(chain_id)
         if residue_name in residue_name_replacements and standardizes_names:
             residue_name = residue_name_replacements[residue_name]
@@ -201,7 +318,7 @@ def _make_topology(
             atom_replacements = atom_name_replacements[residue_name]
         else:
             atom_replacements = {}
-        atom_name = df_at_model["atom"].iloc[atom_index]
+        atom_name = df_at_index["atom"]
         if atom_name in atom_replacements:
             atom_name = atom_replacements[atom_name]
         atom_name = atom_name.strip()
@@ -211,7 +328,7 @@ def _make_topology(
             residue_name,
             residue_length=len(residue_ids),
         )
-        charge = df_at_model["charge"].iloc[atom_index]
+        charge = df_at_index["charge"]
         # TODO: ok to remove serial number?
         _ = topology.add_atom(
             atom_name,
@@ -220,18 +337,36 @@ def _make_topology(
             # serial=atom.serial_number,
             formal_charge=charge,
         )
-
+    # Generate bonds
+    atom_positions = df_at_model[["x", "y", "z"]].to_numpy()
     topology.create_standard_bonds()
-    topology.create_disulfide_bonds(atom_positions[0])
+    topology.create_disulfide_bonds(atom_positions.tolist())
 
     return topology
 
 
+def _center_atom_coordinates(atom_positions, atom_masses):
+    com_position = (
+        np.sum(atom_positions * atom_masses[..., None], axis=1)
+        / atom_masses.sum(axis=1)[:, None]
+    )
+    return atom_positions - com_position[:, None, :]
+
+
+class _AtomProperties(TypedDict):
+    identities: Int[np.ndarray, " N"]
+    masses: Float[np.ndarray, " N"] | None
+    b_factors: Float[np.ndarray, " N"] | None
+
+
+class _AtomicModelInfo(TypedDict):
+    positions: Float[np.ndarray, "M N 3"]
+    properties: _AtomProperties
+
+
 def _load_atom_info(
     df: pd.DataFrame,
-    topology: Topology | None,
     model_index: int | None,
-    standardizes_names: bool,
     loads_b_factors: bool,
     loads_masses: bool,
 ):
@@ -250,40 +385,28 @@ def _load_atom_info(
                 f"{df['model'].unique().tolist()}. "
             )
     model_numbers = df["model"].unique().tolist()
-    atom_positions = []
-    atomic_numbers, atomic_mass, b_factors = None, None, None
-    for index, model_index in enumerate(model_numbers):
+    atom_positions, atomic_numbers, atomic_mass, b_factors = [], [], [], []
+    for model_index in model_numbers:
         df_at_index = df[df["model"] == model_index]
         atom_positions.append(df_at_index[["x", "y", "z"]].to_numpy())
-        if index == 0:
-            # Assume atom properties don't change between models
-            atomic_numbers = df_at_index["atomic_number"].to_numpy()
-            if loads_masses:
-                atomic_mass = df_at_index["atomic_weight"].to_numpy()
-            if loads_b_factors:
-                b_factors = df_at_index["b_isotropic"].to_numpy()
-    assert atomic_numbers is not None
-    if loads_masses:
-        assert atomic_mass is not None
-    if loads_b_factors:
-        assert b_factors is not None
-
-    # Load the topology if None is given
-    if topology is None:
-        topology = _make_topology(df, atom_positions, standardizes_names, model_index)
+        atomic_numbers.append(df_at_index["atomic_number"].to_numpy())
+        if loads_masses:
+            atomic_mass.append(df_at_index["atomic_weight"].to_numpy())
+        if loads_b_factors:
+            b_factors.append(df_at_index["b_isotropic"].to_numpy())
 
     # Gather atom info and return
-    properties = AtomProperties(
+    properties = _AtomProperties(
         identities=np.asarray(atomic_numbers, dtype=int),
-        b_factors=(b_factors if loads_b_factors else None),
-        masses=(atomic_mass if loads_masses else None),
+        b_factors=(np.asarray(b_factors, dtype=float) if loads_b_factors else None),
+        masses=(np.asarray(atomic_mass, dtype=float) if loads_masses else None),
     )
-    atom_info = AtomicModelInfo(
+    atom_info = _AtomicModelInfo(
         positions=np.asarray(atom_positions, dtype=float),
         properties=properties,
     )
 
-    return atom_info, topology
+    return atom_info
 
 
 def _guess_element(atom_name, residue_name, residue_length):
