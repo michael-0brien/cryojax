@@ -1,5 +1,6 @@
 import os
 
+import mdtraj
 import numpy as np
 import pytest
 from jaxtyping import install_import_hook
@@ -99,3 +100,31 @@ def test_center_waterbox(sample_waterbox_pdb):
     )
 
     assert not np.isnan(atom_positions).any(), "Centering resulted in positions with NaNs"
+
+
+@pytest.mark.parametrize(
+    "pdbfile", ["sample_pdb_path", "sample_waterbox_pdb", "sample_cif_path"]
+)
+@pytest.mark.parametrize("center", [True, False])
+def test_consistency_with_mdtraj(pdbfile, center, request):
+    pdbfile = request.getfixturevalue(pdbfile)
+    atom_positions, _ = read_atoms_from_pdb(
+        pdbfile,
+        center=center,
+        selection_string="all",
+    )
+
+    traj = mdtraj.load(pdbfile)
+    if center:
+        traj.center_coordinates(mass_weighted=True)
+
+    mdtraj_positions = traj.xyz[0] * 10.0  # convert to Angstrom
+
+    distance_matrix = np.linalg.norm(
+        atom_positions[:, None, :] - mdtraj_positions[None, :, :], axis=-1
+    )
+    np.testing.assert_allclose(distance_matrix.min(axis=1), 0.0, atol=1e-4, rtol=1e-4)
+    unique_min_indices = np.unique(distance_matrix.argmin(axis=1))
+    assert unique_min_indices.shape[0] == atom_positions.shape[0], (
+        "Atom position loading is not consistent with MDTraj up to permutation"
+    )

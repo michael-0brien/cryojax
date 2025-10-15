@@ -29,7 +29,7 @@ def read_atoms_from_pdb(
     model_index: int | None = None,
     standardizes_names: bool = True,
     topology: mdtraj.Topology | None = None,
-) -> tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, " n_atoms"]]: ...
+) -> tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, "... n_atoms"]]: ...
 
 
 @overload
@@ -44,8 +44,8 @@ def read_atoms_from_pdb(  # type: ignore
     topology: mdtraj.Topology | None = None,
 ) -> tuple[
     Float[np.ndarray, "... n_atoms 3"],
-    Int[np.ndarray, " n_atoms"],
-    Float[np.ndarray, " n_atoms"],
+    Int[np.ndarray, "... n_atoms"],
+    Float[np.ndarray, "... n_atoms"],
 ]: ...
 
 
@@ -59,7 +59,7 @@ def read_atoms_from_pdb(
     model_index: int | None = None,
     standardizes_names: bool = True,
     topology: mdtraj.Topology | None = None,
-) -> tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, " n_atoms"]]: ...
+) -> tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, "... n_atoms"]]: ...
 
 
 def read_atoms_from_pdb(
@@ -72,11 +72,11 @@ def read_atoms_from_pdb(
     standardizes_names: bool = True,
     topology: mdtraj.Topology | None = None,
 ) -> (
-    tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, " n_atoms"]]
+    tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, "... n_atoms"]]
     | tuple[
         Float[np.ndarray, "... n_atoms 3"],
-        Int[np.ndarray, " n_atoms"],
-        Float[np.ndarray, " n_atoms"],
+        Int[np.ndarray, "... n_atoms"],
+        Float[np.ndarray, "... n_atoms"],
     ]
 ):
     """Load relevant atomic information for simulating cryo-EM
@@ -161,7 +161,7 @@ def read_atoms_from_mmdf(
     model_index: int | None = None,
     standardizes_names: bool = True,
     topology: mdtraj.Topology | None = None,
-) -> tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, " n_atoms"]]: ...
+) -> tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, "... n_atoms"]]: ...
 
 
 @overload
@@ -176,8 +176,8 @@ def read_atoms_from_mmdf(  # type: ignore
     topology: mdtraj.Topology | None = None,
 ) -> tuple[
     Float[np.ndarray, "... n_atoms 3"],
-    Int[np.ndarray, " n_atoms"],
-    Float[np.ndarray, " n_atoms"],
+    Int[np.ndarray, "... n_atoms"],
+    Float[np.ndarray, "... n_atoms"],
 ]: ...
 
 
@@ -191,7 +191,7 @@ def read_atoms_from_mmdf(
     model_index: int | None = None,
     standardizes_names: bool = True,
     topology: mdtraj.Topology | None = None,
-) -> tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, " n_atoms"]]: ...
+) -> tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, "... n_atoms"]]: ...
 
 
 def read_atoms_from_mmdf(
@@ -204,11 +204,11 @@ def read_atoms_from_mmdf(
     standardizes_names: bool = True,
     topology: mdtraj.Topology | None = None,
 ) -> (
-    tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, " n_atoms"]]
+    tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, "... n_atoms"]]
     | tuple[
         Float[np.ndarray, "... n_atoms 3"],
-        Int[np.ndarray, " n_atoms"],
-        Float[np.ndarray, " n_atoms"],
+        Int[np.ndarray, "... n_atoms"],
+        Float[np.ndarray, "... n_atoms"],
     ]
 ):
     """Load relevant atomic information for simulating cryo-EM
@@ -334,7 +334,7 @@ def make_mdtraj_topology(
             atom_name,
             element,  # type: ignore
             r,
-            # serial=atom.serial_number,
+            serial=atom_index,  # atom.serial_number,
             formal_charge=charge,
         )
     # Generate bonds
