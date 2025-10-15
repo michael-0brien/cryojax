@@ -322,17 +322,12 @@ def make_mdtraj_topology(
         if atom_name in atom_replacements:
             atom_name = atom_replacements[atom_name]
         atom_name = atom_name.strip()
-        residue_ids = df_at_model[df_at_model["residue_id"] == residue_id]
-        element = _guess_element(
-            atom_name,
-            residue_name,
-            residue_length=len(residue_ids),
-        )
+        element = elem.Element.getByAtomicNumber(df_at_index["atomic_number"])
         charge = df_at_index["charge"]
         # TODO: ok to remove serial number?
         _ = topology.add_atom(
             atom_name,
-            element,  # type: ignore
+            element,
             r,
             serial=atom_index,  # atom.serial_number,
             formal_charge=charge,
@@ -445,57 +440,6 @@ def _load_atom_info(
     )
 
     return atom_info
-
-
-def _guess_element(atom_name, residue_name, residue_length):
-    """Try to guess the element name.
-    Closely follows `mdtraj.formats.pdb.PDBTrajectoryFile._guess_element`."""
-    upper = atom_name.upper()
-    if upper.startswith("CL"):
-        element = elem.chlorine
-    elif upper.startswith("NA"):
-        element = elem.sodium
-    elif upper.startswith("MG"):
-        element = elem.magnesium
-    elif upper.startswith("BE"):
-        element = elem.beryllium
-    elif upper.startswith("LI"):
-        element = elem.lithium
-    elif upper.startswith("K"):
-        element = elem.potassium
-    elif upper.startswith("ZN"):
-        element = elem.zinc
-    elif residue_length == 1 and upper.startswith("CA"):
-        element = elem.calcium
-
-    # TJL has edited this. There are a few issues here. First,
-    # parsing for the element is non-trivial, so I do my best
-    # below. Second, there is additional parsing code in
-    # pdbstructure.py, and I am unsure why it doesn't get used
-    # here...
-    elif residue_length > 1 and upper.startswith("CE"):
-        element = elem.carbon  # (probably) not Celenium...
-    elif residue_length > 1 and upper.startswith("CD"):
-        element = elem.carbon  # (probably) not Cadmium...
-    elif residue_name in ["TRP", "ARG", "GLN", "HIS"] and upper.startswith("NE"):
-        element = elem.nitrogen  # (probably) not Neon...
-    elif residue_name in ["ASN"] and upper.startswith("ND"):
-        element = elem.nitrogen  # (probably) not ND...
-    elif residue_name == "CYS" and upper.startswith("SG"):
-        element = elem.sulfur  # (probably) not SG...
-    else:
-        try:
-            element = elem.get_by_symbol(atom_name[0])
-        except KeyError:
-            try:
-                symbol = (
-                    atom_name[0:2].strip().rstrip("AB0123456789").lstrip("0123456789")
-                )
-                element = elem.get_by_symbol(symbol)
-            except KeyError:
-                element = None
-
-    return element
 
 
 def _load_name_replacement_tables():
