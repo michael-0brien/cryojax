@@ -7,7 +7,7 @@ import pytest
 from packaging.version import parse as parse_version
 
 
-def test_future_deprecated():
+def test_future_deprecated(sample_pdb_path):
     match = re.match(r"(\d+\.\d+(?:\.\d+)?)", cryojax.__version__)
     assert match, f"Could not parse current cryojax version {cryojax.__version__!r}"
     current_version = parse_version(match.group(1))
@@ -28,6 +28,13 @@ def test_future_deprecated():
     with pytest.warns(DeprecationWarning) as record:
         obj = cxs.CTF
         assert obj is cxs.AstigmaticCTF
+        assert not should_be_removed(record)
+
+    with pytest.warns(DeprecationWarning) as record:
+        _ = cryojax.io.read_atoms_from_pdb(
+            sample_pdb_path,
+            loads_b_factors=True,
+        )
         assert not should_be_removed(record)
 
 
