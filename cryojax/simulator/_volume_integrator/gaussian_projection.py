@@ -56,21 +56,19 @@ class GaussianMixtureProjection(
             as a gaussian.
         - `n_batches`:
             The number of batches over groups of positions
-            used to evaluate the projection.
-            This is useful if GPU memory is exhausted. By default,
-            `1`, which computes a projection for all positions at once.
+            used to evaluate the projection. By default, `n_batches = 1`,
+            which computes a projection for all positions at once.
+            This is useful to decrease GPU memory usage.
         """  # noqa: E501
+        if upsampling_factor is not None and upsampling_factor < 1:
+            raise AttributeError(
+                "`GaussianMixtureProjection.upsampling_factor` must "
+                f"be greater than `1`. Got a value of {upsampling_factor}."
+            )
         self.upsampling_factor = upsampling_factor
         self.shape = shape
         self.use_error_functions = use_error_functions
         self.n_batches = n_batches
-
-    def __check_init__(self):
-        if self.upsampling_factor is not None and self.upsampling_factor < 1:
-            raise AttributeError(
-                "`GaussianMixtureProjection.upsampling_factor` must "
-                f"be greater than `1`. Got a value of {self.upsampling_factor}."
-            )
 
     @override
     def integrate(
@@ -89,8 +87,13 @@ class GaussianMixtureProjection(
 
         **Arguments:**
 
-        - `volume_representation`: The volume representation to project.
-        - `image_config`: The configuration of the imaging instrument.
+        - `volume_representation`:
+            The volume representation.
+        - `image_config`:
+            The configuration of the resulting image.
+        - `outputs_real_space`:
+            If `True`, return the image in real space. Otherwise,
+            return in fourier.
 
         **Returns:**
 

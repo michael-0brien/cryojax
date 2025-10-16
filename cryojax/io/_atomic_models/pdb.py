@@ -26,6 +26,12 @@ class AtomProperties(TypedDict):
     charges: Float[np.ndarray, "... n_atoms"]
 
 
+class AtomPropertiesByType(TypedDict):
+    masses: tuple[Float[np.ndarray, "... _"], ...]
+    b_factors: tuple[Float[np.ndarray, "... _"], ...]
+    charges: tuple[Float[np.ndarray, "... _"], ...]
+
+
 @overload
 def read_atoms_from_pdb(
     filename: str | pathlib.Path,
@@ -135,7 +141,7 @@ def read_atoms_from_pdb(
     numbers. To be clear,
 
     ```python
-    atom_positons, atom_numbers = read_atoms_from_pdb(...)
+    atom_positons, atom_type = read_atoms_from_pdb(...)
     ```
 
     !!! info
@@ -146,7 +152,7 @@ def read_atoms_from_pdb(
         model at index 0,
 
         ```python
-        atom_positons, atom_numbers = read_atoms_from_pdb(..., model_index=0)
+        atom_positons, atom_type = read_atoms_from_pdb(..., model_index=0)
         ```
     """
     # Load `mmdf` dataframe forward the `mmdf_to_atoms` method
@@ -249,13 +255,13 @@ def mmdf_to_atoms(
         # Filter atoms and grab atomic positions and numbers
         selected_indices = topology.select(selection_string)
         atom_positions = atom_info["positions"][:, selected_indices]
-        atom_numbers = atom_info["numbers"][:, selected_indices]
+        atom_type = atom_info["numbers"][:, selected_indices]
         atom_properties = jax.tree.map(
             lambda arr: arr[:, selected_indices], atom_info["properties"]
         )
     else:
         atom_positions = atom_info["positions"]
-        atom_numbers = atom_info["numbers"]
+        atom_type = atom_info["numbers"]
         atom_properties = atom_info["properties"]
     # Center by mass
     if center:
@@ -263,7 +269,7 @@ def mmdf_to_atoms(
         atom_positions = _center_atom_coordinates(atom_positions, atom_masses)
     # Return, without leading dimensions if there is only one structure
     atom_positions = atom_positions[0] if atom_positions.shape[0] == 1 else atom_positions
-    atom_numbers = atom_numbers[0] if atom_numbers.shape[0] == 1 else atom_numbers
+    atom_type = atom_type[0] if atom_type.shape[0] == 1 else atom_type
     if loads_properties or loads_b_factors:
         # Optionally return atom properties
         atom_properties = jax.tree.map(
@@ -276,11 +282,11 @@ def mmdf_to_atoms(
                 category=DeprecationWarning,
                 stacklevel=2,
             )
-            return atom_positions, atom_numbers, atom_properties["b_factors"]
+            return atom_positions, atom_type, atom_properties["b_factors"]
         else:
-            return atom_positions, atom_numbers, atom_properties
+            return atom_positions, atom_type, atom_properties
     else:
-        return atom_positions, atom_numbers
+        return atom_positions, atom_type
 
 
 def mmdf_to_topology(
@@ -388,6 +394,62 @@ def read_topology_from_pdb(
     return mmdf_to_topology(df, standardizes_names, model_index)
 
 
+@overload
+def split_atoms_by_number(
+    atom_positions: Float[np.ndarray, "... n_atoms 3"],
+    atom_type: Int[np.ndarray, " n_atoms"],
+    atom_properties: dict | AtomProperties,
+) -> tuple[
+    tuple[Float[np.ndarray, "... _ 3"], ...], tuple[int, ...], AtomPropertiesByType
+]: ...
+
+
+@overload
+def split_atoms_by_number(
+    atom_positions: Float[np.ndarray, "... n_atoms 3"],
+    atom_type: Int[np.ndarray, " n_atoms"],
+    atom_properties: None,
+) -> tuple[tuple[Float[np.ndarray, "... _ 3"], ...], tuple[int, ...]]: ...
+
+
+def split_atoms_by_number(
+    atom_positions: Float[np.ndarray, "... n_atoms 3"],
+    atom_type: Int[np.ndarray, " n_atoms"],
+    atom_properties: dict | AtomProperties | None = None,
+) -> (
+    tuple[tuple[Float[np.ndarray, "... _ 3"], ...], tuple[int, ...]]
+    | tuple[
+        tuple[Float[np.ndarray, "... _ 3"], ...], tuple[int, ...], AtomPropertiesByType
+    ]
+):
+    """Given atom positions and atomic numbers, split
+    atom positions into a tuple where each element
+    is atom positions for a given atomic number.
+
+    **Arguments:**
+
+    - `atom_positions`:
+        An array of atom positions, optionally with a batch
+        dimension.
+    - `atom_type`:
+        Atomic numbers corresponding to `atom_positions`.
+    - `atom_properties`:
+        Optionally, include a dictionary of atom properties.
+        Its arrays must be properties that are quantified by a
+        single number and have the same batch dimension as
+        `atom_positions`.
+
+
+    **Returns:**
+
+    A tuple of atom positions for a given atom type, a tuple
+    of atom types, and optionally a dictionary with the
+    same keys as `atom_properties` but values also a tuple split
+    by the atom types.
+    """
+    pass
+
+
 def _center_atom_coordinates(atom_positions, atom_masses):
     com_position = (
         np.sum(atom_positions * atom_masses[..., None], axis=1)
@@ -418,11 +480,11 @@ def _load_atom_info(df: pd.DataFrame, model_index: int | None):
                 f"{df['model'].unique().tolist()}. "
             )
     model_numbers = df["model"].unique().tolist()
-    atom_positions, atomic_numbers, atomic_masses, b_factors, charges = [], [], [], [], []
+    atom_positions, atom_type, atomic_masses, b_factors, charges = [], [], [], [], []
     for model_index in model_numbers:
         df_at_index = df[df["model"] == model_index]
         atom_positions.append(df_at_index[["x", "y", "z"]].to_numpy())
-        atomic_numbers.append(df_at_index["atomic_number"].to_numpy())
+        atom_type.append(df_at_index["atomic_number"].to_numpy())
         atomic_masses.append(df_at_index["atomic_weight"].to_numpy())
         b_factors.append(df_at_index["b_isotropic"].to_numpy())
         charges.append(df_at_index["charge"].to_numpy())
@@ -435,7 +497,7 @@ def _load_atom_info(df: pd.DataFrame, model_index: int | None):
     )
     atom_info = _AtomicModelInfo(
         positions=np.asarray(atom_positions, dtype=float),
-        numbers=np.asarray(atomic_numbers, dtype=int),
+        numbers=np.asarray(atom_type, dtype=int),
         properties=properties,
     )
 

@@ -5,7 +5,6 @@ Using the fourier slice theorem for computing volume projections.
 from typing import ClassVar
 from typing_extensions import override
 
-import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
@@ -24,15 +23,10 @@ from .._volume import FourierVoxelGridVolume, FourierVoxelSplineVolume
 from .base_integrator import AbstractVolumeIntegrator
 
 
-class AbstractFourierSurfaceExtraction(
+class FourierSliceExtraction(
     AbstractVolumeIntegrator[FourierVoxelGridVolume | FourierVoxelSplineVolume],
     strict=True,
 ):
-    outputs_integral: eqx.AbstractVar[bool]
-    correction_mask: eqx.AbstractVar[InverseSincMask | None]
-
-
-class FourierSliceExtraction(AbstractFourierSurfaceExtraction, strict=True):
     """Integrate points to the exit plane using the Fourier
     projection-slice theorem.
 
@@ -59,9 +53,10 @@ class FourierSliceExtraction(AbstractFourierSurfaceExtraction, strict=True):
         """**Arguments:**
 
         - `outputs_integral`:
-            If `False`, returns a projection. If `True`, return the
-            projection multiplied by the voxel size. This is necessary
-            for simulating in physical units.
+            If `True`, return the fourier slice
+            *multiplied by the voxel size*. Including the voxel size
+            numerical approximates the projection integral and is
+            necessary for simulating images in physical units.
         - `correction_mask`:
             A `cryojax.ndimage.transforms.InverseSincMask` for performing
             sinc-correction on the linear-interpolated projections. This
@@ -98,8 +93,13 @@ class FourierSliceExtraction(AbstractFourierSurfaceExtraction, strict=True):
 
         **Arguments:**
 
-        - `volume_representation`: The volume representation.
-        - `image_config`: The configuration of the resulting image.
+        - `volume_representation`:
+            The volume representation.
+        - `image_config`:
+            The configuration of the resulting image.
+        - `outputs_real_space`:
+            If `True`, return the image in real space. Otherwise,
+            return in fourier.
 
         **Returns:**
 
@@ -222,7 +222,10 @@ class FourierSliceExtraction(AbstractFourierSurfaceExtraction, strict=True):
         return fourier_slice
 
 
-class EwaldSphereExtraction(AbstractFourierSurfaceExtraction, strict=True):
+class EwaldSphereExtraction(
+    AbstractVolumeIntegrator[FourierVoxelGridVolume | FourierVoxelSplineVolume],
+    strict=True,
+):
     """Integrate points to the exit plane by extracting a surface of
     the ewald sphere in fourier space.
 
@@ -249,9 +252,10 @@ class EwaldSphereExtraction(AbstractFourierSurfaceExtraction, strict=True):
         """**Arguments:**
 
         - `outputs_integral`:
-            If `False`, returns a projection. If `True`, return the
-            projection multiplied by the voxel size. This is necessary
-            for simulating in physical units.
+            If `True`, return the ewald sphere surface
+            *multiplied by the voxel size*. Including the voxel size
+            numerical approximates the projection integral and is
+            necessary for simulating images in physical units.
         - `correction_mask`:
             A `cryojax.ndimage.transforms.SincCorrectionMask` for performing
             sinc-correction on the linear-interpolated projections. This
