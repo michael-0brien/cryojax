@@ -1,13 +1,16 @@
 import os
 
+import jax
 import mdtraj
+import mmdf
 import numpy as np
+import pandas as pd
 import pytest
 from jaxtyping import install_import_hook
 
 
 with install_import_hook("cryojax", "typeguard.typechecked"):
-    from cryojax.io import read_atoms_from_pdb
+    from cryojax.io import mmdf_to_atoms, read_atoms_from_pdb
 
 
 @pytest.fixture
@@ -16,52 +19,94 @@ def pdb_multiple_structures_path():
 
 
 def test_read_structure(sample_pdb_path):
-    atom_positions, atom_types, b_factors = read_atoms_from_pdb(
+    atom_positions, atomic_numbers, atom_properties = read_atoms_from_pdb(
         sample_pdb_path,
         center=True,
         selection_string="protein and not element H",
-        loads_b_factors=True,
+        loads_properties=True,
     )
 
     assert atom_positions.ndim == 2
-    assert atom_types.shape == b_factors.shape
-    assert atom_positions.shape[0] == atom_types.shape[0]
+    assert jax.tree.reduce(
+        lambda x, y: x and y,
+        jax.tree.map(lambda z: z.shape == atomic_numbers.shape, atom_properties),
+    )
+    assert atom_positions.shape[0] == atomic_numbers.shape[0]
 
     assert atom_positions.shape[1] == 3
     assert atom_positions.shape[0] == 77
 
 
-def test_read_structure_no_b_factors(sample_pdb_path):
-    atom_positions, atom_types = read_atoms_from_pdb(
+def test_read_structure_no_properties(sample_pdb_path):
+    atom_positions, atomic_numbers = read_atoms_from_pdb(
         sample_pdb_path,
         center=True,
         selection_string="protein and not element H",
-        loads_b_factors=False,
+        loads_properties=False,
     )
 
     assert atom_positions.ndim == 2
-    assert atom_positions.shape[0] == atom_types.shape[0]
+    assert atom_positions.shape[0] == atomic_numbers.shape[0]
 
     assert atom_positions.shape[1] == 3
     assert atom_positions.shape[0] == 77
 
 
-def test_read_pdb_multiple_structures(pdb_multiple_structures_path):
-    atom_positions, atom_types, b_factors = read_atoms_from_pdb(
+def test_read_pdb_multiple_structures_stack(pdb_multiple_structures_path):
+    atom_positions, atomic_numbers, atom_properties = read_atoms_from_pdb(
         pdb_multiple_structures_path,
         center=True,
-        loads_b_factors=True,
+        loads_properties=True,
         selection_string="all",
+        model_index=None,
+        stack_models=True,
     )
     assert atom_positions.ndim == 3
     assert atom_positions.shape[0] == 10
     assert atom_positions.shape[2] == 3
     assert atom_positions.shape[1] == 138
-    assert atom_types.shape == b_factors.shape == atom_positions.shape[0:2]
+    assert jax.tree.reduce(
+        lambda x, y: x and y,
+        jax.tree.map(lambda z: z.shape == atom_positions.shape[0:2], atom_properties),
+    )
+    assert atomic_numbers.shape == (138,)
+
+
+def test_read_pdb_multiple_structures_flat(pdb_multiple_structures_path):
+    atom_positions, atomic_numbers, atom_properties = read_atoms_from_pdb(
+        pdb_multiple_structures_path,
+        center=True,
+        loads_properties=True,
+        selection_string="all",
+        model_index=None,
+        stack_models=False,
+    )
+    assert atom_positions.ndim == 2
+    assert atomic_numbers.shape == (10 * 138,)
+    assert atom_positions.shape == (10 * 138, 3)
+    assert jax.tree.reduce(
+        lambda x, y: x and y,
+        jax.tree.map(lambda z: z.shape == atomic_numbers.shape, atom_properties),
+    )
+
+
+def test_bad_read_pdb_multiple_structures(pdb_multiple_structures_path):
+    df = mmdf.read(pdb_multiple_structures_path)
+    last_row = df.iloc[[-1]]
+    df = pd.concat([df, last_row], ignore_index=True)
+    with pytest.raises(ValueError):
+        _ = mmdf_to_atoms(
+            df,
+            center=True,
+            loads_properties=True,
+            selection_string="all",
+            model_index=None,
+            stack_models=True,
+        )
 
 
 def test_read_pdb_at_structure(pdb_multiple_structures_path):
-    atom_positions, atom_types = read_atoms_from_pdb(
+    atom_positions, atomic_numbers = read_atoms_from_pdb(
         pdb_multiple_structures_path,
         center=True,
         loads_b_factors=False,
@@ -70,23 +115,26 @@ def test_read_pdb_at_structure(pdb_multiple_structures_path):
     )
 
     assert atom_positions.ndim == 2
-    assert atom_positions.shape[0] == atom_types.shape[0]
+    assert atom_positions.shape[0] == atomic_numbers.shape[0]
     assert atom_positions.shape[1] == 3
     assert atom_positions.shape[0] == 138
 
 
 def test_read_cif(sample_cif_path):
-    atom_positions, atom_types, b_factors = read_atoms_from_pdb(
+    atom_positions, atomic_numbers, atom_properties = read_atoms_from_pdb(
         sample_cif_path,
         center=True,
         selection_string="all",
         model_index=None,
-        loads_b_factors=True,
+        loads_properties=True,
     )
 
     assert atom_positions.ndim == 2
-    assert atom_types.shape == b_factors.shape
-    assert atom_positions.shape[0] == atom_types.shape[0]
+    assert jax.tree.reduce(
+        lambda x, y: x and y,
+        jax.tree.map(lambda z: z.shape == atomic_numbers.shape, atom_properties),
+    )
+    assert atom_positions.shape[0] == atomic_numbers.shape[0]
 
     assert atom_positions.shape[1] == 3
     assert atom_positions.shape[0] == 3222
