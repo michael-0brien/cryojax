@@ -19,6 +19,8 @@ from jaxtyping import Float, Int
 from mdtraj.core import element as elem
 from mdtraj.core.topology import Topology
 
+from ...atom_util import center_atom_positions
+
 
 class AtomProperties(TypedDict):
     masses: Float[np.ndarray, "... n_atoms"]
@@ -266,7 +268,7 @@ def mmdf_to_atoms(
     # Center by mass
     if center:
         atom_masses = atom_properties["masses"]
-        atom_positions = _center_atom_coordinates(atom_positions, atom_masses)
+        atom_positions = center_atom_positions(atom_positions, atom_masses, atom_axis=1)
     # Return, without leading dimensions if there is only one structure
     atom_positions = atom_positions[0] if atom_positions.shape[0] == 1 else atom_positions
     atom_type = atom_type[0] if atom_type.shape[0] == 1 else atom_type
@@ -392,70 +394,6 @@ def read_topology_from_pdb(
     """
     df = mmdf.read(pathlib.Path(filename))
     return mmdf_to_topology(df, standardizes_names, model_index)
-
-
-@overload
-def split_atoms_by_number(
-    atom_positions: Float[np.ndarray, "... n_atoms 3"],
-    atom_type: Int[np.ndarray, " n_atoms"],
-    atom_properties: dict | AtomProperties,
-) -> tuple[
-    tuple[Float[np.ndarray, "... _ 3"], ...], tuple[int, ...], AtomPropertiesByType
-]: ...
-
-
-@overload
-def split_atoms_by_number(
-    atom_positions: Float[np.ndarray, "... n_atoms 3"],
-    atom_type: Int[np.ndarray, " n_atoms"],
-    atom_properties: None,
-) -> tuple[tuple[Float[np.ndarray, "... _ 3"], ...], tuple[int, ...]]: ...
-
-
-def split_atoms_by_number(
-    atom_positions: Float[np.ndarray, "... n_atoms 3"],
-    atom_type: Int[np.ndarray, " n_atoms"],
-    atom_properties: dict | AtomProperties | None = None,
-) -> (
-    tuple[tuple[Float[np.ndarray, "... _ 3"], ...], tuple[int, ...]]
-    | tuple[
-        tuple[Float[np.ndarray, "... _ 3"], ...], tuple[int, ...], AtomPropertiesByType
-    ]
-):
-    """Given atom positions and atomic numbers, split
-    atom positions into a tuple where each element
-    is atom positions for a given atomic number.
-
-    **Arguments:**
-
-    - `atom_positions`:
-        An array of atom positions, optionally with a batch
-        dimension.
-    - `atom_type`:
-        Atomic numbers corresponding to `atom_positions`.
-    - `atom_properties`:
-        Optionally, include a dictionary of atom properties.
-        Its arrays must be properties that are quantified by a
-        single number and have the same batch dimension as
-        `atom_positions`.
-
-
-    **Returns:**
-
-    A tuple of atom positions for a given atom type, a tuple
-    of atom types, and optionally a dictionary with the
-    same keys as `atom_properties` but values also a tuple split
-    by the atom types.
-    """
-    pass
-
-
-def _center_atom_coordinates(atom_positions, atom_masses):
-    com_position = (
-        np.sum(atom_positions * atom_masses[..., None], axis=1)
-        / atom_masses.sum(axis=1)[:, None]
-    )
-    return atom_positions - com_position[:, None, :]
 
 
 class _AtomicModelInfo(TypedDict):
