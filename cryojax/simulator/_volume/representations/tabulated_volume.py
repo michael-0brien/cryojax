@@ -2,56 +2,16 @@ import abc
 from typing import Any, Generic, TypeVar
 from typing_extensions import Self, override
 
-import equinox as eqx
 import jax.numpy as jnp
-import numpy as np
-from jaxtyping import Array, Float, Int
+from jaxtyping import Array, Float
 
-from ....constants import (
-    get_tabulated_scattering_factor_parameters,
-    read_peng_scattering_factor_parameter_table,
-)
+from ....constants import PengScatteringFactorParameters
 from ....jax_util import NDArrayLike, error_if_negative
 from .base_representations import AbstractAtomicVolume
 from .common_functions import gaussians_to_real_voxels
 
 
 T = TypeVar("T")
-
-
-class PengScatteringFactorParameters(eqx.Module, strict=True):
-    """A convenience wrapper for instantiating the
-    scattering factor parameters from Peng et al. (1996).
-
-    To access scattering factors $a_i$ and $b_i$ given in
-    the citation,
-
-    ```python
-    from cryojax.io import read_atoms_from_pdb
-    from cryojax.simulator import PengScatteringFactorParameters
-
-    # Load positions of atoms and one-hot encoded atom names
-    atom_positions, atom_types = read_atoms_from_pdb(...)
-    parameters = PengScatteringFactorParameters(atom_types)
-    print(parameters.a, parameters.b)  # a_i and b_i
-    ```
-    """
-
-    a: Float[Array, " n_atoms 5"]
-    b: Float[Array, " n_atoms 5"]
-
-    def __init__(self, atom_types: Int[np.ndarray, " n_atoms"]):
-        """**Arguments:**
-
-        - `atom_types`:
-            The atom types as an integer array.
-        """
-        scattering_factor_parameter_table = read_peng_scattering_factor_parameter_table()
-        scattering_factor_parameter_dict = get_tabulated_scattering_factor_parameters(
-            atom_types, scattering_factor_parameter_table
-        )
-        self.a = jnp.asarray(scattering_factor_parameter_dict["a"], dtype=float)
-        self.b = jnp.asarray(scattering_factor_parameter_dict["b"], dtype=float)
 
 
 class AbstractTabulatedAtomicVolume(AbstractAtomicVolume, Generic[T], strict=True):
@@ -83,10 +43,9 @@ class PengAtomicVolume(
         from tabulated electron scattering factors
 
         ```python
+        from cryojax.constants import PengScatteringFactorParameters
         from cryojax.io import read_atoms_from_pdb
-        from cryojax.simulator import (
-            PengAtomicVolume, PengScatteringFactorParameters
-        )
+        from cryojax.simulator import PengAtomicVolume
 
         # Load positions of atoms and one-hot encoded atom names
         atom_positions, atom_types = read_atoms_from_pdb(...)
@@ -112,8 +71,8 @@ class PengAtomicVolume(
     def __init__(
         self,
         atom_positions: Float[NDArrayLike, "n_atoms 3"],
-        amplitudes: Float[Array, "n_atoms n_gaussians"],
-        b_factors: Float[Array, "n_atoms n_gaussians"],
+        amplitudes: Float[NDArrayLike, "n_atoms n_gaussians"],
+        b_factors: Float[NDArrayLike, "n_atoms n_gaussians"],
     ):
         """**Arguments:**
 
