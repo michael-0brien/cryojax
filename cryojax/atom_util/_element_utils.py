@@ -12,7 +12,7 @@ def split_atoms_by_element(
     atomic_numbers: Int[np.ndarray, " _"],
     atom_pytree: PyTree[np.ndarray, "T"],
     atom_axis: int = 0,
-) -> PyTree[tuple[np.ndarray, ...], "T"]:
+) -> tuple[PyTree[tuple[np.ndarray, ...], "T"], Int[np.ndarray, " _"]]:
     """Given atomic numbers, split a pytree of numpy arrays
     representing atom properties into a tuple where each element
     is the pytree of tuples where each element is the array for
@@ -33,11 +33,12 @@ def split_atoms_by_element(
     A pytree with tree structure matching `atom_pytree`,
     where arrays have been replaced with tuples of arrays.
     """
-    atom_ids = np.unique(atomic_numbers)
+    unique_atomic_numbers = np.unique(atomic_numbers)
     split_pytree = jax.tree.map(
         lambda x: tuple(
-            np.take(x, np.where(atomic_numbers == id), axis=atom_axis) for id in atom_ids
+            np.take(x, np.where(atomic_numbers == id), axis=atom_axis)
+            for id in unique_atomic_numbers
         ),
         atom_pytree,
     )
-    return split_pytree
+    return split_pytree, unique_atomic_numbers

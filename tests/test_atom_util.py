@@ -39,17 +39,18 @@ def test_center_positions(sample_pdb_path, mass_weighted, atom_axis):
 @pytest.mark.parametrize("atom_axis", [1, 2])
 def test_atom_splitting(sample_pdb_path, atom_axis):
     # No batch dimension
-    atom_positions, atomic_numbers = read_atoms_from_pdb(
+    atom_positions, atom_elements = read_atoms_from_pdb(
         sample_pdb_path, selection_string="element C || element O || element N"
     )
-    positions_by_element = split_atoms_by_element(
-        atomic_numbers, atom_positions, atom_axis=0
+    positions_by_element, elements = split_atoms_by_element(
+        atom_elements, atom_positions, atom_axis=0
     )
     assert isinstance(positions_by_element, tuple)
     assert len(positions_by_element) == 3
+    assert len(elements) == 3
 
-    batched_positions_by_element = split_atoms_by_element(
-        atomic_numbers,
+    batched_positions_by_element, _ = split_atoms_by_element(
+        atom_elements,
         np.expand_dims(atom_positions, axis=tuple(range(atom_axis))),
         atom_axis=atom_axis,
     )
