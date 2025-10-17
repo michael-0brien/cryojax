@@ -28,12 +28,6 @@ class AtomProperties(TypedDict):
     charges: Float[np.ndarray, "... n_atoms"]
 
 
-class AtomPropertiesByType(TypedDict):
-    masses: tuple[Float[np.ndarray, "... _"], ...]
-    b_factors: tuple[Float[np.ndarray, "... _"], ...]
-    charges: tuple[Float[np.ndarray, "... _"], ...]
-
-
 @overload
 def read_atoms_from_pdb(
     filename: str | pathlib.Path,
@@ -43,9 +37,10 @@ def read_atoms_from_pdb(
     center: bool = True,
     selection_string: str = "all",
     model_index: int | None = None,
+    stack_models: bool = False,
     standardizes_names: bool = True,
     topology: mdtraj.Topology | None = None,
-) -> tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, "... n_atoms"]]: ...
+) -> tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, " n_atoms"]]: ...
 
 
 @overload
@@ -57,11 +52,12 @@ def read_atoms_from_pdb(  # type: ignore
     center: bool = True,
     selection_string: str = "all",
     model_index: int | None = None,
+    stack_models: bool = False,
     standardizes_names: bool = True,
     topology: mdtraj.Topology | None = None,
 ) -> tuple[
     Float[np.ndarray, "... n_atoms 3"],
-    Int[np.ndarray, "... n_atoms"],
+    Int[np.ndarray, " n_atoms"],
     AtomProperties,
 ]: ...
 
@@ -75,6 +71,7 @@ def read_atoms_from_pdb(
     center: bool = True,
     selection_string: str = "all",
     model_index: int | None = None,
+    stack_models: bool = False,
     standardizes_names: bool = True,
     topology: mdtraj.Topology | None = None,
 ) -> tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, "... n_atoms"]]: ...
@@ -88,13 +85,14 @@ def read_atoms_from_pdb(
     center: bool = True,
     selection_string: str = "all",
     model_index: int | None = None,
+    stack_models: bool = False,
     standardizes_names: bool = True,
     topology: mdtraj.Topology | None = None,
 ) -> (
     tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, "... n_atoms"]]
     | tuple[
         Float[np.ndarray, "... n_atoms 3"],
-        Int[np.ndarray, "... n_atoms"],
+        Int[np.ndarray, " n_atoms"],
         AtomProperties | np.ndarray,  # Included for `loads_b_factors=True`
     ]
 ):
@@ -107,18 +105,10 @@ def read_atoms_from_pdb(
         The `selection_string` argument enables usage of
         [`mdtraj`](https://www.mdtraj.org/) atom selection syntax.
 
-    !!! warning
-
-        Using `mdtraj` atom selection requires also passing a `topology`
-        or this function will generate one on-the-fly. If `model_index = None`
-        and there are multiple models in the PDB/mmCIF, the topology is
-        generated *only* using the first model index, yet will be used to
-        select atoms across all models.
-
     **Arguments:**
 
     - `filename`:
-        The name of the PDB/mmCIF file to open.
+        The name of the PDB/PDBx file to open.
     - `center`:
         If `True`, center the model so that its center of mass coincides
         with the origin.
@@ -128,22 +118,29 @@ def read_atoms_from_pdb(
         A selection string in `mdtraj`'s format.
     - `model_index`:
         An optional index for grabbing a particular model stored in the PDB. If `None`,
-        grab all models, where `atom_positions` has a leading dimension for the model.
+        grab all models, where `atom_positions` has a leading dimension for the model
+        if `stack_models = True` or concatenates all models if `stack_models = False`.
+    - `stack_models`:
+        If `True`, `model_index = None`, and there are multiple models in the PDB,
+        assume that each model is of the same protein and return atom positions
+        and properties with a stacked leading dimension.
     - `standardizes_names`:
         If `True`, non-standard atom names and residue names are standardized.
         If set to `False`, this step is skipped.
     - `topology`:
-        If you give a topology as input, the topology won't be parsed from the pdb file
-        it saves time if you have to parse a big number of files
+        If `None`, use the function `mmdf_to_topology` to build a topology
+        on-the-fly. If `stack_models = True`, `model_index = None`, and there
+        are multiple models in the PDB, use the first model index to build the
+        topology.
 
     **Returns:**
 
     A tuple whose first element is a `numpy` array of coordinates containing
-    atomic positions, and whose second element is an array of atomic element
+    atomic positions, and whose second element is an array of atomic
     numbers. To be clear,
 
     ```python
-    atom_positons, atom_type = read_atoms_from_pdb(...)
+    atom_positons, atomic_numbers = read_atoms_from_pdb(...)
     ```
 
     !!! info
@@ -154,7 +151,7 @@ def read_atoms_from_pdb(
         model at index 0,
 
         ```python
-        atom_positons, atom_type = read_atoms_from_pdb(..., model_index=0)
+        atom_positons, atomic_numbers = read_atoms_from_pdb(..., model_index=0)
         ```
     """
     # Load `mmdf` dataframe forward the `mmdf_to_atoms` method
@@ -166,6 +163,7 @@ def read_atoms_from_pdb(
         center=center,
         selection_string=selection_string,
         model_index=model_index,
+        stack_models=stack_models,
         standardizes_names=standardizes_names,
         topology=topology,
     )
@@ -177,9 +175,10 @@ def mmdf_to_atoms(
     *,
     loads_properties: Literal[False],
     loads_b_factors: bool = False,
-    center: bool = True,
+    center: bool = False,
     selection_string: str = "all",
     model_index: int | None = None,
+    stack_models: bool = False,
     standardizes_names: bool = True,
     topology: mdtraj.Topology | None = None,
 ) -> tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, "... n_atoms"]]: ...
@@ -191,9 +190,10 @@ def mmdf_to_atoms(  # type: ignore
     *,
     loads_properties: Literal[True],
     loads_b_factors: bool = False,
-    center: bool = True,
+    center: bool = False,
     selection_string: str = "all",
     model_index: int | None = None,
+    stack_models: bool = False,
     standardizes_names: bool = True,
     topology: mdtraj.Topology | None = None,
 ) -> tuple[
@@ -209,9 +209,10 @@ def mmdf_to_atoms(
     *,
     loads_properties: bool = False,
     loads_b_factors: bool = False,
-    center: bool = True,
+    center: bool = False,
     selection_string: str = "all",
     model_index: int | None = None,
+    stack_models: bool = False,
     standardizes_names: bool = True,
     topology: mdtraj.Topology | None = None,
 ) -> tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, "... n_atoms"]]: ...
@@ -222,9 +223,10 @@ def mmdf_to_atoms(
     *,
     loads_properties: bool = False,
     loads_b_factors: bool = False,
-    center: bool = True,
+    center: bool = False,
     selection_string: str = "all",
     model_index: int | None = None,
+    stack_models: bool = False,
     standardizes_names: bool = True,
     topology: mdtraj.Topology | None = None,
 ) -> (
@@ -250,20 +252,25 @@ def mmdf_to_atoms(
     ```
     """
     # Load atom info from `mmdf` dataframe
-    atom_info = _load_atom_info(df, model_index=model_index)
+    atom_info = _load_atom_info(df, model_index=model_index, stack_models=stack_models)
     if selection_string != "all":
         if topology is None:
-            topology = mmdf_to_topology(df, standardizes_names, model_index)
+            if model_index is None and stack_models:
+                topology = mmdf_to_topology(df, standardizes_names, model_index=0)
+            else:
+                topology = mmdf_to_topology(
+                    df, standardizes_names, model_index=model_index
+                )
         # Filter atoms and grab atomic positions and numbers
         selected_indices = topology.select(selection_string)
         atom_positions = atom_info["positions"][:, selected_indices]
-        atom_type = atom_info["numbers"][:, selected_indices]
+        atomic_numbers = atom_info["numbers"][selected_indices]
         atom_properties = jax.tree.map(
             lambda arr: arr[:, selected_indices], atom_info["properties"]
         )
     else:
         atom_positions = atom_info["positions"]
-        atom_type = atom_info["numbers"]
+        atomic_numbers = atom_info["numbers"]
         atom_properties = atom_info["properties"]
     # Center by mass
     if center:
@@ -271,7 +278,6 @@ def mmdf_to_atoms(
         atom_positions = center_atom_positions(atom_positions, atom_masses, atom_axis=1)
     # Return, without leading dimensions if there is only one structure
     atom_positions = atom_positions[0] if atom_positions.shape[0] == 1 else atom_positions
-    atom_type = atom_type[0] if atom_type.shape[0] == 1 else atom_type
     if loads_properties or loads_b_factors:
         # Optionally return atom properties
         atom_properties = jax.tree.map(
@@ -284,11 +290,11 @@ def mmdf_to_atoms(
                 category=DeprecationWarning,
                 stacklevel=2,
             )
-            return atom_positions, atom_type, atom_properties["b_factors"]
+            return atom_positions, atomic_numbers, atom_properties["b_factors"]
         else:
-            return atom_positions, atom_type, atom_properties
+            return atom_positions, atomic_numbers, atom_properties
     else:
-        return atom_positions, atom_type
+        return atom_positions, atomic_numbers
 
 
 def mmdf_to_topology(
@@ -310,7 +316,8 @@ def mmdf_to_topology(
         standardized.
     - `model_index`:
         The model index from which to build the topology. Possible
-        indicies are captured in `df["model"]`.
+        indices are captured in `df["model"]`. If `None`, use all
+        models to build a single topology.
 
     **Returns:**
 
@@ -323,9 +330,7 @@ def mmdf_to_topology(
         )
     else:
         residue_name_replacements, atom_name_replacements = {}, {}
-    if model_index is None:
-        model_index = df["model"].unique().tolist()[0]
-    df_at_model = df[df["model"] == model_index]
+    df_at_model = df if model_index is None else df[df["model"] == model_index]
     for atom_index in range(len(df_at_model)):
         df_at_index = df_at_model.iloc[atom_index]
         chain_id = df_at_index["chain"]
@@ -371,7 +376,7 @@ def read_topology_from_pdb(
     This function wraps the function `mmdf_to_topology`.
 
     !!! info
-        Since we use `mmdf` to parse the PDB/mmCIF file, the
+        Since we use `mmdf` to parse the PDB/PDBx file, the
         atom ordering in some of our functions, e.g., `read_atoms_from_pdb`
         may differ from that of `mdtraj.load`. We recommend using this function
         if you need a topology that is consistent with that of `read_atoms_from_pdb`.
@@ -386,7 +391,7 @@ def read_topology_from_pdb(
         standardized.
     - `model_index`:
         The model index from which to build the topology. Possible
-        indicies are captured in `df["model"]`.
+        indices are captured in `df["model"]`.
 
     **Returns:**
 
@@ -402,7 +407,7 @@ class _AtomicModelInfo(TypedDict):
     properties: AtomProperties
 
 
-def _load_atom_info(df: pd.DataFrame, model_index: int | None):
+def _load_atom_info(df: pd.DataFrame, model_index: int | None, stack_models: bool):
     if df.size == 0:
         raise ValueError(
             "When loading an atomic model using `mmdf`, found that "
@@ -417,25 +422,38 @@ def _load_atom_info(df: pd.DataFrame, model_index: int | None):
                 "Model numbers available for indexing are "
                 f"{df['model'].unique().tolist()}. "
             )
-    model_numbers = df["model"].unique().tolist()
-    atom_positions, atom_type, atomic_masses, b_factors, charges = [], [], [], [], []
-    for model_index in model_numbers:
-        df_at_index = df[df["model"] == model_index]
-        atom_positions.append(df_at_index[["x", "y", "z"]].to_numpy())
-        atom_type.append(df_at_index["atomic_number"].to_numpy())
-        atomic_masses.append(df_at_index["atomic_weight"].to_numpy())
-        b_factors.append(df_at_index["b_isotropic"].to_numpy())
-        charges.append(df_at_index["charge"].to_numpy())
+    if model_index is None and stack_models:
+        model_numbers = df["model"].unique().tolist()
+    else:
+        model_numbers = [None]
+    atom_positions, atomic_numbers = [], []
+    atom_masses, b_factors, charges = [], [], []
+    for index in model_numbers:
+        df_at_model = df if index is None else df[df["model"] == index]
+        atom_positions.append(df_at_model[["x", "y", "z"]].to_numpy())
+        atomic_numbers.append(df_at_model["atomic_number"].to_numpy())
+        atom_masses.append(df_at_model["atomic_weight"].to_numpy())
+        b_factors.append(df_at_model["b_isotropic"].to_numpy())
+        charges.append(df_at_model["charge"].to_numpy())
+
+    if len(atomic_numbers) > 1:
+        if not all(np.array_equal(arr, atomic_numbers[0]) for arr in atomic_numbers):
+            raise ValueError(
+                "Tried to load multiple models with `stack_models = True`, "
+                "but found that atomic numbers across different models "
+                "were different. Only use `stack_models = True` if "
+                "each model represents the same protein."
+            )
 
     # Gather atom info and return
     properties = AtomProperties(
         charges=np.asarray(charges, dtype=int),
         b_factors=np.asarray(b_factors, dtype=float),
-        masses=np.asarray(atomic_masses, dtype=float),
+        masses=np.asarray(atom_masses, dtype=float),
     )
     atom_info = _AtomicModelInfo(
         positions=np.asarray(atom_positions, dtype=float),
-        numbers=np.asarray(atom_type, dtype=int),
+        numbers=np.asarray(atomic_numbers[0], dtype=int),
         properties=properties,
     )
 
