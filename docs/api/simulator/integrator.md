@@ -10,12 +10,6 @@
 
 ## Integration methods for voxel-based structures
 
-???+ abstract "`cryojax.simulator.AbstractVoxelVolumeIntegrator`"
-    ::: cryojax.simulator.AbstractVoxelVolumeIntegrator
-        options:
-            members:
-                - outputs_integral
-
 ::: cryojax.simulator.FourierSliceExtraction
         options:
             members:

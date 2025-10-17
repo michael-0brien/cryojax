@@ -11,6 +11,5 @@ from .representations import (
     FourierVoxelSplineVolume as FourierVoxelSplineVolume,
     GaussianMixtureVolume as GaussianMixtureVolume,
     PengAtomicVolume as PengAtomicVolume,
-    PengScatteringFactorParameters as PengScatteringFactorParameters,
     RealVoxelGridVolume as RealVoxelGridVolume,
 )

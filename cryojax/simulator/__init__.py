@@ -62,7 +62,6 @@ from ._volume import (
     FourierVoxelSplineVolume as FourierVoxelSplineVolume,
     GaussianMixtureVolume as GaussianMixtureVolume,
     PengAtomicVolume as PengAtomicVolume,
-    PengScatteringFactorParameters as PengScatteringFactorParameters,
     RealVoxelGridVolume as RealVoxelGridVolume,
 )
 from ._volume_integrator import (
@@ -91,6 +90,17 @@ def __getattr__(name: str):
             stacklevel=2,
         )
         return AstigmaticCTF
+    if name == "PengScatteringFactorParameters":
+        _warnings.warn(
+            "'PengScatteringFactorParameters' has been moved to `cryojax.constants` "
+            "will be removed from `cryojax.simulator` in "
+            "cryoJAX 0.6.0.",
+            category=DeprecationWarning,
+            stacklevel=2,
+        )
+        from ..constants import PengScatteringFactorParameters
+
+        return PengScatteringFactorParameters
     # Deprecated in previous versions
     if name == "DiscreteStructuralEnsemble":
         raise ValueError(

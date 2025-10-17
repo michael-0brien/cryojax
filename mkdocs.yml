@@ -46,6 +46,7 @@ plugins:
     - hippogriffe:
         extra_public_objects:
             - xarray.core.dataset.Dataset
+            - numpy.ndarray
     - mkdocstrings:
         handlers:
           python:

@@ -31,6 +31,11 @@ def test_future_deprecated(sample_pdb_path):
         assert not should_be_removed(record)
 
     with pytest.warns(DeprecationWarning) as record:
+        obj = cxs.PengScatteringFactorParameters
+        assert obj is cryojax.constants.PengScatteringFactorParameters
+        assert not should_be_removed(record)
+
+    with pytest.warns(DeprecationWarning) as record:
         _ = cryojax.io.read_atoms_from_pdb(
             sample_pdb_path,
             loads_b_factors=True,
