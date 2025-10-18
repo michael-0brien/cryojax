@@ -53,15 +53,12 @@ from ._transfer_theory import (
     WaveTransferTheory as WaveTransferTheory,
 )
 from ._volume import (
-    AbstractAtomicVolume as AbstractAtomicVolume,
     AbstractPointCloudVolume as AbstractPointCloudVolume,
-    AbstractTabulatedAtomicVolume as AbstractTabulatedAtomicVolume,
     AbstractVolumeParametrization as AbstractVolumeParametrization,
     AbstractVolumeRepresentation as AbstractVolumeRepresentation,
     FourierVoxelGridVolume as FourierVoxelGridVolume,
     FourierVoxelSplineVolume as FourierVoxelSplineVolume,
     GaussianMixtureVolume as GaussianMixtureVolume,
-    PengAtomicVolume as PengAtomicVolume,
     RealVoxelGridVolume as RealVoxelGridVolume,
 )
 from ._volume_integrator import (
@@ -101,6 +98,17 @@ def __getattr__(name: str):
         from ..constants import PengScatteringFactorParameters
 
         return PengScatteringFactorParameters
+    if name == "PengAtomicVolume":
+        _warnings.warn(
+            "'PengAtomicVolume' is deprecated  and will be removed in "
+            "cryoJAX 0.6.0. To achieve identical functionality, use "
+            "`GaussianMixtureVolume.from_tabulated_parameters`. "
+            "This is a breaking change if you are "
+            "directly using `PengAtomicVolume.__init__`.",
+            category=DeprecationWarning,
+            stacklevel=2,
+        )
+        return GaussianMixtureVolume
     # Deprecated in previous versions
     if name == "DiscreteStructuralEnsemble":
         raise ValueError(

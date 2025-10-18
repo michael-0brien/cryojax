@@ -19,7 +19,7 @@ There are many different volume representations of biological structures for cry
 
 ## Volume representations
 
-### Point clouds
+### Atom-based volumes
 
 ??? abstract "`cryojax.simulator.AbstractPointCloudVolume`"
     ::: cryojax.simulator.AbstractPointCloudVolume
@@ -31,31 +31,13 @@ There are many different volume representations of biological structures for cry
     options:
         members:
             - __init__
-            - compute_representation
-            - rotate_to_pose
-            - translate_to_pose
-            - to_real_voxel_grid
-
-#### Atomic models
-
-??? abstract "`cryojax.simulator.AbstractTabulatedAtomicVolume`"
-    ::: cryojax.simulator.AbstractTabulatedAtomicVolume
-        options:
-            members:
-                - atom_positions
-                - from_tabulated_parameters
-
-::: cryojax.simulator.PengAtomicVolume
-    options:
-        members:
-            - __init__
             - from_tabulated_parameters
             - compute_representation
             - rotate_to_pose
             - translate_to_pose
             - to_real_voxel_grid
 
-### Voxel-based
+### Voxel-based volumes
 
 #### Fourier-space
 

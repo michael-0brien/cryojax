@@ -6,7 +6,6 @@ from jaxtyping import Array, Float, install_import_hook
 
 
 with install_import_hook("cryojax", "typeguard.typechecked"):
-    from cryojax.constants import b_factor_to_variance
     from cryojax.coordinates import make_coordinate_grid
     from cryojax.io import read_atoms_from_pdb
     from cryojax.ndimage import downsample_with_fourier_cropping, ifftn, irfftn
@@ -223,48 +222,6 @@ def test_downsampled_gmm_potential_agreement(sample_pdb_path):
     assert image_from_hires.shape == image_lowres.shape
 
 
-def test_peng_vs_gmm_agreement(sample_pdb_path):
-    """Integration test ensuring that Peng Potential and GMM potential agree when
-    gaussians are identical"""
-
-    # Load atoms and build potentials
-    atom_positions, atom_types = read_atoms_from_pdb(
-        sample_pdb_path,
-        loads_b_factors=False,
-        center=True,
-        selection_string="not element H",
-    )
-    atom_potential = PengAtomicVolume.from_tabulated_parameters(
-        atom_positions,
-        parameters=PengScatteringFactorParameters(atom_types),
-    )
-
-    b_factors = atom_potential.b_factors
-    amplitudes = atom_potential.amplitudes
-
-    gmm_potential = GaussianMixtureVolume(
-        atom_positions,
-        amplitudes,
-        b_factor_to_variance(b_factors),
-    )
-
-    # Create instrument configuration
-    shape = (64, 64)
-    pixel_size = 0.5
-    image_config = BasicImageConfig(
-        shape=shape,
-        pixel_size=pixel_size,
-        voltage_in_kilovolts=300.0,
-    )
-
-    # Compute projections
-    integrator = GaussianMixtureProjection(upsampling_factor=1)
-    projection_gmm = integrator.integrate(gmm_potential, image_config)
-    projection_peng = integrator.integrate(atom_potential, image_config)
-
-    np.testing.assert_allclose(projection_gmm, projection_peng)
-
-
 @pytest.mark.parametrize("shape", ((128, 127, 126),))
 def test_compute_rectangular_voxel_grid(sample_pdb_path, shape):
     voxel_size = 0.5
@@ -373,7 +330,7 @@ class TestIntegrateGMMToPixels:
         n_pixels_per_side = n_voxels_per_side[:2]
         # Build the potential
         atomic_potential = GaussianMixtureVolume(
-            atom_positions, ff_a, ff_b / (8.0 * jnp.pi**2)
+            atom_positions, 4 * jnp.pi * ff_a, ff_b / (8.0 * jnp.pi**2)
         )
         image_config = BasicImageConfig(
             shape=n_pixels_per_side,
@@ -430,7 +387,9 @@ class TestRenderGMMToVoxels:
         ) = toy_gaussian_cloud
 
         # Build the potential
-        gmm_volume = GaussianMixtureVolume(atom_positions, ff_a, ff_b / (8 * jnp.pi**2))
+        gmm_volume = GaussianMixtureVolume(
+            atom_positions, 4 * jnp.pi * ff_a, ff_b / (8 * jnp.pi**2)
+        )
         real_voxel_grid = gmm_volume.to_real_voxel_grid(n_voxels_per_side, voxel_size)
 
         integral = jnp.sum(real_voxel_grid) * voxel_size**3

@@ -30,9 +30,15 @@ def test_future_deprecated(sample_pdb_path):
         assert obj is cxs.AstigmaticCTF
         assert not should_be_removed(record)
 
+    # Old volume-related interfaces
     with pytest.warns(DeprecationWarning) as record:
         obj = cxs.PengScatteringFactorParameters
         assert obj is cryojax.constants.PengScatteringFactorParameters
+        assert not should_be_removed(record)
+
+    with pytest.warns(DeprecationWarning) as record:
+        obj = cxs.PengAtomicVolume
+        assert obj is cryojax.simulator.GaussianMixtureVolume
         assert not should_be_removed(record)
 
     with pytest.warns(DeprecationWarning) as record:

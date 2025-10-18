@@ -56,7 +56,7 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
         make_spline(real_voxel_grid),
         cxs.GaussianMixtureVolume(
             atom_positions,
-            scattering_factor_parameters.a,
+            4 * jnp.pi * scattering_factor_parameters.a,
             (scattering_factor_parameters.b + b_factors[:, None]) / (8 * jnp.pi**2),
         ),
         cxs.RealVoxelGridVolume.from_real_voxel_grid(real_voxel_grid),
