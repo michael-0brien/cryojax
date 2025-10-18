@@ -21,14 +21,11 @@ from ._volume import (
     FourierVoxelGridVolume,
     FourierVoxelSplineVolume,
     GaussianMixtureVolume,
-    PengAtomicVolume,
-    RealVoxelGridVolume,
 )
 from ._volume_integrator import (
     AbstractVolumeIntegrator,
     FourierSliceExtraction,
     GaussianMixtureProjection,
-    NufftProjection,
 )
 
 
@@ -53,8 +50,7 @@ def make_image_model(
     - `volume_parametrization`:
         The representation of the protein volume.
         Common choices are the `FourierVoxelGridVolume`
-        for fourier-space voxel grids or the `PengAtomicVolume`
-        for gaussian mixtures of atoms parameterized by electron scattering factors.
+        for fourier-space voxel grids or the `GaussianMixtureVolume`.
     - `image_config`:
         The configuration for the image and imagining instrument. Unless using
         a model that uses the electron dose as a parameter, choose the
@@ -199,11 +195,9 @@ def _select_default_integrator(
         integrator = FourierSliceExtraction(outputs_integral=simulates_quantity)
     elif isinstance(
         volume,
-        (PengAtomicVolume, GaussianMixtureVolume),
+        GaussianMixtureVolume,
     ):
         integrator = GaussianMixtureProjection(use_error_functions=True)
-    elif isinstance(volume, RealVoxelGridVolume):
-        integrator = NufftProjection(outputs_integral=simulates_quantity)
     else:
         raise ValueError(
             "Could not select default integrator for volume of "

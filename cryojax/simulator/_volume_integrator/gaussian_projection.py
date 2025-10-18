@@ -15,12 +15,12 @@ from ...ndimage import (
     rfftn,
 )
 from .._image_config import AbstractImageConfig
-from .._volume import GaussianMixtureVolume, PengAtomicVolume
+from .._volume import GaussianMixtureVolume
 from .base_integrator import AbstractVolumeIntegrator
 
 
 class GaussianMixtureProjection(
-    AbstractVolumeIntegrator[GaussianMixtureVolume | PengAtomicVolume],
+    AbstractVolumeIntegrator[GaussianMixtureVolume],
     strict=True,
 ):
     upsampling_factor: int | None
@@ -73,7 +73,7 @@ class GaussianMixtureProjection(
     @override
     def integrate(
         self,
-        volume_representation: GaussianMixtureVolume | PengAtomicVolume,
+        volume_representation: GaussianMixtureVolume,
         image_config: AbstractImageConfig,
         outputs_real_space: bool = False,
     ) -> (
@@ -115,19 +115,9 @@ class GaussianMixtureProjection(
         else:
             upsampled_pixel_size, upsampled_shape = pixel_size, shape
         # Grab the gaussian amplitudes and widths
-        if isinstance(volume_representation, PengAtomicVolume):
-            positions = volume_representation.atom_positions
-            amplitudes = volume_representation.amplitudes
-            b_factors = volume_representation.b_factors
-        elif isinstance(volume_representation, GaussianMixtureVolume):
-            positions = volume_representation.positions
-            amplitudes = volume_representation.amplitudes
-            b_factors = variance_to_b_factor(volume_representation.variances)
-        else:
-            raise ValueError(
-                "Supported types for `volume_representation` are "
-                "`PengAtomicVolume` and `GaussianMixtureVolume`."
-            )
+        positions = volume_representation.positions
+        amplitudes = volume_representation.amplitudes
+        b_factors = variance_to_b_factor(volume_representation.variances)
         # Compute the projection
         projection_integral = _gaussians_to_projection(
             upsampled_shape,
@@ -300,7 +290,7 @@ def _evaluate_gaussian_integrals(
     gauss_x, gauss_y = (integration_kernel(delta_x), integration_kernel(delta_y))
     # Compute the prefactors for each position and each gaussian per position
     # for the volume
-    prefactor = (4 * jnp.pi * a) / (2 * pixel_size) ** 2
+    prefactor = a / (2 * pixel_size) ** 2
     # Multiply the prefactor onto one of the gaussians for efficiency
     return prefactor * gauss_x, gauss_y
 
@@ -326,7 +316,7 @@ def _evaluate_gaussians(
         * b_inverse[None, :, :]
         * ((grid_y[:, None] - positions.T[1, :]) ** 2)[:, :, None]
     )
-    prefactor = 4 * jnp.pi * a[None, :, :] * b_inverse[None, :, :]
+    prefactor = a[None, :, :] * b_inverse[None, :, :]
 
     return prefactor * gauss_x, gauss_y
 
