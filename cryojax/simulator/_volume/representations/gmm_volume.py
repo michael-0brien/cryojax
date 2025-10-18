@@ -25,9 +25,9 @@ class GaussianMixtureVolume(AbstractPointCloudVolume, strict=True):
 
     The convention of allowing multiple gaussians per position
     follows "Robust Parameterization of Elastic and Absorptive
-    Electron Atomic Scattering Factors" by Peng et al. (1996), where
-    `amplitudes` follows $a_i$ and $b_i$ follows `variances`
-    (multiplied by $8\pi^2$ to convert to a variance).
+    Electron Atomic Scattering Factors" by Peng et al. (1996). The
+    $a$ and $b$ parameters in this work correspond to
+    `amplitudes = 4 * np.pi * a` and `variances = b / 8\pi^2`.
 
     !!! info
         Use the following to load a `GaussianMixtureVolume`
