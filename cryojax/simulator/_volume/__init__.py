@@ -3,7 +3,7 @@ from .base_volume import (
     AbstractVolumeRepresentation as AbstractVolumeRepresentation,
 )
 from .representations import (
-    AbstractPointCloudVolume as AbstractPointCloudVolume,
+    AbstractAtomVolume as AbstractAtomVolume,
     AbstractVoxelVolume as AbstractVoxelVolume,
     FourierVoxelGridVolume as FourierVoxelGridVolume,
     FourierVoxelSplineVolume as FourierVoxelSplineVolume,

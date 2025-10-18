@@ -16,7 +16,7 @@ from ..base_volume import AbstractVolumeRepresentation
 T = TypeVar("T")
 
 
-class AbstractPointCloudVolume(AbstractVolumeRepresentation, strict=True):
+class AbstractAtomVolume(AbstractVolumeRepresentation, strict=True):
     """Abstract interface for a volume represented as a point-cloud."""
 
     @abc.abstractmethod

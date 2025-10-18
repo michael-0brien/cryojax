@@ -42,10 +42,15 @@ def test_future_deprecated(sample_pdb_path):
         assert not should_be_removed(record)
 
     with pytest.warns(DeprecationWarning) as record:
-        _ = cryojax.io.read_atoms_from_pdb(
+        atom_pos, _, _ = cryojax.io.read_atoms_from_pdb(
             sample_pdb_path,
             loads_b_factors=True,
         )
+        assert not should_be_removed(record)
+
+    with pytest.warns(DeprecationWarning) as record:
+        volume = cxs.GaussianMixtureVolume(atom_pos, amplitudes=1.0, variances=1.0)
+        _ = volume.to_real_voxel_grid((32, 32, 32), 2.0)
         assert not should_be_removed(record)
 
 

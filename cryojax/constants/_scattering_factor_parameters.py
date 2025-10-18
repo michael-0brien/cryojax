@@ -41,7 +41,7 @@ class PengScatteringFactorParameters(eqx.Module, strict=True):
             The atom types as an integer array.
         """
         scattering_factor_parameter_table = read_peng_scattering_factor_parameter_table()
-        parameter_dict = _get_tabulated_scattering_factor_parameters(
+        parameter_dict = extract_scattering_factor_parameters(
             atomic_numbers, scattering_factor_parameter_table
         )
         self.a = parameter_dict["a"]
@@ -77,7 +77,7 @@ def read_peng_scattering_factor_parameter_table() -> xr.Dataset:
     return scattering_factor_parameter_table
 
 
-def _get_tabulated_scattering_factor_parameters(
+def extract_scattering_factor_parameters(
     atom_types: Int[np.ndarray, " n_atoms"],
     scattering_factor_parameter_table: xr.Dataset | None = None,
 ) -> dict[str, Float[np.ndarray, " n_atoms n_scattering_factors"]]:

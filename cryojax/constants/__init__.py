@@ -12,5 +12,6 @@ from ._physical_constants import (
 )
 from ._scattering_factor_parameters import (
     PengScatteringFactorParameters as PengScatteringFactorParameters,
+    extract_scattering_factor_parameters as extract_scattering_factor_parameters,
     read_peng_scattering_factor_parameter_table as read_peng_scattering_factor_parameter_table,  # noqa: E501
 )

@@ -1,8 +1,8 @@
 from .base_representations import (
-    AbstractPointCloudVolume as AbstractPointCloudVolume,
+    AbstractAtomVolume as AbstractAtomVolume,
     AbstractVoxelVolume as AbstractVoxelVolume,
 )
-from .gmm_volume import GaussianMixtureVolume as GaussianMixtureVolume
+from .gaussian_volume import GaussianMixtureVolume as GaussianMixtureVolume
 from .voxel_volume import (
     FourierVoxelGridVolume as FourierVoxelGridVolume,
     FourierVoxelSplineVolume as FourierVoxelSplineVolume,
