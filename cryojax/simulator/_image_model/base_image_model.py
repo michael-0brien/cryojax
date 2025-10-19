@@ -278,10 +278,10 @@ class LinearImageModel(AbstractImageModel, strict=True):
     ) -> PaddedFourierImageArray:
         # Get the representation of the volume
         if rng_key is None:
-            volume_representation = self.volume_parametrization.compute_representation()
+            volume_representation = self.volume_parametrization.get_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            volume_representation = self.volume_parametrization.compute_representation(
+            volume_representation = self.volume_parametrization.get_representation(
                 rng_key=this_key
             )
         # Rotate it to the lab frame
@@ -378,10 +378,10 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
     ) -> ImageArray | PaddedImageArray:
         # Get the representation of the volume
         if rng_key is None:
-            volume_representation = self.volume_parametrization.compute_representation()
+            volume_representation = self.volume_parametrization.get_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            volume_representation = self.volume_parametrization.compute_representation(
+            volume_representation = self.volume_parametrization.get_representation(
                 rng_key=this_key
             )
         # Rotate it to the lab frame

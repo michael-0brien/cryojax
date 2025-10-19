@@ -58,7 +58,7 @@ class AbstractVolumeParametrization(eqx.Module, strict=True):
     """  # noqa: E501
 
     @abc.abstractmethod
-    def compute_representation(
+    def get_representation(
         self, rng_key: PRNGKeyArray | None = None
     ) -> "AbstractVolumeRepresentation":
         """Core interface for computing the representation of
@@ -87,7 +87,7 @@ class AbstractVolumeRepresentation(AbstractVolumeParametrization, strict=True):
         raise NotImplementedError
 
     @override
-    def compute_representation(self, rng_key: PRNGKeyArray | None = None) -> Self:
+    def get_representation(self, rng_key: PRNGKeyArray | None = None) -> Self:
         """Since this class is itself an
         `AbstractVolumeRepresentation`, this function maps to the identity.
 
