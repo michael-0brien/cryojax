@@ -1,5 +1,6 @@
 # Deprecation warnings
 import warnings as _warnings
+from typing import Any as _Any
 
 from ._api_utils import make_image_model as make_image_model
 from ._detector import (
@@ -53,9 +54,10 @@ from ._transfer_theory import (
     WaveTransferTheory as WaveTransferTheory,
 )
 from ._volume import (
-    AbstractPointCloudVolume as AbstractPointCloudVolume,
+    AbstractAtomVolume as AbstractAtomVolume,
     AbstractVolumeParametrization as AbstractVolumeParametrization,
     AbstractVolumeRepresentation as AbstractVolumeRepresentation,
+    AbstractVoxelVolume as AbstractVoxelVolume,
     FourierVoxelGridVolume as FourierVoxelGridVolume,
     FourierVoxelSplineVolume as FourierVoxelSplineVolume,
     GaussianMixtureVolume as GaussianMixtureVolume,
@@ -67,9 +69,13 @@ from ._volume_integrator import (
     GaussianMixtureProjection as GaussianMixtureProjection,
     NufftProjection as NufftProjection,
 )
+from ._volume_rendering import (
+    AbstractVolumeRenderFn as AbstractVolumeRenderFn,
+    GaussianMixtureRenderFn as GaussianMixtureRenderFn,
+)
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> _Any:
     # Future deprecations
     if name == "AberratedAstigmaticCTF":
         _warnings.warn(
@@ -100,7 +106,7 @@ def __getattr__(name: str):
         return PengScatteringFactorParameters
     if name == "PengAtomicVolume":
         _warnings.warn(
-            "'PengAtomicVolume' is deprecated  and will be removed in "
+            "'PengAtomicVolume' is deprecated and will be removed in "
             "cryoJAX 0.6.0. To achieve identical functionality, use "
             "`GaussianMixtureVolume.from_tabulated_parameters`. "
             "This is a breaking change if you are "

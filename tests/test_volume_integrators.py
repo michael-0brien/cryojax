@@ -6,6 +6,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
+from cryojax.constants import PengScatteringFactorParameters
 from cryojax.io import read_atoms_from_pdb
 from cryojax.ndimage import crop_to_shape, irfftn
 from jaxtyping import Array
@@ -39,25 +40,26 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
     )
     # Real vs fourier volumes
     dim = max(*shape)  # Make sure to use `padded_shape` here
-    atom_positions, atom_types, b_factors = read_atoms_from_pdb(
-        sample_pdb_path, center=True, loads_b_factors=True
+    atom_positions, atom_types, atom_properties = read_atoms_from_pdb(
+        sample_pdb_path, center=True, loads_properties=True
     )
-    scattering_factor_parameters = cxs.PengScatteringFactorParameters(atom_types)
-    base_volume = cxs.PengAtomicVolume.from_tabulated_parameters(
+    scattering_factor_parameters = PengScatteringFactorParameters(atom_types)
+    base_volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(
         atom_positions,
         scattering_factor_parameters,
-        extra_b_factors=b_factors,
+        extra_b_factors=atom_properties["b_factors"],
     )
     base_method = cxs.GaussianMixtureProjection(use_error_functions=True)
-
-    real_voxel_grid = base_volume.to_real_voxel_grid((dim, dim, dim), pixel_size)
+    render_fn = cxs.GaussianMixtureRenderFn((dim, dim, dim), pixel_size)
+    real_voxel_grid = render_fn(base_volume)
     other_volumes = [
         cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid),
         make_spline(real_voxel_grid),
         cxs.GaussianMixtureVolume(
             atom_positions,
             4 * jnp.pi * scattering_factor_parameters.a,
-            (scattering_factor_parameters.b + b_factors[:, None]) / (8 * jnp.pi**2),
+            (scattering_factor_parameters.b + atom_properties["b_factors"][:, None])
+            / (8 * jnp.pi**2),
         ),
         cxs.RealVoxelGridVolume.from_real_voxel_grid(real_voxel_grid),
     ]

@@ -4,6 +4,7 @@ import cryojax.simulator as cxs
 import equinox as eqx
 import jax
 import jax.numpy as jnp
+from cryojax.constants import PengScatteringFactorParameters
 from cryojax.dataset import RelionParticleParameterFile
 from cryojax.io import read_atoms_from_pdb
 from cryojax.rotations import SO3
@@ -88,17 +89,17 @@ def setup(num_images, path_to_pdb, path_to_starfile):
     )
     parameter_file.append(particle_parameters)
 
-    atom_positions, atom_types, b_factors = read_atoms_from_pdb(
+    atom_positions, atom_types, atom_properties = read_atoms_from_pdb(
         path_to_pdb,
         center=True,
-        loads_b_factors=True,
+        loads_properties=True,
         selection_string="name CA",  # C-Alphas for simplicity
     )
-    scattering_parameters = cxs.PengScatteringFactorParameters(atom_types)
-    volume_gmm = cxs.PengAtomicVolume.from_tabulated_parameters(
+    scattering_parameters = PengScatteringFactorParameters(atom_types)
+    volume_gmm = cxs.GaussianMixtureVolume.from_tabulated_parameters(
         atom_positions,
         scattering_parameters,
-        extra_b_factors=b_factors,
+        extra_b_factors=atom_properties["b_factors"],
     )
 
     real_voxel_grid = volume_gmm.to_real_voxel_grid(shape=(150, 150, 150), voxel_size=1.0)

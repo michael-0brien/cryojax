@@ -1,3 +1,4 @@
+import warnings
 from collections.abc import Callable
 from typing import Any
 from typing_extensions import Self, override
@@ -16,10 +17,10 @@ from ....constants import (
 from ....coordinates import make_1d_coordinate_grid
 from ....jax_util import NDArrayLike, error_if_not_positive
 from ..._pose import AbstractPose
-from .base_representations import AbstractPointCloudVolume
+from .base_representations import AbstractAtomVolume
 
 
-class GaussianMixtureVolume(AbstractPointCloudVolume, strict=True):
+class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
     r"""A representation of a volume as a mixture of
     gaussians, with multiple gaussians used per position.
 
@@ -213,67 +214,13 @@ class GaussianMixtureVolume(AbstractPointCloudVolume, strict=True):
         *,
         batch_options: dict[str, Any] = {},
     ) -> Float[Array, "{shape[0]} {shape[1]} {shape[2]}"]:
-        """Return a voxel grid of the volume in real space.
-
-        For the case where tabulated electron scattering factors are used,
-        elastic electron scattering factors are defined as
-
-        $$f^{(e)}(\\mathbf{q}) = \\sum\\limits_{i = 1}^5 a_i \\exp(- b_i |\\mathbf{q}|^2),$$
-
-        where $a_i$ is stored as `GaussianMixtureVolume.amplitudes`, $b_i / 8 \\pi^2$
-        are the `GaussianMixtureVolume.variances`, and
-        $\\mathbf{q}$ is the scattering vector.
-
-        Under usual scattering approximations (i.e. the first-born approximation),
-        the rescaled electrostatic potential energy $U(\\mathbf{r})$ for a given atom type is
-        $4 \\pi \\mathcal{F}^{-1}[f^{(e)}(\\boldsymbol{\\xi} / 2)](\\mathbf{r})$, which is computed
-        analytically as
-
-        $$U(\\mathbf{r}) = 4 \\pi \\sum\\limits_{i = 1}^5 \\frac{a_i}{(2\\pi (b_i / 8 \\pi^2))^{3/2}} \\exp(- \\frac{|\\mathbf{r} - \\mathbf{r}'|^2}{2 (b_i / 8 \\pi^2)}),$$
-
-        where $\\mathbf{r}'$ is the position of the atom. Including an additional B-factor (denoted by
-        $B$) gives the expression for the potential
-        $U(\\mathbf{r})$ of a single atom type and its fourier transform pair $\\tilde{U}(\\boldsymbol{\\xi}) \\equiv \\mathcal{F}[U](\\boldsymbol{\\xi})$,
-
-        $$U(\\mathbf{r}) = 4 \\pi \\sum\\limits_{i = 1}^5 \\frac{a_i}{(2\\pi ((b_i + B) / 8 \\pi^2))^{3/2}} \\exp(- \\frac{|\\mathbf{r} - \\mathbf{r}'|^2}{2 ((b_i + B) / 8 \\pi^2)}),$$
-
-        $$\\tilde{U}(\\boldsymbol{\\xi}) = 4 \\pi \\sum\\limits_{i = 1}^5 a_i \\exp(- (b_i + B) |\\boldsymbol{\\xi}|^2 / 4) \\exp(2 \\pi i \\boldsymbol{\\xi}\\cdot\\mathbf{r}'),$$
-
-        where $\\mathbf{q} = \\boldsymbol{\\xi} / 2$ gives the relationship between the wave vector and the
-        scattering vector.
-
-        In practice, for a discretization on a grid with voxel size $\\Delta r$ and grid point $\\mathbf{r}_{\\ell}$,
-        the potential is evaluated as the average value inside the voxel
-
-        $$U_{\\ell} = 4 \\pi \\frac{1}{\\Delta r^3} \\sum\\limits_{i = 1}^5 a_i \\prod\\limits_{j = 1}^3 \\int_{r^{\\ell}_j-\\Delta r/2}^{r^{\\ell}_j+\\Delta r/2} dr_j \\ \\frac{1}{{\\sqrt{2\\pi ((b_i + B) / 8 \\pi^2)}}} \\exp(- \\frac{(r_j - r'_j)^2}{2 ((b_i + B) / 8 \\pi^2)}),$$
-
-        where $j$ indexes the components of the spatial coordinate vector $\\mathbf{r}$. The above expression is evaluated using the error function as
-
-        $$U_{\\ell} = 4 \\pi \\frac{1}{(2 \\Delta r)^3} \\sum\\limits_{i = 1}^5 a_i \\prod\\limits_{j = 1}^3 \\textrm{erf}(\\frac{r_j^{\\ell} - r'_j + \\Delta r / 2}{\\sqrt{2 ((b_i + B) / 8\\pi^2)}}) - \\textrm{erf}(\\frac{r_j^{\\ell} - r'_j - \\Delta r / 2}{\\sqrt{2 ((b_i + B) / 8\\pi^2)}}).$$
-
-        **Arguments:**
-
-        - `shape`:
-            The shape of the resulting voxel grid.
-        - `voxel_size`:
-            The voxel size of the resulting voxel grid.
-        - `batch_options`:
-            Advanced options for controlling batching. This is a dictionary
-            with the following keys:
-            - "batch_size":
-                The number of z-planes to evaluate in parallel with
-                `jax.vmap`. By default, `1`.
-            - "n_batches":
-                The number of iterations used to evaluate the volume,
-                where the iteration is taken over groups of atoms.
-                This is useful if `batch_size = 1`
-                and GPU memory is exhausted. By default, `1`.
-
-        **Returns:**
-
-        The rescaled electrostatic potential $U_{\\ell}$ as a voxel grid of
-        shape `shape` and voxel size `voxel_size`.
-        """  # noqa: E501
+        warnings.warn(
+            "'GaussianMixtureVolume.to_real_voxel_grid' is deprecated "
+            "and will be removed in cryoJAX 0.6.0. Instead, use "
+            "`cryojax.simulator.GaussianMixtureRenderFn`.",
+            category=DeprecationWarning,
+            stacklevel=2,
+        )
         return _gaussians_to_real_voxels(
             shape,
             jnp.asarray(voxel_size, dtype=float),
