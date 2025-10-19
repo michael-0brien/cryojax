@@ -47,7 +47,7 @@ class AbstractNoiseModel(eqx.Module, strict=True):
         raise NotImplementedError
 
 
-class AbstractProbabilisticNoiseModel(eqx.Module, strict=True):
+class AbstractProbabilisticNoiseModel(AbstractNoiseModel, strict=True):
     """An image formation model equipped with a noise model."""
 
     @abstractmethod
