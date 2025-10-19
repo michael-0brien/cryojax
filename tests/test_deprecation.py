@@ -55,7 +55,11 @@ def test_future_deprecated(sample_pdb_path):
 
 
 def test_deprecated():
-    DEPRECATED = ["cryojax.simulator.DiscreteStructuralEnsemble"]
+    DEPRECATED = [
+        "cryojax.simulator.DiscreteStructuralEnsemble",
+        "cryojax.simulator.CorrelatedGaussianNoiseModel",
+        "cryojax.simulator.UncorrelatedGaussianNoiseModel",
+    ]
 
     # Deprecated features
     for path in DEPRECATED:

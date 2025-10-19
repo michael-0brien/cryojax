@@ -27,10 +27,12 @@ from ._image_model import (
     ProjectionImageModel as ProjectionImageModel,
 )
 from ._noise_model import (
+    AbstractEmpiricalNoiseModel as AbstractEmpiricalNoiseModel,
     AbstractGaussianNoiseModel as AbstractGaussianNoiseModel,
     AbstractNoiseModel as AbstractNoiseModel,
-    CorrelatedGaussianNoiseModel as CorrelatedGaussianNoiseModel,
-    UncorrelatedGaussianNoiseModel as UncorrelatedGaussianNoiseModel,
+    AbstractProbabilisticNoiseModel as AbstractProbabilisticNoiseModel,
+    GaussianColoredNoiseModel as GaussianColoredNoiseModel,
+    GaussianWhiteNoiseModel as GaussianWhiteNoiseModel,
 )
 from ._pose import (
     AbstractPose as AbstractPose,
@@ -122,6 +124,16 @@ def __getattr__(name: str) -> _Any:
             "To achieve similar functionality, see the examples section "
             "of the documentation: "
             "https://michael-0brien.github.io/cryojax/examples/simulate-relion-dataset/.",
+        )
+    if name == "UncorrelatedGaussianNoiseModel":
+        raise ValueError(
+            "'UncorrelatedGaussianNoiseModel' was deprecated in cryoJAX 0.5.1 and "
+            "renamed to `GaussianWhiteNoiseModel` instead.",
+        )
+    if name == "CorrelatedGaussianNoiseModel":
+        raise ValueError(
+            "'CorrelatedGaussianNoiseModel' was deprecated in cryoJAX 0.5.1 and "
+            "renamed to `GaussianColoredNoiseModel` instead.",
         )
 
     raise AttributeError(f"cannot import name '{name}' from 'cryojax.simulator'")
