@@ -38,7 +38,6 @@ class AbstractNoiseModel(eqx.Module, strict=True):
     def compute_signal(
         self,
         *,
-        rng_key: PRNGKeyArray | None = None,
         outputs_real_space: bool = True,
         mask: MaskLike | None = None,
         filter: FilterLike | None = None,
@@ -47,7 +46,7 @@ class AbstractNoiseModel(eqx.Module, strict=True):
         raise NotImplementedError
 
 
-class AbstractProbabilisticNoiseModel(AbstractNoiseModel, strict=True):
+class AbstractLikelihoodNoiseModel(AbstractNoiseModel, strict=True):
     """A noise model equipped with a likelihood."""
 
     @abstractmethod

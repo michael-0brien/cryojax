@@ -2,6 +2,7 @@
 Image formation models simulated from gaussian noise distributions.
 """
 
+import warnings
 from abc import abstractmethod
 from typing_extensions import override
 
@@ -15,7 +16,7 @@ from ...ndimage import rfftn
 from ...ndimage.operators import Constant, FourierOperatorLike
 from ...ndimage.transforms import FilterLike, MaskLike
 from .._image_model import AbstractImageModel
-from .base_noise_model import AbstractEmpiricalNoiseModel, AbstractProbabilisticNoiseModel
+from .base_noise_model import AbstractEmpiricalNoiseModel, AbstractLikelihoodNoiseModel
 
 
 RealImageArray = Float[
@@ -30,7 +31,7 @@ ImageArray = RealImageArray | FourierImageArray
 
 
 class AbstractGaussianNoiseModel(
-    AbstractEmpiricalNoiseModel, AbstractProbabilisticNoiseModel, strict=True
+    AbstractEmpiricalNoiseModel, AbstractLikelihoodNoiseModel, strict=True
 ):
     r"""An `AbstractNoiseModel` where images are formed via additive
     gaussian noise.
@@ -42,6 +43,18 @@ class AbstractGaussianNoiseModel(
     image_model: AbstractVar[AbstractImageModel]
     signal_scale_factor: AbstractVar[Float[Array, ""]]
     signal_offset: AbstractVar[Float[Array, ""]]
+
+    def __check_init__(self):
+        if not self.image_model.normalizes_signal:
+            cls_name = self.__class__.__name__
+            warnings.warn(
+                f"Tried to instantiate a `{cls_name}` "
+                f"with `{cls_name}.image_model.normalizes_signal = False`, "
+                "but this may lead to confusing behavior. Either change "
+                "this to `True` or proceed with caution.",
+                category=UserWarning,
+                stacklevel=2,
+            )
 
     @override
     def sample(
@@ -55,10 +68,11 @@ class AbstractGaussianNoiseModel(
         """Sample a noisy image from the gaussian noise model.
 
         !!! info
-            If the `AbstractImageModel` has stochastic elements to it,
-            a random number generator key will also be passed to
-            `AbstractImageModel.simulate`. Therefore, this method is
-            not compatible with the `AbstractDetector` class.
+            A random number generator key will *not* be passed to
+            `AbstractImageModel.simulate`, therefore any
+            stochastic elements to the `AbstractImageModel`
+            will not be used.
+
 
         **Arguments:**
 
@@ -70,14 +84,12 @@ class AbstractGaussianNoiseModel(
         - `filter`:
             A filter to apply to the final image.
         """
-        noise_rng_key, signal_rng_key = jr.split(rng_key, 2)
         return self.compute_signal(
-            rng_key=signal_rng_key,
             outputs_real_space=outputs_real_space,
             mask=mask,
             filter=filter,
         ) + self.compute_noise(
-            noise_rng_key,
+            rng_key,
             outputs_real_space=outputs_real_space,
             mask=mask,
             filter=filter,
@@ -87,7 +99,6 @@ class AbstractGaussianNoiseModel(
     def compute_signal(
         self,
         *,
-        rng_key: PRNGKeyArray | None = None,
         outputs_real_space: bool = True,
         mask: MaskLike | None = None,
         filter: FilterLike | None = None,
@@ -96,9 +107,6 @@ class AbstractGaussianNoiseModel(
 
         **Arguments:**
 
-        - `rng_key`:
-            An random number generator key to be passed to
-            the `AbstractImageModel.simulate` method.
         - `outputs_real_space`:
             If `True`, return the signal in real space.
         - `mask`:
@@ -108,7 +116,7 @@ class AbstractGaussianNoiseModel(
             A filter to apply to the final image.
         """
         simulated_image = self.image_model.simulate(
-            rng_key=rng_key, outputs_real_space=True, mask=None, filter=filter
+            outputs_real_space=True, mask=None, filter=filter
         )
         simulated_image = self.signal_scale_factor * simulated_image + self.signal_offset
         if mask is not None:

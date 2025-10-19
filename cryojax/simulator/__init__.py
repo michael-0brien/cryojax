@@ -29,8 +29,8 @@ from ._image_model import (
 from ._noise_model import (
     AbstractEmpiricalNoiseModel as AbstractEmpiricalNoiseModel,
     AbstractGaussianNoiseModel as AbstractGaussianNoiseModel,
+    AbstractLikelihoodNoiseModel as AbstractLikelihoodNoiseModel,
     AbstractNoiseModel as AbstractNoiseModel,
-    AbstractProbabilisticNoiseModel as AbstractProbabilisticNoiseModel,
     GaussianColoredNoiseModel as GaussianColoredNoiseModel,
     GaussianWhiteNoiseModel as GaussianWhiteNoiseModel,
 )

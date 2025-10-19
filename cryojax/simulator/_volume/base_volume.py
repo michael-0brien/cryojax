@@ -63,6 +63,12 @@ class AbstractVolumeParametrization(eqx.Module, strict=True):
     ) -> "AbstractVolumeRepresentation":
         """Core interface for computing the representation of
         the volume.
+
+        **Arguments:**
+
+        - `rng_key`:
+            An optional RNG key for including noise / stochastic
+            elements to volume simulation.
         """
         raise NotImplementedError
 
@@ -88,7 +94,6 @@ class AbstractVolumeRepresentation(AbstractVolumeParametrization, strict=True):
         **Arguments:**
 
         - `rng_key`:
-            Not used in this implementation, but optionally
-            included for other implementations.
+            Not used in this implementation.
         """
         return self

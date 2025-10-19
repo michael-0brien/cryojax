@@ -1,7 +1,7 @@
 from .base_noise_model import (
     AbstractEmpiricalNoiseModel as AbstractEmpiricalNoiseModel,
+    AbstractLikelihoodNoiseModel as AbstractLikelihoodNoiseModel,
     AbstractNoiseModel as AbstractNoiseModel,
-    AbstractProbabilisticNoiseModel as AbstractProbabilisticNoiseModel,
 )
 from .gaussian_noise_model import (
     AbstractGaussianNoiseModel as AbstractGaussianNoiseModel,
