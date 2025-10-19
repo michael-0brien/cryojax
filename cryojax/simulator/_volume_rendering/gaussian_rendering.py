@@ -11,6 +11,7 @@ from jaxtyping import Array, Float, PyTree
 from ...constants import variance_to_b_factor
 from ...coordinates import make_1d_coordinate_grid
 from ...jax_util import NDArrayLike, error_if_not_positive
+from ...ndimage import fftn, rfftn
 from .._volume import GaussianMixtureVolume
 from .base_rendering import AbstractVolumeRenderFn
 
@@ -98,14 +99,31 @@ class GaussianMixtureRenderFn(AbstractVolumeRenderFn[GaussianMixtureVolume], str
 
     @override
     def __call__(
-        self, volume_representation: GaussianMixtureVolume
+        self,
+        volume_representation: GaussianMixtureVolume,
+        *,
+        outputs_real_space: bool = True,
+        outputs_rfft: bool = False,
+        fftshifted: bool = False,
     ) -> Float[Array, "{self.shape[0]} {self.shape[1]} {self.shape[2]}"]:
         """**Arguments:**
 
         - `volume_representation`:
             The `GaussianMixtureVolume`.
+        - `outputs_real_space`:
+            If `True`, return a voxel grid in real-space.
+        - `outputs_rfft`:
+            If `True`, return a fourier-space voxel grid transformed with
+            `cryojax.ndimage.rfftn`. Otherwise, use `fftn`. Does nothing
+            if `outputs_real_space = True`.
+        - `fftshifted`:
+            If `True`, return a fourier-space voxel grid with the zero
+            frequency component in the center of the grid via
+            `jax.numpy.fft.fftshift`. Otherwise, the zero frequency
+            component is in the corner. Does nothing if
+            `outputs_real_space = True`.
         """
-        return _gaussians_to_real_voxels(
+        real_voxel_grid = _gaussians_to_real_voxels(
             self.shape,
             self.voxel_size,
             volume_representation.positions,
@@ -113,6 +131,21 @@ class GaussianMixtureRenderFn(AbstractVolumeRenderFn[GaussianMixtureVolume], str
             variance_to_b_factor(volume_representation.variances),
             **self.batch_options,
         )
+        if outputs_real_space:
+            return real_voxel_grid
+        else:
+            if outputs_rfft:
+                return (
+                    jnp.fft.fftshift(rfftn(real_voxel_grid), axes=(0, 1))
+                    if fftshifted
+                    else rfftn(real_voxel_grid)
+                )
+            else:
+                return (
+                    jnp.fft.fftshift(fftn(real_voxel_grid))
+                    if fftshifted
+                    else fftn(real_voxel_grid)
+                )
 
 
 def _dict_to_batch_options(d):
