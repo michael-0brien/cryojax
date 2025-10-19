@@ -45,7 +45,7 @@ def test_scattering_theories_no_pose(
         selection_string="not element H",
         loads_properties=True,
     )
-    atom_potential = cxs.GaussianMixtureVolume.from_tabulated_parameters(
+    atom_potential = cxs.GaussianMixtureVolume.from_peng_parameters(
         atom_positions,
         parameters=PengScatteringFactorParameters(atom_types),
         extra_b_factors=atom_properties["b_factors"],
@@ -165,7 +165,7 @@ def test_scattering_theories_pose(
         loads_properties=True,
     )
 
-    atom_potential = cxs.GaussianMixtureVolume.from_tabulated_parameters(
+    atom_potential = cxs.GaussianMixtureVolume.from_peng_parameters(
         atom_positions,
         parameters=PengScatteringFactorParameters(atom_types),
         extra_b_factors=atom_properties["b_factors"],
