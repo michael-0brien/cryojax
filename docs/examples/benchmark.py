@@ -96,7 +96,7 @@ def setup(num_images, path_to_pdb, path_to_starfile):
         selection_string="name CA",  # C-Alphas for simplicity
     )
     scattering_parameters = PengScatteringFactorParameters(atom_types)
-    volume_gmm = cxs.GaussianMixtureVolume.from_tabulated_parameters(
+    volume_gmm = cxs.GaussianMixtureVolume.from_peng_parameters(
         atom_positions,
         scattering_parameters,
         extra_b_factors=atom_properties["b_factors"],

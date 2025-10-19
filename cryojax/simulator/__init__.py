@@ -109,10 +109,11 @@ def __getattr__(name: str) -> _Any:
     if name == "PengAtomicVolume":
         _warnings.warn(
             "'PengAtomicVolume' is deprecated and will be removed in "
-            "cryoJAX 0.6.0. To achieve identical functionality, use "
-            "`GaussianMixtureVolume.from_tabulated_parameters`. "
-            "This is a breaking change if you are "
-            "directly using `PengAtomicVolume.__init__`.",
+            "cryoJAX 0.6.0. To achieve identical functionality as "
+            "'PengAtomicVolume.from_tabulated_parameters', use "
+            "`GaussianMixtureVolume.from_peng_parameters`. "
+            "Note that is a breaking change if are directly using "
+            "`PengAtomicVolume.__init__`.",
             category=DeprecationWarning,
             stacklevel=2,
         )

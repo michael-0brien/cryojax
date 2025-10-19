@@ -60,7 +60,7 @@ def test_atom_integrator_shape(sample_pdb_path, shape):
         selection_string="not element H",
         loads_properties=True,
     )
-    atom_volume = GaussianMixtureVolume.from_tabulated_parameters(
+    atom_volume = GaussianMixtureVolume.from_peng_parameters(
         atom_positions,
         parameters=PengScatteringFactorParameters(atom_types),
         extra_b_factors=atom_properties["b_factors"],
@@ -116,7 +116,7 @@ def test_fourier_vs_real_voxel_volume_agreement(sample_pdb_path):
         selection_string="not element H",
     )
     # Load atomistic volume
-    atom_volume = GaussianMixtureVolume.from_tabulated_parameters(
+    atom_volume = GaussianMixtureVolume.from_peng_parameters(
         atom_positions,
         parameters=PengScatteringFactorParameters(atom_types),
     )
@@ -158,7 +158,7 @@ def test_downsampled_voxel_volume_agreement(sample_pdb_path):
         selection_string="not element H",
     )
     # Load atomistic volume
-    atom_volume = GaussianMixtureVolume.from_tabulated_parameters(
+    atom_volume = GaussianMixtureVolume.from_peng_parameters(
         atom_positions,
         parameters=PengScatteringFactorParameters(atom_types),
     )
@@ -187,7 +187,7 @@ def test_downsampled_gmm_volume_agreement(sample_pdb_path):
         center=True,
         selection_string="not element H",
     )
-    atom_volume = GaussianMixtureVolume.from_tabulated_parameters(
+    atom_volume = GaussianMixtureVolume.from_peng_parameters(
         atom_positions,
         parameters=PengScatteringFactorParameters(atom_types),
     )
@@ -233,7 +233,7 @@ def test_compute_rectangular_voxel_grid(sample_pdb_path, shape):
         selection_string="not element H",
     )
     # Load atomistic volume
-    atom_volume = GaussianMixtureVolume.from_tabulated_parameters(
+    atom_volume = GaussianMixtureVolume.from_peng_parameters(
         atom_positions,
         parameters=PengScatteringFactorParameters(atom_types),
     )
@@ -261,7 +261,7 @@ def test_z_plane_batched_vs_non_batched_loop_agreement(
         selection_string="not element H",
     )
     # Load atomistic volume
-    atom_volume = GaussianMixtureVolume.from_tabulated_parameters(
+    atom_volume = GaussianMixtureVolume.from_peng_parameters(
         atom_positions,
         parameters=PengScatteringFactorParameters(atom_types),
     )
