@@ -15,7 +15,7 @@ from ...ndimage import rfftn
 from ...ndimage.operators import Constant, FourierOperatorLike
 from ...ndimage.transforms import FilterLike, MaskLike
 from .._image_model import AbstractImageModel
-from .base_noise_model import AbstractNoiseModel
+from .base_noise_model import AbstractEmpiricalNoiseModel
 
 
 RealImageArray = Float[
@@ -29,7 +29,7 @@ FourierImageArray = Complex[
 ImageArray = RealImageArray | FourierImageArray
 
 
-class AbstractGaussianNoiseModel(AbstractNoiseModel, strict=True):
+class AbstractGaussianNoiseModel(AbstractEmpiricalNoiseModel, strict=True):
     r"""An `AbstractNoiseModel` where images are formed via additive
     gaussian noise.
 
@@ -128,7 +128,7 @@ class AbstractGaussianNoiseModel(AbstractNoiseModel, strict=True):
         raise NotImplementedError
 
 
-class UncorrelatedGaussianNoiseModel(AbstractGaussianNoiseModel, strict=True):
+class GaussianWhiteNoiseModel(AbstractGaussianNoiseModel, strict=True):
     r"""A gaussian noise model, where each pixel is independently drawn from
     a zero-mean gaussian of fixed variance (white noise).
 
@@ -258,7 +258,7 @@ class UncorrelatedGaussianNoiseModel(AbstractGaussianNoiseModel, strict=True):
         return log_likelihood
 
 
-class CorrelatedGaussianNoiseModel(AbstractGaussianNoiseModel, strict=True):
+class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
     r"""A gaussian noise model, where pixels are correlated, but each
     frequency is independent (colored noise).
 
@@ -267,14 +267,14 @@ class CorrelatedGaussianNoiseModel(AbstractGaussianNoiseModel, strict=True):
     """
 
     image_model: AbstractImageModel
-    variance_function: FourierOperatorLike
+    power_spectrum_fn: FourierOperatorLike
     signal_scale_factor: Float[Array, ""]
     signal_offset: Float[Array, ""]
 
     def __init__(
         self,
         image_model: AbstractImageModel,
-        variance_function: FourierOperatorLike | None = None,
+        power_spectrum_fn: FourierOperatorLike | None = None,
         signal_scale_factor: float | Float[NDArrayLike, ""] = 1.0,
         signal_offset: float | Float[NDArrayLike, ""] = 0.0,
     ):
@@ -282,7 +282,7 @@ class CorrelatedGaussianNoiseModel(AbstractGaussianNoiseModel, strict=True):
 
         - `image_model`:
             The image formation model.
-        - `variance_function`:
+        - `power_spectrum_fn`:
             The variance of each fourier mode. By default,
             `cryojax.image.operators.Constant(1.0)`.
         - `signal_scale_factor`:
@@ -291,7 +291,7 @@ class CorrelatedGaussianNoiseModel(AbstractGaussianNoiseModel, strict=True):
             An offset for the underlying signal simulated from `image_model`.
         """  # noqa: E501
         self.image_model = image_model
-        self.variance_function = variance_function or Constant(1.0)
+        self.power_spectrum_fn = power_spectrum_fn or Constant(1.0)
         self.signal_scale_factor = error_if_not_positive(
             jnp.asarray(signal_scale_factor, dtype=float)
         )
@@ -322,7 +322,7 @@ class CorrelatedGaussianNoiseModel(AbstractGaussianNoiseModel, strict=True):
         freqs = image_model.image_config.padded_frequency_grid_in_angstroms
         # Compute the zero mean variance and scale up to be independent of the number of
         # pixels
-        std = jnp.sqrt(n_pixels * self.variance_function(freqs))
+        std = jnp.sqrt(n_pixels * self.power_spectrum_fn(freqs))
         noise = image_model.postprocess(
             std
             * jr.normal(rng_key, shape=freqs.shape[0:-1])
@@ -371,7 +371,7 @@ class CorrelatedGaussianNoiseModel(AbstractGaussianNoiseModel, strict=True):
         n_pixels = config.n_pixels
         freqs = config.frequency_grid_in_angstroms
         # Compute the variance and scale up to be independent of the number of pixels
-        variance = n_pixels * self.variance_function(freqs)
+        variance = n_pixels * self.power_spectrum_fn(freqs)
         # Create simulated data
         simulated = self.compute_signal(
             outputs_real_space=False,

@@ -31,6 +31,17 @@ def basic_config(volume_and_pixel_size):
 
 
 @pytest.fixture
+def dose_config(volume_and_pixel_size):
+    volume, pixel_size = volume_and_pixel_size
+    return cxs.DoseImageConfig(
+        shape=volume.shape[0:2],
+        pixel_size=pixel_size,
+        voltage_in_kilovolts=300.0,
+        electrons_per_angstrom_squared=100.0,
+    )
+
+
+@pytest.fixture
 def image_model(volume, basic_config):
     image_model = cxs.make_image_model(
         volume,
@@ -41,14 +52,59 @@ def image_model(volume, basic_config):
     return image_model
 
 
+@pytest.fixture
+def detector_image_model(volume, dose_config):
+    detector = cxs.PoissonDetector(cxs.NullDQE())
+    scattering_theory = cxs.WeakPhaseScatteringTheory(
+        volume_integrator=cxs.FourierSliceExtraction(),
+        transfer_theory=cxs.ContrastTransferTheory(cxs.AstigmaticCTF()),
+    )
+    image_model = cxs.ElectronCountsImageModel(
+        volume,
+        image_config=dose_config,
+        pose=cxs.EulerAnglePose(),
+        scattering_theory=scattering_theory,
+        detector=detector,
+    )
+    return image_model
+
+
+@pytest.fixture
+def solvent_image_model(volume, basic_config):
+    import cryojax.experimental as cxe
+
+    scattering_theory = cxs.WeakPhaseScatteringTheory(
+        volume_integrator=cxs.FourierSliceExtraction(),
+        transfer_theory=cxs.ContrastTransferTheory(cxs.AstigmaticCTF()),
+        solvent=cxe.GRFSolvent2D(100.0),
+    )
+    image_model = cxs.ContrastImageModel(
+        volume,
+        image_config=basic_config,
+        pose=cxs.EulerAnglePose(),
+        scattering_theory=scattering_theory,
+    )
+    return image_model
+
+
 @pytest.mark.parametrize(
     "cls, model",
     [
-        (cxs.UncorrelatedGaussianNoiseModel, "image_model"),
-        (cxs.CorrelatedGaussianNoiseModel, "image_model"),
+        (cxs.GaussianWhiteNoiseModel, "image_model"),
+        (cxs.GaussianColoredNoiseModel, "image_model"),
     ],
 )
-def test_simulate_signal_from_gaussian_distributions(cls, model, request):
+def test_simulate_equals_compute_signal(cls, model, request):
     model = request.getfixturevalue(model)
-    distribution = cls(model)
-    np.testing.assert_allclose(model.simulate(), distribution.compute_signal())
+    noise_model = cls(model)
+    np.testing.assert_allclose(model.simulate(), noise_model.compute_signal())
+
+
+def test_detector_incompatible(detector_image_model):
+    with pytest.raises(ValueError):
+        _ = cxs.GaussianWhiteNoiseModel(detector_image_model)
+
+
+def test_solvent2d_incompatible(solvent_image_model):
+    with pytest.raises(ValueError):
+        _ = cxs.GaussianWhiteNoiseModel(solvent_image_model)
