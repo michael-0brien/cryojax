@@ -27,8 +27,10 @@ from ._image_model import (
     ProjectionImageModel as ProjectionImageModel,
 )
 from ._noise_model import (
+    AbstractEmpiricalNoiseModel as AbstractEmpiricalNoiseModel,
     AbstractGaussianNoiseModel as AbstractGaussianNoiseModel,
     AbstractNoiseModel as AbstractNoiseModel,
+    AbstractProbabilisticNoiseModel as AbstractProbabilisticNoiseModel,
     GaussianColoredNoiseModel as GaussianColoredNoiseModel,
     GaussianWhiteNoiseModel as GaussianWhiteNoiseModel,
 )

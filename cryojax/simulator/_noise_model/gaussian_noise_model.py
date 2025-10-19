@@ -15,7 +15,7 @@ from ...ndimage import rfftn
 from ...ndimage.operators import Constant, FourierOperatorLike
 from ...ndimage.transforms import FilterLike, MaskLike
 from .._image_model import AbstractImageModel
-from .base_noise_model import AbstractEmpiricalNoiseModel
+from .base_noise_model import AbstractEmpiricalNoiseModel, AbstractProbabilisticNoiseModel
 
 
 RealImageArray = Float[
@@ -29,7 +29,9 @@ FourierImageArray = Complex[
 ImageArray = RealImageArray | FourierImageArray
 
 
-class AbstractGaussianNoiseModel(AbstractEmpiricalNoiseModel, strict=True):
+class AbstractGaussianNoiseModel(
+    AbstractEmpiricalNoiseModel, AbstractProbabilisticNoiseModel, strict=True
+):
     r"""An `AbstractNoiseModel` where images are formed via additive
     gaussian noise.
 

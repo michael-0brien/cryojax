@@ -17,22 +17,6 @@ class AbstractNoiseModel(eqx.Module, strict=True):
     """An image formation model equipped with a noise model."""
 
     @abstractmethod
-    def log_likelihood(
-        self,
-        observed: Inexact[Array, "y_dim x_dim"],
-        *,
-        mask: MaskLike | None = None,
-        filter: FilterLike | None = None,
-    ) -> Float[Array, ""]:
-        """Evaluate the log likelihood.
-
-        **Arguments:**
-
-        - `observed` : The observed data in real or fourier space.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
     def sample(
         self,
         rng_key: PRNGKeyArray,
@@ -60,6 +44,26 @@ class AbstractNoiseModel(eqx.Module, strict=True):
         filter: FilterLike | None = None,
     ) -> Inexact[Array, "y_dim x_dim"]:
         """Compute the signal of the image formation model."""
+        raise NotImplementedError
+
+
+class AbstractProbabilisticNoiseModel(eqx.Module, strict=True):
+    """An image formation model equipped with a noise model."""
+
+    @abstractmethod
+    def log_likelihood(
+        self,
+        observed: Inexact[Array, "y_dim x_dim"],
+        *,
+        mask: MaskLike | None = None,
+        filter: FilterLike | None = None,
+    ) -> Float[Array, ""]:
+        """Evaluate the log likelihood.
+
+        **Arguments:**
+
+        - `observed` : The observed data.
+        """
         raise NotImplementedError
 
 
