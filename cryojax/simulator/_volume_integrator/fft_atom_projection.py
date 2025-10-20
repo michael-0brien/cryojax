@@ -74,7 +74,7 @@ class FFTAtomProjection(
             shape, pixel_size, pos, kernel, frequency_grid, eps=self.eps, opts=self.opts
         )
 
-        fourier_projection = (4 * jnp.pi) * jax.tree.reduce(
+        fourier_projection = jax.tree.reduce(
             lambda x, y: x + y,
             jax.tree.map(
                 proj_kernel,

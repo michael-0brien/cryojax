@@ -81,7 +81,7 @@ def interaction_constant_from_kilovolts(
 
         with
 
-        $$\\sigma_e = \\frac{\\lambda \\gamma}{4 \\pi},$$
+        $$\\sigma_e = \\lambda \\gamma,$$
 
         where $\\lambda$ the relativistic electron wavelength $\\gamma$ is
         the lorentz factor.
@@ -110,4 +110,4 @@ def interaction_constant_from_kilovolts(
     """
     wavelength = wavelength_from_kilovolts(voltage_in_kilovolts)
     lorentz_factor = lorentz_factor_from_kilovolts(voltage_in_kilovolts)
-    return wavelength * lorentz_factor / (4 * jnp.pi)
+    return wavelength * lorentz_factor
