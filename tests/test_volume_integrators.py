@@ -3,9 +3,9 @@ import warnings
 import cryojax.simulator as cxs
 import equinox as eqx
 import jax
-import jax.numpy as jnp
 import numpy as np
 import pytest
+from cryojax.atom_util import split_atoms_by_element
 from cryojax.constants import PengScatteringFactorParameters
 from cryojax.io import read_atoms_from_pdb
 from cryojax.ndimage import crop_to_shape, irfftn
@@ -43,53 +43,54 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
     atom_positions, atom_types, atom_properties = read_atoms_from_pdb(
         sample_pdb_path, center=True, loads_properties=True
     )
-    scattering_factor_parameters = PengScatteringFactorParameters(atom_types)
+    positions_by_id, atom_id = split_atoms_by_element(atom_types, atom_positions)
+
+    peng_parameters = PengScatteringFactorParameters(atom_types)
+    peng_parameters_by_id = PengScatteringFactorParameters(atom_id)
     base_volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(
         atom_positions,
-        scattering_factor_parameters,
+        peng_parameters,
         extra_b_factors=atom_properties["b_factors"],
     )
     base_method = cxs.GaussianMixtureProjection(use_error_functions=True)
-    render_fn = cxs.GaussianMixtureRenderFn((dim, dim, dim), pixel_size)
-    real_voxel_grid = render_fn(base_volume)
+    render_volume_fn = cxs.GaussianMixtureRenderFn((dim, dim, dim), pixel_size)
+    real_voxel_grid = render_volume_fn(base_volume)
     other_volumes = [
         cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid),
         make_spline(real_voxel_grid),
-        cxs.GaussianMixtureVolume(
-            atom_positions,
-            4 * jnp.pi * scattering_factor_parameters.a,
-            (scattering_factor_parameters.b + atom_properties["b_factors"][:, None])
-            / (8 * jnp.pi**2),
-        ),
-        cxs.RealVoxelGridVolume.from_real_voxel_grid(real_voxel_grid),
+        base_volume,
     ]
     other_projection_methods = [
         cxs.FourierSliceExtraction(),
         cxs.FourierSliceExtraction(),
-        base_method,
-        cxs.NufftProjection(eps=1e-16),
+        cxs.GaussianMixtureProjection(use_error_functions=False, upsampling_factor=4),
     ]
+    try:
+        other_projection_methods.extend(
+            [cxs.FFTAtomProjection(), cxs.RealVoxelProjection(eps=1e-16)]
+        )
+        other_volumes.extend(
+            [
+                cxs.IndependentAtomVolume.from_tabulated_parameters(
+                    positions_by_id, peng_parameters_by_id
+                ),
+                cxs.RealVoxelGridVolume.from_real_voxel_grid(real_voxel_grid),
+            ]
+        )
+    except RuntimeError as err:
+        warnings.warn(
+            "Could not test projection method `NufftProjection`, "
+            "most likely because `jax_finufft` is not installed. "
+            f"Error traceback is:\n{err}"
+        )
 
     projection_by_gaussian_integration = compute_projection(
         base_volume, base_method, image_config
     )
     for volume, projection_method in zip(other_volumes, other_projection_methods):
-        if isinstance(projection_method, cxs.NufftProjection):
-            try:
-                projection_by_other_method = compute_projection(
-                    volume, projection_method, image_config
-                )
-            except RuntimeError as err:
-                warnings.warn(
-                    "Could not test projection method `NufftProjection`, "
-                    "most likely because `jax_finufft` is not installed. "
-                    f"Error traceback is:\n{err}"
-                )
-                continue
-        else:
-            projection_by_other_method = compute_projection(
-                volume, projection_method, image_config
-            )
+        projection_by_other_method = compute_projection(
+            volume, projection_method, image_config
+        )
         np.testing.assert_allclose(
             projection_by_gaussian_integration, projection_by_other_method, atol=1e-12
         )

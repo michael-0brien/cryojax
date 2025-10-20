@@ -63,13 +63,15 @@ from ._volume import (
     FourierVoxelGridVolume as FourierVoxelGridVolume,
     FourierVoxelSplineVolume as FourierVoxelSplineVolume,
     GaussianMixtureVolume as GaussianMixtureVolume,
+    IndependentAtomVolume as IndependentAtomVolume,
     RealVoxelGridVolume as RealVoxelGridVolume,
 )
 from ._volume_integrator import (
     AbstractVolumeIntegrator as AbstractVolumeIntegrator,
+    FFTAtomProjection as FFTAtomProjection,
     FourierSliceExtraction as FourierSliceExtraction,
     GaussianMixtureProjection as GaussianMixtureProjection,
-    NufftProjection as NufftProjection,
+    RealVoxelProjection as RealVoxelProjection,
 )
 from ._volume_rendering import (
     AbstractVolumeRenderFn as AbstractVolumeRenderFn,
@@ -95,6 +97,14 @@ def __getattr__(name: str) -> _Any:
             stacklevel=2,
         )
         return AstigmaticCTF
+    if name == "NufftProjection":
+        _warnings.warn(
+            "'NufftProjection' is deprecated and will be removed in "
+            "cryoJAX 0.6.0. Use 'RealVoxelProjection' instead.",
+            category=DeprecationWarning,
+            stacklevel=2,
+        )
+        return RealVoxelProjection
     if name == "PengScatteringFactorParameters":
         _warnings.warn(
             "'PengScatteringFactorParameters' has been moved to `cryojax.constants` "

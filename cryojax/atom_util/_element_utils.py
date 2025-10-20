@@ -36,7 +36,7 @@ def split_atoms_by_element(
     unique_atomic_numbers = np.unique(atomic_numbers)
     split_pytree = jax.tree.map(
         lambda x: tuple(
-            np.take(x, np.where(atomic_numbers == id), axis=atom_axis)
+            np.take(x, np.where(atomic_numbers == id)[0], axis=atom_axis)
             for id in unique_atomic_numbers
         ),
         atom_pytree,

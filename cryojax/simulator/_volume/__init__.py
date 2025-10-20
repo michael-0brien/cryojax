@@ -8,5 +8,6 @@ from .representations import (
     FourierVoxelGridVolume as FourierVoxelGridVolume,
     FourierVoxelSplineVolume as FourierVoxelSplineVolume,
     GaussianMixtureVolume as GaussianMixtureVolume,
+    IndependentAtomVolume as IndependentAtomVolume,
     RealVoxelGridVolume as RealVoxelGridVolume,
 )
