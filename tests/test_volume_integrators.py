@@ -44,7 +44,7 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
         sample_pdb_path, center=True, loads_properties=True
     )
     scattering_factor_parameters = PengScatteringFactorParameters(atom_types)
-    base_volume = cxs.GaussianMixtureVolume.from_peng_parameters(
+    base_volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(
         atom_positions,
         scattering_factor_parameters,
         extra_b_factors=atom_properties["b_factors"],
