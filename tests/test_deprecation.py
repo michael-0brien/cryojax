@@ -19,7 +19,6 @@ def test_future_deprecated(sample_pdb_path):
         removal_version = parse_version(match.group(1))
         return current_version >= removal_version
 
-    # Old CTF aliases
     with pytest.warns(DeprecationWarning) as record:
         obj = cxs.AberratedAstigmaticCTF
         assert obj is cxs.AstigmaticCTF
@@ -30,7 +29,16 @@ def test_future_deprecated(sample_pdb_path):
         assert obj is cxs.AstigmaticCTF
         assert not should_be_removed(record)
 
-    # Old volume-related interfaces
+    with pytest.warns(DeprecationWarning) as record:
+        obj = cxs.CorrelatedGaussianNoiseModel
+        assert obj is cxs.GaussianColoredNoiseModel
+        assert not should_be_removed(record)
+
+    with pytest.warns(DeprecationWarning) as record:
+        obj = cxs.UncorrelatedGaussianNoiseModel
+        assert obj is cxs.GaussianWhiteNoiseModel
+        assert not should_be_removed(record)
+
     with pytest.warns(DeprecationWarning) as record:
         obj = cxs.PengScatteringFactorParameters
         assert obj is cryojax.constants.PengScatteringFactorParameters
@@ -57,8 +65,6 @@ def test_future_deprecated(sample_pdb_path):
 def test_deprecated():
     DEPRECATED = [
         "cryojax.simulator.DiscreteStructuralEnsemble",
-        "cryojax.simulator.CorrelatedGaussianNoiseModel",
-        "cryojax.simulator.UncorrelatedGaussianNoiseModel",
     ]
 
     # Deprecated features

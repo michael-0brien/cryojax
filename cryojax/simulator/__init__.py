@@ -118,6 +118,24 @@ def __getattr__(name: str) -> _Any:
             stacklevel=2,
         )
         return GaussianMixtureVolume
+    if name == "UncorrelatedGaussianNoiseModel":
+        _warnings.warn(
+            "'UncorrelatedGaussianNoiseModel' is deprecated and "
+            "will be removed in cryoJAX 0.6.0. Instead, use "
+            "'GaussianWhiteNoiseModel'.",
+            category=DeprecationWarning,
+            stacklevel=2,
+        )
+        return GaussianWhiteNoiseModel
+    if name == "CorrelatedGaussianNoiseModel":
+        _warnings.warn(
+            "'CorrelatedGaussianNoiseModel' is deprecated and "
+            "will be removed in cryoJAX 0.6.0. Instead, use "
+            "'GaussianColoredNoiseModel'.",
+            category=DeprecationWarning,
+            stacklevel=2,
+        )
+        return GaussianColoredNoiseModel
     # Deprecated in previous versions
     if name == "DiscreteStructuralEnsemble":
         raise ValueError(
@@ -125,16 +143,6 @@ def __getattr__(name: str) -> _Any:
             "To achieve similar functionality, see the examples section "
             "of the documentation: "
             "https://michael-0brien.github.io/cryojax/examples/simulate-relion-dataset/.",
-        )
-    if name == "UncorrelatedGaussianNoiseModel":
-        raise ValueError(
-            "'UncorrelatedGaussianNoiseModel' was deprecated in cryoJAX 0.5.1 and "
-            "renamed to `GaussianWhiteNoiseModel` instead.",
-        )
-    if name == "CorrelatedGaussianNoiseModel":
-        raise ValueError(
-            "'CorrelatedGaussianNoiseModel' was deprecated in cryoJAX 0.5.1 and "
-            "renamed to `GaussianColoredNoiseModel` instead.",
         )
 
     raise AttributeError(f"cannot import name '{name}' from 'cryojax.simulator'")
