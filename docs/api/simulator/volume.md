@@ -31,7 +31,7 @@ There are many different volume representations of biological structures for cry
     options:
         members:
             - __init__
-            - from_peng_parameters
+            - from_tabulated_parameters
             - get_representation
             - rotate_to_pose
             - translate_to_pose
