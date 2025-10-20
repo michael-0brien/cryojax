@@ -240,17 +240,21 @@ class GRFSolvent2D(AbstractRandomSolvent2D, strict=True):
         # Compute standard deviation, scaling up by the variance by the number
         # of pixels to make the realization independent pixel-independent in real-space.
         std = jnp.sqrt(n_pixels * self.power_fn(frequency_grid_in_angstroms))
-        solvent_grf = std * jr.normal(
-            rng_key,
-            shape=frequency_grid_in_angstroms.shape[0:-1],
-            dtype=complex,
-        ).at[0, 0].set(0.0)
+        if self.samples_power:
+            solvent_grf = std * jr.normal(
+                rng_key,
+                shape=frequency_grid_in_angstroms.shape[0:-1],
+                dtype=complex,
+            ).at[0, 0].set(0.0)
+        else:
+            phase = jr.uniform(rng_key, shape=frequency_grid_in_angstroms.shape[0:-1])
+            solvent_grf = std * jnp.exp(1.0j * 2 * jnp.pi * phase).at[0, 0].set(0.0)
         # Scale to desired mean and standard deviation
         molecules_per_angstrom_squared = (
             self.thickness_in_angstroms * self.molecules_per_angstrom_cubed
         )
         mean = self.total_potential_per_molecule * molecules_per_angstrom_squared
-        std = 1.0  # TODO: set standard deviation
+        std = 1.0  # TODO: set standard deviation?
         fourier_in_plane_potential_of_solvent = rescale_image(
             solvent_grf,
             mean=mean,
