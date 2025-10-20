@@ -8,11 +8,87 @@ import pytest
 from cryojax.atom_util import split_atoms_by_element
 from cryojax.constants import PengScatteringFactorParameters
 from cryojax.io import read_atoms_from_pdb
-from cryojax.ndimage import crop_to_shape, irfftn
+from cryojax.ndimage import crop_to_shape, irfftn, operators as op
 from jaxtyping import Array
 
 
 jax.config.update("jax_enable_x64", True)
+
+
+@pytest.fixture
+def pdb_info(sample_pdb_path):
+    return read_atoms_from_pdb(sample_pdb_path, center=True, loads_properties=True)
+
+
+def test_fft_atom_projection_correct(pdb_info):
+    atom_positions, _, _ = pdb_info
+    pixel_size, shape = 0.5, (64, 64)
+    pad_options = dict(shape=(128, 128))
+    image_config = cxs.BasicImageConfig(
+        shape, pixel_size, voltage_in_kilovolts=300.0, pad_options=pad_options
+    )
+    amplitude, b_factor = 1.0, 1000.0
+    gaussian_volume, gaussian_integrator = (
+        cxs.GaussianMixtureVolume(
+            atom_positions,
+            amplitudes=4 * np.pi * amplitude,
+            variances=b_factor / (8 * np.pi**2),
+        ),
+        cxs.GaussianMixtureProjection(use_error_functions=False),
+    )
+    atom_volume, fft_integrator = (
+        cxs.IndependentAtomVolume(
+            position_pytree=atom_positions,
+            scattering_factor_pytree=op.FourierGaussian(
+                amplitude=amplitude, b_factor=b_factor
+            ),
+        ),
+        cxs.FFTAtomProjection(eps=1e-16),
+    )
+    pose = cxs.EulerAnglePose(theta_angle=45.0)
+    proj_by_gaussians = compute_projection_at_pose(
+        gaussian_volume, gaussian_integrator, pose, image_config
+    )
+    proj_by_fft = compute_projection_at_pose(
+        atom_volume, fft_integrator, pose, image_config
+    )
+    plot_images(proj_by_gaussians, proj_by_fft)
+
+
+def test_fft_atom_projection_numerical_accuracy(pdb_info):
+    atom_positions, _, _ = pdb_info
+    pixel_size, shape = 0.5, (64, 64)
+    pad_options = dict(shape=(128, 128))
+    image_config = cxs.BasicImageConfig(
+        shape, pixel_size, voltage_in_kilovolts=300.0, pad_options=pad_options
+    )
+    amplitude, b_factor = 1.0, 1000.0
+    gaussian_volume, gaussian_integrator = (
+        cxs.GaussianMixtureVolume(
+            atom_positions,
+            amplitudes=4 * np.pi * amplitude,
+            variances=b_factor / (8 * np.pi**2),
+        ),
+        cxs.GaussianMixtureProjection(use_error_functions=False),
+    )
+    atom_volume, fft_integrator = (
+        cxs.IndependentAtomVolume(
+            position_pytree=atom_positions,
+            scattering_factor_pytree=op.FourierGaussian(
+                amplitude=amplitude, b_factor=b_factor
+            ),
+        ),
+        cxs.FFTAtomProjection(eps=1e-16),
+    )
+    pose = cxs.EulerAnglePose(theta_angle=45.0)
+    proj_by_gaussians = compute_projection_at_pose(
+        gaussian_volume, gaussian_integrator, pose, image_config
+    )
+    proj_by_fft = compute_projection_at_pose(
+        atom_volume, fft_integrator, pose, image_config
+    )
+    plot_images(proj_by_gaussians, proj_by_fft)
+    # np.testing.assert_allclose(proj_by_gaussians, proj_by_fft)
 
 
 @pytest.mark.parametrize(
@@ -24,7 +100,7 @@ jax.config.update("jax_enable_x64", True)
         (1.0, (32, 31)),
     ),
 )
-def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
+def test_projection_methods_no_pose(pdb_info, pixel_size, shape):
     """
     Test that computing a projection in real
     space agrees with real-space, with no rotation. This mostly
@@ -32,6 +108,8 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
     interpolation and that volumes are read in real vs. fourier
     at the same orientation.
     """
+    # Unpack PDB info
+    atom_positions, atom_types, atom_properties = pdb_info
     # Objects for imaging
     image_config = cxs.BasicImageConfig(
         shape,
@@ -40,9 +118,6 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
     )
     # Real vs fourier volumes
     dim = max(*shape)  # Make sure to use `padded_shape` here
-    atom_positions, atom_types, atom_properties = read_atoms_from_pdb(
-        sample_pdb_path, center=True, loads_properties=True
-    )
     positions_by_id, atom_id = split_atoms_by_element(atom_types, atom_positions)
 
     peng_parameters = PengScatteringFactorParameters(atom_types)
@@ -185,6 +260,24 @@ def test_projection_methods_no_pose(sample_pdb_path, pixel_size, shape):
 #             0.0,
 #             atol=1e-8,
 #         )
+
+
+def plot_images(proj1, proj2):
+    from matplotlib import pyplot as plt
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+    vmin, vmax = min(proj1.min(), proj2.min()), max(proj1.max(), proj2.max())
+    fig, axes = plt.subplots(figsize=(15, 5), ncols=3)
+    im1 = axes[0].imshow(proj1, vmin=vmin, vmax=vmax, cmap="gray")
+    _ = axes[1].imshow(proj2, vmin=vmin, vmax=vmax, cmap="gray")
+    divider = make_axes_locatable(axes[1])
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    fig.colorbar(im1, cax=cax)
+    im2 = axes[2].imshow(np.abs(proj2 - proj1), cmap="gray")
+    divider = make_axes_locatable(axes[2])
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    fig.colorbar(im2, cax=cax)
+    plt.show()
 
 
 @eqx.filter_jit

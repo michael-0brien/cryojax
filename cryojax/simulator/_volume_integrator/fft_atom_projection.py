@@ -69,12 +69,12 @@ class FFTAtomProjection(
         | Float[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
     ):
         shape, pixel_size = image_config.padded_shape, image_config.pixel_size
-        frequency_grid = image_config.frequency_grid_in_angstroms
+        frequency_grid = image_config.padded_frequency_grid_in_angstroms
         proj_kernel = lambda pos, kernel: _project_with_nufft(
             shape, pixel_size, pos, kernel, frequency_grid, eps=self.eps, opts=self.opts
         )
 
-        fourier_projection = jax.tree.reduce(
+        fourier_projection = (4 * jnp.pi) * jax.tree.reduce(
             lambda x, y: x + y,
             jax.tree.map(
                 proj_kernel,
