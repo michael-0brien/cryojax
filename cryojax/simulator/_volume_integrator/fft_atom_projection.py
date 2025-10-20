@@ -1,3 +1,4 @@
+import math
 from typing import Any, ClassVar
 from typing_extensions import override
 
@@ -5,7 +6,13 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
-from ...ndimage import convert_fftn_to_rfftn, irfftn, operators as op
+from ...coordinates import make_frequency_grid
+from ...ndimage import (
+    convert_fftn_to_rfftn,
+    crop_to_shape,
+    irfftn,
+    operators as op,
+)
 from .._image_config import AbstractImageConfig
 from .._volume import IndependentAtomVolume
 from .base_integrator import AbstractVolumeIntegrator
@@ -28,14 +35,22 @@ class FFTAtomProjection(
     the exit plane using non-uniform FFTs plus convolution.
     """
 
+    upsampling_factor: int | None
     eps: float
     opts: Any
 
     is_projection_approximation: ClassVar[bool] = True
 
-    def __init__(self, *, eps: float = 1e-6, opts: Any = None):
+    def __init__(
+        self, *, upsampling_factor: int | None = None, eps: float = 1e-6, opts: Any = None
+    ):
         """**Arguments:**
 
+        - `upsampling_factor`:
+            The factor by which to upsample the computation of the images.
+            If `upsampling_factor` is greater than 1, the images will be computed
+            at a higher resolution and then downsampled to the original resolution.
+            This can be useful for reducing aliasing artifacts in the images.
         - `eps`:
             See [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft)
             for documentation.
@@ -52,6 +67,7 @@ class FFTAtomProjection(
                 "See https://github.com/flatironinstitute/jax-finufft "
                 "for installation instructions."
             ) from JAX_FINUFFT_IMPORT_ERROR
+        self.upsampling_factor = upsampling_factor
         self.eps = eps
         self.opts = opts
 
@@ -68,12 +84,33 @@ class FFTAtomProjection(
         ]
         | Float[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
     ):
-        shape, pixel_size = image_config.padded_shape, image_config.pixel_size
-        frequency_grid = image_config.padded_frequency_grid_in_angstroms
+        pixel_size, shape = image_config.pixel_size, image_config.padded_shape
+        if self.upsampling_factor is not None:
+            u = self.upsampling_factor
+            pixel_size_u, shape_u = (
+                pixel_size / u,
+                (
+                    shape[0] * u,
+                    shape[1] * u,
+                ),
+            )
+            frequency_grid_u = make_frequency_grid(
+                shape_u, pixel_size_u, outputs_rfftfreqs=False
+            )
+        else:
+            pixel_size_u, shape_u = pixel_size, shape
+            frequency_grid_u = image_config.padded_full_frequency_grid_in_angstroms
+        frequency_grid_u = jnp.fft.fftshift(frequency_grid_u, axes=(0, 1))
         proj_kernel = lambda pos, kernel: _project_with_nufft(
-            shape, pixel_size, pos, kernel, frequency_grid, eps=self.eps, opts=self.opts
+            shape_u,
+            pixel_size_u,
+            pos,
+            kernel,
+            frequency_grid_u,
+            eps=self.eps,
+            opts=self.opts,
         )
-
+        # Compute projection over atom types
         fourier_projection = jax.tree.reduce(
             lambda x, y: x + y,
             jax.tree.map(
@@ -83,11 +120,23 @@ class FFTAtomProjection(
                 is_leaf=lambda x: isinstance(x, op.AbstractFourierOperator),
             ),
         )
+        if self.upsampling_factor is not None:
+            # Downsample back to the original pixel size, rescaling so that the
+            # downsampling produces an average in a given region, not a sum
+            n_pix, n_pix_u = math.prod(shape), math.prod(shape_u)
+            fourier_projection = (n_pix / n_pix_u) * crop_to_shape(
+                fourier_projection, shape
+            )
 
-        if outputs_real_space:
-            return irfftn(fourier_projection, s=shape)
-        else:
-            return fourier_projection
+        # Shift zero frequency component to corner
+        fourier_projection = convert_fftn_to_rfftn(
+            jnp.fft.ifftshift(fourier_projection), mode="real"
+        )
+        return (
+            irfftn(fourier_projection, s=shape)
+            if outputs_real_space
+            else fourier_projection
+        )
 
 
 def _project_with_nufft(shape, ps, pos, kernel, freqs, eps=1e-6, opts=None):
@@ -113,10 +162,6 @@ def _project_with_nufft(shape, ps, pos, kernel, freqs, eps=1e-6, opts=None):
             iflag=-1,
         )
         / area_element
-    )
-    # Shift zero frequency component to corner and convert to half-space
-    fourier_projection = convert_fftn_to_rfftn(
-        jnp.fft.ifftshift(fourier_projection), mode="real"
     )
     # Evaluate kernel, multiply, and return
     fourier_projection *= kernel(freqs)

@@ -57,6 +57,17 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
         )
         self.scattering_factor_pytree = scattering_factor_pytree
 
+    def __check_init__(self):
+        if jax.tree.structure(self.position_pytree) != jax.tree.structure(
+            self.scattering_factor_pytree,
+            is_leaf=lambda x: isinstance(x, AbstractFourierOperator),
+        ):
+            raise ValueError(
+                "When instantiating an `IndependentAtomVolume`, found "
+                "that the pytree structures of `positions_pytree` and "
+                "`scattering_factor_pytree` were not equal."
+            )
+
     @override
     def rotate_to_pose(self, pose: AbstractPose, inverse: bool = False) -> Self:
         """Return a new potential with rotated `positions`."""

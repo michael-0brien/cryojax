@@ -20,6 +20,14 @@ def pdb_info(sample_pdb_path):
     return read_atoms_from_pdb(sample_pdb_path, center=True, loads_properties=True)
 
 
+def test_fft_atom_bad_instantiation():
+    with pytest.raises(ValueError):
+        _ = cxs.IndependentAtomVolume(
+            position_pytree=np.zeros((10, 3)),
+            scattering_factor_pytree=(op.FourierGaussian(),),
+        )
+
+
 def test_fft_atom_projection_correct(pdb_info):
     atom_positions, _, _ = pdb_info
     pixel_size, shape = 0.5, (64, 64)
@@ -27,7 +35,7 @@ def test_fft_atom_projection_correct(pdb_info):
     image_config = cxs.BasicImageConfig(
         shape, pixel_size, voltage_in_kilovolts=300.0, pad_options=pad_options
     )
-    amplitude, b_factor = 1.0, 1000.0
+    amplitude, b_factor = 1.0, 100.0
     gaussian_volume, gaussian_integrator = (
         cxs.GaussianMixtureVolume(
             atom_positions,
@@ -45,31 +53,32 @@ def test_fft_atom_projection_correct(pdb_info):
         ),
         cxs.FFTAtomProjection(eps=1e-16),
     )
-    pose = cxs.EulerAnglePose(theta_angle=45.0)
-    proj_by_gaussians = compute_projection_at_pose(
-        gaussian_volume, gaussian_integrator, pose, image_config
+    proj_by_gaussians = compute_projection(
+        gaussian_volume, gaussian_integrator, image_config
     )
-    proj_by_fft = compute_projection_at_pose(
-        atom_volume, fft_integrator, pose, image_config
-    )
-    plot_images(proj_by_gaussians, proj_by_fft)
+    proj_by_fft = compute_projection(atom_volume, fft_integrator, image_config)
+    np.testing.assert_allclose(proj_by_gaussians, proj_by_fft, atol=1e-8)
 
 
-def test_fft_atom_projection_numerical_accuracy(pdb_info):
+@pytest.mark.parametrize(
+    "upsampling_factor",
+    (None,),
+)
+def test_fft_atom_projection_numerical_accuracy(pdb_info, upsampling_factor):
     atom_positions, _, _ = pdb_info
-    pixel_size, shape = 0.5, (64, 64)
+    pixel_size, shape = 0.25, (128, 128)
     pad_options = dict(shape=(128, 128))
     image_config = cxs.BasicImageConfig(
         shape, pixel_size, voltage_in_kilovolts=300.0, pad_options=pad_options
     )
-    amplitude, b_factor = 1.0, 1000.0
+    amplitude, b_factor = 1.0, 100.0
     gaussian_volume, gaussian_integrator = (
         cxs.GaussianMixtureVolume(
             atom_positions,
             amplitudes=amplitude,
             variances=b_factor / (8 * np.pi**2),
         ),
-        cxs.GaussianMixtureProjection(use_error_functions=False),
+        cxs.GaussianMixtureProjection(use_error_functions=True),
     )
     atom_volume, fft_integrator = (
         cxs.IndependentAtomVolume(
@@ -78,17 +87,15 @@ def test_fft_atom_projection_numerical_accuracy(pdb_info):
                 amplitude=amplitude, b_factor=b_factor
             ),
         ),
-        cxs.FFTAtomProjection(eps=1e-16),
+        cxs.FFTAtomProjection(upsampling_factor=upsampling_factor, eps=1e-16),
     )
-    pose = cxs.EulerAnglePose(theta_angle=45.0)
-    proj_by_gaussians = compute_projection_at_pose(
-        gaussian_volume, gaussian_integrator, pose, image_config
+    proj_by_gaussians = compute_projection(
+        gaussian_volume, gaussian_integrator, image_config
     )
-    proj_by_fft = compute_projection_at_pose(
-        atom_volume, fft_integrator, pose, image_config
-    )
-    plot_images(proj_by_gaussians, proj_by_fft)
-    # np.testing.assert_allclose(proj_by_gaussians, proj_by_fft)
+    proj_by_fft = compute_projection(atom_volume, fft_integrator, image_config)
+    plot_images(proj_by_fft, proj_by_gaussians)
+    exit()
+    np.testing.assert_allclose(proj_by_gaussians, proj_by_fft)
 
 
 @pytest.mark.parametrize(
