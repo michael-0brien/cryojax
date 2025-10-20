@@ -1,6 +1,7 @@
 from typing import TypeVar
-from typing_extensions import Self
+from typing_extensions import Self, override
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float, PyTree
@@ -8,6 +9,7 @@ from jaxtyping import Array, Float, PyTree
 from ....constants import PengScatteringFactorParameters
 from ....jax_util import NDArrayLike
 from ....ndimage.operators import AbstractFourierOperator
+from ..._pose import AbstractPose
 from .base_representations import AbstractAtomVolume
 
 
@@ -17,7 +19,7 @@ T = TypeVar("T")
 class PengScatteringFactor(AbstractFourierOperator, strict=True):
     a: Float[Array, "5"]
     b: Float[Array, "5"]
-    b_factor = Float[Array, ""]
+    b_factor: Float[Array, ""] | None
 
     def __init__(
         self,
@@ -42,18 +44,43 @@ class PengScatteringFactor(AbstractFourierOperator, strict=True):
 
 
 class IndependentAtomVolume(AbstractAtomVolume, strict=True):
-    atom_positions: PyTree[Float[Array, "_ 3"]]
-    scattering_factors: PyTree[AbstractFourierOperator]
+    position_pytree: PyTree[Float[Array, "_ 3"]]
+    scattering_factor_pytree: PyTree[AbstractFourierOperator]
 
     def __init__(
         self,
-        atom_positions: PyTree[Float[NDArrayLike, "_ 3"], "T"],
-        scattering_factors: PyTree[AbstractFourierOperator, "T"],
+        position_pytree: PyTree[Float[NDArrayLike, "_ 3"], "T"],
+        scattering_factor_pytree: PyTree[AbstractFourierOperator, "T"],
     ):
-        self.atom_positions = jax.tree.map(
-            lambda x: jnp.asarray(x, dtype=float), atom_positions
+        self.position_pytree = jax.tree.map(
+            lambda x: jnp.asarray(x, dtype=float), position_pytree
         )
-        self.scattering_factors = scattering_factors
+        self.scattering_factor_pytree = scattering_factor_pytree
+
+    @override
+    def rotate_to_pose(self, pose: AbstractPose, inverse: bool = False) -> Self:
+        """Return a new potential with rotated `positions`."""
+        rotate_fn = lambda pos: pose.rotate_coordinates(pos, inverse=inverse)
+        return eqx.tree_at(
+            lambda x: x.position_pytree,
+            self,
+            jax.tree.map(rotate_fn, self.position_pytree),
+        )
+
+    @override
+    def translate_to_pose(self, pose: AbstractPose) -> Self:
+        """Return a new potential with rotated `positions`."""
+        offset_in_angstroms = pose.offset_in_angstroms
+        if pose.offset_z_in_angstroms is None:
+            offset_in_angstroms = jnp.concatenate(
+                (offset_in_angstroms, jnp.atleast_1d(0.0))
+            )
+        translate_fn = lambda pos: pos + offset_in_angstroms
+        return eqx.tree_at(
+            lambda x: x.position_pytree,
+            self,
+            jax.tree.map(translate_fn, self.position_pytree),
+        )
 
     @classmethod
     def from_tabulated_parameters(
