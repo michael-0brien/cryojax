@@ -48,10 +48,10 @@ class AbstractGaussianNoiseModel(
         if not self.image_model.normalizes_signal:
             cls_name = self.__class__.__name__
             warnings.warn(
-                f"Tried to instantiate a `{cls_name}` "
-                f"with `{cls_name}.image_model.normalizes_signal = False`, "
-                "but this may lead to confusing behavior. Either change "
-                "this to `True` or proceed with caution.",
+                f"Instantiated a `{cls_name}` "
+                f"with `{cls_name}.image_model.normalizes_signal = False`. "
+                "This means that noise is calibrated relative to the "
+                "unnormalized output, which may lead to unexpected behavior.",
                 category=UserWarning,
                 stacklevel=2,
             )
@@ -277,14 +277,14 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
     """
 
     image_model: AbstractImageModel
-    power_spectrum_fn: FourierOperatorLike
+    power_fn: FourierOperatorLike
     signal_scale_factor: Float[Array, ""]
     signal_offset: Float[Array, ""]
 
     def __init__(
         self,
         image_model: AbstractImageModel,
-        power_spectrum_fn: FourierOperatorLike | None = None,
+        power_fn: FourierOperatorLike | None = None,
         signal_scale_factor: float | Float[NDArrayLike, ""] = 1.0,
         signal_offset: float | Float[NDArrayLike, ""] = 0.0,
     ):
@@ -292,16 +292,16 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
 
         - `image_model`:
             The image formation model.
-        - `power_spectrum_fn`:
+        - `power_fn`:
             The variance of each fourier mode. By default,
-            `cryojax.image.operators.Constant(1.0)`.
+            `cryojax.ndimage.operators.Constant(1.0)`.
         - `signal_scale_factor`:
             A scale factor for the underlying signal simulated from `image_model`.
         - `signal_offset`:
             An offset for the underlying signal simulated from `image_model`.
         """  # noqa: E501
         self.image_model = image_model
-        self.power_spectrum_fn = power_spectrum_fn or Constant(1.0)
+        self.power_fn = power_fn or Constant(1.0)
         self.signal_scale_factor = error_if_not_positive(
             jnp.asarray(signal_scale_factor, dtype=float)
         )
@@ -332,7 +332,7 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
         freqs = image_model.image_config.padded_frequency_grid_in_angstroms
         # Compute the zero mean variance and scale up to be independent of the number of
         # pixels
-        std = jnp.sqrt(n_pixels * self.power_spectrum_fn(freqs))
+        std = jnp.sqrt(n_pixels * self.power_fn(freqs))
         noise = image_model.postprocess(
             std
             * jr.normal(rng_key, shape=freqs.shape[0:-1])
@@ -381,7 +381,7 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
         n_pixels = config.n_pixels
         freqs = config.frequency_grid_in_angstroms
         # Compute the variance and scale up to be independent of the number of pixels
-        variance = n_pixels * self.power_spectrum_fn(freqs)
+        variance = n_pixels * self.power_fn(freqs)
         # Create simulated data
         simulated = self.compute_signal(
             outputs_real_space=False,
