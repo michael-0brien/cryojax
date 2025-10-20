@@ -25,7 +25,7 @@ class GaussianMixtureRenderFn(AbstractVolumeRenderFn[GaussianMixtureVolume], str
     """Render a voxel grid from the `GaussianMixtureVolume`.
 
     If `GaussianMixtureVolume` is instantiated from electron scattering
-    factors via `from_peng_parameters`, this renders an electrostatic
+    factors via `from_tabulated_parameters`, this renders an electrostatic
     potential as tabulated in Peng et al. 1996. The elastic electron
     scattering factors defined in this work are
 

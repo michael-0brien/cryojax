@@ -42,7 +42,7 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
         # Load positions of atoms and one-hot encoded atom names
         atom_positions, atom_types = read_atoms_from_pdb(...)
         parameters = PengScatteringFactorParameters(atom_types)
-        potential = GaussianMixtureVolume.from_peng_parameters(
+        potential = GaussianMixtureVolume.from_tabulated_parameters(
             atom_positions, parameters
         )
         ```
@@ -144,14 +144,6 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
 
     @classmethod
     def from_tabulated_parameters(
-        cls,
-        *args,
-        **kwargs,
-    ) -> Self:
-        return cls.from_peng_parameters(*args, **kwargs)
-
-    @classmethod
-    def from_peng_parameters(
         cls,
         atom_positions: Float[NDArrayLike, "n_atoms 3"],
         parameters: PengScatteringFactorParameters,
