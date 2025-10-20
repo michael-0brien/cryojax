@@ -31,7 +31,7 @@ def test_fft_atom_projection_correct(pdb_info):
     gaussian_volume, gaussian_integrator = (
         cxs.GaussianMixtureVolume(
             atom_positions,
-            amplitudes=4 * np.pi * amplitude,
+            amplitudes=amplitude,
             variances=b_factor / (8 * np.pi**2),
         ),
         cxs.GaussianMixtureProjection(use_error_functions=False),
@@ -66,7 +66,7 @@ def test_fft_atom_projection_numerical_accuracy(pdb_info):
     gaussian_volume, gaussian_integrator = (
         cxs.GaussianMixtureVolume(
             atom_positions,
-            amplitudes=4 * np.pi * amplitude,
+            amplitudes=amplitude,
             variances=b_factor / (8 * np.pi**2),
         ),
         cxs.GaussianMixtureProjection(use_error_functions=False),

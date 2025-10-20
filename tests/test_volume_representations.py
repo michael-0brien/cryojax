@@ -332,7 +332,7 @@ class TestIntegrateGMMToPixels:
         n_pixels_per_side = n_voxels_per_side[:2]
         # Build the volume
         atomic_volume = GaussianMixtureVolume(
-            atom_positions, 4 * jnp.pi * ff_a, ff_b / (8.0 * jnp.pi**2)
+            atom_positions, ff_a, ff_b / (8.0 * jnp.pi**2)
         )
         image_config = BasicImageConfig(
             shape=n_pixels_per_side,
@@ -346,7 +346,7 @@ class TestIntegrateGMMToPixels:
         projection = irfftn(projection)
 
         integral = jnp.sum(projection) * voxel_size**2
-        assert jnp.isclose(integral, jnp.sum(4 * jnp.pi * ff_a))
+        assert jnp.isclose(integral, jnp.sum(ff_a))
 
 
 class TestRenderGMMToVoxels:
@@ -390,14 +390,12 @@ class TestRenderGMMToVoxels:
         ) = toy_gaussian_cloud
 
         # Build the volume
-        gmm_volume = GaussianMixtureVolume(
-            atom_positions, 4 * jnp.pi * ff_a, ff_b / (8 * jnp.pi**2)
-        )
+        gmm_volume = GaussianMixtureVolume(atom_positions, ff_a, ff_b / (8 * jnp.pi**2))
         render_fn = GaussianMixtureRenderFn(n_voxels_per_side, voxel_size)
         real_voxel_grid = render_fn(gmm_volume)
 
         integral = jnp.sum(real_voxel_grid) * voxel_size**3
-        assert jnp.isclose(integral, jnp.sum(4 * jnp.pi * ff_a))
+        assert jnp.isclose(integral, jnp.sum(ff_a))
 
 
 def test_gmm_shape():

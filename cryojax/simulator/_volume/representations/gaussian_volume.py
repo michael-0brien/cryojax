@@ -28,7 +28,7 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
     follows "Robust Parameterization of Elastic and Absorptive
     Electron Atomic Scattering Factors" by Peng et al. (1996). The
     $a$ and $b$ parameters in this work correspond to
-    `amplitudes = 4 * np.pi * a` and `variances = b / 8\pi^2`.
+    `amplitudes = a` and `variances = b / 8\pi^2`.
 
     !!! info
         Use the following to load a `GaussianMixtureVolume`
@@ -182,9 +182,7 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
             if extra_b_factors.ndim == 1:
                 extra_b_factors = extra_b_factors[:, None]
             b_factors += extra_b_factors
-        return cls(
-            atom_positions, 4 * jnp.pi * amplitudes, b_factor_to_variance(b_factors)
-        )
+        return cls(atom_positions, amplitudes, b_factor_to_variance(b_factors))
 
     @override
     def rotate_to_pose(self, pose: AbstractPose, inverse: bool = False) -> Self:
