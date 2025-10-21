@@ -9,7 +9,7 @@ with install_import_hook("cryojax", "typeguard.typechecked"):
     from cryojax.constants import PengScatteringFactorParameters
     from cryojax.coordinates import make_coordinate_grid
     from cryojax.io import read_atoms_from_pdb
-    from cryojax.ndimage import downsample_with_fourier_cropping, ifftn, irfftn
+    from cryojax.ndimage import downsample_by_factor, ifftn, irfftn
     from cryojax.simulator import (
         BasicImageConfig,
         FourierVoxelGridVolume,
@@ -167,7 +167,7 @@ def test_downsampled_voxel_volume_agreement(sample_pdb_path):
     low_resolution_volume_grid = lowres_render_fn(atom_volume)
     highres_render_fn = GaussianMixtureRenderFn(shape, voxel_size)
     high_resolution_volume_grid = highres_render_fn(atom_volume)
-    downsampled_volume_grid = downsample_with_fourier_cropping(
+    downsampled_volume_grid = downsample_by_factor(
         high_resolution_volume_grid, downsampling_factor
     )
 

@@ -8,12 +8,16 @@ have a rule for how they should be applied to images.
 These classes are modified from the library ``tinygp``.
 """
 
+import functools
+import operator
 from abc import abstractmethod
 from typing import overload
 from typing_extensions import override
 
 import jax.numpy as jnp
 from jaxtyping import Array, Float, Inexact
+
+from cryojax.jax_util._typing import NDArrayLike
 
 from ...jax_util import error_if_negative, error_if_not_positive
 from ._base_operator import AbstractImageOperator
@@ -288,3 +292,46 @@ class FourierGaussianWithRadialOffset(AbstractFourierOperator, strict=True):
         k = jnp.linalg.norm(frequency_grid, axis=-1)
         scaling = self.amplitude * jnp.exp(-0.25 * self.b_factor * (k - self.offset) ** 2)
         return scaling
+
+
+class FourierSinc(AbstractFourierOperator, strict=True):
+    r"""The separable sinc function is the Fourier transform
+    of the box function and is commonly used for anti-aliasing
+    applications. In 2D, this is
+
+    $$f_{2D}(\vec{q}) = \sinc(q_x w) \sinc(q_y w),$$
+
+    and in 3D this is
+
+    $$f_{3D}(\vec{q}) = \sinc(q_x w) \sinc(q_y w) \sinc(q_z w)},$$
+
+    where $\sinc(x) = \frac{\sin(\pi x)}{\pi x}$,
+    $\vec{q} = (q_x, q_y)$ or $\vec{q} = (q_x, q_y, q_z)$ are spatial
+    frequency coordinates for 2D and 3D respectively,
+    and $w$ is width of the real-space box function.
+    """
+
+    box_width: Float[Array, ""]
+
+    def __init__(self, box_width: float | Float[NDArrayLike, ""] = 1.0):
+        """**Arguments:**
+
+        - `box_width`:
+            If the inverse fourier transform of this class
+            is the rectangular function, its interval is
+            `- box_width / 2` to `+ box_width / 2`.
+        """
+        self.box_width = jnp.asarray(box_width, dtype=float)
+
+    @override
+    def __call__(
+        self,
+        frequency_grid: (
+            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
+        ),
+    ) -> Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]:
+        ndim = frequency_grid.ndim - 1
+        return functools.reduce(
+            operator.mul,
+            [jnp.sinc(frequency_grid[..., i] * self.box_width) for i in range(ndim)],
+        )

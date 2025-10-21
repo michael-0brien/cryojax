@@ -1,6 +1,6 @@
 """Routines for downsampling arrays"""
 
-from typing import overload
+import math
 
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float, Inexact
@@ -10,21 +10,25 @@ from ._edges import crop_to_shape
 from ._fft import fftn, ifftn, rfftn
 
 
-def downsample_with_fourier_cropping(
+def downsample_by_factor(
     image_or_volume: Inexact[NDArrayLike, "_ _"] | Inexact[NDArrayLike, "_ _ _"],
     downsampling_factor: float | int,
     outputs_real_space: bool = True,
+    preserve_mean: bool = False,
 ) -> Inexact[Array, "_ _"] | Inexact[Array, "_ _ _"]:
     """Downsample an array using fourier cropping.
 
     **Arguments:**
 
     - `image_or_volume`: The image or volume array to downsample.
-    - `downsample_factor`:
+    - `downsampling_factor`:
         A scale factor at which to downsample `image_or_volume`
         by. Must be a value greater than `1`.
     - `outputs_real_space`:
         If `False`, the `image_or_volume` is returned in fourier space.
+    - `preserve_mean`:
+        Preserve the mean of the volume after downsampling, rather
+        than the sum.
 
     **Returns:**
 
@@ -43,8 +47,11 @@ def downsample_with_fourier_cropping(
             int(image.shape[0] / downsampling_factor),
             int(image.shape[1] / downsampling_factor),
         )
-        downsampled_array = downsample_to_shape_with_fourier_cropping(
-            image, new_shape, outputs_real_space=outputs_real_space
+        downsampled_array = downsample_to_shape(
+            image,
+            new_shape,
+            preserve_mean=preserve_mean,
+            outputs_real_space=outputs_real_space,
         )
     elif image_or_volume.ndim == 3:
         volume = image_or_volume
@@ -53,38 +60,27 @@ def downsample_with_fourier_cropping(
             int(volume.shape[1] / downsampling_factor),
             int(volume.shape[2] / downsampling_factor),
         )
-        downsampled_array = downsample_to_shape_with_fourier_cropping(
-            volume, new_shape, outputs_real_space=outputs_real_space
+        downsampled_array = downsample_to_shape(
+            volume,
+            new_shape,
+            preserve_mean=preserve_mean,
+            outputs_real_space=outputs_real_space,
         )
     else:
         raise ValueError(
-            "`downsample_with_fourier_cropping` can only crop images and volumes. "
-            f"Got an array with number of dimensions {image_or_volume.ndim}."
+            "`downsample_by_factor` was passed an array with "
+            f"`ndim = {image_or_volume.ndim}`, but this function "
+            "can only crop images and volumes."
         )
 
     return downsampled_array
 
 
-@overload
-def downsample_to_shape_with_fourier_cropping(
-    image_or_volume: Inexact[NDArrayLike, "_ _"],
-    downsampled_shape: tuple[int, int],
-    outputs_real_space: bool = True,
-) -> Inexact[Array, "_ _"]: ...
-
-
-@overload
-def downsample_to_shape_with_fourier_cropping(
-    image_or_volume: Inexact[NDArrayLike, "_ _ _"],
-    downsampled_shape: tuple[int, int, int],
-    outputs_real_space: bool = True,
-) -> Inexact[Array, "_ _ _"]: ...
-
-
-def downsample_to_shape_with_fourier_cropping(
+def downsample_to_shape(
     image_or_volume: Inexact[NDArrayLike, "_ _"] | Inexact[NDArrayLike, "_ _ _"],
     downsampled_shape: tuple[int, int] | tuple[int, int, int],
     outputs_real_space: bool = True,
+    preserve_mean: bool = False,
 ) -> Inexact[Array, "_ _"] | Inexact[Array, "_ _ _"]:
     """Downsample an array to a specified shape using fourier cropping.
 
@@ -101,6 +97,9 @@ def downsample_to_shape_with_fourier_cropping(
         The new shape after fourier cropping.
     - `outputs_real_space`:
         If `False`, the `image_or_volume` is returned in fourier space.
+    - `preserve_mean`:
+        Preserve the mean of the volume after downsampling, rather
+        than the sum.
 
     **Returns:**
 
@@ -111,13 +110,15 @@ def downsample_to_shape_with_fourier_cropping(
     assumed.
     """
     if jnp.iscomplexobj(image_or_volume):
-        return _downsample_complex_signal_to_shape(
+        signal = _downsample_complex_signal_to_shape(
             image_or_volume, downsampled_shape, outputs_real_space=outputs_real_space
         )
     else:
-        return _downsample_real_signal_to_shape(
+        signal = _downsample_real_signal_to_shape(
             image_or_volume, downsampled_shape, outputs_real_space=outputs_real_space
         )
+    n_pixels, n_pixels_ds = math.prod(image_or_volume.shape), math.prod(downsampled_shape)
+    return (n_pixels_ds / n_pixels) * signal if preserve_mean else signal
 
 
 def _downsample_real_signal_to_shape(
@@ -130,17 +131,17 @@ def _downsample_real_signal_to_shape(
     hartley_array = hartley_array.real - hartley_array.imag
 
     # Crop to the desired shape
-    ds_image_or_volume = crop_to_shape(hartley_array, downsampled_shape)
+    ds_array = crop_to_shape(hartley_array, downsampled_shape)
 
     # Inverse Hartley Transform
-    ds_image_or_volume = jnp.fft.fftshift(fftn(ds_image_or_volume))
-    ds_image_or_volume /= ds_image_or_volume.size
-    ds_image_or_volume = ds_image_or_volume.real - ds_image_or_volume.imag
+    ds_array = jnp.fft.fftshift(fftn(ds_array))
+    ds_array /= ds_array.size
+    ds_array = ds_array.real - ds_array.imag
 
     if outputs_real_space:
-        return ds_image_or_volume
+        return ds_array
     else:
-        return rfftn(ds_image_or_volume)
+        return rfftn(ds_array)
 
 
 def _downsample_complex_signal_to_shape(

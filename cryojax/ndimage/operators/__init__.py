@@ -13,6 +13,7 @@ from ._fourier_operator import (
     FourierGaussian as FourierGaussian,
     FourierGaussianWithRadialOffset as FourierGaussianWithRadialOffset,
     FourierOperatorLike as FourierOperatorLike,
+    FourierSinc as FourierSinc,
     Lorenzian as Lorenzian,
     ZeroMode as ZeroMode,
 )
