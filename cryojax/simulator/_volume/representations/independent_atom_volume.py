@@ -99,7 +99,7 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
         positions_by_element: tuple[Float[NDArrayLike, "_ 3"], ...],
         parameters: PengScatteringFactorParameters,
         *,
-        b_factors_by_element: tuple[float | Float[NDArrayLike, ""], ...] | None = None,
+        b_factor_by_element: tuple[float | Float[NDArrayLike, ""], ...] | None = None,
     ) -> Self:
         n_elements = len(positions_by_element)
         a, b = parameters.a, parameters.b
@@ -112,8 +112,8 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
                 "Make sure that `a` and `b` correspond to the element types "
                 "in `positions_by_element.`"
             )
-        if b_factors_by_element is not None:
-            if len(b_factors_by_element) != n_elements:
+        if b_factor_by_element is not None:
+            if len(b_factor_by_element) != n_elements:
                 raise ValueError(
                     "When constructing an `IndependentAtomVolume` via "
                     "`from_tabulated_parameters`, found that "
@@ -124,7 +124,7 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
             scattering_factors_by_element = tuple(
                 PengScatteringFactor(a_i, b_i, b_factor)
                 for a_i, b_i, b_factor in zip(
-                    parameters.a, parameters.b, b_factors_by_element
+                    parameters.a, parameters.b, b_factor_by_element
                 )
             )
         else:

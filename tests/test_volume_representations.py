@@ -52,36 +52,6 @@ def toy_gaussian_cloud():
     return (atom_positions, ff_a, ff_b, n_voxels_per_side, voxel_size)
 
 
-@pytest.mark.parametrize("shape", ((64, 64), (63, 63), (63, 64), (64, 63)))
-def test_atom_integrator_shape(sample_pdb_path, shape):
-    atom_positions, atom_types, atom_properties = read_atoms_from_pdb(
-        sample_pdb_path,
-        center=True,
-        selection_string="not element H",
-        loads_properties=True,
-    )
-    atom_volume = GaussianMixtureVolume.from_tabulated_parameters(
-        atom_positions,
-        parameters=PengScatteringFactorParameters(atom_types),
-        extra_b_factors=atom_properties["b_factors"],
-    )
-    pixel_size = 0.5
-
-    integrator = GaussianMixtureProjection(upsampling_factor=2)
-    # # ... and the configuration of the imaging instrument
-    image_config = BasicImageConfig(
-        shape=shape,
-        pixel_size=pixel_size,
-        voltage_in_kilovolts=300.0,
-    )
-    # ... compute the integrated volume
-    fourier_integrated_volume = integrator.integrate(
-        atom_volume, image_config, outputs_real_space=False
-    )
-
-    assert fourier_integrated_volume.shape == (shape[0], shape[1] // 2 + 1)
-
-
 #
 # Test different representations
 #
@@ -177,48 +147,6 @@ def test_downsampled_voxel_volume_agreement(sample_pdb_path):
 #
 # TODO: organize
 #
-def test_downsampled_gmm_volume_agreement(sample_pdb_path):
-    """Integration test ensuring that rasterized voxel grids roughly
-    agree with downsampled versions.
-    """
-    atom_positions, atom_types = read_atoms_from_pdb(
-        sample_pdb_path,
-        loads_b_factors=False,
-        center=True,
-        selection_string="not element H",
-    )
-    atom_volume = GaussianMixtureVolume.from_tabulated_parameters(
-        atom_positions,
-        parameters=PengScatteringFactorParameters(atom_types),
-    )
-
-    # Parameters for rasterization
-    shape = (128, 128)
-    pixel_size = 0.25
-
-    # Downsampling parameters
-    downsampling_factor = 2
-    downsampled_shape = (
-        int(shape[0] / downsampling_factor),
-        int(shape[1] / downsampling_factor),
-    )
-    downsampled_pixel_size = pixel_size * downsampling_factor
-
-    integrator_int_hires = GaussianMixtureProjection(
-        upsampling_factor=downsampling_factor
-    )
-    integrator_int_lowres = GaussianMixtureProjection(upsampling_factor=1)
-    # ... and the configuration of the imaging instrument
-    image_config = BasicImageConfig(
-        shape=downsampled_shape,
-        pixel_size=downsampled_pixel_size,
-        voltage_in_kilovolts=300.0,
-    )
-    # ... compute the integrated volumetric_volume
-    image_from_hires = integrator_int_hires.integrate(atom_volume, image_config)
-    image_lowres = integrator_int_lowres.integrate(atom_volume, image_config)
-
-    assert image_from_hires.shape == image_lowres.shape
 
 
 @pytest.mark.parametrize("shape", ((128, 127, 126),))

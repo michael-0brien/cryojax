@@ -18,8 +18,8 @@ class GaussianMixtureProjection(
     AbstractVolumeIntegrator[GaussianMixtureVolume],
     strict=True,
 ):
-    shape: tuple[int, int] | None
     use_error_functions: bool
+    shape: tuple[int, int] | None
     n_batches: int
 
     is_projection_approximation: ClassVar[bool] = True
