@@ -21,7 +21,7 @@ except ModuleNotFoundError as err:
     JAX_FINUFFT_IMPORT_ERROR = err
 
 
-class GaussianMixtureRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True):
+class FFTAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True):
     """Render a voxel grid using non-uniform FFTs and convoluton."""
 
     shape: tuple[int, int, int]

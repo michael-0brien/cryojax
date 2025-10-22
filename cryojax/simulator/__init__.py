@@ -75,6 +75,7 @@ from ._volume_integrator import (
 )
 from ._volume_rendering import (
     AbstractVolumeRenderFn as AbstractVolumeRenderFn,
+    FFTAtomRenderFn as FFTAtomRenderFn,
     GaussianMixtureRenderFn as GaussianMixtureRenderFn,
 )
 
