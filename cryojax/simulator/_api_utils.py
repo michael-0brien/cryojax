@@ -21,11 +21,15 @@ from ._volume import (
     FourierVoxelGridVolume,
     FourierVoxelSplineVolume,
     GaussianMixtureVolume,
+    IndependentAtomVolume,
+    RealVoxelGridVolume,
 )
 from ._volume_integrator import (
     AbstractVolumeIntegrator,
+    FFTAtomProjection,
     FourierSliceExtraction,
     GaussianMixtureProjection,
+    RealVoxelProjection,
 )
 
 
@@ -204,11 +208,12 @@ def _select_default_integrator(
 ) -> AbstractVolumeIntegrator:
     if isinstance(volume, (FourierVoxelGridVolume, FourierVoxelSplineVolume)):
         integrator = FourierSliceExtraction(outputs_integral=simulates_quantity)
-    elif isinstance(
-        volume,
-        GaussianMixtureVolume,
-    ):
+    elif isinstance(volume, GaussianMixtureVolume):
         integrator = GaussianMixtureProjection(use_error_functions=True)
+    elif isinstance(volume, RealVoxelGridVolume):
+        integrator = RealVoxelProjection()
+    elif isinstance(volume, IndependentAtomVolume):
+        integrator = FFTAtomProjection()
     else:
         raise ValueError(
             "Could not select default integrator for volume of "
