@@ -1,13 +1,82 @@
 """Routines for downsampling arrays using fourier cropping."""
 
 import math
+from collections.abc import Callable
 
+import equinox as eqx
 import jax.numpy as jnp
+from jax import lax
 from jaxtyping import Array, Complex, Float, Inexact
 
 from ..jax_util import NDArrayLike
-from ._edges import crop_to_shape
+from ._edges import crop_to_shape, pad_to_shape
 from ._fft import fftn, ifftn, rfftn
+
+
+def block_reduce_downsample(
+    image_or_volume: Inexact[NDArrayLike, "_ _"] | Inexact[NDArrayLike, "_ _ _"],
+    downsample_factor: int,
+    operation: Callable[[Array, Array], Array] = lax.add,
+) -> Inexact[Array, "_ _"] | Inexact[Array, "_ _ _"]:
+    """Downsample an array by pooling together blocks.
+    Wraps `equinox.nn.Pool`.
+
+    **Arguments:**
+
+    - `image_or_volume`: The image or volume array to downsample.
+    - `downsample_factor`:
+        A scale factor at which to downsample `image_or_volume`
+        by. Must be a value greater than `1`.
+    - `operation`:
+        A function such as `operation = lambda x, y: f(x, y)`,
+        where `x` and `y` are JAX arrays. See [`equinox.nn.Pool`]
+        (https://docs.kidger.site/equinox/api/nn/pool/#equinox.nn.Pool)
+        for documentation.
+
+    **Returns:**
+
+    The downsampled `image_or_volume` at shape reduced by
+    `downsample_factor`.
+    """
+    array = image_or_volume
+    if downsample_factor < 1:
+        raise ValueError(
+            "Called `block_reduce_downsample` with `downsample_factor` less than 1."
+        )
+    shape, ndim = array.shape, array.ndim
+    if ndim == 2:
+        extra_y = 1 if shape[0] % 2 == 0 else 0
+        extra_x = 1 if shape[1] % 2 == 0 else 0
+        padded_shape = (shape[0] + extra_y, shape[1] + extra_x)
+    elif ndim == 3:
+        extra_z = 1 if shape[0] % 2 == 0 else 0
+        extra_y = 1 if shape[1] % 2 == 0 else 0
+        extra_x = 1 if shape[2] % 2 == 0 else 0
+        padded_shape = (shape[0] + extra_z, shape[1] + extra_y, shape[2] + extra_x)
+    else:
+        raise ValueError(
+            "`block_reduce_downsample` was passed an array with "
+            f"`ndim = {array.ndim}`, but this function "
+            "only supports images and volumes as input."
+        )
+    # Pad to odd dimension to preserve center
+    if shape != padded_shape:
+        array = pad_to_shape(array, padded_shape)
+    print(padded_shape, array.shape)
+    # Pooling function
+    reduce_fn = lambda x: eqx.nn.Pool(
+        init=0,
+        operation=operation,
+        num_spatial_dims=ndim,
+        kernel_size=downsample_factor,
+        stride=downsample_factor,
+        padding=0,
+        use_ceil=False,
+    )(x[None, ...])[0]
+    # Pool, crop, and return
+    array_ds = reduce_fn(array)
+
+    return array_ds
 
 
 def fourier_crop_downsample(
@@ -16,7 +85,7 @@ def fourier_crop_downsample(
     outputs_real_space: bool = True,
     preserve_mean: bool = False,
 ) -> Inexact[Array, "_ _"] | Inexact[Array, "_ _ _"]:
-    """Rescale an array using fourier cropping.
+    """Downsample an array using fourier cropping.
 
     **Arguments:**
 
@@ -25,22 +94,23 @@ def fourier_crop_downsample(
         A scale factor at which to downsample `image_or_volume`
         by. Must be a value greater than `1`.
     - `outputs_real_space`:
-        If `False`, the `image_or_volume` is returned in fourier space.
+        If `False`, the `image_or_volume` is returned in fourier space
+        with the zero-frequency component in the corner. For real signals,
+        hermitian symmetry is assumed.
     - `preserve_mean`:
         Preserve the mean of the volume after downsampling, rather
         than the sum.
 
     **Returns:**
 
-    The downsampled `image_or_volume`, at the new real-space shape
-    `downsampled_shape`. If `outputs_real_space = False`, return
-    the downsampled array in fourier space, with the zero frequency
-    component in the corner. For real signals, hermitian symmetry is
-    assumed.
+    The downsampled `image_or_volume` at shape reduced by
+    `downsample_factor`.
     """
     downsample_factor = float(downsample_factor)
     if downsample_factor < 1.0:
-        raise ValueError("`downsample_factor` must be greater than 1.0")
+        raise ValueError(
+            "Called `fourier_crop_downsample` with `downsample_factor` less than 1."
+        )
     if image_or_volume.ndim == 2:
         image = image_or_volume
         new_shape = (
@@ -96,7 +166,9 @@ def fourier_crop_downsample_to_shape(
     - `downsampled_shape`:
         The new shape after fourier cropping.
     - `outputs_real_space`:
-        If `False`, the `image_or_volume` is returned in fourier space.
+        If `False`, the `image_or_volume` is returned in fourier space
+        with the zero-frequency component in the corner. For real signals,
+        hermitian symmetry is assumed.
     - `preserve_mean`:
         Preserve the mean of the volume after downsampling, rather
         than the sum.
@@ -104,24 +176,21 @@ def fourier_crop_downsample_to_shape(
     **Returns:**
 
     The downsampled `image_or_volume`, at the new real-space shape
-    `downsampled_shape`. If `outputs_real_space = False`, return
-    the downsampled array in fourier space, with the zero frequency
-    component in the corner. For real signals, hermitian symmetry is
-    assumed.
+    `downsampled_shape`.
     """
     if jnp.iscomplexobj(image_or_volume):
-        signal = _downsample_complex_signal_to_shape(
+        signal = _fft_ds_complex_signal_to_shape(
             image_or_volume, downsampled_shape, outputs_real_space=outputs_real_space
         )
     else:
-        signal = _downsample_real_signal_to_shape(
+        signal = _fft_ds_real_signal_to_shape(
             image_or_volume, downsampled_shape, outputs_real_space=outputs_real_space
         )
     n_pixels, n_pixels_ds = math.prod(image_or_volume.shape), math.prod(downsampled_shape)
     return (n_pixels_ds / n_pixels) * signal if preserve_mean else signal
 
 
-def _downsample_real_signal_to_shape(
+def _fft_ds_real_signal_to_shape(
     image_or_volume: Float[NDArrayLike, "_ _"] | Float[NDArrayLike, "_ _ _"],
     downsampled_shape: tuple[int, int] | tuple[int, int, int],
     outputs_real_space: bool = True,
@@ -144,7 +213,7 @@ def _downsample_real_signal_to_shape(
         return rfftn(ds_array)
 
 
-def _downsample_complex_signal_to_shape(
+def _fft_ds_complex_signal_to_shape(
     image_or_volume: Complex[NDArrayLike, "_ _"] | Complex[NDArrayLike, "_ _ _"],
     downsampled_shape: tuple[int, int] | tuple[int, int, int],
     outputs_real_space: bool = True,

@@ -3,6 +3,7 @@ from typing import Any as _Any
 
 from . import operators as operators, transforms as transforms
 from ._downsample import (
+    block_reduce_downsample as block_reduce_downsample,
     fourier_crop_downsample as fourier_crop_downsample,
     fourier_crop_downsample_to_shape as fourier_crop_downsample_to_shape,
 )

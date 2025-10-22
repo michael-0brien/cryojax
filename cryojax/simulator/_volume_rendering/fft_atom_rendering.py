@@ -55,7 +55,8 @@ class FFTAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True
 
             ```python
             frequency_grid = jnp.fft.fftshift(
-                make_frequency_grid(shape, voxel_size, outputs_rfft=False)
+                make_frequency_grid(shape, voxel_size, outputs_rfft=False),
+                axes=(0, 1, 2),
             )
             ```
         - `antialias`:

@@ -93,17 +93,22 @@ class FFTAtomProjection(
         | Float[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
     ):
         pixel_size = image_config.pixel_size
-        if self.shape is not None:
-            shape = self.shape
+        shape = image_config.padded_shape if self.shape is None else self.shape
+        if shape == image_config.padded_shape:
+            frequency_grid = image_config.padded_full_frequency_grid_in_angstroms
+        else:
             frequency_grid = make_frequency_grid(
                 shape, pixel_size, outputs_rfftfreqs=False
             )
-        else:
-            shape = image_config.padded_shape
-            frequency_grid = image_config.padded_full_frequency_grid_in_angstroms
         frequency_grid = jnp.fft.fftshift(frequency_grid, axes=(0, 1))
         proj_kernel = lambda pos, kernel: _project_with_nufft(
-            shape, pixel_size, pos, kernel, frequency_grid, eps=self.eps, opts=self.opts
+            shape,
+            pixel_size,
+            pos,
+            kernel,
+            frequency_grid,
+            eps=self.eps,
+            opts=self.opts,
         )
         # Compute projection over atom types
         fourier_projection = jax.tree.reduce(
@@ -115,11 +120,12 @@ class FFTAtomProjection(
                 is_leaf=lambda x: isinstance(x, op.AbstractFourierOperator),
             ),
         )
+        # Apply anti-aliasing
         if self.antialias:
             antialias_fn = op.FourierSinc(box_width=pixel_size)
             fourier_projection *= antialias_fn(frequency_grid)
-
-        # Shift zero frequency component to corner
+        # Shift zero frequency component to corner and convert to
+        # rfft
         fourier_projection = convert_fftn_to_rfftn(
             jnp.fft.ifftshift(fourier_projection), mode="real"
         )
@@ -130,9 +136,8 @@ class FFTAtomProjection(
                 else fourier_projection
             )
         else:
-            projection = resize_with_crop_or_pad(
-                irfftn(fourier_projection, s=shape), image_config.padded_shape
-            )
+            projection = irfftn(fourier_projection, s=shape)
+            projection = resize_with_crop_or_pad(projection, image_config.padded_shape)
             return projection if outputs_real_space else rfftn(projection)
 
 

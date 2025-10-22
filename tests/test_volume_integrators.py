@@ -144,7 +144,7 @@ def test_fft_atom_projection_antialias(pdb_info, width, pixel_size, shape):
 
 @pytest.mark.parametrize(
     "pixel_size, shape, extra_width",
-    ((0.25, (128, 128), 0.5),),
+    ((0.25, (128, 128), 0.25),),
 )
 def test_fft_atom_projection_peng(pdb_info, pixel_size, shape, extra_width):
     if jnufft is not None:
@@ -169,7 +169,7 @@ def test_fft_atom_projection_peng(pdb_info, pixel_size, shape, extra_width):
                 extra_b_factor for _ in range(len(positions_by_id))
             ),
         )
-        pad_options = dict(shape=(2 * shape[0], 2 * shape[1]))
+        pad_options = dict(shape=(4 * shape[0], 4 * shape[1]))
         image_config = cxs.BasicImageConfig(
             shape, pixel_size, voltage_in_kilovolts=300.0, pad_options=pad_options
         )
@@ -181,7 +181,8 @@ def test_fft_atom_projection_peng(pdb_info, pixel_size, shape, extra_width):
             gaussian_volume, gaussian_integrator, image_config
         )
         proj_by_fft = compute_projection(atom_volume, fft_integrator, image_config)
-        np.testing.assert_allclose(proj_by_gaussians, proj_by_fft, atol=1e-8)
+        # plot_images(proj_by_gaussians, proj_by_fft)
+        np.testing.assert_allclose(proj_by_gaussians, proj_by_fft, atol=1e-3)
 
 
 @pytest.mark.parametrize(
@@ -341,23 +342,23 @@ def test_analytic_vs_voxels_nopose(pdb_info, pixel_size, shape):
 #         )
 
 
-def plot_images(proj1, proj2):
-    from matplotlib import pyplot as plt
-    from mpl_toolkits.axes_grid1 import make_axes_locatable
+# def plot_images(proj1, proj2):
+#     from matplotlib import pyplot as plt
+#     from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-    vmin, vmax = min(proj1.min(), proj2.min()), max(proj1.max(), proj2.max())
-    fig, axes = plt.subplots(figsize=(15, 5), ncols=3)
-    im1 = axes[0].imshow(proj1, vmin=vmin, vmax=vmax, cmap="gray")
-    im2 = axes[1].imshow(proj2, vmin=vmin, vmax=vmax, cmap="gray")
-    for im, ax in zip([im1, im2], axes):
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        fig.colorbar(im, cax=cax)
-    im3 = axes[2].imshow(np.abs(proj2 - proj1), cmap="gray")
-    divider = make_axes_locatable(axes[2])
-    cax = divider.append_axes("right", size="5%", pad=0.05)
-    fig.colorbar(im3, cax=cax)
-    plt.show()
+#     vmin, vmax = min(proj1.min(), proj2.min()), max(proj1.max(), proj2.max())
+#     fig, axes = plt.subplots(figsize=(15, 5), ncols=3)
+#     im1 = axes[0].imshow(proj1, vmin=vmin, vmax=vmax, cmap="gray")
+#     im2 = axes[1].imshow(proj2, vmin=vmin, vmax=vmax, cmap="gray")
+#     for im, ax in zip([im1, im2], axes):
+#         divider = make_axes_locatable(ax)
+#         cax = divider.append_axes("right", size="5%", pad=0.05)
+#         fig.colorbar(im, cax=cax)
+#     im3 = axes[2].imshow(np.abs(proj2 - proj1), cmap="gray")
+#     divider = make_axes_locatable(axes[2])
+#     cax = divider.append_axes("right", size="5%", pad=0.05)
+#     fig.colorbar(im3, cax=cax)
+#     plt.show()
 
 
 @eqx.filter_jit

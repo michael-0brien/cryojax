@@ -152,9 +152,53 @@ def test_downsampled_voxel_volume_agreement(sample_pdb_path):
     assert low_resolution_volume_grid.shape == downsampled_volume_grid.shape
 
 
+def test_render_options(pdb_info):
+    width, voxel_size, shape = (1.0, 1.0, (31, 32, 33))
+    atom_positions, _, _ = pdb_info
+    volumes, render_fns = [], []
+    gaussian_volume, gaussian_render_fn = (
+        cxs.GaussianMixtureVolume(
+            atom_positions,
+            amplitudes=1.0,
+            variances=width**2,
+        ),
+        cxs.GaussianMixtureRenderFn(shape, voxel_size),
+    )
+    volumes.append(gaussian_volume)
+    render_fns.append(gaussian_render_fn)
+    if jnufft is not None:
+        volumes.append(
+            cxs.IndependentAtomVolume(
+                position_pytree=atom_positions,
+                scattering_factor_pytree=op.FourierGaussian(
+                    amplitude=1.0, b_factor=width**2 * (8 * np.pi**2)
+                ),
+            )
+        )
+        render_fns.append(cxs.FFTAtomRenderFn(shape, voxel_size, eps=1e-16))
+    for volume, render_fn in zip(volumes, render_fns):
+        real_voxel_grid = render_fn(volume, outputs_real_space=True)
+        assert real_voxel_grid.shape == shape
+        assert not jnp.iscomplexobj(real_voxel_grid)
+        fftn_voxel_grid = render_fn(
+            volume,
+            outputs_real_space=False,
+            outputs_rfft=False,
+        )
+        assert fftn_voxel_grid.shape == shape
+        assert jnp.iscomplexobj(fftn_voxel_grid)
+        rfftn_voxel_grid = render_fn(
+            volume,
+            outputs_real_space=False,
+            outputs_rfft=True,
+        )
+        assert rfftn_voxel_grid.shape == (*shape[0:2], shape[2] // 2 + 1)
+        assert jnp.iscomplexobj(rfftn_voxel_grid)
+
+
 @pytest.mark.parametrize(
     "width, voxel_size, shape",
-    ((5.0, 0.5, (64, 64, 64)),),  # (1.0, 0.5, (64, 64, 64)), (2.0, 1.0, (32, 32, 32))),
+    ((1.0, 0.5, (64, 64, 64)), (1.0, 0.5, (63, 63, 63))),
 )
 def test_fft_atom_render(pdb_info, width, voxel_size, shape):
     if jnufft is not None:
