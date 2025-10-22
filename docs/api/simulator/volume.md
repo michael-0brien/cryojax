@@ -36,6 +36,16 @@ There are many different volume representations of biological structures for cry
             - rotate_to_pose
             - translate_to_pose
 
+---
+
+::: cryojax.simulator.IndependentAtomVolume
+    options:
+        members:
+            - __init__
+            - from_tabulated_parameters
+            - get_representation
+            - rotate_to_pose
+            - translate_to_pose
 
 ### Voxel-based volumes
 
@@ -92,6 +102,14 @@ There are many different volume representations of biological structures for cry
                 - __call__
 
 ::: cryojax.simulator.GaussianMixtureRenderFn
+        options:
+            members:
+                - __init__
+                - __call__
+
+---
+
+::: cryojax.simulator.FFTAtomRenderFn
         options:
             members:
                 - __init__

@@ -20,16 +20,24 @@
 
 ---
 
-::: cryojax.simulator.NufftProjection
+::: cryojax.simulator.RealVoxelProjection
         options:
             members:
                 - __init__
                 - integrate
                 - project_voxel_cloud_with_nufft
 
-## Integration methods for point-cloud based structures
+## Integration methods for atom-based based structures
 
 ::: cryojax.simulator.GaussianMixtureProjection
+        options:
+            members:
+                - __init__
+                - integrate
+
+---
+
+::: cryojax.simulator.FFTAtomProjection
         options:
             members:
                 - __init__
