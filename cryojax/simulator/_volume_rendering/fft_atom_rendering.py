@@ -59,6 +59,7 @@ class FFTAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True
                 axes=(0, 1, 2),
             )
             ```
+
         - `antialias`:
             If `True`, apply an anti-aliasing filter to more accurately
             sample the volume.

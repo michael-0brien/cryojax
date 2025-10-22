@@ -92,6 +92,24 @@ class FFTAtomProjection(
         ]
         | Float[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
     ):
+        """Compute a projection from scattering factors per atom type
+        from the `IndependentAtomVolume`.
+
+        **Arguments:**
+
+        - `volume_representation`:
+            The volume representation.
+        - `image_config`:
+            The configuration of the resulting image.
+        - `outputs_real_space`:
+            If `True`, return the image in real space. Otherwise,
+            return in fourier.
+
+        **Returns:**
+
+        The integrated volume in real or fourier space at the
+        `AbstractImageConfig.padded_shape`.
+        """  # noqa: E501
         pixel_size = image_config.pixel_size
         shape = image_config.padded_shape if self.shape is None else self.shape
         if shape == image_config.padded_shape:
