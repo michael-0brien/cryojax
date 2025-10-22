@@ -15,7 +15,16 @@ from .._volume import RealVoxelGridVolume
 from .base_integrator import AbstractVolumeIntegrator
 
 
-class NufftProjection(
+try:
+    import jax_finufft as jnufft
+
+    JAX_FINUFFT_IMPORT_ERROR = None
+except ModuleNotFoundError as err:
+    jnufft = None
+    JAX_FINUFFT_IMPORT_ERROR = err
+
+
+class RealVoxelProjection(
     AbstractVolumeIntegrator[RealVoxelGridVolume],
     strict=True,
 ):
@@ -38,6 +47,13 @@ class NufftProjection(
             See [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft)
             for documentation.
         """
+        if jnufft is None:
+            raise RuntimeError(
+                "Tried to use the `RealVoxelProjection` "
+                "class, but `jax-finufft` is not installed. "
+                "See https://github.com/flatironinstitute/jax-finufft "
+                "for installation instructions."
+            ) from JAX_FINUFFT_IMPORT_ERROR
         self.eps = eps
         self.opts = opts
 
@@ -61,28 +77,24 @@ class NufftProjection(
 
         - `volume_representation`: The volume representation.
         - `image_config`: The configuration of the resulting image.
+        - `outputs_real_space`:
+            If `True`, return the image in real space. Otherwise,
+            return in fourier.
 
         **Returns:**
 
         The projection integral of the `volume_representation` in fourier space, at the
         `image_config.padded_shape` and the `image_config.pixel_size`.
         """
-        if isinstance(volume_representation, RealVoxelGridVolume):
-            shape = volume_representation.shape
-            fourier_projection = _project_with_nufft(
-                volume_representation.real_voxel_grid.ravel(),
-                volume_representation.coordinate_grid_in_pixels.reshape(
-                    (math.prod(shape), 3)
-                ),
-                image_config.padded_shape,
-                eps=self.eps,
-                opts=self.opts,
-            )
-        else:
-            raise ValueError(
-                "Supported type for `volume_representation` is `RealVoxelGridVolume`"
-            )
-        # Scale by voxel size to convert from projection to integral
+        n_voxels = math.prod(volume_representation.shape)
+        fourier_projection = _project_with_nufft(
+            volume_representation.real_voxel_grid.ravel(),
+            volume_representation.coordinate_grid_in_pixels.reshape((n_voxels, 3)),
+            image_config.padded_shape,
+            eps=self.eps,
+            opts=self.opts,
+        )
+        # Scale by voxel size for units
         fourier_projection *= image_config.pixel_size
         return (
             irfftn(fourier_projection, s=image_config.padded_shape)
@@ -92,16 +104,7 @@ class NufftProjection(
 
 
 def _project_with_nufft(weights, coordinate_list, shape, eps=1e-6, opts=None):
-    try:
-        import jax_finufft as jnufft
-    except ModuleNotFoundError as err:
-        raise RuntimeError(
-            "Tried to compute a projection using the `NufftProjection` "
-            "class, but `jax-finufft` is not installed. "
-            "See https://github.com/flatironinstitute/jax-finufft "
-            "for installation instructions."
-        ) from err
-
+    assert jnufft is not None
     weights, coordinate_list = (
         jnp.asarray(weights, dtype=complex),
         jnp.asarray(coordinate_list, dtype=float),

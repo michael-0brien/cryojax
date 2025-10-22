@@ -12,10 +12,10 @@ from jaxtyping import Array, Complex, Float, Inexact
 
 from ...coordinates import make_frequency_grid
 from ...jax_util import NDArrayLike
-from .._average import interpolate_radial_average_on_grid
 from .._edges import resize_with_crop_or_pad
 from .._fft import irfftn, rfftn
 from .._fourier_statistics import compute_binned_powerspectrum
+from .._radial_average import interpolate_radial_average_on_grid
 from ._base_transform import AbstractImageTransform
 
 

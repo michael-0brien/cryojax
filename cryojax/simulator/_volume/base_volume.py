@@ -20,10 +20,10 @@ class AbstractVolumeParametrization(eqx.Module, strict=True):
         In, `cryojax`, potentials should be built in units of *inverse length squared*,
         $[L]^{-2}$. This rescaled potential is defined to be
 
-        $$U(\\mathbf{r}) = \\frac{2 m e}{\\hbar^2} V(\\mathbf{r}),$$
+        $$U(\\mathbf{r}) = \\frac{m_0 e}{2 \\pi \\hbar^2} V(\\mathbf{r}),$$
 
         where $V$ is the electrostatic potential energy, $\\mathbf{r}$ is a positional
-        coordinate, $m$ is the electron mass, and $e$ is the electron charge.
+        coordinate, $m_0$ is the electron rest mass, and $e$ is the electron charge.
 
         For a single atom, this rescaled potential has the advantage that under usual
         scattering approximations (i.e. the first-born approximation), the
@@ -31,7 +31,7 @@ class AbstractVolumeParametrization(eqx.Module, strict=True):
         factors. In particular, for a single atom with scattering factor $f^{(e)}(\\mathbf{q})$
         and scattering vector $\\mathbf{q}$, its rescaled potential is equal to
 
-        $$U(\\mathbf{r}) = 4 \\pi \\mathcal{F}^{-1}[f^{(e)}(\\boldsymbol{\\xi} / 2)](\\mathbf{r}),$$
+        $$U(\\mathbf{r}) = \\mathcal{F}^{-1}[f^{(e)}(\\boldsymbol{\\xi} / 2)](\\mathbf{r}),$$
 
         where $\\boldsymbol{\\xi} = 2 \\mathbf{q}$ is the wave vector coordinate and
         $\\mathcal{F}^{-1}$ is the inverse fourier transform operator in the convention
@@ -41,7 +41,7 @@ class AbstractVolumeParametrization(eqx.Module, strict=True):
         The rescaled potential $U$ gives the following time-independent schrodinger equation
         for the scattering problem,
 
-        $$(\\nabla^2 + k^2) \\psi(\\mathbf{r}) = - U(\\mathbf{r}) \\psi(\\mathbf{r}),$$
+        $$(\\nabla^2 + k^2) \\psi(\\mathbf{r}) = - 4 \\pi U(\\mathbf{r}) \\psi(\\mathbf{r}),$$
 
         where $k$ is the incident wavenumber of the electron beam.
 

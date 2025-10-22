@@ -40,6 +40,11 @@ def test_future_deprecated(sample_pdb_path):
         assert not should_be_removed(record)
 
     with pytest.warns(DeprecationWarning) as record:
+        obj = cxs.NufftProjection
+        assert obj is cxs.RealVoxelProjection
+        assert not should_be_removed(record)
+
+    with pytest.warns(DeprecationWarning) as record:
         obj = cxs.PengScatteringFactorParameters
         assert obj is cryojax.constants.PengScatteringFactorParameters
         assert not should_be_removed(record)
