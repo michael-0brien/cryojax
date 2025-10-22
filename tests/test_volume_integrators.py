@@ -134,7 +134,6 @@ def test_fft_atom_projection_antialias(pdb_info, width, pixel_size, shape):
         image_config = cxs.BasicImageConfig(
             shape, pixel_size, voltage_in_kilovolts=300.0, pad_options=pad_options
         )
-        fft_integrator = cxs.FFTAtomProjection(eps=1e-16)
         proj_by_gaussians = compute_projection(
             gaussian_volume, gaussian_integrator, image_config
         )
