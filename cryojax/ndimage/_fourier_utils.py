@@ -36,12 +36,14 @@ def convert_fftn_to_rfftn(
     to `cryojax.image.rfftn` function.
     """
     shape = fftn_array.shape
+    # Take upper half plane
     if fftn_array.ndim == 2:
-        # Take upper half plane
         rfftn_array = fftn_array[:, : shape[-1] // 2 + 1]
+    elif fftn_array.ndim == 3:
+        rfftn_array = fftn_array[:, :, : shape[-1] // 2 + 1]
     else:
         raise NotImplementedError(
-            "Only two-dimensional arrays are supported "
+            "Only 2D and 3D arrays are supported "
             "in function `convert_fftn_to_rfftn`. "
             f"Passed an array with `ndim = {fftn_array.ndim}`."
         )
@@ -56,11 +58,17 @@ def convert_fftn_to_rfftn(
 
 
 def enforce_self_conjugate_rfftn_components(
-    rfftn_array: Complex[Array, "{shape[0]} {shape[1]}//2+1"],
-    shape: tuple[int, int],
+    rfftn_array: (
+        Complex[Array, "{shape[0]} {shape[1]}//2+1"]
+        | Complex[Array, "{shape[0]} {shape[1]} {shape[2]}//2+1"]
+    ),
+    shape: tuple[int, int] | tuple[int, int, int],
     includes_zero_frequency: bool = False,
     mode: Literal["zero", "one", "real"] = "zero",
-) -> Complex[Array, "{shape[0]} {shape[1]}//2+1"]:
+) -> (
+    Complex[Array, "{shape[0]} {shape[1]}//2+1"]
+    | Complex[Array, "{shape[0]} {shape[1]} {shape[2]}//2+1"]
+):
     """For an array that is the output of a call to an "rfftn"
     function, enforce that self-conjugate components are real-valued.
 
@@ -106,6 +114,7 @@ def enforce_self_conjugate_rfftn_components(
             "The supported modes are 'zero', 'one', and 'real'."
         )
     if rfftn_array.ndim == 2:
+        assert len(shape) == 2
         y_dim, x_dim = shape
         if includes_zero_frequency:
             rfftn_array = rfftn_array.at[0, 0].set(replace_fn(rfftn_array[0, 0]))
@@ -121,9 +130,42 @@ def enforce_self_conjugate_rfftn_components(
             rfftn_array = rfftn_array.at[y_dim // 2, x_dim // 2].set(
                 replace_fn(rfftn_array[y_dim // 2, x_dim // 2])
             )
+    elif rfftn_array.ndim == 3:
+        assert len(shape) == 3
+        z_dim, y_dim, x_dim = shape
+        if includes_zero_frequency:
+            rfftn_array = rfftn_array.at[0, 0, 0].set(replace_fn(rfftn_array[0, 0, 0]))
+        if z_dim % 2 == 0:
+            rfftn_array = rfftn_array.at[0, z_dim // 2, 0].set(
+                replace_fn(rfftn_array[0, z_dim // 2, 0])
+            )
+        if y_dim % 2 == 0:
+            rfftn_array = rfftn_array.at[0, y_dim // 2, 0].set(
+                replace_fn(rfftn_array[0, y_dim // 2, 0])
+            )
+        if x_dim % 2 == 0:
+            rfftn_array = rfftn_array.at[0, 0, x_dim // 2].set(
+                replace_fn(rfftn_array[0, 0, x_dim // 2])
+            )
+        if y_dim % 2 == 0 and x_dim % 2 == 0:
+            rfftn_array = rfftn_array.at[0, y_dim // 2, x_dim // 2].set(
+                replace_fn(rfftn_array[0, y_dim // 2, x_dim // 2])
+            )
+        if z_dim % 2 == 0 and x_dim % 2 == 0:
+            rfftn_array = rfftn_array.at[z_dim // 2, 0, x_dim // 2].set(
+                replace_fn(rfftn_array[z_dim // 2, 0, x_dim // 2])
+            )
+        if z_dim % 2 == 0 and y_dim % 2 == 0:
+            rfftn_array = rfftn_array.at[z_dim // 2, y_dim // 2, 0].set(
+                replace_fn(rfftn_array[z_dim // 2, y_dim // 2, 0])
+            )
+        if z_dim % 2 == 0 and y_dim % 2 == 0 and x_dim % 2 == 0:
+            rfftn_array = rfftn_array.at[z_dim // 2, y_dim // 2, x_dim // 2].set(
+                replace_fn(rfftn_array[z_dim // 2, y_dim // 2, x_dim // 2])
+            )
     else:
         raise NotImplementedError(
-            "Only two-dimensional arrays are supported "
+            "Only 2D and 3D arrays are supported "
             "in function `enforce_self_conjugate_rfftn_components`. "
             f"Passed an array with `ndim = {rfftn_array.ndim}`."
         )

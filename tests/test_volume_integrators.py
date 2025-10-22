@@ -182,7 +182,6 @@ def test_fft_atom_projection_peng(pdb_info, pixel_size, shape, extra_width):
             gaussian_volume, gaussian_integrator, image_config
         )
         proj_by_fft = compute_projection(atom_volume, fft_integrator, image_config)
-
         np.testing.assert_allclose(proj_by_gaussians, proj_by_fft, atol=1e-8)
 
 
@@ -343,23 +342,23 @@ def test_analytic_vs_voxels_nopose(pdb_info, pixel_size, shape):
 #         )
 
 
-# def plot_images(proj1, proj2):
-#     from matplotlib import pyplot as plt
-#     from mpl_toolkits.axes_grid1 import make_axes_locatable
+def plot_images(proj1, proj2):
+    from matplotlib import pyplot as plt
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-#     vmin, vmax = min(proj1.min(), proj2.min()), max(proj1.max(), proj2.max())
-#     fig, axes = plt.subplots(figsize=(15, 5), ncols=3)
-#     im1 = axes[0].imshow(proj1, vmin=vmin, vmax=vmax, cmap="gray")
-#     im2 = axes[1].imshow(proj2, vmin=vmin, vmax=vmax, cmap="gray")
-#     for im, ax in zip([im1, im2], axes):
-#         divider = make_axes_locatable(ax)
-#         cax = divider.append_axes("right", size="5%", pad=0.05)
-#         fig.colorbar(im, cax=cax)
-#     im3 = axes[2].imshow(np.abs(proj2 - proj1), cmap="gray")
-#     divider = make_axes_locatable(axes[2])
-#     cax = divider.append_axes("right", size="5%", pad=0.05)
-#     fig.colorbar(im3, cax=cax)
-#     plt.show()
+    vmin, vmax = min(proj1.min(), proj2.min()), max(proj1.max(), proj2.max())
+    fig, axes = plt.subplots(figsize=(15, 5), ncols=3)
+    im1 = axes[0].imshow(proj1, vmin=vmin, vmax=vmax, cmap="gray")
+    im2 = axes[1].imshow(proj2, vmin=vmin, vmax=vmax, cmap="gray")
+    for im, ax in zip([im1, im2], axes):
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        fig.colorbar(im, cax=cax)
+    im3 = axes[2].imshow(np.abs(proj2 - proj1), cmap="gray")
+    divider = make_axes_locatable(axes[2])
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    fig.colorbar(im3, cax=cax)
+    plt.show()
 
 
 @eqx.filter_jit

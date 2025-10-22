@@ -2,13 +2,9 @@ import warnings as _warnings
 from typing import Any as _Any
 
 from . import operators as operators, transforms as transforms
-from ._average import (
-    compute_binned_radial_average as compute_binned_radial_average,
-    interpolate_radial_average_on_grid as interpolate_radial_average_on_grid,
-)
 from ._downsample import (
-    downsample_by_factor as downsample_by_factor,
-    downsample_to_shape as downsample_to_shape,
+    fourier_crop_downsample as fourier_crop_downsample,
+    fourier_crop_downsample_to_shape as fourier_crop_downsample_to_shape,
 )
 from ._edges import (
     crop_to_shape as crop_to_shape,
@@ -37,8 +33,11 @@ from ._map_coordinates import (
     map_coordinates_spline as map_coordinates_spline,
 )
 from ._normalize import normalize_image as normalize_image, rescale_image as rescale_image
+from ._radial_average import (
+    compute_binned_radial_average as compute_binned_radial_average,
+    interpolate_radial_average_on_grid as interpolate_radial_average_on_grid,
+)
 from ._rescale_pixel_size import (
-    maybe_rescale_pixel_size as maybe_rescale_pixel_size,
     rescale_pixel_size as rescale_pixel_size,
 )
 
@@ -53,7 +52,7 @@ def __getattr__(name: str) -> _Any:
             category=DeprecationWarning,
             stacklevel=2,
         )
-        return downsample_by_factor
+        return fourier_crop_downsample
     if name == "downsample_to_shape_with_fourier_cropping":
         _warnings.warn(
             "'downsample_to_shape_with_fourier_cropping' is deprecated"
@@ -62,6 +61,6 @@ def __getattr__(name: str) -> _Any:
             category=DeprecationWarning,
             stacklevel=2,
         )
-        return downsample_by_factor
+        return fourier_crop_downsample_to_shape
 
     raise AttributeError(f"cannot import name '{name}' from 'cryojax.ndimage'.")

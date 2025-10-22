@@ -5,13 +5,12 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
-from cryojax.ndimage._edges import resize_with_crop_or_pad
-
 from ...coordinates import make_frequency_grid
 from ...ndimage import (
     convert_fftn_to_rfftn,
     irfftn,
     operators as op,
+    resize_with_crop_or_pad,
     rfftn,
 )
 from .._image_config import AbstractImageConfig

@@ -1,11 +1,12 @@
-"""Implementation of an AbstractFourierOperator. Put simply, these are
+"""Implementation of an `AbstractFourierOperator`. Put simply, these are
 functions commonly applied to images in fourier space.
 
-Opposed to a AbstractFilter, a AbstractFourierOperator is computed at
-runtime---not upon initialization. AbstractFourierOperators also do not
-have a rule for how they should be applied to images.
+Opposed to a `AbstractFilter`, a `AbstractFourierOperator` is computed at
+runtime---not upon initialization. `AbstractFourierOperators` also do not
+have a rule for how they should be applied to images and can be composed
+with other operators.
 
-These classes are modified from the library ``tinygp``.
+These classes are modified from the library `tinygp`.
 """
 
 import functools
@@ -17,9 +18,7 @@ from typing_extensions import override
 import jax.numpy as jnp
 from jaxtyping import Array, Float, Inexact
 
-from cryojax.jax_util._typing import NDArrayLike
-
-from ...jax_util import error_if_negative, error_if_not_positive
+from ...jax_util import NDArrayLike, error_if_negative, error_if_not_positive
 from ._base_operator import AbstractImageOperator
 
 

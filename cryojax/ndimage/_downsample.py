@@ -1,4 +1,4 @@
-"""Routines for downsampling arrays"""
+"""Routines for downsampling arrays using fourier cropping."""
 
 import math
 
@@ -10,18 +10,18 @@ from ._edges import crop_to_shape
 from ._fft import fftn, ifftn, rfftn
 
 
-def downsample_by_factor(
+def fourier_crop_downsample(
     image_or_volume: Inexact[NDArrayLike, "_ _"] | Inexact[NDArrayLike, "_ _ _"],
-    downsampling_factor: float | int,
+    downsample_factor: float | int,
     outputs_real_space: bool = True,
     preserve_mean: bool = False,
 ) -> Inexact[Array, "_ _"] | Inexact[Array, "_ _ _"]:
-    """Downsample an array using fourier cropping.
+    """Rescale an array using fourier cropping.
 
     **Arguments:**
 
     - `image_or_volume`: The image or volume array to downsample.
-    - `downsampling_factor`:
+    - `downsample_factor`:
         A scale factor at which to downsample `image_or_volume`
         by. Must be a value greater than `1`.
     - `outputs_real_space`:
@@ -38,16 +38,16 @@ def downsample_by_factor(
     component in the corner. For real signals, hermitian symmetry is
     assumed.
     """
-    downsampling_factor = float(downsampling_factor)
-    if downsampling_factor < 1.0:
-        raise ValueError("`downsampling_factor` must be greater than 1.0")
+    downsample_factor = float(downsample_factor)
+    if downsample_factor < 1.0:
+        raise ValueError("`downsample_factor` must be greater than 1.0")
     if image_or_volume.ndim == 2:
         image = image_or_volume
         new_shape = (
-            int(image.shape[0] / downsampling_factor),
-            int(image.shape[1] / downsampling_factor),
+            int(image.shape[0] / downsample_factor),
+            int(image.shape[1] / downsample_factor),
         )
-        downsampled_array = downsample_to_shape(
+        downsampled_array = fourier_crop_downsample_to_shape(
             image,
             new_shape,
             preserve_mean=preserve_mean,
@@ -56,11 +56,11 @@ def downsample_by_factor(
     elif image_or_volume.ndim == 3:
         volume = image_or_volume
         new_shape = (
-            int(volume.shape[0] / downsampling_factor),
-            int(volume.shape[1] / downsampling_factor),
-            int(volume.shape[2] / downsampling_factor),
+            int(volume.shape[0] / downsample_factor),
+            int(volume.shape[1] / downsample_factor),
+            int(volume.shape[2] / downsample_factor),
         )
-        downsampled_array = downsample_to_shape(
+        downsampled_array = fourier_crop_downsample_to_shape(
             volume,
             new_shape,
             preserve_mean=preserve_mean,
@@ -68,15 +68,15 @@ def downsample_by_factor(
         )
     else:
         raise ValueError(
-            "`downsample_by_factor` was passed an array with "
+            "`fourier_crop_downsample` was passed an array with "
             f"`ndim = {image_or_volume.ndim}`, but this function "
-            "can only crop images and volumes."
+            "only supports images and volumes as input."
         )
 
     return downsampled_array
 
 
-def downsample_to_shape(
+def fourier_crop_downsample_to_shape(
     image_or_volume: Inexact[NDArrayLike, "_ _"] | Inexact[NDArrayLike, "_ _ _"],
     downsampled_shape: tuple[int, int] | tuple[int, int, int],
     outputs_real_space: bool = True,
