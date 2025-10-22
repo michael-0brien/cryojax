@@ -2,6 +2,7 @@
 Image formation models.
 """
 
+from typing import Literal
 from typing_extensions import override
 
 import equinox as eqx
@@ -39,6 +40,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
     applies_translation: bool
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
+    translate_mode: Literal["fft", "atom"]
 
     def __init__(
         self,
@@ -50,6 +52,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
         applies_translation: bool = True,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
+        translate_mode: Literal["fft", "atom"] = "fft",
     ):
         """**Arguments:**
 
@@ -71,12 +74,18 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
             A boolean array that is 1 where there is signal,
             and 0 otherwise used to normalize the image.
             Must have shape equal to `AbstractImageConfig.shape`.
+        - `translate_mode`:
+            If `'fft'`, apply in-plane translation via phase
+            shifts in the Fourier domain. If `'atoms'`,
+            apply translation on atom positions before projection.
+            Does nothing if `applies_translation = False`.
         """
         self.volume_parametrization = volume_parametrization
         self.pose = pose
         self.image_config = image_config
         self.scattering_theory = scattering_theory
         self.applies_translation = applies_translation
+        self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
         if signal_region is None:
             self.signal_region = None
@@ -110,6 +119,9 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
             )
         # Rotate it to the lab frame
         volume_representation = volume_representation.rotate_to_pose(self.pose)
+        # Translate if using atom translations
+        if self.applies_translation and self.translate_mode == "atom":
+            volume_representation = self._atom_translate(volume_representation)
         # Compute the contrast
         contrast_spectrum = self.scattering_theory.compute_contrast_spectrum(
             volume_representation,
@@ -118,8 +130,8 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
             defocus_offset=self.pose.offset_z_in_angstroms,
         )
         # Apply the translation
-        if self.applies_translation:
-            contrast_spectrum = self._apply_translation(contrast_spectrum)
+        if self.applies_translation and self.translate_mode == "fft":
+            contrast_spectrum = self._phase_shift_translate(contrast_spectrum)
 
         return contrast_spectrum
 
@@ -137,6 +149,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
     applies_translation: bool
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
+    translate_mode: Literal["fft", "atom"]
 
     def __init__(
         self,
@@ -148,6 +161,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
         applies_translation: bool = True,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
+        translate_mode: Literal["fft", "atom"] = "fft",
     ):
         """**Arguments:**
 
@@ -169,12 +183,18 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
             A boolean array that is 1 where there is signal,
             and 0 otherwise used to normalize the image.
             Must have shape equal to `AbstractImageConfig.shape`.
+        - `translate_mode`:
+            If `'fft'`, apply in-plane translation via phase
+            shifts in the Fourier domain. If `'atoms'`,
+            apply translation on atom positions before projection.
+            Does nothing if `applies_translation = False`.
         """
         self.volume_parametrization = volume_parametrization
         self.pose = pose
         self.image_config = image_config
         self.scattering_theory = scattering_theory
         self.applies_translation = applies_translation
+        self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
         if signal_region is None:
             self.signal_region = None
@@ -208,6 +228,9 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
             )
         # Rotate it to the lab frame
         volume_representation = volume_representation.rotate_to_pose(self.pose)
+        # Translate if using atom translations
+        if self.applies_translation and self.translate_mode == "atom":
+            volume_representation = self._atom_translate(volume_representation)
         # Compute the intensity spectrum
         intensity_spectrum = self.scattering_theory.compute_intensity_spectrum(
             volume_representation,
@@ -215,8 +238,8 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
             rng_key,
             defocus_offset=self.pose.offset_z_in_angstroms,
         )
-        if self.applies_translation:
-            intensity_spectrum = self._apply_translation(intensity_spectrum)
+        if self.applies_translation and self.translate_mode == "fft":
+            intensity_spectrum = self._phase_shift_translate(intensity_spectrum)
 
         return intensity_spectrum
 
@@ -235,6 +258,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
     applies_translation: bool
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
+    translate_mode: Literal["fft", "atom"]
 
     def __init__(
         self,
@@ -247,6 +271,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
         applies_translation: bool = True,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
+        translate_mode: Literal["fft", "atom"] = "fft",
     ):
         """**Arguments:**
 
@@ -268,6 +293,11 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
             A boolean array that is 1 where there is signal,
             and 0 otherwise used to normalize the image.
             Must have shape equal to `AbstractImageConfig.shape`.
+        - `translate_mode`:
+            If `'fft'`, apply in-plane translation via phase
+            shifts in the Fourier domain. If `'atoms'`,
+            apply translation on atom positions before projection.
+            Does nothing if `applies_translation = False`.
         """
         self.volume_parametrization = volume_parametrization
         self.pose = pose
@@ -275,6 +305,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
         self.scattering_theory = scattering_theory
         self.detector = detector
         self.applies_translation = applies_translation
+        self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
         if signal_region is None:
             self.signal_region = None
@@ -303,14 +334,17 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
             volume_representation = self.volume_parametrization.get_representation()
             # Rotate it to the lab frame
             volume_representation = volume_representation.rotate_to_pose(self.pose)
+            # Translate if using atom translations
+            if self.applies_translation and self.translate_mode == "atom":
+                volume_representation = self._atom_translate(volume_representation)
             # Compute the intensity
             fourier_intensity = self.scattering_theory.compute_intensity_spectrum(
                 volume_representation,
                 self.image_config,
                 defocus_offset=self.pose.offset_z_in_angstroms,
             )
-            if self.applies_translation:
-                fourier_intensity = self._apply_translation(fourier_intensity)
+            if self.applies_translation and self.translate_mode == "fft":
+                fourier_intensity = self._phase_shift_translate(fourier_intensity)
             # ... now measure the expected electron events at the detector
             fourier_expected_electron_events = (
                 self.detector.compute_expected_electron_events(
@@ -328,6 +362,9 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
             )
             # Rotate it to the lab frame
             volume_representation = volume_representation.rotate_to_pose(self.pose)
+            # Translate if using atom translations
+            if self.applies_translation and self.translate_mode == "atom":
+                volume_representation = self._atom_translate(volume_representation)
             # Compute the squared wavefunction
             fourier_intensity = self.scattering_theory.compute_intensity_spectrum(
                 volume_representation,
@@ -335,8 +372,8 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
                 keys[1],
                 defocus_offset=self.pose.offset_z_in_angstroms,
             )
-            if self.applies_translation:
-                fourier_intensity = self._apply_translation(fourier_intensity)
+            if self.applies_translation and self.translate_mode == "fft":
+                fourier_intensity = self._phase_shift_translate(fourier_intensity)
             # ... now measure the detector readout
             fourier_detector_readout = self.detector.compute_detector_readout(
                 keys[2],
