@@ -42,6 +42,7 @@ def make_image_model(
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
     simulates_quantity: bool = False,
     quantity_mode: Literal["contrast", "intensity", "counts"] = "contrast",
+    translate_mode: Literal["fft", "atom"] = "fft",
 ) -> AbstractImageModel:
     """Construct an `AbstractImageModel` for most common use-cases.
 
@@ -92,6 +93,11 @@ def make_image_model(
         - 'counts':
             Uses the `ElectronCountsImageModel` to simulate electron counts.
             If this is passed, a `detector` must also be passed.
+    - `translate_mode`:
+        If `'fft'`, apply in-plane translation via phase
+        shifts in the Fourier domain. If `'atoms'` apply translation
+        on atom positions before projection. Does nothing if
+        `applies_translation = False`.
 
     **Returns:**
 
@@ -117,6 +123,7 @@ def make_image_model(
             applies_translation=applies_translation,
             normalizes_signal=normalizes_signal,
             signal_region=signal_region,
+            translate_mode=translate_mode,
         )
     else:
         # Simulate physical observables
@@ -145,6 +152,7 @@ def make_image_model(
                     applies_translation=applies_translation,
                     normalizes_signal=normalizes_signal,
                     signal_region=signal_region,
+                    translate_mode=translate_mode,
                 )
             elif quantity_mode == "contrast":
                 image_model = ContrastImageModel(
@@ -155,6 +163,7 @@ def make_image_model(
                     applies_translation=applies_translation,
                     normalizes_signal=normalizes_signal,
                     signal_region=signal_region,
+                    translate_mode=translate_mode,
                 )
             elif quantity_mode == "intensity":
                 image_model = IntensityImageModel(
@@ -165,6 +174,7 @@ def make_image_model(
                     applies_translation=applies_translation,
                     normalizes_signal=normalizes_signal,
                     signal_region=signal_region,
+                    translate_mode=translate_mode,
                 )
             else:
                 raise ValueError(
@@ -183,6 +193,7 @@ def make_image_model(
                 applies_translation=applies_translation,
                 normalizes_signal=normalizes_signal,
                 signal_region=signal_region,
+                translate_mode=translate_mode,
             )
 
     return image_model

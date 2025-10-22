@@ -179,7 +179,7 @@ class AbstractPose(Module, strict=True):
     @classmethod
     def from_translation(
         cls,
-        offset_in_angstroms: Float[Array, "2"] | Float[Array, "3"],
+        offset_in_angstroms: Float[NDArrayLike, "2"] | Float[NDArrayLike, "3"],
     ) -> Self:
         """Construct an `AbstractPose` from a
         translation vector.
@@ -187,7 +187,7 @@ class AbstractPose(Module, strict=True):
         return eqx.tree_at(
             lambda p: p.offset_in_angstroms,
             cls.from_rotation(SO3(wxyz=jnp.asarray((1, 0, 0, 0), dtype=float))),
-            offset_in_angstroms,
+            jnp.asarray(offset_in_angstroms, dtype=float),
         )
 
     def to_inverse_rotation(self) -> Self:

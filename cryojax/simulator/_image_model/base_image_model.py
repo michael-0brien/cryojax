@@ -3,6 +3,7 @@ Image formation models.
 """
 
 from abc import abstractmethod
+from typing import Literal
 from typing_extensions import override
 
 import equinox as eqx
@@ -10,13 +11,15 @@ import jax.numpy as jnp
 import jax.random as jr
 from jaxtyping import Array, Bool, Complex, Float, PRNGKeyArray
 
+from cryojax.simulator._volume.base_volume import AbstractVolumeRepresentation
+
 from ...jax_util import NDArrayLike
 from ...ndimage import irfftn, rfftn
 from ...ndimage.transforms import FilterLike, MaskLike
 from .._image_config import AbstractImageConfig
 from .._pose import AbstractPose
 from .._transfer_theory import ContrastTransferTheory
-from .._volume import AbstractVolumeParametrization
+from .._volume import AbstractAtomVolume, AbstractVolumeParametrization
 from .._volume_integrator import AbstractVolumeIntegrator
 
 
@@ -45,6 +48,7 @@ class AbstractImageModel(eqx.Module, strict=True):
 
     applies_translation: eqx.AbstractVar[bool]
     normalizes_signal: eqx.AbstractVar[bool]
+    translate_mode: eqx.AbstractVar[Literal["fft", "atom"]]
 
     @abstractmethod
     def get_pose(self) -> AbstractPose:
@@ -155,7 +159,7 @@ class AbstractImageModel(eqx.Module, strict=True):
                 image = mask(image)
             return image if outputs_real_space else rfftn(image)
 
-    def _apply_translation(self, fourier_image: Array) -> Array:
+    def _phase_shift_translate(self, fourier_image: Array) -> Array:
         pose, image_config = self.get_pose(), self.get_image_config()
         phase_shifts = pose.compute_translation_operator(
             image_config.padded_frequency_grid_in_angstroms
@@ -167,6 +171,17 @@ class AbstractImageModel(eqx.Module, strict=True):
         )
 
         return fourier_image
+
+    def _atom_translate(self, volrep: AbstractVolumeRepresentation) -> AbstractAtomVolume:
+        pose = self.get_pose()
+        if isinstance(volrep, AbstractAtomVolume):
+            return volrep.translate_to_pose(pose)
+        else:
+            raise ValueError(
+                "Tried to apply translation in `translate_mode = 'atom'`, but "
+                "found a volume representation that was not an `AbstractAtomVolume`."
+                f"Got a `{volrep.__class__.__name__}` class."
+            )
 
     def _normalize_image(self, image: Array) -> Array:
         signal_region = self.get_signal_region()
@@ -212,6 +227,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
     applies_translation: bool
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
+    translate_mode: Literal["fft", "atom"]
 
     def __init__(
         self,
@@ -224,6 +240,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
         applies_translation: bool = True,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
+        translate_mode: Literal["fft", "atom"] = "fft",
     ):
         """**Arguments:**
 
@@ -245,6 +262,11 @@ class LinearImageModel(AbstractImageModel, strict=True):
             A boolean array that is 1 where there is signal,
             and 0 otherwise used to normalize the image.
             Must have shape equal to `AbstractImageConfig.shape`.
+        - `translate_mode`:
+            If `'fft'`, apply in-plane translation via phase
+            shifts in the Fourier domain. If `'atoms'`,
+            apply translation on atom positions before projection.
+            Does nothing if `applies_translation = False`.
         """
         # Simulator components
         self.volume_parametrization = volume_parametrization
@@ -254,6 +276,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
         self.transfer_theory = transfer_theory
         # Options
         self.applies_translation = applies_translation
+        self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
         if signal_region is None:
             self.signal_region = None
@@ -286,6 +309,9 @@ class LinearImageModel(AbstractImageModel, strict=True):
             )
         # Rotate it to the lab frame
         volume_representation = volume_representation.rotate_to_pose(self.pose)
+        # Translate if using atom translations
+        if self.applies_translation and self.translate_mode == "atom":
+            volume_representation = self._atom_translate(volume_representation)
         # Compute the projection image
         fourier_image = self.volume_integrator.integrate(
             volume_representation, self.image_config, outputs_real_space=False
@@ -297,9 +323,9 @@ class LinearImageModel(AbstractImageModel, strict=True):
             is_projection_approximation=self.volume_integrator.is_projection_approximation,
             defocus_offset=self.pose.offset_z_in_angstroms,
         )
-        # Now for the in-plane translation
-        if self.applies_translation:
-            fourier_image = self._apply_translation(fourier_image)
+        # Now for the in-plane translation if using phase shifts
+        if self.applies_translation and self.translate_mode == "fft":
+            fourier_image = self._phase_shift_translate(fourier_image)
 
         return fourier_image
 
@@ -315,6 +341,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
     applies_translation: bool
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
+    translate_mode: Literal["fft", "atom"]
 
     def __init__(
         self,
@@ -326,6 +353,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
         applies_translation: bool = True,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
+        translate_mode: Literal["fft", "atom"] = "fft",
     ):
         """**Arguments:**
 
@@ -346,6 +374,11 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
             A boolean array that is 1 where there is signal,
             and 0 otherwise used to normalize the image.
             Must have shape equal to `AbstractImageConfig.shape`.
+        - `translate_mode`:
+            If `'fft'`, apply in-plane translation via phase
+            shifts in the Fourier domain. If `'atoms'`,
+            apply translation on atom positions before projection.
+            Does nothing if `applies_translation = False`.
         """
         # Simulator components
         self.volume_parametrization = volume_parametrization
@@ -354,6 +387,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
         self.volume_integrator = volume_integrator
         # Options
         self.applies_translation = applies_translation
+        self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
         if signal_region is None:
             self.signal_region = None
@@ -386,12 +420,15 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
             )
         # Rotate it to the lab frame
         volume_representation = volume_representation.rotate_to_pose(self.pose)
+        # Translate if using atom translations
+        if self.applies_translation and self.translate_mode == "atom":
+            volume_representation = self._atom_translate(volume_representation)
         # Compute the projection image
         fourier_image = self.volume_integrator.integrate(
             volume_representation, self.image_config, outputs_real_space=False
         )
         # Now for the in-plane translation
-        if self.applies_translation:
-            fourier_image = self._apply_translation(fourier_image)
+        if self.applies_translation and self.translate_mode == "fft":
+            fourier_image = self._phase_shift_translate(fourier_image)
 
         return fourier_image
