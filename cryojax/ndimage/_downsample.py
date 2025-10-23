@@ -74,7 +74,7 @@ def block_reduce_downsample(
             for k, s in zip(kernel_size, shape)
         )
     block_reduce_fn = lambda x: eqx.nn.Pool(
-        init=0,
+        init=jnp.asarray(0.0, array.dtype),
         operation=operation,
         num_spatial_dims=array.ndim,
         kernel_size=kernel_size,
