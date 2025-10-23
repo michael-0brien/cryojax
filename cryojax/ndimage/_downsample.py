@@ -9,7 +9,7 @@ from jax import lax
 from jaxtyping import Array, Complex, Float, Inexact
 
 from ..jax_util import NDArrayLike
-from ._edges import crop_to_shape, pad_to_shape
+from ._edges import crop_to_shape
 from ._fft import fftn, ifftn, rfftn
 
 
@@ -18,12 +18,14 @@ def block_reduce_downsample(
     downsample_factor: int,
     operation: Callable[[Array, Array], Array] = lax.add,
 ) -> Inexact[Array, "_ _"] | Inexact[Array, "_ _ _"]:
-    """Downsample an array by pooling together blocks.
-    Wraps `equinox.nn.Pool`.
+    """Downsample an array by pooling together blocks, keeping
+    the center position of the array unchanged. Wraps `equinox.nn.Pool`.
 
     **Arguments:**
 
-    - `image_or_volume`: The image or volume array to downsample.
+    - `image_or_volume`:
+        image or volume array to downsample. The shape must be
+        a multiple of `downsample_factor`
     - `downsample_factor`:
         A scale factor at which to downsample `image_or_volume`
         by. Must be a value greater than `1`.
@@ -43,38 +45,45 @@ def block_reduce_downsample(
         raise ValueError(
             "Called `block_reduce_downsample` with `downsample_factor` less than 1."
         )
-    shape, ndim = array.shape, array.ndim
-    if ndim == 2:
-        extra_y = 1 if shape[0] % 2 == 0 else 0
-        extra_x = 1 if shape[1] % 2 == 0 else 0
-        padded_shape = (shape[0] + extra_y, shape[1] + extra_x)
-    elif ndim == 3:
-        extra_z = 1 if shape[0] % 2 == 0 else 0
-        extra_y = 1 if shape[1] % 2 == 0 else 0
-        extra_x = 1 if shape[2] % 2 == 0 else 0
-        padded_shape = (shape[0] + extra_z, shape[1] + extra_y, shape[2] + extra_x)
-    else:
+    if array.ndim not in [2, 3]:
         raise ValueError(
             "`block_reduce_downsample` was passed an array with "
             f"`ndim = {array.ndim}`, but this function "
             "only supports images and volumes as input."
         )
-    # Pad to odd dimension to preserve center
-    if shape != padded_shape:
-        array = pad_to_shape(array, padded_shape)
-    print(padded_shape, array.shape)
-    # Pooling function
-    reduce_fn = lambda x: eqx.nn.Pool(
+    if any(s % downsample_factor != 0 for s in array.shape):
+        raise ValueError(
+            "`block_reduce_downsample` only supports "
+            "downsampling arrays with dimensions that "
+            "are a multiple of `downsample_factor`."
+            f"Got `downsample_factor = {downsample_factor}` "
+            f"but `shape = {array.shape}`."
+        )
+    # Pooling function downsamples array
+    shape = array.shape
+    kernel_size = array.ndim * (downsample_factor,)
+    if downsample_factor % 2 == 0:
+        raise ValueError(
+            "Called `block_reduce_downsample` with "
+            f"`downsample_factor = {downsample_factor}`, but "
+            "only odd-valued numbers are supported."
+        )
+    else:
+        padding = tuple(
+            ((k - 1) // 2, (k - 1) // 2) if s % 2 == 0 else (0, 0)
+            for k, s in zip(kernel_size, shape)
+        )
+    block_reduce_fn = lambda x: eqx.nn.Pool(
         init=0,
         operation=operation,
-        num_spatial_dims=ndim,
-        kernel_size=downsample_factor,
-        stride=downsample_factor,
-        padding=0,
+        num_spatial_dims=array.ndim,
+        kernel_size=kernel_size,
+        stride=kernel_size,
+        padding=padding,
         use_ceil=False,
     )(x[None, ...])[0]
-    # Pool, crop, and return
-    array_ds = reduce_fn(array)
+
+    array_ds = block_reduce_fn(array)
 
     return array_ds
 

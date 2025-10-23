@@ -7,6 +7,7 @@ from jaxtyping import Array, Complex, Float
 
 from ...coordinates import make_frequency_grid
 from ...ndimage import (
+    block_reduce_downsample,
     convert_fftn_to_rfftn,
     irfftn,
     operators as op,
@@ -36,6 +37,7 @@ class FFTAtomProjection(
     """
 
     antialias: bool
+    upsample_factor: int | None
     shape: tuple[int, int] | None
     eps: float
     opts: Any
@@ -46,6 +48,7 @@ class FFTAtomProjection(
         self,
         *,
         antialias: bool = True,
+        upsample_factor: int | None = None,
         shape: tuple[int, int] | None = None,
         eps: float = 1e-6,
         opts: Any = None,
@@ -55,6 +58,12 @@ class FFTAtomProjection(
         - `antialias`:
             If `True`, apply an anti-aliasing filter to more accurately
             sample the volume.
+        - `upsample_factor`:
+            If provided, first compute an upsampled version of the
+            image at pixel size `image_config.pixel_size / upsample_factor`.
+            Then, downsample with `cryojax.ndimage.block_reduce_downsample`
+            to locally average to the correct pixel size. This is useful
+            for reducing aliasing.
         - `shape`:
             If given, first compute the image at `shape`, then
             pad or crop to `image_config.padded_shape`.
@@ -75,9 +84,18 @@ class FFTAtomProjection(
                 "for installation instructions."
             ) from JAX_FINUFFT_IMPORT_ERROR
         self.antialias = antialias
+        self.upsample_factor = upsample_factor
         self.shape = shape
         self.eps = eps
         self.opts = opts
+
+    def __check_init__(self):
+        if self.upsample_factor is not None:
+            if self.upsample_factor % 2 == 0:
+                raise ValueError(
+                    f"Set `upsample_factor = {self.upsample_factor}` when instantiating "
+                    "`FFTAtomProjection`, but only odd `upsample_factor` are supported."
+                )
 
     @override
     def integrate(
@@ -110,18 +128,23 @@ class FFTAtomProjection(
         The integrated volume in real or fourier space at the
         `AbstractImageConfig.padded_shape`.
         """  # noqa: E501
+        u = self.upsample_factor
         pixel_size = image_config.pixel_size
         shape = image_config.padded_shape if self.shape is None else self.shape
-        if shape == image_config.padded_shape:
+        if u is None:
+            shape_u, pixel_size_u = shape, pixel_size
+        else:
+            shape_u, pixel_size_u = (u * shape[0], u * shape[1]), pixel_size / u
+        if shape_u == image_config.padded_shape:
             frequency_grid = image_config.padded_full_frequency_grid_in_angstroms
         else:
             frequency_grid = make_frequency_grid(
-                shape, pixel_size, outputs_rfftfreqs=False
+                shape_u, pixel_size_u, outputs_rfftfreqs=False
             )
         frequency_grid = jnp.fft.fftshift(frequency_grid, axes=(0, 1))
         proj_kernel = lambda pos, kernel: _project_with_nufft(
-            shape,
-            pixel_size,
+            shape_u,
+            pixel_size_u,
             pos,
             kernel,
             frequency_grid,
@@ -138,9 +161,9 @@ class FFTAtomProjection(
                 is_leaf=lambda x: isinstance(x, op.AbstractFourierOperator),
             ),
         )
-        # Apply anti-aliasing
+        # Apply anti-aliasing filter
         if self.antialias:
-            antialias_fn = op.FourierSinc(box_width=pixel_size)
+            antialias_fn = op.FourierSinc(box_width=pixel_size_u)
             fourier_projection *= antialias_fn(frequency_grid)
         # Shift zero frequency component to corner and convert to
         # rfft
@@ -148,13 +171,19 @@ class FFTAtomProjection(
             jnp.fft.ifftshift(fourier_projection), mode="real"
         )
         if self.shape is None:
-            return (
-                irfftn(fourier_projection, s=shape)
-                if outputs_real_space
-                else fourier_projection
-            )
+            if u is None:
+                return (
+                    irfftn(fourier_projection, s=shape)
+                    if outputs_real_space
+                    else fourier_projection
+                )
+            else:
+                projection = _block_average(irfftn(fourier_projection, s=shape_u), u)
+                return projection if outputs_real_space else rfftn(projection)
         else:
-            projection = irfftn(fourier_projection, s=shape)
+            projection = irfftn(fourier_projection, s=shape_u)
+            if u is not None:
+                projection = _block_average(projection, u)
             projection = resize_with_crop_or_pad(projection, image_config.padded_shape)
             return projection if outputs_real_space else rfftn(projection)
 
@@ -186,3 +215,7 @@ def _project_with_nufft(shape, ps, pos, kernel, freqs, eps=1e-6, opts=None):
     )
 
     return fourier_projection
+
+
+def _block_average(x, factor):
+    return block_reduce_downsample(x, factor, jax.lax.add) / factor**x.ndim
