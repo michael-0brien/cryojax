@@ -46,9 +46,7 @@ class AbstractImageModel(eqx.Module, strict=True):
     Call an `AbstractImageModel`'s `simulate` routine.
     """
 
-    applies_translation: eqx.AbstractVar[bool]
     normalizes_signal: eqx.AbstractVar[bool]
-    translate_mode: eqx.AbstractVar[Literal["fft", "atom"]]
 
     @abstractmethod
     def get_pose(self) -> AbstractPose:
