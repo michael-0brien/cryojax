@@ -120,14 +120,14 @@ def filter_bscan(
         return _carry_dynamic, _ys_wrapped
 
     # Scan over batches
-    xs_dynamic = jax.tree.map(
+    xs_reshaped = jax.tree.map(
         lambda x: x[: batch_dim - batch_dim % batch_size, ...].reshape(
             (n_batches, batch_size, *x.shape[1:])
         ),
         xs_dynamic,
     )
     carry_dynamic, ys_wrapped = jax.lax.scan(
-        f_scan, init_dynamic, xs_dynamic, length=length, unroll=unroll
+        f_scan, init_dynamic, xs_reshaped, length=length, unroll=unroll
     )
     ys_wrapped = jax.tree.map(
         lambda y: y.reshape(n_batches * batch_size, *y.shape[2:]), ys_wrapped
