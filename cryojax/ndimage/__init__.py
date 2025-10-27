@@ -48,8 +48,8 @@ def __getattr__(name: str) -> _Any:
     if name == "downsample_with_fourier_cropping":
         _warnings.warn(
             "'downsample_with_fourier_cropping' is deprecated"
-            "has been renamed to 'downsample_by_factor'. The old name "
-            "will be deprecated in cryoJAX 0.6.0.",
+            "has been renamed to 'fourier_crop_downsample'. "
+            "The old name will be deprecated in cryoJAX 0.6.0.",
             category=DeprecationWarning,
             stacklevel=2,
         )
@@ -57,8 +57,8 @@ def __getattr__(name: str) -> _Any:
     if name == "downsample_to_shape_with_fourier_cropping":
         _warnings.warn(
             "'downsample_to_shape_with_fourier_cropping' is deprecated"
-            "has been renamed to 'downsample_to_shape'. The old name "
-            "will be deprecated in cryoJAX 0.6.0.",
+            "has been renamed to 'fourier_crop_downsample_to_shape'. "
+            "The old name will be deprecated in cryoJAX 0.6.0.",
             category=DeprecationWarning,
             stacklevel=2,
         )

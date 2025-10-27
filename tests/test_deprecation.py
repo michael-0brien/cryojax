@@ -1,15 +1,15 @@
 import importlib
 import re
 
-import cryojax
+import cryojax as cx
 import cryojax.simulator as cxs
 import pytest
 from packaging.version import parse as parse_version
 
 
 def test_future_deprecated(sample_pdb_path):
-    match = re.match(r"(\d+\.\d+(?:\.\d+)?)", cryojax.__version__)
-    assert match, f"Could not parse current cryojax version {cryojax.__version__!r}"
+    match = re.match(r"(\d+\.\d+(?:\.\d+)?)", cx.__version__)
+    assert match, f"Could not parse current cryojax version {cx.__version__!r}"
     current_version = parse_version(match.group(1))
 
     def should_be_removed(_record):
@@ -46,16 +46,16 @@ def test_future_deprecated(sample_pdb_path):
 
     with pytest.warns(DeprecationWarning) as record:
         obj = cxs.PengScatteringFactorParameters
-        assert obj is cryojax.constants.PengScatteringFactorParameters
+        assert obj is cx.constants.PengScatteringFactorParameters
         assert not should_be_removed(record)
 
     with pytest.warns(DeprecationWarning) as record:
         obj = cxs.PengAtomicVolume
-        assert obj is cryojax.simulator.GaussianMixtureVolume
+        assert obj is cxs.GaussianMixtureVolume
         assert not should_be_removed(record)
 
     with pytest.warns(DeprecationWarning) as record:
-        atom_pos, _, _ = cryojax.io.read_atoms_from_pdb(
+        atom_pos, _, _ = cx.io.read_atoms_from_pdb(  # type: ignore
             sample_pdb_path,
             loads_b_factors=True,
         )
@@ -64,6 +64,16 @@ def test_future_deprecated(sample_pdb_path):
     with pytest.warns(DeprecationWarning) as record:
         volume = cxs.GaussianMixtureVolume(atom_pos, amplitudes=1.0, variances=1.0)
         _ = volume.to_real_voxel_grid((32, 32, 32), 2.0)
+        assert not should_be_removed(record)
+
+    with pytest.warns(DeprecationWarning) as record:
+        func = cx.ndimage.downsample_with_fourier_cropping
+        assert func is cx.ndimage.fourier_crop_downsample
+        assert not should_be_removed(record)
+
+    with pytest.warns(DeprecationWarning) as record:
+        func = cx.ndimage.downsample_to_shape_with_fourier_cropping
+        assert func is cx.ndimage.fourier_crop_downsample_to_shape
         assert not should_be_removed(record)
 
 
