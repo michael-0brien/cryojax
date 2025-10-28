@@ -3,26 +3,29 @@ changelog:
     labels:
       - version-release
       - duplicate
+      - changelog-ignore
     authors:
       - dependabot
   categories:
-    - title: "Features"
+    - title: "Breaking changes"
       labels:
-        - feature
-        - enhancement
+        - convention-change
+        - breaking-change
     - title: "Bug Fixes"
       labels:
         - bug
     - title: "API Changes"
       labels:
         - api-change
-    - title: "Refactoring"
+    - title: "Features"
+      labels:
+        - feature
+        - enhancement
+    - title: "Maintanence"
       labels:
         - refactor
         - cleanup
-    - title: "Convention changes"
-      labels:
-        - convention-change
+        - unit tests
     - title: "Other Changes"
       labels:
         - "*"
