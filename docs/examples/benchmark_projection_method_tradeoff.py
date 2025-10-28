@@ -133,7 +133,12 @@ def generate_random_parameters(n_projections, config):
 
 
 def benchmark_projection_methods(
-    n_projections_list, n_atoms_list, box_sizes, n_iterations=3
+    n_projections_list,
+    n_atoms_list,
+    box_sizes,
+    n_iterations,
+    antialias,
+    use_error_functions,
 ):
     """Benchmark both projection methods across different conditions."""
     results = []
@@ -181,7 +186,7 @@ def benchmark_projection_methods(
                         poses,
                         transfer_theories,
                         atom_volume,
-                        cxs.FFTAtomProjection(eps=1e-16, antialias=True),
+                        cxs.FFTAtomProjection(eps=1e-16, antialias=antialias),
                     )
                     images.block_until_ready()
                     times.append(time() - start_time)
@@ -197,7 +202,9 @@ def benchmark_projection_methods(
                         poses,
                         transfer_theories,
                         gmm_volume,
-                        cxs.GaussianMixtureProjection(use_error_functions=True),
+                        cxs.GaussianMixtureProjection(
+                            use_error_functions=use_error_functions
+                        ),
                     )
                     images.block_until_ready()
                     times.append(time() - start_time)
@@ -220,7 +227,7 @@ def benchmark_projection_methods(
     return pd.DataFrame(results)
 
 
-def plot_crossover_analysis(df):
+def plot_crossover_analysis(df, datetimestamp, antialias, use_error_functions):
     """Plot the crossover analysis showing when each method is faster."""
     n_atoms_list = df["n_atoms"].unique()
     box_sizes = df["box_size"].unique()
@@ -246,19 +253,19 @@ def plot_crossover_analysis(df):
                 color="blue",
                 linewidth=2,
             )
-            ax.plot(
-                subset["n_projections"],
-                subset["atom_projection_time"] * 1000,
-                "s-",
-                label="Atom Projection",
-                color="red",
-                linewidth=2,
-            )
+            # ax.plot(
+            #     subset["n_projections"],
+            #     subset["atom_projection_time"] * 1000,
+            #     "s-",
+            #     label="Atom Projection (antialias={})".format(antialias),
+            #     color="red",
+            #     linewidth=2,
+            # )
             ax.plot(
                 subset["n_projections"],
                 subset["gmm_projection_time"] * 1000,
                 "^-",
-                label="GMM Projection",
+                label=f"GMM Projection (use_error_functions={use_error_functions})",
                 color="green",
                 linewidth=2,
             )
@@ -272,7 +279,9 @@ def plot_crossover_analysis(df):
             ax.set_yscale("log")
 
     plt.tight_layout()
-    plt.savefig("projection_method_crossover.png", dpi=300, bbox_inches="tight")
+    plt.savefig(
+        f"projection_method_crossover_{datetimestamp}.png", dpi=300, bbox_inches="tight"
+    )
     plt.show()
 
 
@@ -311,23 +320,35 @@ def find_crossover_points(df):
 if __name__ == "__main__":
     # Test parameters
     n_projections_list = [1, 3, 10, 30, 100, 300, 1000, 3000]
-    n_atoms_list = [30, 100, 300, 1000, 3000, 10000]  # Low to high atom counts
-    box_sizes = [32, 64, 128, 256]  # Small to large box sizes
+    n_atoms_list = [
+        1000,
+    ]  # Low to high atom counts
+    box_sizes = [
+        64,
+    ]  # Small to large box sizes
 
     print("Running projection method crossover benchmark...")
     print("This will test Fourier slicing vs GMM projection across different conditions")
 
     # Run benchmark
+    antialias = False
+    use_error_functions = True
     results_df = benchmark_projection_methods(
-        n_projections_list, n_atoms_list, box_sizes, n_iterations=3
+        n_projections_list,
+        n_atoms_list,
+        box_sizes,
+        n_iterations=3,
+        antialias=antialias,
+        use_error_functions=use_error_functions,
     )
 
     # Save results
-    results_df.to_csv("projection_crossover_benchmark.csv", index=False)
-    print("Results saved to projection_crossover_benchmark.csv")
+    datetimestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
+    results_df.to_csv(f"projection_crossover_benchmark_{datetimestamp}.csv", index=False)
+    print(f"Results saved to projection_crossover_benchmark_{datetimestamp}.csv")
 
     # Plot results
-    plot_crossover_analysis(results_df)
+    plot_crossover_analysis(results_df, datetimestamp, antialias, use_error_functions)
 
     # Find and display crossover points
     crossovers = find_crossover_points(results_df)
