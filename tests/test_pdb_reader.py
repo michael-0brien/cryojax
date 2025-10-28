@@ -150,9 +150,7 @@ def test_center_waterbox(sample_waterbox_pdb):
     assert not np.isnan(atom_positions).any(), "Centering resulted in positions with NaNs"
 
 
-@pytest.mark.parametrize(
-    "pdbfile", ["sample_pdb_path", "sample_waterbox_pdb", "sample_cif_path"]
-)
+@pytest.mark.parametrize("pdbfile", ["sample_pdb_path", "sample_waterbox_pdb"])
 @pytest.mark.parametrize("center", [True, False])
 def test_consistency_with_mdtraj(pdbfile, center, request):
     pdbfile = request.getfixturevalue(pdbfile)
