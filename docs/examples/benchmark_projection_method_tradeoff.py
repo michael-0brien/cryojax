@@ -256,14 +256,14 @@ def plot_crossover_analysis(df, datetimestamp, antialias, use_error_functions):
                 color="blue",
                 linewidth=2,
             )
-            # ax.plot(
-            #     subset["n_projections"],
-            #     subset["atom_projection_time"] * 1000,
-            #     "s-",
-            #     label="Atom Projection (antialias={})".format(antialias),
-            #     color="red",
-            #     linewidth=2,
-            # )
+            ax.plot(
+                subset["n_projections"],
+                subset["atom_projection_time"] * 1000,
+                "s-",
+                label=f"Atom Projection (antialias={antialias})",
+                color="red",
+                linewidth=2,
+            )
             ax.plot(
                 subset["n_projections"],
                 subset["gmm_projection_time"] * 1000,
@@ -283,7 +283,9 @@ def plot_crossover_analysis(df, datetimestamp, antialias, use_error_functions):
 
     plt.tight_layout()
     plt.savefig(
-        f"projection_method_crossover_{datetimestamp}.png", dpi=300, bbox_inches="tight"
+        f"benchmark_projection_method_tradeoff_{datetimestamp}.png",
+        dpi=300,
+        bbox_inches="tight",
     )
     plt.show()
 
@@ -322,11 +324,10 @@ def find_crossover_points(df):
 
 if __name__ == "__main__":
     # Test parameters
-    n_projections_list = [100, 300]
-    n_atoms_list = [
-        1000,
-    ]
+    n_projections_list = [1, 3, 10, 30, 100]
+    n_atoms_list = [30, 100, 300]
     box_sizes = [
+        32,
         64,
     ]
 
@@ -347,8 +348,10 @@ if __name__ == "__main__":
 
     # Save results
     datetimestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
-    results_df.to_csv(f"projection_crossover_benchmark_{datetimestamp}.csv", index=False)
-    print(f"Results saved to projection_crossover_benchmark_{datetimestamp}.csv")
+    results_df.to_csv(
+        f"benchmark_projection_method_tradeoff_{datetimestamp}.csv", index=False
+    )
+    print(f"Results saved to benchmark_projection_method_tradeoff_{datetimestamp}.csv")
 
     # Plot results
     plot_crossover_analysis(results_df, datetimestamp, antialias, use_error_functions)
