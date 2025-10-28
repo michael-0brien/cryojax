@@ -26,6 +26,8 @@ changelog:
         - refactor
         - cleanup
         - unit tests
+        - error handling
+        - type checking
     - title: "Other Changes"
       labels:
         - "*"
