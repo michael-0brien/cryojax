@@ -162,6 +162,7 @@ def benchmark_projection_methods(
 
                 # Benchmark Fourier Slice Extraction
                 times = []
+                integrator = cxs.FourierSliceExtraction()
                 for _ in range(n_iterations + 1):
                     start_time = time()
                     images = simulate_image_batch(
@@ -169,7 +170,7 @@ def benchmark_projection_methods(
                         poses,
                         transfer_theories,
                         volume_fourier_grid,
-                        cxs.FourierSliceExtraction(),
+                        integrator,
                     )
                     images.block_until_ready()
                     times.append(time() - start_time)
@@ -179,6 +180,7 @@ def benchmark_projection_methods(
 
                 # Benchmark Atom Projection (FFT)
                 times = []
+                integrator = cxs.FFTAtomProjection(eps=1e-16, antialias=antialias)
                 for _ in range(n_iterations + 1):
                     start_time = time()
                     images = simulate_image_batch(
@@ -186,7 +188,7 @@ def benchmark_projection_methods(
                         poses,
                         transfer_theories,
                         atom_volume,
-                        cxs.FFTAtomProjection(eps=1e-16, antialias=antialias),
+                        integrator,
                     )
                     images.block_until_ready()
                     times.append(time() - start_time)
@@ -195,6 +197,9 @@ def benchmark_projection_methods(
 
                 # Benchmark GMM Projection (FFT)
                 times = []
+                integrator = cxs.GaussianMixtureProjection(
+                    use_error_functions=use_error_functions
+                )
                 for _ in range(n_iterations + 1):
                     start_time = time()
                     images = simulate_image_batch(
@@ -202,9 +207,7 @@ def benchmark_projection_methods(
                         poses,
                         transfer_theories,
                         gmm_volume,
-                        cxs.GaussianMixtureProjection(
-                            use_error_functions=use_error_functions
-                        ),
+                        integrator,
                     )
                     images.block_until_ready()
                     times.append(time() - start_time)
@@ -319,13 +322,13 @@ def find_crossover_points(df):
 
 if __name__ == "__main__":
     # Test parameters
-    n_projections_list = [1, 3, 10, 30, 100, 300, 1000, 3000]
+    n_projections_list = [100, 300]
     n_atoms_list = [
         1000,
-    ]  # Low to high atom counts
+    ]
     box_sizes = [
         64,
-    ]  # Small to large box sizes
+    ]
 
     print("Running projection method crossover benchmark...")
     print("This will test Fourier slicing vs GMM projection across different conditions")
