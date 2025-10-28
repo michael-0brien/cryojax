@@ -231,19 +231,6 @@ def setup(num_images, path_to_pdb, path_to_starfile):
 #     print(f"JIT, Fourier Slice: {fs_avg_time:.4f} +/- {fs_std_time:.4f} s")
 
 
-@eqx.filter_jit
-@eqx.filter_vmap(in_axes=(eqx.if_array(0), eqx.if_array(0), eqx.if_array(0), None, None))
-def simulate_image(image_config, pose, transfer_theory, potential, volume_integrator):
-    image_model = cxs.make_image_model(
-        volume_parametrization=potential,
-        image_config=image_config,
-        pose=pose,
-        transfer_theory=transfer_theory,
-        volume_integrator=volume_integrator,
-    )
-    return image_model.simulate()
-
-
 @eqx.filter_vmap(in_axes=(eqx.if_array(0), eqx.if_array(0), eqx.if_array(0), None, None))
 def simulate_image_nojit(
     image_config, pose, transfer_theory, potential, volume_integrator
@@ -258,6 +245,9 @@ def simulate_image_nojit(
     return image_model.simulate()
 
 
+simulate_image_jit = eqx.filter_jit(simulate_image_nojit)
+
+
 def benchmark_fourier_slice_vs_gmm(
     n_iterations, num_images, path_to_pdb, path_to_starfile
 ):
@@ -269,14 +259,6 @@ def benchmark_fourier_slice_vs_gmm(
         particle_parameters["image_config"],
         particle_parameters["pose"],
         particle_parameters["transfer_theory"],
-    )
-
-    fft_image = simulate_image(
-        image_config,
-        pose,
-        transfer_theory,
-        atom_volume,
-        cxs.FFTAtomProjection(eps=1e-16),
     )
 
     time_list = []
@@ -299,7 +281,7 @@ def benchmark_fourier_slice_vs_gmm(
     time_list = []
     for _ in range(n_iterations + 1):
         start_time = time()
-        fft_image = simulate_image(
+        fft_image = simulate_image_jit(
             image_config,
             pose,
             transfer_theory,
@@ -315,17 +297,16 @@ def benchmark_fourier_slice_vs_gmm(
 
     time_list = []
     for _ in range(n_iterations + 1):
-        with jax.disable_jit():
-            start_time = time()
-            gmm_image = simulate_image(
-                image_config,
-                pose,
-                transfer_theory,
-                volume_gmm,
-                cxs.GaussianMixtureProjection(),
-            )
-            gmm_image.block_until_ready()
-            end_time = time()
+        start_time = time()
+        gmm_image = simulate_image_nojit(
+            image_config,
+            pose,
+            transfer_theory,
+            volume_gmm,
+            cxs.GaussianMixtureProjection(),
+        )
+        gmm_image.block_until_ready()
+        end_time = time()
         time_list.append(end_time - start_time)
     gmm_avg_time = jnp.mean(jnp.array(time_list[1:]))
     gmm_std_time = jnp.std(jnp.array(time_list[1:]))
@@ -334,7 +315,7 @@ def benchmark_fourier_slice_vs_gmm(
     time_list = []
     for _ in range(n_iterations + 1):
         start_time = time()
-        gmm_image = simulate_image(
+        gmm_image = simulate_image_jit(
             image_config,
             pose,
             transfer_theory,
@@ -352,17 +333,16 @@ def benchmark_fourier_slice_vs_gmm(
 
     time_list = []
     for _ in range(n_iterations + 1):
-        with jax.disable_jit():
-            start_time = time()
-            fs_image = simulate_image(
-                image_config,
-                pose,
-                transfer_theory,
-                volume_fourier_grid,
-                cxs.FourierSliceExtraction(),
-            )
-            fs_image.block_until_ready()
-            end_time = time()
+        start_time = time()
+        fs_image = simulate_image_nojit(
+            image_config,
+            pose,
+            transfer_theory,
+            volume_fourier_grid,
+            cxs.FourierSliceExtraction(),
+        )
+        fs_image.block_until_ready()
+        end_time = time()
         time_list.append(end_time - start_time)
     fs_avg_time = jnp.mean(jnp.array(time_list[1:]))
     fs_std_time = jnp.std(jnp.array(time_list[1:]))
@@ -374,7 +354,7 @@ def benchmark_fourier_slice_vs_gmm(
     time_list = []
     for _ in range(n_iterations + 1):
         start_time = time()
-        fs_image = simulate_image(
+        fs_image = simulate_image_jit(
             image_config,
             pose,
             transfer_theory,
