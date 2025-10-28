@@ -1754,7 +1754,7 @@
             
   
   <span class="md-ellipsis">
-    cryojax.jax_util
+    cryojax.atom_util
     
   </span>
   
@@ -1764,6 +1764,74 @@
         
         <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_8_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3_8">
+            <span class="md-nav__icon md-icon"></span>
+            cryojax.atom_util
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/atom_util/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Utilities for atom manipulation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_9" id="__nav_3_9_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    cryojax.jax_util
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_9">
             <span class="md-nav__icon md-icon"></span>
             cryojax.jax_util
           </label>
@@ -1903,7 +1971,7 @@
 <span class="nb">cd</span><span class="w"> </span>cryojax
 python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>.
 </code></pre></div>
-<p>The <a href="https://github.com/dfm/jax-finufft"><code>jax-finufft</code></a> package is an optional dependency used for non-uniform fast fourier transforms. These are included as an option for computing image projections. In this case, we recommend first following the <code>jax_finufft</code> installation instructions and then installing <code>cryojax</code>.</p>
+<p>The <a href="https://github.com/dfm/jax-finufft"><code>jax-finufft</code></a> package is an optional dependency used for non-uniform fast fourier transforms. This is used in select methods for computing image projections from atoms and voxels. If you would like to use these methods, we recommend first following the <code>jax_finufft</code> installation instructions and then installing <code>cryojax</code>.</p>
 <h2 id="simulating-an-image">Simulating an image<a class="headerlink" href="#simulating-an-image" title="Permanent link">¤</a></h2>
 <p>The following is a basic workflow to simulate an image.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>

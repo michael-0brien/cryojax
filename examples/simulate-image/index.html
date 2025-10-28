@@ -1653,7 +1653,7 @@
             
   
   <span class="md-ellipsis">
-    cryojax.jax_util
+    cryojax.atom_util
     
   </span>
   
@@ -1663,6 +1663,74 @@
         
         <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_8_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3_8">
+            <span class="md-nav__icon md-icon"></span>
+            cryojax.atom_util
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/atom_util/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Utilities for atom manipulation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_9" id="__nav_3_9_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    cryojax.jax_util
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_9">
             <span class="md-nav__icon md-icon"></span>
             cryojax.jax_util
           </label>
@@ -1931,8 +1999,8 @@ simulating an image, such as the pose, the volume, and the CTF and 2) Images are
 <span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/4083d6b5026b4dc2972f6df4ba952a17.png" /></p>
-<p>Alternatively, the user can simulate an image with noise from a particular statistical distribution. In this example, we use the <code>UncorrelatedGaussianNoiseModel</code>, which simulates images with white noise.</p>
+<p><img alt="img" src="../_data/553f6ae29692425dabecf5bff26d5411.png" /></p>
+<p>Alternatively, the user can simulate an image with noise from a particular statistical distribution. In this example, we use the <code>GaussianWhiteNoiseModel</code>.</p>
 <p>Here, we will directly control image SNR through the parameters <code>signal_scale_factor</code> (a phenomenological scale factor for the underlying signal) and <code>variance</code> (the variance of the additive gaussian white noise).</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">equinox</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">eqx</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">jaxtyping</span><span class="w"> </span><span class="kn">import</span> <span class="n">PRNGKeyArray</span>
@@ -1951,7 +2019,7 @@ simulating an image, such as the pose, the volume, and the CTF and 2) Images are
 
 
 <span class="c1"># Passing the ImagePipeline and a variance function, instantiate the `noise_model``</span>
-<span class="n">noise_model</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">UncorrelatedGaussianNoiseModel</span><span class="p">(</span>
+<span class="n">noise_model</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">GaussianWhiteNoiseModel</span><span class="p">(</span>
     <span class="n">image_model</span><span class="p">,</span>
     <span class="n">signal_scale_factor</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
     <span class="n">variance</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
@@ -1975,7 +2043,7 @@ simulating an image, such as the pose, the volume, and the CTF and 2) Images are
 <span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/5d725595be99482e9cb02790b64441dc.png" /></p>
+<p><img alt="img" src="../_data/1e159147d28c4846af60736022caf151.png" /></p>
 
 
 

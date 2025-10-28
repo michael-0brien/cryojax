@@ -1627,6 +1627,74 @@
                 
   
   
+  
+  
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_8" id="__nav_3_8_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    cryojax.atom_util
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_8">
+            <span class="md-nav__icon md-icon"></span>
+            cryojax.atom_util
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../atom_util/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Utilities for atom manipulation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -1641,10 +1709,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9" checked>
         
           
-          <label class="md-nav__link" for="__nav_3_8" id="__nav_3_8_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_9" id="__nav_3_9_label" tabindex="0">
             
   
   <span class="md-ellipsis">
@@ -1656,8 +1724,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_8_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_3_8">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_9_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_9">
             <span class="md-nav__icon md-icon"></span>
             cryojax.jax_util
           </label>
@@ -1850,7 +1918,7 @@
 
 <h4 id="cryojax.jax_util.filter_bmap" class="doc doc-heading">
   <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">filter_bmap</span><span class="p">(</span><span class="n">f</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">PyTree</span><span class="p">[</span><span class="n">Shaped</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;_ ...&#39;</span><span class="p">],</span> <span class="s1">&#39;X&#39;</span><span class="p">]],</span> <span class="n">PyTree</span><span class="p">[</span><span class="n">Shaped</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;_ ...&#39;</span><span class="p">],</span> <span class="s1">&#39;Y&#39;</span><span class="p">]],</span> <span class="n">xs</span><span class="p">:</span> <span class="n">PyTree</span><span class="p">[</span><span class="n">Shaped</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;_ ...&#39;</span><span class="p">],</span> <span class="s1">&#39;X&#39;</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PyTree</span><span class="p">[</span><span class="n">Shaped</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;_ ...&#39;</span><span class="p">],</span> <span class="s1">&#39;Y&#39;</span><span class="p">]</span></code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/98c017fc405ec3faaa64cb4bb36346ae15834148/cryojax/jax_util/_batched_loop.py#L16-L48"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/f43884d2c47fe8369c931f61ed10e41064b7e5f9/cryojax/jax_util/_batched_loop.py#L16-L48"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.jax_util.filter_bmap" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1884,7 +1952,7 @@ with the same rank as <code>xs</code>. <code>xs</code> is filtered in the usual
 
 <h4 id="cryojax.jax_util.filter_bscan" class="doc doc-heading">
   <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">filter_bscan</span><span class="p">(</span><span class="n">f</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="o">~</span><span class="n">Carry</span><span class="p">,</span> <span class="o">~</span><span class="n">X</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">[</span><span class="o">~</span><span class="n">Carry</span><span class="p">,</span> <span class="o">~</span><span class="n">Y</span><span class="p">]],</span> <span class="n">init</span><span class="p">:</span> <span class="o">~</span><span class="n">Carry</span><span class="p">,</span> <span class="n">xs</span><span class="p">:</span> <span class="o">~</span><span class="n">X</span><span class="p">,</span> <span class="n">length</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">unroll</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">bool</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="o">~</span><span class="n">Carry</span><span class="p">,</span> <span class="o">~</span><span class="n">Y</span><span class="p">]</span></code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/98c017fc405ec3faaa64cb4bb36346ae15834148/cryojax/jax_util/_batched_loop.py#L51-L146"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/f43884d2c47fe8369c931f61ed10e41064b7e5f9/cryojax/jax_util/_batched_loop.py#L51-L146"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.jax_util.filter_bscan" class="headerlink" title="Permanent link">¤</a></h4>

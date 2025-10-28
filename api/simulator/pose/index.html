@@ -1729,7 +1729,7 @@
             
   
   <span class="md-ellipsis">
-    cryojax.jax_util
+    cryojax.atom_util
     
   </span>
   
@@ -1739,6 +1739,74 @@
         
         <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_8_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3_8">
+            <span class="md-nav__icon md-icon"></span>
+            cryojax.atom_util
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../atom_util/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Utilities for atom manipulation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_9" id="__nav_3_9_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    cryojax.jax_util
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_9">
             <span class="md-nav__icon md-icon"></span>
             cryojax.jax_util
           </label>
@@ -1902,7 +1970,7 @@ angles in degrees, e.g.</p>
 
 <h4 id="cryojax.simulator.AbstractPose" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.AbstractPose</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/98c017fc405ec3faaa64cb4bb36346ae15834148/cryojax/simulator/_pose.py#L20-L201"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/f43884d2c47fe8369c931f61ed10e41064b7e5f9/cryojax/simulator/_pose.py#L20-L199"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.AbstractPose" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1931,30 +1999,6 @@ overwriting the <code>AbstractPose.rotation</code> property.</p>
 
 
 
-
-<div class="doc doc-object doc-attribute">
-
-
-
-<h5 id="cryojax.simulator.AbstractPose.offset_in_angstroms" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <code class="highlight language-python"><span class="n">offset_in_angstroms</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span></code>
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-cached"><code>cached</code></small>
-      <small class="doc doc-label doc-label-property"><code>property</code></small>
-  </span>
-
-<a href="#cryojax.simulator.AbstractPose.offset_in_angstroms" class="headerlink" title="Permanent link">¤</a></h5>
-
-
-    <div class="doc doc-contents ">
-
-        <p>The in-plane translation vector, where the origin in taken to
-be in the center of the imaging plane.</p>
-
-    </div>
-
-</div>
 
 <div class="doc doc-object doc-attribute">
 
@@ -2161,7 +2205,7 @@ representation.</p>
 
 <h4 id="cryojax.simulator.EulerAnglePose" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.EulerAnglePose(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractPose">cryojax.simulator.AbstractPose</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/98c017fc405ec3faaa64cb4bb36346ae15834148/cryojax/simulator/_pose.py#L204-L280"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/f43884d2c47fe8369c931f61ed10e41064b7e5f9/cryojax/simulator/_pose.py#L202-L279"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.EulerAnglePose" class="headerlink" title="Permanent link">¤</a></h4>
@@ -2245,7 +2289,7 @@ simply <strong>negate each euler angle</strong>.</p>
 
 <h4 id="cryojax.simulator.QuaternionPose" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.QuaternionPose(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractPose">cryojax.simulator.AbstractPose</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/98c017fc405ec3faaa64cb4bb36346ae15834148/cryojax/simulator/_pose.py#L283-L335"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/f43884d2c47fe8369c931f61ed10e41064b7e5f9/cryojax/simulator/_pose.py#L282-L334"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.QuaternionPose" class="headerlink" title="Permanent link">¤</a></h4>
@@ -2317,7 +2361,7 @@ simply <strong>negate each euler angle</strong>.</p>
 
 <h4 id="cryojax.simulator.AxisAnglePose" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.AxisAnglePose(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractPose">cryojax.simulator.AbstractPose</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/98c017fc405ec3faaa64cb4bb36346ae15834148/cryojax/simulator/_pose.py#L338-L402"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/f43884d2c47fe8369c931f61ed10e41064b7e5f9/cryojax/simulator/_pose.py#L337-L401"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.AxisAnglePose" class="headerlink" title="Permanent link">¤</a></h4>

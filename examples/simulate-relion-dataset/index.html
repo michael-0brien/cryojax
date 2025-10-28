@@ -1653,7 +1653,7 @@
             
   
   <span class="md-ellipsis">
-    cryojax.jax_util
+    cryojax.atom_util
     
   </span>
   
@@ -1663,6 +1663,74 @@
         
         <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_8_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3_8">
+            <span class="md-nav__icon md-icon"></span>
+            cryojax.atom_util
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/atom_util/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Utilities for atom manipulation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_9" id="__nav_3_9_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    cryojax.jax_util
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_9">
             <span class="md-nav__icon md-icon"></span>
             cryojax.jax_util
           </label>
@@ -1903,41 +1971,46 @@
 <p>Next, create a custom <code>AbstractVolumeParametrization</code> to simulate images randomized over a structure's discrete conformations. We will simulate images of thyroglobulin in two conformations. See the <a href="https://michael-0brien.github.io/cryojax/examples/extending-cryojax/">tutorial</a> for creating cryoJAX extensions for more information.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">typing_extensions</span><span class="w"> </span><span class="kn">import</span> <span class="n">override</span>
 
+<span class="kn">from</span><span class="w"> </span><span class="nn">cryojax.constants</span><span class="w"> </span><span class="kn">import</span> <span class="n">PengScatteringFactorParameters</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">cryojax.io</span><span class="w"> </span><span class="kn">import</span> <span class="n">read_atoms_from_pdb</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">jaxtyping</span><span class="w"> </span><span class="kn">import</span> <span class="n">Array</span><span class="p">,</span> <span class="n">Float</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">jaxtyping</span><span class="w"> </span><span class="kn">import</span> <span class="n">Array</span><span class="p">,</span> <span class="n">Float</span><span class="p">,</span> <span class="n">Int</span>
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">DiscreteConformationSampler</span><span class="p">(</span><span class="n">cxs</span><span class="o">.</span><span class="n">AbstractVolumeParametrization</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Sample discrete conformational heterogeneity.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Sample discrete conformational heterogeneity.</span>
 
-    <span class="n">conformational_space</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">cxs</span><span class="o">.</span><span class="n">AbstractVolumeRepresentation</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
-    <span class="n">weights</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot; _&quot;</span><span class="p">]</span>
+<span class="sd">    Note that sampling occurs upon intialization and the conformation</span>
+<span class="sd">    index sampled is stored.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">sampled_volume</span><span class="p">:</span> <span class="n">cxs</span><span class="o">.</span><span class="n">AbstractVolumeRepresentation</span>
+    <span class="n">conformation</span><span class="p">:</span> <span class="n">Int</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">]</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
+        <span class="n">rng_key</span><span class="p">:</span> <span class="n">PRNGKeyArray</span><span class="p">,</span>
         <span class="n">conformational_space</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">cxs</span><span class="o">.</span><span class="n">AbstractVolumeRepresentation</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
         <span class="n">weights</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot; _&quot;</span><span class="p">],</span>
     <span class="p">):</span>
         <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">conformational_space</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">weights</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">conformational_space</span> <span class="o">=</span> <span class="n">conformational_space</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">weights</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">weights</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+        <span class="n">n_conformations</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">conformational_space</span><span class="p">)</span>
+        <span class="n">conformation</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span>
+            <span class="n">rng_key</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n_conformations</span><span class="p">),</span> <span class="n">p</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">weights</span><span class="p">,</span> <span class="nb">float</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="c1"># Assumes that the `AbstractVolumeRepresentation` is a pytree</span>
+        <span class="c1"># of arrays only. Otherwise, calls to `equinox.partition` and</span>
+        <span class="c1"># `equinox.combine` would be necessary</span>
+        <span class="n">stacked_volume</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">tree</span><span class="o">.</span><span class="n">map</span><span class="p">(</span>
+            <span class="k">lambda</span> <span class="o">*</span><span class="n">xs</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">),</span> <span class="o">*</span><span class="n">conformational_space</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sampled_volume</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">tree</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="n">conformation</span><span class="p">],</span> <span class="n">stacked_volume</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conformation</span> <span class="o">=</span> <span class="n">conformation</span>
 
     <span class="nd">@override</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">compute_representation</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_representation</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">rng_key</span><span class="p">:</span> <span class="n">PRNGKeyArray</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">cxs</span><span class="o">.</span><span class="n">AbstractVolumeRepresentation</span><span class="p">:</span>
-        <span class="k">assert</span> <span class="n">rng_key</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-        <span class="n">n_conformations</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">conformational_space</span><span class="p">)</span>
-        <span class="n">conformation</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span>
-            <span class="n">rng_key</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n_conformations</span><span class="p">),</span> <span class="n">p</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">weights</span>
-        <span class="p">)</span>
-        <span class="n">funcs</span> <span class="o">=</span> <span class="p">[</span>
-            <span class="k">lambda</span> <span class="n">i</span><span class="o">=</span><span class="n">i</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">conformational_space</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
-            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">conformational_space</span><span class="p">))</span>
-        <span class="p">]</span>
-        <span class="n">volume</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">lax</span><span class="o">.</span><span class="n">switch</span><span class="p">(</span><span class="n">conformation</span><span class="p">,</span> <span class="n">funcs</span><span class="p">)</span>
-
-        <span class="k">return</span> <span class="n">volume</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">sampled_volume</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">make_conformational_space</span><span class="p">(</span><span class="n">paths_to_pdb</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]):</span>
@@ -1945,17 +2018,18 @@
 <span class="sd">    simply given multiple paths to PDB files.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">for</span> <span class="n">path_to_pdb</span> <span class="ow">in</span> <span class="n">paths_to_pdb</span><span class="p">:</span>
-        <span class="n">atom_positions</span><span class="p">,</span> <span class="n">atom_types</span><span class="p">,</span> <span class="n">b_factors</span> <span class="o">=</span> <span class="n">read_atoms_from_pdb</span><span class="p">(</span>
+        <span class="n">atom_positions</span><span class="p">,</span> <span class="n">atom_types</span><span class="p">,</span> <span class="n">atom_properties</span> <span class="o">=</span> <span class="n">read_atoms_from_pdb</span><span class="p">(</span>
             <span class="n">path_to_pdb</span><span class="p">,</span>
             <span class="n">center</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-            <span class="n">loads_b_factors</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">loads_properties</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
             <span class="n">selection_string</span><span class="o">=</span><span class="s2">&quot;name CA&quot;</span><span class="p">,</span>  <span class="c1"># C-Alphas for simplicity</span>
         <span class="p">)</span>
-        <span class="n">scattering_parameters</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">PengScatteringFactorParameters</span><span class="p">(</span><span class="n">atom_types</span><span class="p">)</span>
-        <span class="k">yield</span> <span class="n">cxs</span><span class="o">.</span><span class="n">PengAtomicVolume</span><span class="o">.</span><span class="n">from_tabulated_parameters</span><span class="p">(</span>
+
+        <span class="n">scattering_parameters</span> <span class="o">=</span> <span class="n">PengScatteringFactorParameters</span><span class="p">(</span><span class="n">atom_types</span><span class="p">)</span>
+        <span class="k">yield</span> <span class="n">cxs</span><span class="o">.</span><span class="n">GaussianMixtureVolume</span><span class="o">.</span><span class="n">from_tabulated_parameters</span><span class="p">(</span>
             <span class="n">atom_positions</span><span class="p">,</span>
             <span class="n">scattering_parameters</span><span class="p">,</span>
-            <span class="n">extra_b_factors</span><span class="o">=</span><span class="n">b_factors</span><span class="p">,</span>
+            <span class="n">extra_b_factors</span><span class="o">=</span><span class="n">atom_properties</span><span class="p">[</span><span class="s2">&quot;b_factors&quot;</span><span class="p">],</span>
         <span class="p">)</span>
 
 
@@ -1963,10 +2037,6 @@
     <span class="n">make_conformational_space</span><span class="p">(</span>
         <span class="p">[</span><span class="s2">&quot;./data/thyroglobulin_initial.pdb&quot;</span><span class="p">,</span> <span class="s2">&quot;./data/thyroglobulin_target.pdb&quot;</span><span class="p">]</span>
     <span class="p">)</span>
-<span class="p">)</span>
-<span class="n">ensemble</span> <span class="o">=</span> <span class="n">DiscreteConformationSampler</span><span class="p">(</span>
-    <span class="n">conformational_space</span><span class="o">=</span><span class="n">conformational_space</span><span class="p">,</span>
-    <span class="n">weights</span><span class="o">=</span><span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">),</span>  <span class="c1"># each conformation has equal probability</span>
 <span class="p">)</span>
 </code></pre></div>
 <p>Now, define a function that simulates images given the <code>DiscreteConformationSampler</code>. Ultimately this will be passed to the <code>cryojax.dataset.simulate_particle_stack</code> utility. For reasons we will see, the following function signature is required.</p>
@@ -1994,10 +2064,13 @@
 The signal is normalized by defining a region where we know there is signal, where we can measure the
 mean and standard deviation of our simulated image without noise. After normalizing, we can set the signal-to-noise ratio (SNR) by setting the noise variance to 1 and the signal variance equal to the <code>SNR</code>. The latter step is simply done by scaling the normalized image by a constant.</p>
 </div>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">cryojax.ndimage</span><span class="w"> </span><span class="kn">import</span> <span class="n">transforms</span> <span class="k">as</span> <span class="n">tf</span>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">jax.random</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jr</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">cryojax.ndimage</span><span class="w"> </span><span class="kn">import</span> <span class="n">transforms</span> <span class="k">as</span> <span class="n">tf</span>
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">compute_image</span><span class="p">(</span><span class="n">particle_parameters</span><span class="p">,</span> <span class="n">volume</span><span class="p">,</span> <span class="n">rng_key</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">compute_image</span><span class="p">(</span><span class="n">particle_parameters</span><span class="p">,</span> <span class="n">conformational_space</span><span class="p">,</span> <span class="n">rng_key</span><span class="p">):</span>
+    <span class="c1"># Generate RNG keys for each part of the process</span>
+    <span class="n">conformation_rng_key</span><span class="p">,</span> <span class="n">noise_rng_key</span><span class="p">,</span> <span class="n">snr_rng_key</span> <span class="o">=</span> <span class="n">jr</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">rng_key</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
     <span class="c1"># Build image model, including normalization within a circular mask</span>
     <span class="c1"># around each particle</span>
     <span class="n">image_config</span><span class="p">,</span> <span class="n">pose</span><span class="p">,</span> <span class="n">transfer_theory</span> <span class="o">=</span> <span class="p">(</span>
@@ -2011,6 +2084,9 @@ mean and standard deviation of our simulated image without noise. After normaliz
         <span class="n">rolloff_width</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
         <span class="n">xy_offset</span><span class="o">=</span><span class="n">pose</span><span class="o">.</span><span class="n">offset_in_angstroms</span><span class="p">,</span>
     <span class="p">)</span>
+    <span class="n">volume</span> <span class="o">=</span> <span class="n">DiscreteConformationSampler</span><span class="p">(</span>
+        <span class="n">conformation_rng_key</span><span class="p">,</span> <span class="n">conformational_space</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">)</span>
+    <span class="p">)</span>
     <span class="n">image_model</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">make_image_model</span><span class="p">(</span>
         <span class="n">volume_parametrization</span><span class="o">=</span><span class="n">volume</span><span class="p">,</span>
         <span class="n">pose</span><span class="o">=</span><span class="n">pose</span><span class="p">,</span>
@@ -2022,27 +2098,26 @@ mean and standard deviation of our simulated image without noise. After normaliz
     <span class="p">)</span>
     <span class="c1"># Build noise model at a randomly sampled SNR within a</span>
     <span class="c1"># uniform range, then simulate</span>
-    <span class="n">simulator_rng_key</span><span class="p">,</span> <span class="n">snr_rng_key</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">rng_key</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
     <span class="n">snr</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="n">snr_rng_key</span><span class="p">,</span> <span class="n">minval</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span> <span class="n">maxval</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
-    <span class="n">noise_model</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">UncorrelatedGaussianNoiseModel</span><span class="p">(</span>
+    <span class="n">noise_model</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">GaussianWhiteNoiseModel</span><span class="p">(</span>
         <span class="n">image_model</span><span class="p">,</span>
         <span class="n">variance</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
         <span class="n">signal_scale_factor</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">snr</span><span class="p">),</span>
     <span class="p">)</span>
 
-    <span class="k">return</span> <span class="n">noise_model</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">rng_key</span><span class="o">=</span><span class="n">simulator_rng_key</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">noise_model</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">rng_key</span><span class="o">=</span><span class="n">noise_rng_key</span><span class="p">)</span>
 
 
 <span class="c1"># Simulate a test image</span>
 <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">)),</span> <span class="n">plt</span><span class="o">.</span><span class="n">gca</span><span class="p">()</span>
 <span class="n">test_parameters</span> <span class="o">=</span> <span class="n">parameter_file</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-<span class="n">image</span> <span class="o">=</span> <span class="n">compute_image</span><span class="p">(</span><span class="n">test_parameters</span><span class="p">,</span> <span class="n">volume</span><span class="o">=</span><span class="n">ensemble</span><span class="p">,</span> <span class="n">rng_key</span><span class="o">=</span><span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">key</span><span class="p">(</span><span class="mi">1234</span><span class="p">))</span>
+<span class="n">image</span> <span class="o">=</span> <span class="n">compute_image</span><span class="p">(</span><span class="n">test_parameters</span><span class="p">,</span> <span class="n">conformational_space</span><span class="p">,</span> <span class="n">rng_key</span><span class="o">=</span><span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">key</span><span class="p">(</span><span class="mi">1234</span><span class="p">))</span>
 <span class="n">plot_image</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Simulated Image&quot;</span><span class="p">)</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code>(&lt;Figure size 300x300 with 2 Axes&gt;,
  &lt;Axes: title={&#39;center&#39;: &#39;Simulated Image&#39;}&gt;)
 </code></pre></div>
-<p><img alt="img" src="../_data/6a14ee9c57e14959b932ae41ec1c1116.png" /></p>
+<p><img alt="img" src="../_data/39db589eb6c04584ac1b43474560af49.png" /></p>
 <p>Finally, simulate a dataset, again using the utilities in <code>cryojax.dataset</code>.</p>
 <div class="admonition info">
 <p class="admonition-title">The <code>cryojax.dataset.simulate_particle_stack</code> tool</p>
@@ -2082,7 +2157,7 @@ the MRC files.</p>
 <span class="n">simulate_particle_stack</span><span class="p">(</span>
     <span class="n">dataset</span><span class="p">,</span>
     <span class="n">compute_image_fn</span><span class="o">=</span><span class="n">compute_image</span><span class="p">,</span>
-    <span class="n">constant_args</span><span class="o">=</span><span class="n">ensemble</span><span class="p">,</span>
+    <span class="n">constant_args</span><span class="o">=</span><span class="n">conformational_space</span><span class="p">,</span>
     <span class="n">per_particle_args</span><span class="o">=</span><span class="n">rng_keys</span><span class="p">,</span>
     <span class="n">batch_size</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>  <span class="c1"># how many images to simulate in parallel</span>
     <span class="n">images_per_file</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>  <span class="c1"># how many images in each MRC file</span>
@@ -2110,7 +2185,7 @@ the MRC files.</p>
 <span class="n">particles</span> <span class="o">=</span> <span class="n">dataset</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">9</span><span class="p">]</span>
 <span class="n">plot_image_stack</span><span class="p">(</span><span class="n">particles</span><span class="p">[</span><span class="s2">&quot;images&quot;</span><span class="p">])</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/dc76cf307a7a4b77894858c503417f75.png" /></p>
+<p><img alt="img" src="../_data/318a004f17574f85bf02e0640831a76c.png" /></p>
 
 
 

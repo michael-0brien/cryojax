@@ -1653,7 +1653,7 @@
             
   
   <span class="md-ellipsis">
-    cryojax.jax_util
+    cryojax.atom_util
     
   </span>
   
@@ -1663,6 +1663,74 @@
         
         <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_8_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3_8">
+            <span class="md-nav__icon md-icon"></span>
+            cryojax.atom_util
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/atom_util/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Utilities for atom manipulation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_9" id="__nav_3_9_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    cryojax.jax_util
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_9">
             <span class="md-nav__icon md-icon"></span>
             cryojax.jax_util
           </label>
@@ -1900,7 +1968,7 @@
         <span class="n">normalizes_signal</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
         <span class="n">signal_region</span><span class="o">=</span><span class="n">circular_mask</span><span class="o">.</span><span class="n">get</span><span class="p">()</span> <span class="o">==</span> <span class="mf">1.0</span><span class="p">,</span>
     <span class="p">)</span>
-    <span class="n">noise_model</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">UncorrelatedGaussianNoiseModel</span><span class="p">(</span>
+    <span class="n">noise_model</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">GaussianWhiteNoiseModel</span><span class="p">(</span>
         <span class="n">image_model</span><span class="p">,</span> <span class="n">variance</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">signal_scale_factor</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">SNR</span><span class="p">)</span>
     <span class="p">)</span>
     <span class="n">parameters</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
@@ -1941,7 +2009,7 @@
 <span class="p">)</span>
 <span class="n">plot_image_stack</span><span class="p">(</span><span class="n">dataset_images</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">9</span><span class="p">])</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/e0f53ae2429c49499556dd29ffa214b0.png" /></p>
+<p><img alt="img" src="../_data/d4cd24189f474bbcbb694c61d77b1a3a.png" /></p>
 <p>Next, define the loss function. We will naively do a gradient descent on the positions of the C-alpha atoms to see if we can capture the large-scale difference of the conformational change.</p>
 <div class="highlight"><pre><span></span><code><span class="nd">@eqx</span><span class="o">.</span><span class="n">filter_value_and_grad</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">compute_loss</span><span class="p">(</span><span class="n">atom_positions</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
@@ -2064,7 +2132,7 @@ step=99, loss=-112113.4765625
 </code></pre></div>
 <div class="highlight"><pre><span></span><code>[Text(0.5, 0, &#39;step number&#39;), Text(0, 0.5, &#39;cross-correlation loss&#39;)]
 </code></pre></div>
-<p><img alt="img" src="../_data/520ea19bbd394dd0898c28fafd2b31c4.png" /></p>
+<p><img alt="img" src="../_data/f7f43c5a51f243089b040c81fba91433.png" /></p>
 <p>Now let's check the results! Let's first look at FSC curves between the ground truth and structure before and after refinement.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">cryojax.coordinates</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_radial_frequency_grid</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">cryojax.ndimage</span><span class="w"> </span><span class="kn">import</span> <span class="n">compute_fourier_shell_correlation</span><span class="p">,</span> <span class="n">rfftn</span>
@@ -2072,11 +2140,14 @@ step=99, loss=-112113.4765625
 
 <span class="k">def</span><span class="w"> </span><span class="nf">plot_fsc</span><span class="p">(</span><span class="n">pos1</span><span class="p">,</span> <span class="n">pos2</span><span class="p">,</span> <span class="n">ax</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
     <span class="n">shape</span><span class="p">,</span> <span class="n">voxel_size</span> <span class="o">=</span> <span class="p">(</span><span class="n">IMAGE_DIM</span><span class="p">,</span> <span class="n">IMAGE_DIM</span><span class="p">,</span> <span class="n">IMAGE_DIM</span><span class="p">),</span> <span class="n">PIXEL_SIZE</span>
-    <span class="n">compute_voxels</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">pos</span><span class="p">:</span> <span class="n">cxs</span><span class="o">.</span><span class="n">GaussianMixtureVolume</span><span class="p">(</span>
-        <span class="n">pos</span><span class="p">,</span>
-        <span class="n">amplitudes</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
-        <span class="n">variances</span><span class="o">=</span><span class="n">GMM_WIDTH_IN_ANGSTROMS</span><span class="o">**</span><span class="mi">2</span><span class="p">,</span>
-    <span class="p">)</span><span class="o">.</span><span class="n">to_real_voxel_grid</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">voxel_size</span><span class="p">)</span>
+    <span class="n">gaussian_render_fn</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">GaussianMixtureRenderFn</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">voxel_size</span><span class="p">)</span>
+    <span class="n">compute_voxels</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">pos</span><span class="p">:</span> <span class="n">gaussian_render_fn</span><span class="p">(</span>
+        <span class="n">cxs</span><span class="o">.</span><span class="n">GaussianMixtureVolume</span><span class="p">(</span>
+            <span class="n">pos</span><span class="p">,</span>
+            <span class="n">amplitudes</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+            <span class="n">variances</span><span class="o">=</span><span class="n">GMM_WIDTH_IN_ANGSTROMS</span><span class="o">**</span><span class="mi">2</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="p">)</span>
     <span class="n">voxels1</span> <span class="o">=</span> <span class="n">rfftn</span><span class="p">(</span><span class="n">compute_voxels</span><span class="p">(</span><span class="n">pos1</span><span class="p">))</span>
     <span class="n">voxels2</span> <span class="o">=</span> <span class="n">rfftn</span><span class="p">(</span><span class="n">compute_voxels</span><span class="p">(</span><span class="n">pos2</span><span class="p">))</span>
     <span class="n">frequencies</span> <span class="o">=</span> <span class="n">make_radial_frequency_grid</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span>
@@ -2104,7 +2175,7 @@ step=99, loss=-112113.4765625
 <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/fdfbb5978a634e3984fcf2e444dffc6b.png" /></p>
+<p><img alt="img" src="../_data/734061d1350946b39aed69003e969d9b.png" /></p>
 <p>The above FSC curves quantifies the increase in correlation after gradient descent refinement. Indeed, visually the refinement is able to (roughly) recover the ground truth conformation!</p>
 <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_cross_sections</span><span class="p">(</span>
     <span class="n">pos1</span><span class="p">,</span> <span class="n">pos2</span><span class="p">,</span> <span class="n">axes</span><span class="p">,</span> <span class="n">label1</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">label2</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">color1</span><span class="o">=</span><span class="s2">&quot;b&quot;</span><span class="p">,</span> <span class="n">color2</span><span class="o">=</span><span class="s2">&quot;orange&quot;</span>
@@ -2143,7 +2214,7 @@ step=99, loss=-112113.4765625
 <span class="n">fig</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s2">&quot;Central cross sections of GMM positions&quot;</span><span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/47c85e14eb1d47eb949055847d7cf76b.png" /></p>
+<p><img alt="img" src="../_data/f8c52b74036e483e98279d61037e0b63.png" /></p>
 <p>Interactive plots of the 3D point clouds can be generated locally using <code>plotly</code> with the following code block:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">plotly.graph_objects</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">go</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">plotly.subplots</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_subplots</span>

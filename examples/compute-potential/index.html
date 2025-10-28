@@ -1653,7 +1653,7 @@
             
   
   <span class="md-ellipsis">
-    cryojax.jax_util
+    cryojax.atom_util
     
   </span>
   
@@ -1663,6 +1663,74 @@
         
         <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_8_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3_8">
+            <span class="md-nav__icon md-icon"></span>
+            cryojax.atom_util
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/atom_util/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Utilities for atom manipulation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_9" id="__nav_3_9_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    cryojax.jax_util
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_9">
             <span class="md-nav__icon md-icon"></span>
             cryojax.jax_util
           </label>
@@ -1790,7 +1858,7 @@
   <h1>Render a volume</h1>
 
 <p>This tutorial demonstrates how to use <code>cryojax</code> to build a scattering potential from a PDB entry. Specifically, the tutorial will build a voxel grid, take some steps to validate it, then save the result to be used in subsequent tutorials.</p>
-<p>The scattering potential will be built using the tabulation of atomic scattering factors from the work of Lian-Mao Peng, which fits the potential from single atoms to a sum of five gaussians. See the <code>cryojax</code> documentation <a href="../../api/simulator/volume/#atomic-models">here</a> for more information.</p>
+<p>The scattering potential will be built using the tabulation of atomic scattering factors from the work of Lian-Mao Peng, which fits the potential from single atoms to a sum of five gaussians. See the <code>cryojax</code> documentation <a href="../../api/simulator/volume/#atom-based-volumes">here</a> for more information.</p>
 <p><em>References:</em></p>
 <ul>
 <li>Peng, L-M., et al. "Robust parameterization of elastic and absorptive electron atomic scattering factors." Acta Crystallographica Section A: Foundations of Crystallography 52.2 (1996): 257-276.</li>
@@ -1810,36 +1878,37 @@
         <span class="n">ax</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="n">label</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span>
 </code></pre></div>
-<p>First, load the atomic positions and identities from a PDB entry. Here, a structure of GroEL (PDB ID 5w0s) is used. This is loaded into a <code>PengAtomicVolume</code> object.</p>
+<p>First, load the atomic positions and identities from a PDB entry. Here, a structure of GroEL (PDB ID 5w0s) is used. This is loaded into a <code>GaussianMixtureVolume</code> object.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">cryojax.simulator</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">cxs</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">cryojax.constants</span><span class="w"> </span><span class="kn">import</span> <span class="n">PengScatteringFactorParameters</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">cryojax.io</span><span class="w"> </span><span class="kn">import</span> <span class="n">read_atoms_from_pdb</span>
 
 
-<span class="n">atom_positions</span><span class="p">,</span> <span class="n">atom_types</span> <span class="o">=</span> <span class="n">read_atoms_from_pdb</span><span class="p">(</span>
+<span class="n">atom_positions</span><span class="p">,</span> <span class="n">atomic_numbers</span> <span class="o">=</span> <span class="n">read_atoms_from_pdb</span><span class="p">(</span>
     <span class="s2">&quot;./data/5w0s.pdb&quot;</span><span class="p">,</span>
     <span class="n">center</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-    <span class="n">loads_b_factors</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="n">parameters</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">PengScatteringFactorParameters</span><span class="p">(</span><span class="n">atom_types</span><span class="p">)</span>
-<span class="n">atom_volume</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">PengAtomicVolume</span><span class="o">.</span><span class="n">from_tabulated_parameters</span><span class="p">(</span>
+<span class="n">parameters</span> <span class="o">=</span> <span class="n">PengScatteringFactorParameters</span><span class="p">(</span><span class="n">atomic_numbers</span><span class="p">)</span>
+<span class="n">atom_volume</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">GaussianMixtureVolume</span><span class="o">.</span><span class="n">from_tabulated_parameters</span><span class="p">(</span>
     <span class="n">atom_positions</span><span class="p">,</span>
     <span class="n">parameters</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">atom_volume</span><span class="p">)</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code>PengAtomicVolume(
-  atom_positions=f32[54021,3], amplitudes=f32[54021,5], b_factors=f32[54021,5]
+<div class="highlight"><pre><span></span><code>GaussianMixtureVolume(
+  positions=f32[54021,3], amplitudes=f32[54021,5], variances=f32[54021,5]
 )
 </code></pre></div>
-<p>We see above that the <code>PengAtomicVolume</code> includes </p>
+<p>We see above that the <code>GaussianMixtureVolume</code> includes </p>
 <ul>
-<li>The <code>atom_positions</code> are the positions of the atoms in angstroms.</li>
-<li>The <code>amplitudes</code>, and <code>b_factors</code> are the parameters <span class="arithmatex">\(a_i\)</span> and <span class="arithmatex">\(b_i\)</span> from Peng et al. (1996). </li>
+<li>The <code>positions</code> are the positions of the atoms in angstroms.</li>
+<li>The <code>amplitudes</code>, and <code>variances</code> are the parameters <span class="arithmatex">\(a_i\)</span> and <span class="arithmatex">\(b_i\)</span> from Peng et al. (1996) up to numerical constants (see documentation for details). </li>
 </ul>
 <p>Optionally, we can also load PDB B-factors into the <code>b_factors</code> field using</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">cryojax.io</span><span class="w"> </span><span class="kn">import</span> <span class="n">read_atoms_from_pdb</span>
 
-<span class="n">atom_positions</span><span class="p">,</span> <span class="n">atom_types</span><span class="p">,</span> <span class="n">b_factors</span> <span class="o">=</span> <span class="n">read_atoms_from_pdb</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">loads_b_factors</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">atom_positions</span><span class="p">,</span> <span class="n">atom_types</span><span class="p">,</span> <span class="n">atom_properties</span> <span class="o">=</span> <span class="n">read_atoms_from_pdb</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">loads_properties</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">b_factors</span> <span class="o">=</span> <span class="n">atom_properties</span><span class="p">[</span><span class="s2">&quot;b_factors&quot;</span><span class="p">]</span>
 </code></pre></div>
 <p>Next, we can build the voxel grid representation of the potential.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">equinox</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">eqx</span>
@@ -1847,36 +1916,25 @@
 
 
 <span class="c1"># Evaluate the potential on a voxel grid</span>
-<span class="n">shape</span> <span class="o">=</span> <span class="p">(</span><span class="mi">240</span><span class="p">,</span> <span class="mi">240</span><span class="p">,</span> <span class="mi">240</span><span class="p">)</span>
-<span class="n">voxel_size</span> <span class="o">=</span> <span class="mf">1.0</span>
+<span class="n">shape</span> <span class="o">=</span> <span class="p">(</span><span class="mi">80</span><span class="p">,</span> <span class="mi">80</span><span class="p">,</span> <span class="mi">80</span><span class="p">)</span>
+<span class="n">voxel_size</span> <span class="o">=</span> <span class="mf">3.0</span>
 
 
 <span class="nd">@eqx</span><span class="o">.</span><span class="n">filter_jit</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">compute_voxels</span><span class="p">(</span><span class="n">atom_volume</span><span class="p">:</span> <span class="n">cxs</span><span class="o">.</span><span class="n">PengAtomicVolume</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
-    <span class="k">return</span> <span class="n">atom_volume</span><span class="o">.</span><span class="n">to_real_voxel_grid</span><span class="p">(</span>
-        <span class="n">shape</span><span class="p">,</span>
-        <span class="n">voxel_size</span><span class="p">,</span>
-        <span class="n">batch_options</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;batch_size&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">},</span>  <span class="c1"># options for rendering</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">compute_voxels</span><span class="p">(</span><span class="n">atom_volume</span><span class="p">:</span> <span class="n">cxs</span><span class="o">.</span><span class="n">GaussianMixtureVolume</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+    <span class="n">gaussian_render_fn</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">GaussianMixtureRenderFn</span><span class="p">(</span>
+        <span class="n">shape</span><span class="p">,</span> <span class="n">voxel_size</span><span class="p">,</span> <span class="n">batch_options</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
     <span class="p">)</span>
+    <span class="k">return</span> <span class="n">gaussian_render_fn</span><span class="p">(</span><span class="n">atom_volume</span><span class="p">)</span>
 
 
 <span class="n">real_voxel_grid</span> <span class="o">=</span> <span class="n">compute_voxels</span><span class="p">(</span><span class="n">atom_volume</span><span class="p">)</span>
-</code></pre></div>
-<p>Now, downsample the voxel array to the desired voxel size. Because the potentials from individual atoms are short-ranged, finite sampling effects can be significant and it is best to first generate a potential at a smaller-than-desired voxel size. </p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">cryojax.ndimage</span><span class="w"> </span><span class="kn">import</span> <span class="n">downsample_with_fourier_cropping</span>
-
-
-<span class="n">downsampling_factor</span> <span class="o">=</span> <span class="mi">3</span>
-<span class="n">downsampled_voxel_size</span> <span class="o">=</span> <span class="n">downsampling_factor</span> <span class="o">*</span> <span class="n">voxel_size</span>
-<span class="n">downsampled_voxel_grid</span> <span class="o">=</span> <span class="n">downsample_with_fourier_cropping</span><span class="p">(</span>
-    <span class="n">real_voxel_grid</span><span class="p">,</span> <span class="n">downsampling_factor</span>
-<span class="p">)</span>
 </code></pre></div>
 <div class="admonition info">
 <p class="admonition-title">Info</p>
 <p>In, <code>cryojax</code>, potentials are built in units of <em>inverse length squared</em>,
 <span class="arithmatex">\([L]^{-2}\)</span>. This rescaled potential is defined to be</p>
-<div class="arithmatex">\[U(x, y, z) = \frac{2 m_0 e}{\hbar^2} V(x, y, z),\]</div>
+<div class="arithmatex">\[U(x, y, z) = \frac{m_0 e}{2 \pi \hbar^2} V(x, y, z),\]</div>
 <p>where <span class="arithmatex">\(V\)</span> is the electrostatic potential energy, <span class="arithmatex">\((x, y, z)\)</span> are positional
 coordinates, <span class="arithmatex">\(m_0\)</span> is the electron rest mass, and <span class="arithmatex">\(e\)</span> is the electron charge.</p>
 <p>In the following, we will compute projections of the potential, which we will
@@ -1902,12 +1960,12 @@ define to be</p>
 
 <span class="c1"># Load the voxel grid into a voxel-based potential representation</span>
 <span class="n">voxel_potential</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">FourierVoxelGridVolume</span><span class="o">.</span><span class="n">from_real_voxel_grid</span><span class="p">(</span>
-    <span class="n">downsampled_voxel_grid</span><span class="p">,</span>
+    <span class="n">real_voxel_grid</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="c1"># ... and the configuration of the imaging instrument</span>
 <span class="n">config</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">BasicImageConfig</span><span class="p">(</span>
     <span class="n">shape</span><span class="o">=</span><span class="n">voxel_potential</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">2</span><span class="p">],</span>
-    <span class="n">pixel_size</span><span class="o">=</span><span class="n">downsampled_voxel_size</span><span class="p">,</span>
+    <span class="n">pixel_size</span><span class="o">=</span><span class="n">voxel_size</span><span class="p">,</span>
     <span class="n">voltage_in_kilovolts</span><span class="o">=</span><span class="mf">300.0</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="c1"># Now, compute the projection integral</span>
@@ -1919,7 +1977,7 @@ define to be</p>
 <div class="highlight"><pre><span></span><code>(&lt;Figure size 300x300 with 2 Axes&gt;,
  &lt;Axes: title={&#39;center&#39;: &#39;Integrated potential, $U_z(x, y)$&#39;}&gt;)
 </code></pre></div>
-<p><img alt="img" src="../_data/4352f031bf074e9280e9ab639de0dabe.png" /></p>
+<p><img alt="img" src="../_data/f83195ee13a04dd6ac2ebd7fc8adcd85.png" /></p>
 <p>We can also inspect a different viewing angle by rotating the <code>voxel_potential</code> to a different pose. This involves instantiating a <code>cryojax</code> representation of a pose, which here is the <code>cryojax.simulator.EulerAnglePose</code>. The three euler angles in this object are:</p>
 <ul>
 <li>The first euler angle <span class="arithmatex">\(\phi\)</span>, denoted <code>phi_angle</code></li>
@@ -1940,10 +1998,10 @@ define to be</p>
 <div class="highlight"><pre><span></span><code>(&lt;Figure size 300x300 with 2 Axes&gt;,
  &lt;Axes: title={&#39;center&#39;: &#39;Integrated potential, $U_z(x, y)$&#39;}&gt;)
 </code></pre></div>
-<p><img alt="img" src="../_data/2769a06abfae471987942aa6f056cdc8.png" /></p>
+<p><img alt="img" src="../_data/2bb6239deaae401f8ede4657cebd6d8d.png" /></p>
 <p>Another good sanity check is to check that the potential is relatively weak compared to a typical incident electron beam energy in cryo-EM. For an electron beam with incident wavenumber <span class="arithmatex">\(k\)</span>, this can be checked with the condition</p>
-<div class="arithmatex">\[U/k^2 &lt;&lt; 1,\]</div>
-<p>where again <span class="arithmatex">\(U = 2 m_0 e V / \hbar^2\)</span> is the rescaled potential. Below, we consider an incident energy of <span class="arithmatex">\(300 \ \textrm{keV}\)</span>.</p>
+<div class="arithmatex">\[4 \pi U / k^2 &lt;&lt; 1,\]</div>
+<p>where again <span class="arithmatex">\(U = m_0 e V / 2 \pi \hbar^2\)</span> is the rescaled potential. Below, we consider an incident energy of <span class="arithmatex">\(300 \ \textrm{keV}\)</span>.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">cryojax.constants</span><span class="w"> </span><span class="kn">import</span> <span class="n">wavelength_from_kilovolts</span>
 
@@ -1953,11 +2011,11 @@ define to be</p>
 <span class="n">wavelength_in_angstroms</span> <span class="o">=</span> <span class="n">wavelength_from_kilovolts</span><span class="p">(</span><span class="n">voltage_in_kilovolts</span><span class="p">)</span>
 <span class="n">wavenumber</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="n">wavelength_in_angstroms</span>
 <span class="c1"># ... now get the maximum value of the potential</span>
-<span class="n">potential_maximum</span> <span class="o">=</span> <span class="n">downsampled_voxel_grid</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+<span class="n">potential_maximum</span> <span class="o">=</span> <span class="n">real_voxel_grid</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
 <span class="c1"># ... and compare</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">potential_maximum</span> <span class="o">/</span> <span class="n">wavenumber</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="mi">4</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">potential_maximum</span> <span class="o">/</span> <span class="n">wavenumber</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code>0.001362027
+<div class="highlight"><pre><span></span><code>4.9315266e-05
 </code></pre></div>
 <p>Looks reasonable! Finally, we can write the voxel grid to disk for later processing.</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># from cryojax.io import write_volume_to_mrc</span>

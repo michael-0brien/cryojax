@@ -12,13 +12,13 @@
         <meta name="author" content="Michael O'Brien">
       
       
-        <link rel="canonical" href="https://michael-0brien.github.io/cryojax/examples/extending-cryojax/">
+        <link rel="canonical" href="https://michael-0brien.github.io/cryojax/api/atom_util/">
       
       
-        <link rel="prev" href="../read-dataset/">
+        <link rel="prev" href="../constants/conventions/">
       
       
-        <link rel="next" href="../simulate-relion-dataset/">
+        <link rel="next" href="../jax_util/filter_specs/">
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
@@ -26,7 +26,7 @@
     
     
       
-        <title>Create custom image simulation methods - cryoJAX</title>
+        <title>Utilities for atom manipulation - cryoJAX</title>
       
     
     
@@ -73,6 +73,11 @@
     <label class="md-overlay" for="__drawer"></label>
     <div data-md-component="skip">
       
+        
+        <a href="#utilities-for-atom-manipulation" class="md-skip">
+          Skip to content
+        </a>
+      
     </div>
     <div data-md-component="announce">
       
@@ -105,7 +110,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Create custom image simulation methods
+              Utilities for atom manipulation
             
           </span>
         </div>
@@ -205,8 +210,6 @@
       
   
   
-    
-  
   
   
     
@@ -218,11 +221,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
         
           
           <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
@@ -237,7 +240,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             Examples
@@ -248,8 +251,6 @@
                 
   
   
-    
-  
   
   
     
@@ -258,11 +259,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_1" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_1" >
         
           
           <label class="md-nav__link" for="__nav_2_1" id="__nav_2_1_label" tabindex="0">
@@ -277,7 +278,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_1_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_1_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2_1">
             <span class="md-nav__icon md-icon"></span>
             Getting started
@@ -291,7 +292,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../simulate-image/" class="md-nav__link">
+      <a href="../../examples/simulate-image/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -313,7 +314,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../jax-transformations/" class="md-nav__link">
+      <a href="../../examples/jax-transformations/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -335,7 +336,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../compute-potential/" class="md-nav__link">
+      <a href="../../examples/compute-potential/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -357,7 +358,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../read-dataset/" class="md-nav__link">
+      <a href="../../examples/read-dataset/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -376,17 +377,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../examples/extending-cryojax/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -396,7 +390,6 @@
   
 
       </a>
-      
     </li>
   
 
@@ -455,7 +448,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../simulate-relion-dataset/" class="md-nav__link">
+      <a href="../../examples/simulate-relion-dataset/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -523,7 +516,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../structure-refinement/" class="md-nav__link">
+      <a href="../../examples/structure-refinement/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -557,8 +550,10 @@
       
   
   
+    
   
   
+  
     
     
     
@@ -568,11 +563,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
           <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
@@ -587,7 +582,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             API
@@ -639,7 +634,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/simulator/api/" class="md-nav__link">
+      <a href="../simulator/api/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -699,7 +694,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/simulator/pose/" class="md-nav__link">
+      <a href="../simulator/pose/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -721,7 +716,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/simulator/volume/" class="md-nav__link">
+      <a href="../simulator/volume/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -789,7 +784,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/simulator/integrator/" class="md-nav__link">
+      <a href="../simulator/integrator/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -811,7 +806,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/simulator/transfer_theory/" class="md-nav__link">
+      <a href="../simulator/transfer_theory/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -833,7 +828,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/simulator/scattering_theory/" class="md-nav__link">
+      <a href="../simulator/scattering_theory/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -901,7 +896,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/simulator/config/" class="md-nav__link">
+      <a href="../simulator/config/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -923,7 +918,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/simulator/image_model/" class="md-nav__link">
+      <a href="../simulator/image_model/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -945,7 +940,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/simulator/noise_model/" class="md-nav__link">
+      <a href="../simulator/noise_model/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1021,7 +1016,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/dataset/relion/" class="md-nav__link">
+      <a href="../dataset/relion/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1089,7 +1084,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/io/mrc/" class="md-nav__link">
+      <a href="../io/mrc/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1111,7 +1106,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/io/atom_loading/" class="md-nav__link">
+      <a href="../io/atom_loading/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1179,7 +1174,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/ndimage/functions/" class="md-nav__link">
+      <a href="../ndimage/functions/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1239,7 +1234,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/ndimage/operators/" class="md-nav__link">
+      <a href="../ndimage/operators/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1307,7 +1302,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/ndimage/transforms/" class="md-nav__link">
+      <a href="../ndimage/transforms/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1383,7 +1378,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/coordinates/making_coordinates/" class="md-nav__link">
+      <a href="../coordinates/making_coordinates/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1405,7 +1400,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/coordinates/transforming_coordinates/" class="md-nav__link">
+      <a href="../coordinates/transforming_coordinates/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1473,7 +1468,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/rotations/lie_groups/" class="md-nav__link">
+      <a href="../rotations/lie_groups/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1495,7 +1490,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/rotations/conversions/" class="md-nav__link">
+      <a href="../rotations/conversions/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1563,7 +1558,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/constants/units/" class="md-nav__link">
+      <a href="../constants/units/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1585,7 +1580,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/constants/scattering_factor_parameters/" class="md-nav__link">
+      <a href="../constants/scattering_factor_parameters/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1607,7 +1602,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/constants/conventions/" class="md-nav__link">
+      <a href="../constants/conventions/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1634,6 +1629,8 @@
                 
   
   
+    
+  
   
   
     
@@ -1642,11 +1639,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_8" checked>
         
           
           <label class="md-nav__link" for="__nav_3_8" id="__nav_3_8_label" tabindex="0">
@@ -1661,7 +1658,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_8_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_8_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3_8">
             <span class="md-nav__icon md-icon"></span>
             cryojax.atom_util
@@ -1672,10 +1669,31 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../api/atom_util/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Utilities for atom manipulation
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   <span class="md-ellipsis">
@@ -1685,6 +1703,74 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#chemistry" class="md-nav__link">
+    <span class="md-ellipsis">
+      Chemistry
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Chemistry">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cryojax.atom_util.split_atoms_by_element" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;split_atoms_by_element
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geometry" class="md-nav__link">
+    <span class="md-ellipsis">
+      Geometry
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Geometry">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cryojax.atom_util.center_atom_positions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;center_atom_positions
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1743,7 +1829,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/jax_util/filter_specs/" class="md-nav__link">
+      <a href="../jax_util/filter_specs/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1765,7 +1851,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/jax_util/grid_search/" class="md-nav__link">
+      <a href="../jax_util/grid_search/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1787,7 +1873,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/jax_util/pytree_transforms/" class="md-nav__link">
+      <a href="../jax_util/pytree_transforms/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1809,7 +1895,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/jax_util/useful_functions/" class="md-nav__link">
+      <a href="../jax_util/useful_functions/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1855,239 +1941,83 @@
 
 
 
-  <h1>Create custom image simulation methods</h1>
-
-<p>CryoJAX is built to support new image simulation methods external to the main codebase. To achieve this, cryoJAX models and algorithms--e.g. for volumes, CTFs, and poses--are built on abstract base classes.</p>
-<p>To name a few, the following table outlines abstract base classes for key modeling components in cryoJAX:</p>
-<table>
-<thead>
-<tr>
-<th style="text-align: left;">Modeling component</th>
-<th style="text-align: left;">Abstract base class</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: left;">Model image formation</td>
-<td style="text-align: left;"><code>AbstractImageModel</code></td>
-</tr>
-<tr>
-<td style="text-align: left;">Represent a volume for imaging</td>
-<td style="text-align: left;"><code>AbstractVolumeRepresentation</code></td>
-</tr>
-<tr>
-<td style="text-align: left;">Project an <code>AbstractVolumeRepresentation</code> on imaging plane</td>
-<td style="text-align: left;"><code>AbstractVolumeIntegrator</code></td>
-</tr>
-<tr>
-<td style="text-align: left;">Contrast transfer functions</td>
-<td style="text-align: left;"><code>AbstractCTF</code></td>
-</tr>
-<tr>
-<td style="text-align: left;">Pose</td>
-<td style="text-align: left;"><code>AbstractPose</code></td>
-</tr>
-</tbody>
-</table>
-<p>To see what exactly needs to be implemented for a particular abstract base class, it is necessary to read the cryoJAX documentation or source code.</p>
-<p>In this tutorial it is demonstrated how to extend the <code>AbstractCTF</code> class for use with other existing image simulation code. A simple model for defocus and spherical aberration will be implemented with aberration function <span class="arithmatex">\(\chi\)</span> as</p>
-<div class="arithmatex">\[\chi(\vec{q}) = -\pi \lambda \Delta f |\vec{q}|^2 + \frac{\pi}{2} \lambda^3 C_s |\vec{q}|^4,\]</div>
-<p>where <span class="arithmatex">\(\vec{q}\)</span> is an in-plane spatial frequency vector, <span class="arithmatex">\(\lambda\)</span> is wavelength, <span class="arithmatex">\(\Delta f\)</span> is defocus, and <span class="arithmatex">\(C_s\)</span> is the spherical aberration coefficient. </p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Plotting imports and functions</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">matplotlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">pyplot</span> <span class="k">as</span> <span class="n">plt</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">mpl_toolkits.axes_grid1</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_axes_locatable</span>
+<h1 id="utilities-for-atom-manipulation">Utilities for atom manipulation<a class="headerlink" href="#utilities-for-atom-manipulation" title="Permanent link">¤</a></h1>
+<p><code>cryojax.atom_util</code> is a submodule that contains functions for manipulating arrays of atoms and their properties.</p>
+<h2 id="chemistry">Chemistry<a class="headerlink" href="#chemistry" title="Permanent link">¤</a></h2>
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">plot_image</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;gray&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-    <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
-    <span class="n">im</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="n">cmap</span><span class="p">,</span> <span class="n">origin</span><span class="o">=</span><span class="s2">&quot;lower&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-    <span class="n">divider</span> <span class="o">=</span> <span class="n">make_axes_locatable</span><span class="p">(</span><span class="n">ax</span><span class="p">)</span>
-    <span class="n">cax</span> <span class="o">=</span> <span class="n">divider</span><span class="o">.</span><span class="n">append_axes</span><span class="p">(</span><span class="s2">&quot;right&quot;</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="s2">&quot;5%&quot;</span><span class="p">,</span> <span class="n">pad</span><span class="o">=</span><span class="mf">0.05</span><span class="p">)</span>
-    <span class="n">fig</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">cax</span><span class="o">=</span><span class="n">cax</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">label</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">ax</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="n">label</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span>
-</code></pre></div>
-<div class="highlight"><pre><span></span><code><span class="c1"># Start with building other image simulation components</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">cryojax.simulator</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">cxs</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">equinox</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">eqx</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">cryojax.io</span><span class="w"> </span><span class="kn">import</span> <span class="n">read_array_from_mrc</span>
+<div class="doc doc-object doc-function">
 
 
-<span class="n">jax</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="s2">&quot;jax_enable_x64&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
-
-<span class="c1"># ... scattering potential stored in MRC format</span>
-<span class="n">filename</span> <span class="o">=</span> <span class="s2">&quot;./data/groel_5w0s_scattering_potential.mrc&quot;</span>
-<span class="c1"># ... read into a FourierVoxelGridPotential</span>
-<span class="n">real_voxel_grid</span><span class="p">,</span> <span class="n">voxel_size</span> <span class="o">=</span> <span class="n">read_array_from_mrc</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">loads_grid_spacing</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="n">volume</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">FourierVoxelGridVolume</span><span class="o">.</span><span class="n">from_real_voxel_grid</span><span class="p">(</span><span class="n">real_voxel_grid</span><span class="p">,</span> <span class="n">pad_scale</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
-<span class="c1"># ... instantiate the pose. Angles are given in degrees</span>
-<span class="n">pose</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">EulerAnglePose</span><span class="p">(</span>
-    <span class="n">offset_x_in_angstroms</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span>
-    <span class="n">offset_y_in_angstroms</span><span class="o">=-</span><span class="mf">3.0</span><span class="p">,</span>
-    <span class="n">phi_angle</span><span class="o">=</span><span class="mf">20.0</span><span class="p">,</span>
-    <span class="n">theta_angle</span><span class="o">=</span><span class="mf">80.0</span><span class="p">,</span>
-    <span class="n">psi_angle</span><span class="o">=-</span><span class="mf">5.0</span><span class="p">,</span>
-<span class="p">)</span>
-<span class="c1"># ... the configuration. Add padding with respect to the final image shape.</span>
-<span class="n">pad_options</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="n">volume</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">2</span><span class="p">])</span>
-<span class="n">config</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">BasicImageConfig</span><span class="p">(</span>
-    <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">80</span><span class="p">,</span> <span class="mi">80</span><span class="p">),</span>
-    <span class="n">pixel_size</span><span class="o">=</span><span class="n">voxel_size</span><span class="p">,</span>
-    <span class="n">voltage_in_kilovolts</span><span class="o">=</span><span class="mf">300.0</span><span class="p">,</span>
-    <span class="n">pad_options</span><span class="o">=</span><span class="n">pad_options</span><span class="p">,</span>
-<span class="p">)</span>
+<h4 id="cryojax.atom_util.split_atoms_by_element" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">atom_util</span><span class="o">.</span><span class="n">split_atoms_by_element</span><span class="p">(</span><span class="n">atomic_numbers</span><span class="p">:</span> <span class="n">Int</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;_&#39;</span><span class="p">],</span> <span class="n">atom_pytree</span><span class="p">:</span> <span class="n">PyTree</span><span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;T&#39;</span><span class="p">],</span> <span class="n">atom_axis</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">PyTree</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="s1">&#39;T&#39;</span><span class="p">],</span> <span class="n">Int</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;_&#39;</span><span class="p">]]</span></code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/f43884d2c47fe8369c931f61ed10e41064b7e5f9/cryojax/atom_util/_element_utils.py#L11-L44"><code class='hippogriffe-repo-url'></code></a>
 
 
-<span class="c1"># Now, define function for image simulation</span>
-<span class="nd">@eqx</span><span class="o">.</span><span class="n">filter_jit</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">simulate_fn</span><span class="p">(</span><span class="n">ctf</span><span class="p">:</span> <span class="n">cxs</span><span class="o">.</span><span class="n">AbstractCTF</span><span class="p">,</span> <span class="n">ac</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">args</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
-    <span class="n">volume</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">pose</span> <span class="o">=</span> <span class="n">args</span>
-    <span class="n">transfer_theory</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">ContrastTransferTheory</span><span class="p">(</span><span class="n">ctf</span><span class="o">=</span><span class="n">ctf</span><span class="p">,</span> <span class="n">amplitude_contrast_ratio</span><span class="o">=</span><span class="n">ac</span><span class="p">)</span>
-    <span class="n">image_model</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">make_image_model</span><span class="p">(</span>
-        <span class="n">volume</span><span class="p">,</span>
-        <span class="n">config</span><span class="p">,</span>
-        <span class="n">pose</span><span class="p">,</span>
-        <span class="n">transfer_theory</span><span class="p">,</span>
-        <span class="n">normalizes_signal</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-    <span class="p">)</span>
-    <span class="k">return</span> <span class="n">image_model</span><span class="o">.</span><span class="n">simulate</span><span class="p">()</span>
-</code></pre></div>
-<p>First, just the defocus term of the CTF will be implemented. To do so, the interface for an <code>AbstractCTF</code> must be implemented. The jist of what this looks like is the following:</p>
-<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AbstractCTF</span><span class="p">(</span><span class="n">eqx</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;An abstract base class for a CTF in cryo-EM.&quot;&quot;&quot;</span>
-
-    <span class="nd">@abstractmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">compute_aberration_phase_shifts</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span>
-        <span class="n">frequency_grid_in_angstroms</span><span class="p">,</span>
-        <span class="n">wavelength_in_angstroms</span><span class="p">,</span>
-        <span class="n">defocus_offset</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="p">):</span>
-        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
-</code></pre></div>
-<p>There is a single <code>abstractmethod</code> to implement for the aberration function <span class="arithmatex">\(\chi\)</span>.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">cryojax.simulator</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">cxs</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">cryojax.jax_util</span><span class="w"> </span><span class="kn">import</span> <span class="n">NDArrayLike</span>
+<a href="#cryojax.atom_util.split_atoms_by_element" class="headerlink" title="Permanent link">¤</a></h4>
 
 
-<span class="k">class</span><span class="w"> </span><span class="nc">CustomCTF</span><span class="p">(</span><span class="n">cxs</span><span class="o">.</span><span class="n">AbstractCTF</span><span class="p">):</span>  <span class="c1"># First, subclass `AbstractCTF`</span>
-    <span class="n">defocus_in_angstroms</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>  <span class="c1"># Next, parameters are `dataclass` fields</span>
+    <div class="doc doc-contents first">
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">defocus_in_angstroms</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">defocus_in_angstroms</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">defocus_in_angstroms</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+        <p>Given atomic numbers, split a pytree of numpy arrays
+representing atom properties into a tuple where each element
+is the pytree of tuples where each element is the array for
+a given atomic number.</p>
+<p><strong>Arguments:</strong></p>
+<ul>
+<li><code>atomic_numbers</code>:
+    Atomic numbers as a numpy arrays.</li>
+<li><code>atom_pytree</code>:
+    A pytree of numpy arrays,</li>
+<li><code>atom_axis</code>:
+    The axis representing the atom index. Leading axes
+    are assumed to be batched axes.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p>A pytree with tree structure matching <code>atom_pytree</code>,
+where arrays have been replaced with tuples of arrays.</p>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">compute_aberration_phase_shifts</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span>
-        <span class="n">frequency_grid_in_angstroms</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
-        <span class="n">wavelength_in_angstroms</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">NDArrayLike</span><span class="p">,</span>
-        <span class="n">defocus_offset</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">NDArrayLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Finally, implement the interface defined by `AbstractCTF`&quot;&quot;&quot;</span>
-        <span class="n">q_squared</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">frequency_grid_in_angstroms</span><span class="o">**</span><span class="mi">2</span><span class="p">,</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
-        <span class="n">defocus</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">defocus_in_angstroms</span>
-        <span class="k">if</span> <span class="n">defocus_offset</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">defocus</span> <span class="o">+=</span> <span class="n">defocus_offset</span>
-        <span class="k">return</span> <span class="o">-</span><span class="n">jnp</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">wavelength_in_angstroms</span> <span class="o">*</span> <span class="n">defocus</span> <span class="o">*</span> <span class="n">q_squared</span><span class="p">)</span>
-</code></pre></div>
-<div class="admonition info">
-<p class="admonition-title">How do classes work in cryoJAX?</p>
-<p>Classes in cryoJAX are built on <a href="https://docs.kidger.site/equinox/api/module/module/#module"><code>equinox.Module</code>s</a>. These are reminiscent of a PyTorch <code>torch.nn.Module</code>, but also have python <code>dataclass</code>-like features and smoothly integrate with JAX functional programming.</p>
-<p>CryoJAX's abstract base class paradigm is inspired from other libraries in the JAX+Equinox ecosystem. To learn more, see <a href="https://docs.kidger.site/lineax/"><code>lineax</code></a>, <a href="https://docs.kidger.site/optimistix/"><code>optimistix</code></a>, and <a href="https://docs.kidger.site/diffrax/"><code>diffrax</code></a>. </p>
+
+    </div>
+
+</div><h2 id="geometry">Geometry<a class="headerlink" href="#geometry" title="Permanent link">¤</a></h2>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="cryojax.atom_util.center_atom_positions" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">atom_util</span><span class="o">.</span><span class="n">center_atom_positions</span><span class="p">(</span><span class="n">atom_positions</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;... n_atoms 3&#39;</span><span class="p">],</span> <span class="n">atom_masses</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;... n_atoms&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">atom_axis</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;... n_atoms 3&#39;</span><span class="p">]</span></code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/f43884d2c47fe8369c931f61ed10e41064b7e5f9/cryojax/atom_util/_geometry.py#L5-L38"><code class='hippogriffe-repo-url'></code></a>
+
+
+<a href="#cryojax.atom_util.center_atom_positions" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+        <p>Center positions of a numpy array of atoms.</p>
+<p><strong>Arguments:</strong></p>
+<ul>
+<li><code>atom_positions</code>:
+    The array of atom positions.</li>
+<li><code>atom_masses</code>:
+    Optionally, provide the masses of the atoms
+    to center by mass.</li>
+<li><code>atom_axis</code>:
+    The axis representing the atom index. Leading axes
+    are assumed to be batched axes. <code>atom_positions</code>
+    and <code>atom_masses</code> are assumed to have the same
+    batched axes.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p>The centered <code>atom_positions</code>. This is centered by
+geometry if <code>atom_masses = None</code> and by mass otherwise.</p>
+
+
+    </div>
+
 </div>
-<div class="highlight"><pre><span></span><code><span class="c1"># Now, simulate an image using our `CustomCTF`</span>
-<span class="n">args</span> <span class="o">=</span> <span class="p">(</span><span class="n">volume</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">pose</span><span class="p">)</span>
-<span class="n">custom_ctf</span> <span class="o">=</span> <span class="n">CustomCTF</span><span class="p">(</span><span class="n">defocus_in_angstroms</span><span class="o">=</span><span class="mi">10_000</span><span class="p">)</span>  <span class="c1"># 1 um defocus</span>
-<span class="n">image_1</span> <span class="o">=</span> <span class="n">simulate_fn</span><span class="p">(</span><span class="n">custom_ctf</span><span class="p">,</span> <span class="n">ac</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="n">args</span><span class="p">)</span>
-<span class="n">plot_image</span><span class="p">(</span><span class="n">image_1</span><span class="p">)</span>
-</code></pre></div>
-<div class="highlight"><pre><span></span><code>(&lt;Figure size 300x300 with 2 Axes&gt;, &lt;Axes: &gt;)
-</code></pre></div>
-<p><img alt="img" src="../_data/62f468e77cae4df0b0ff9aae8e0f3a64.png" /></p>
-<div class="highlight"><pre><span></span><code><span class="c1"># This image should be identical to cryoJAX&#39;s built-in CTF at zero</span>
-<span class="c1"># astigmatism and spherical aberration!</span>
-<span class="n">builtin_ctf</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">AstigmaticCTF</span><span class="p">(</span>
-    <span class="n">defocus_in_angstroms</span><span class="o">=</span><span class="mi">10_000</span><span class="p">,</span>
-    <span class="n">spherical_aberration_in_mm</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
-    <span class="n">astigmatism_in_angstroms</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
-<span class="p">)</span>
-<span class="n">test_image_1</span> <span class="o">=</span> <span class="n">simulate_fn</span><span class="p">(</span><span class="n">builtin_ctf</span><span class="p">,</span> <span class="n">ac</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="n">args</span><span class="p">)</span>
-<span class="k">assert</span> <span class="n">jnp</span><span class="o">.</span><span class="n">allclose</span><span class="p">(</span><span class="n">image_1</span><span class="p">,</span> <span class="n">test_image_1</span><span class="p">)</span>
-</code></pre></div>
-<p>That was easy! Implementing abstract interfaces is the most important concept to know for extending cryoJAX, but it is also possible to modify existing implementations by wrapping <em>existing</em> implementations. To demonstrate this, we can modify the <code>CustomCTF</code> to also include a spherical aberration term.</p>
-<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">WrappedCTF</span><span class="p">(</span><span class="n">cxs</span><span class="o">.</span><span class="n">AbstractCTF</span><span class="p">):</span>  <span class="c1"># Implement a new `AbstractCTF`</span>
-    <span class="n">ctf</span><span class="p">:</span> <span class="n">CustomCTF</span>  <span class="c1"># Wrap the `CustomCTF`</span>
-    <span class="n">spherical_aberration_in_mm</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">Array</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">compute_aberration_phase_shifts</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span>
-        <span class="n">frequency_grid_in_angstroms</span><span class="p">,</span>
-        <span class="n">wavelength_in_angstroms</span><span class="p">,</span>
-        <span class="n">defocus_offset</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="p">):</span>
-        <span class="n">q_squared</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">frequency_grid_in_angstroms</span><span class="o">**</span><span class="mi">2</span><span class="p">,</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
-        <span class="n">Cs</span> <span class="o">=</span> <span class="mf">1e7</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">spherical_aberration_in_mm</span>  <span class="c1"># mm to Angstroms</span>
-        <span class="c1"># Compute the `CustomCTF`` aberration function</span>
-        <span class="n">chi</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ctf</span><span class="o">.</span><span class="n">compute_aberration_phase_shifts</span><span class="p">(</span>
-            <span class="n">frequency_grid_in_angstroms</span><span class="p">,</span> <span class="n">wavelength_in_angstroms</span><span class="p">,</span> <span class="n">defocus_offset</span>
-        <span class="p">)</span>
-        <span class="c1"># Modify output to include spherical aberration term</span>
-        <span class="n">chi</span> <span class="o">+=</span> <span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="n">Cs</span> <span class="o">*</span> <span class="n">wavelength_in_angstroms</span><span class="o">**</span><span class="mi">3</span> <span class="o">*</span> <span class="n">q_squared</span><span class="o">**</span><span class="mi">2</span>
-        <span class="k">return</span> <span class="n">chi</span>
-</code></pre></div>
-<div class="highlight"><pre><span></span><code><span class="c1"># Simulate an image using the `WrappedCTF`</span>
-<span class="n">args</span> <span class="o">=</span> <span class="p">(</span><span class="n">volume</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">pose</span><span class="p">)</span>
-<span class="n">wrapped_ctf</span> <span class="o">=</span> <span class="n">WrappedCTF</span><span class="p">(</span><span class="n">ctf</span><span class="o">=</span><span class="n">custom_ctf</span><span class="p">,</span> <span class="n">spherical_aberration_in_mm</span><span class="o">=</span><span class="mf">2.7</span><span class="p">)</span>
-<span class="n">image_2</span> <span class="o">=</span> <span class="n">simulate_fn</span><span class="p">(</span><span class="n">wrapped_ctf</span><span class="p">,</span> <span class="n">ac</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="n">args</span><span class="p">)</span>
-<span class="n">plot_image</span><span class="p">(</span><span class="n">image_2</span><span class="p">)</span>
-</code></pre></div>
-<div class="highlight"><pre><span></span><code>(&lt;Figure size 300x300 with 2 Axes&gt;, &lt;Axes: &gt;)
-</code></pre></div>
-<p><img alt="img" src="../_data/eb1f042bed324760bf28f5a99b460e29.png" /></p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Again, confirm that this is the same as the native cryoJAX implementation</span>
-<span class="n">builtin_ctf</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">AstigmaticCTF</span><span class="p">(</span>
-    <span class="n">defocus_in_angstroms</span><span class="o">=</span><span class="mi">10_000</span><span class="p">,</span>
-    <span class="n">spherical_aberration_in_mm</span><span class="o">=</span><span class="mf">2.7</span><span class="p">,</span>
-    <span class="n">astigmatism_in_angstroms</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
-<span class="p">)</span>
-<span class="n">test_image_2</span> <span class="o">=</span> <span class="n">simulate_fn</span><span class="p">(</span><span class="n">builtin_ctf</span><span class="p">,</span> <span class="n">ac</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="n">args</span><span class="p">)</span>
-<span class="k">assert</span> <span class="n">jnp</span><span class="o">.</span><span class="n">allclose</span><span class="p">(</span><span class="n">image_2</span><span class="p">,</span> <span class="n">test_image_2</span><span class="p">)</span>
-</code></pre></div>
-<p>While this is a toy example, the principle applies generally in cryoJAX and is meant to support an ecosystem of cryo-EM research projects. For example, one can implement custom volumes via the <code>AbstractVolumeRepresentation</code> and <code>AbstractVolumeIntegrator</code> interfaces to model particular proteins or parametrize conformational heterogeneity.</p>
-<p>What next? There is a wide range of possible image formation modeling in cryoJAX to learn about. For example, other useful abstract interfaces include the following:</p>
-<table>
-<thead>
-<tr>
-<th style="text-align: left;">Modeling component</th>
-<th style="text-align: left;">Abstract base class</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: left;">Function returning an <code>AbstractVolumeRepresentation</code></td>
-<td style="text-align: left;"><code>AbstractVolumeParametrization</code></td>
-</tr>
-<tr>
-<td style="text-align: left;">Noise models</td>
-<td style="text-align: left;"><code>AbstractNoiseModel</code></td>
-</tr>
-<tr>
-<td style="text-align: left;">Filters and masks</td>
-<td style="text-align: left;"><code>AbstractFilter</code> and <code>AbstractMask</code></td>
-</tr>
-<tr>
-<td style="text-align: left;">Scattering approximations</td>
-<td style="text-align: left;"><code>AbstractScatteringTheory</code></td>
-</tr>
-<tr>
-<td style="text-align: left;">Detectors and DQEs</td>
-<td style="text-align: left;"><code>AbstractDetector</code> and <code>AbstractDQE</code></td>
-</tr>
-</tbody>
-</table>
 
 
 

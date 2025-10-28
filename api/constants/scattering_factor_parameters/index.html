@@ -1630,38 +1630,32 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#extracting-parameters-from-a-lookup-table" class="md-nav__link">
+  <a href="#cryojax.constants.extract_scattering_factor_parameters" class="md-nav__link">
     <span class="md-ellipsis">
-      Extracting parameters from a lookup table
+      <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;extract_scattering_factor_parameters
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Extracting parameters from a lookup table">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cryojax.constants.get_tabulated_scattering_factor_parameters" class="md-nav__link">
-    <span class="md-ellipsis">
-      <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;get_tabulated_scattering_factor_parameters
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#lookup-tables" class="md-nav__link">
+  <a href="#peng-scattering-factor-parameters" class="md-nav__link">
     <span class="md-ellipsis">
-      Lookup tables
+      Peng scattering factor parameters
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Lookup tables">
+    <nav class="md-nav" aria-label="Peng scattering factor parameters">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cryojax.constants.PengScatteringFactorParameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;PengScatteringFactorParameters
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#cryojax.constants.read_peng_scattering_factor_parameter_table" class="md-nav__link">
@@ -1739,7 +1733,7 @@
             
   
   <span class="md-ellipsis">
-    cryojax.jax_util
+    cryojax.atom_util
     
   </span>
   
@@ -1749,6 +1743,74 @@
         
         <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_8_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3_8">
+            <span class="md-nav__icon md-icon"></span>
+            cryojax.atom_util
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../atom_util/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Utilities for atom manipulation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_9" id="__nav_3_9_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    cryojax.jax_util
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_9">
             <span class="md-nav__icon md-icon"></span>
             cryojax.jax_util
           </label>
@@ -1874,19 +1936,18 @@
 
 
 <h1 id="scattering-factor-parameters">Scattering factor parameters<a class="headerlink" href="#scattering-factor-parameters" title="Permanent link">¤</a></h1>
-<p>Modeling the electron scattering amplitudes of individual atoms is an important component of modeling cryo-EM images, as these are typically used to approximate the electrostatic potential. Typically, the scattering factor for each individual atom is numerically approximated with a fixed functional form but varying parameters for different atoms. These parameters are stored in lookup tables in the literature. This documentation provides these lookup tables so that they may be used to compute electrostatic potentials in cryoJAX.</p>
-<h2 id="extracting-parameters-from-a-lookup-table">Extracting parameters from a lookup table<a class="headerlink" href="#extracting-parameters-from-a-lookup-table" title="Permanent link">¤</a></h2>
+<p>Modeling the electron scattering amplitudes of individual atoms is an important component of modeling cryo-EM images, as these are typically used to approximate the electrostatic potential. Typically, the scattering factor for each individual atom is numerically approximated with a fixed functional form but varying parameters for different atoms. These parameters are stored in lookup tables in the literature. This documentation provides these lookup tables and utilities for extracting them so that they may be used to compute electrostatic potentials in cryoJAX.</p>
 
 
 <div class="doc doc-object doc-function">
 
 
-<h4 id="cryojax.constants.get_tabulated_scattering_factor_parameters" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">constants</span><span class="o">.</span><span class="n">get_tabulated_scattering_factor_parameters</span><span class="p">(</span><span class="n">atom_types</span><span class="p">:</span> <span class="n">Int</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;n_atoms&#39;</span><span class="p">],</span> <span class="n">scattering_factor_parameter_table</span><span class="p">:</span> <span class="n">xarray</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">dataset</span><span class="o">.</span><span class="n">Dataset</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;n_atoms n_scattering_factors&#39;</span><span class="p">]]</span></code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/98c017fc405ec3faaa64cb4bb36346ae15834148/cryojax/constants/_scattering_factor_parameters.py#L15-L43"><code class='hippogriffe-repo-url'></code></a>
+<h4 id="cryojax.constants.extract_scattering_factor_parameters" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">constants</span><span class="o">.</span><span class="n">extract_scattering_factor_parameters</span><span class="p">(</span><span class="n">atom_types</span><span class="p">:</span> <span class="n">Int</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;n_atoms&#39;</span><span class="p">],</span> <span class="n">scattering_factor_parameter_table</span><span class="p">:</span> <span class="n">xarray</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">dataset</span><span class="o">.</span><span class="n">Dataset</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;n_atoms n_scattering_factors&#39;</span><span class="p">]]</span></code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/f43884d2c47fe8369c931f61ed10e41064b7e5f9/cryojax/constants/_scattering_factor_parameters.py#L80-L108"><code class='hippogriffe-repo-url'></code></a>
 
 
-<a href="#cryojax.constants.get_tabulated_scattering_factor_parameters" class="headerlink" title="Permanent link">¤</a></h4>
+<a href="#cryojax.constants.extract_scattering_factor_parameters" class="headerlink" title="Permanent link">¤</a></h4>
 
 
     <div class="doc doc-contents first">
@@ -1911,7 +1972,87 @@
 
     </div>
 
-</div><h2 id="lookup-tables">Lookup tables<a class="headerlink" href="#lookup-tables" title="Permanent link">¤</a></h2>
+</div><h2 id="peng-scattering-factor-parameters">Peng scattering factor parameters<a class="headerlink" href="#peng-scattering-factor-parameters" title="Permanent link">¤</a></h2>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="cryojax.constants.PengScatteringFactorParameters" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.constants.PengScatteringFactorParameters</code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/f43884d2c47fe8369c931f61ed10e41064b7e5f9/cryojax/constants/_scattering_factor_parameters.py#L16-L48"><code class='hippogriffe-repo-url'></code></a>
+
+
+<a href="#cryojax.constants.PengScatteringFactorParameters" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+
+        <p>A convenience wrapper for instantiating the
+scattering factor parameters from Peng et al. (1996).</p>
+<p>To access scattering factors <span class="arithmatex">\(a_i\)</span> and <span class="arithmatex">\(b_i\)</span> given in
+the citation,</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">cryojax.io</span><span class="w"> </span><span class="kn">import</span> <span class="n">read_atoms_from_pdb</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">cryojax.constants</span><span class="w"> </span><span class="kn">import</span> <span class="n">PengScatteringFactorParameters</span>
+
+<span class="c1"># Load positions of atoms and one-hot encoded atom names</span>
+<span class="n">atom_positions</span><span class="p">,</span> <span class="n">atom_types</span> <span class="o">=</span> <span class="n">read_atoms_from_pdb</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+<span class="n">parameters</span> <span class="o">=</span> <span class="n">PengScatteringFactorParameters</span><span class="p">(</span><span class="n">atom_types</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">parameters</span><span class="o">.</span><span class="n">a</span><span class="p">,</span> <span class="n">parameters</span><span class="o">.</span><span class="n">b</span><span class="p">)</span>  <span class="c1"># a_i and b_i</span>
+</code></pre></div>
+
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.constants.PengScatteringFactorParameters.__init__" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">atomic_numbers</span><span class="p">:</span> <span class="n">Int</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;n_atoms&#39;</span><span class="p">])</span></code>
+  
+
+
+<a href="#cryojax.constants.PengScatteringFactorParameters.__init__" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p><strong>Arguments:</strong></p>
+<ul>
+<li><code>atomic_numbers</code>:
+    The atom types as an integer array.</li>
+</ul>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div><hr />
 
 
 <div class="doc doc-object doc-function">
@@ -1919,7 +2060,7 @@
 
 <h4 id="cryojax.constants.read_peng_scattering_factor_parameter_table" class="doc doc-heading">
   <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">constants</span><span class="o">.</span><span class="n">read_peng_scattering_factor_parameter_table</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">xarray</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">dataset</span><span class="o">.</span><span class="n">Dataset</span></code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/98c017fc405ec3faaa64cb4bb36346ae15834148/cryojax/constants/_scattering_factor_parameters.py#L46-L72"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/f43884d2c47fe8369c931f61ed10e41064b7e5f9/cryojax/constants/_scattering_factor_parameters.py#L51-L77"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.constants.read_peng_scattering_factor_parameter_table" class="headerlink" title="Permanent link">¤</a></h4>
