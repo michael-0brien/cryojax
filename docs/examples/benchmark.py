@@ -7,6 +7,7 @@ import jax.numpy as jnp
 from cryojax.constants import PengScatteringFactorParameters
 from cryojax.dataset import RelionParticleParameterFile
 from cryojax.io import read_atoms_from_pdb
+from cryojax.ndimage import operators as op
 from cryojax.rotations import SO3
 from jaxtyping import PRNGKeyArray
 
@@ -106,8 +107,18 @@ def setup(num_images, path_to_pdb, path_to_starfile):
     volume_fourier_grid = cxs.FourierVoxelGridVolume.from_real_voxel_grid(
         real_voxel_grid, pad_scale=2
     )
-
-    return particle_parameters, parameter_file, volume_gmm, volume_fourier_grid
+    # print(atom_properties["b_factors"].mean() * 8 * jnp.pi**2)
+    atom_volume = cxs.IndependentAtomVolume(
+        position_pytree=atom_positions,
+        scattering_factor_pytree=op.FourierGaussian(amplitude=1.0, b_factor=10.0),
+    )
+    return (
+        particle_parameters,
+        parameter_file,
+        volume_gmm,
+        atom_volume,
+        volume_fourier_grid,
+    )
 
 
 # def compute_image(particle_parameters, volume, volume_integrator, rng_key):
@@ -233,17 +244,111 @@ def simulate_image(image_config, pose, transfer_theory, potential, volume_integr
     return image_model.simulate()
 
 
+@eqx.filter_vmap(in_axes=(eqx.if_array(0), eqx.if_array(0), eqx.if_array(0), None, None))
+def simulate_image_nojit(
+    image_config, pose, transfer_theory, potential, volume_integrator
+):
+    image_model = cxs.make_image_model(
+        volume_parametrization=potential,
+        image_config=image_config,
+        pose=pose,
+        transfer_theory=transfer_theory,
+        volume_integrator=volume_integrator,
+    )
+    return image_model.simulate()
+
+
 def benchmark_fourier_slice_vs_gmm(
     n_iterations, num_images, path_to_pdb, path_to_starfile
 ):
-    particle_parameters, _, volume_gmm, volume_fourier_grid = setup(
+    particle_parameters, _, volume_gmm, atom_volume, volume_fourier_grid = setup(
         num_images, path_to_pdb, path_to_starfile
     )
+
+    # pixel_size, shape = 0.5, (64, 64)
+    # pad_options = dict(shape=(128, 128))
+    # image_config = cxs.BasicImageConfig(
+    #     shape, pixel_size, voltage_in_kilovolts=300.0, pad_options=pad_options
+    # )
+    # key = jax.random.PRNGKey(0)
+    # rotation = SO3.sample_uniform(key)
+    # offset_in_angstroms = jnp.zeros(2)
+    # pose = cxs.EulerAnglePose.from_rotation_and_translation(
+    #     rotation, offset_in_angstroms
+    # )
+
+    # defocus_in_angstroms = 15000.0
+    # astigmatism_in_angstroms = 2000.0
+    # astigmatism_angle = jnp.pi / 4
+    # spherical_aberration_in_mm = 2.0
+    # amplitude_contrast_ratio = 0.1
+    # transfer_theory = cxs.ContrastTransferTheory(
+    #     ctf=cxs.AstigmaticCTF(
+    #         defocus_in_angstroms=defocus_in_angstroms,
+    #         astigmatism_in_angstroms=astigmatism_in_angstroms,
+    #         astigmatism_angle=astigmatism_angle,
+    #         spherical_aberration_in_mm=spherical_aberration_in_mm,
+    #     ),
+    #     amplitude_contrast_ratio=amplitude_contrast_ratio,
+    # )
+    # image_model = eqx.filter_jit(cxs.make_image_model)(
+    #     volume_parametrization=atom_volume,
+    #     image_config=image_config,
+    #     pose=pose,
+    #     transfer_theory=transfer_theory,
+    #     volume_integrator=cxs.FFTAtomProjection(eps=1e-16),
+    # )
+    # _ = image_model.simulate()
+
+    # assert False
+
     image_config, pose, transfer_theory = (
         particle_parameters["image_config"],
         particle_parameters["pose"],
         particle_parameters["transfer_theory"],
     )
+
+    fft_image = simulate_image(
+        image_config,
+        pose,
+        transfer_theory,
+        atom_volume,
+        cxs.FFTAtomProjection(eps=1e-16),
+    )
+
+    time_list = []
+    for _ in range(n_iterations + 1):
+        start_time = time()
+        fft_image = simulate_image_nojit(
+            image_config,
+            pose,
+            transfer_theory,
+            atom_volume,
+            cxs.FFTAtomProjection(eps=1e-16),
+        )
+        fft_image.block_until_ready()
+        end_time = time()
+        time_list.append(end_time - start_time)
+    fft_avg_time = jnp.mean(jnp.array(time_list[1:]))
+    fft_std_time = jnp.std(jnp.array(time_list[1:]))
+    print(f"FFTproj (no JIT): {1000 * fft_avg_time:.2f} +/- {1000 * fft_std_time:.2f} ms")
+
+    time_list = []
+    for _ in range(n_iterations + 1):
+        start_time = time()
+        fft_image = simulate_image(
+            image_config,
+            pose,
+            transfer_theory,
+            atom_volume,
+            cxs.FFTAtomProjection(eps=1e-16),
+        )
+        fft_image.block_until_ready()
+        end_time = time()
+        time_list.append(end_time - start_time)
+    fft_avg_time = jnp.mean(jnp.array(time_list[1:]))
+    fft_std_time = jnp.std(jnp.array(time_list[1:]))
+    print(f"FFTproj (JIT): {1000 * fft_avg_time:.2f} +/- {1000 * fft_std_time:.2f} ms")
 
     time_list = []
     for _ in range(n_iterations + 1):
@@ -324,7 +429,7 @@ def benchmark_fourier_slice_vs_gmm(
 
 
 if __name__ == "__main__":
-    n_iterations, n_images = 10, 100
+    n_iterations, n_images = 2, 3
     print(
         f"Benchmarking image simulation of {n_images} images "
         f"averaged over {n_iterations} iterations"
