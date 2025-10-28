@@ -21,7 +21,7 @@ def test_downsample_preserves_sum(shape, downsample_factor):
     upsampled_shape = tuple(downsample_factor * s for s in shape)
     rng_key = jr.key(seed=1234)
     upsampled_image = 2.0 + 1.0 * jr.normal(rng_key, upsampled_shape)
-    image = cxi.downsample_with_fourier_cropping(upsampled_image, downsample_factor)
+    image = cxi.fourier_crop_downsample(upsampled_image, downsample_factor)
     np.testing.assert_allclose(image.sum(), upsampled_image.sum())
 
 

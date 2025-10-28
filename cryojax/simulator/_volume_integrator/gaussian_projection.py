@@ -1,4 +1,3 @@
-import math
 from typing import ClassVar
 from typing_extensions import override
 
@@ -9,23 +8,18 @@ from jaxtyping import Array, Complex, Float
 
 from ...constants import variance_to_b_factor
 from ...coordinates import make_1d_coordinate_grid
-from ...ndimage import (
-    downsample_to_shape_with_fourier_cropping,
-    resize_with_crop_or_pad,
-    rfftn,
-)
+from ...ndimage import resize_with_crop_or_pad, rfftn
 from .._image_config import AbstractImageConfig
-from .._volume import GaussianMixtureVolume, PengAtomicVolume
+from .._volume import GaussianMixtureVolume
 from .base_integrator import AbstractVolumeIntegrator
 
 
 class GaussianMixtureProjection(
-    AbstractVolumeIntegrator[GaussianMixtureVolume | PengAtomicVolume],
+    AbstractVolumeIntegrator[GaussianMixtureVolume],
     strict=True,
 ):
-    upsampling_factor: int | None
-    shape: tuple[int, int] | None
     use_error_functions: bool
+    shape: tuple[int, int] | None
     n_batches: int
 
     is_projection_approximation: ClassVar[bool] = True
@@ -40,11 +34,6 @@ class GaussianMixtureProjection(
     ):
         """**Arguments:**
 
-        - `upsampling_factor`:
-            The factor by which to upsample the computation of the images.
-            If `upsampling_factor` is greater than 1, the images will be computed
-            at a higher resolution and then downsampled to the original resolution.
-            This can be useful for reducing aliasing artifacts in the images.
         - `shape`:
             The shape of the plane on which projections are computed before padding or
             cropping to the `AbstractImageConfig.padded_shape`. This argument is particularly
@@ -52,30 +41,28 @@ class GaussianMixtureProjection(
         - `use_error_functions`:
             If `True`, use error functions to evaluate the projected volume at
             a pixel to be the average value within the pixel using gaussian
-            integrals. If `False`, the volume at a pixel will simply be evaluated
-            as a gaussian.
+            integrals (i.e. apply antialiasing). If `False`, the volume at a pixel will
+            be evaluated as a gaussian.
         - `n_batches`:
             The number of batches over groups of positions
-            used to evaluate the projection.
-            This is useful if GPU memory is exhausted. By default,
-            `1`, which computes a projection for all positions at once.
+            used to evaluate the projection. By default, `n_batches = 1`,
+            which computes a projection for all positions at once.
+            This is useful to decrease GPU memory usage.
         """  # noqa: E501
-        self.upsampling_factor = upsampling_factor
+        if upsampling_factor is not None:
+            raise ValueError(
+                "`upsampling_factor` in `GaussianMixtureProjection` "
+                "has been deprecated as of cryoJAX 0.5.1. The "
+                "functionality this implemented was not as intended."
+            )
         self.shape = shape
         self.use_error_functions = use_error_functions
         self.n_batches = n_batches
 
-    def __check_init__(self):
-        if self.upsampling_factor is not None and self.upsampling_factor < 1:
-            raise AttributeError(
-                "`GaussianMixtureProjection.upsampling_factor` must "
-                f"be greater than `1`. Got a value of {self.upsampling_factor}."
-            )
-
     @override
     def integrate(
         self,
-        volume_representation: GaussianMixtureVolume | PengAtomicVolume,
+        volume_representation: GaussianMixtureVolume,
         image_config: AbstractImageConfig,
         outputs_real_space: bool = False,
     ) -> (
@@ -89,8 +76,13 @@ class GaussianMixtureProjection(
 
         **Arguments:**
 
-        - `volume_representation`: The volume representation to project.
-        - `image_config`: The configuration of the imaging instrument.
+        - `volume_representation`:
+            The volume representation.
+        - `image_config`:
+            The configuration of the resulting image.
+        - `outputs_real_space`:
+            If `True`, return the image in real space. Otherwise,
+            return in fourier.
 
         **Returns:**
 
@@ -100,81 +92,31 @@ class GaussianMixtureProjection(
         # Grab the image configuration
         shape = image_config.padded_shape if self.shape is None else self.shape
         pixel_size = image_config.pixel_size
-        if self.upsampling_factor is not None:
-            u = self.upsampling_factor
-            upsampled_pixel_size, upsampled_shape = (
-                pixel_size / u,
-                (
-                    shape[0] * u,
-                    shape[1] * u,
-                ),
-            )
-        else:
-            upsampled_pixel_size, upsampled_shape = pixel_size, shape
         # Grab the gaussian amplitudes and widths
-        if isinstance(volume_representation, PengAtomicVolume):
-            positions = volume_representation.atom_positions
-            amplitudes = volume_representation.amplitudes
-            b_factors = volume_representation.b_factors
-        elif isinstance(volume_representation, GaussianMixtureVolume):
-            positions = volume_representation.positions
-            amplitudes = volume_representation.amplitudes
-            b_factors = variance_to_b_factor(volume_representation.variances)
-        else:
-            raise ValueError(
-                "Supported types for `volume_representation` are "
-                "`PengAtomicVolume` and `GaussianMixtureVolume`."
-            )
+        positions = volume_representation.positions
+        amplitudes = volume_representation.amplitudes
+        b_factors = variance_to_b_factor(volume_representation.variances)
         # Compute the projection
         projection_integral = _gaussians_to_projection(
-            upsampled_shape,
-            upsampled_pixel_size,
+            shape,
+            pixel_size,
             positions,
             amplitudes,
             b_factors,
             self.use_error_functions,
             self.n_batches,
         )
-        if self.upsampling_factor is not None:
-            # Downsample back to the original pixel size, rescaling so that the
-            # downsampling produces an average in a given region, not a sum
-            n_pixels, upsampled_n_pixels = math.prod(shape), math.prod(upsampled_shape)
-            if self.shape is None:
-                return downsample_to_shape_with_fourier_cropping(
-                    projection_integral * (n_pixels / upsampled_n_pixels),
-                    downsampled_shape=shape,
-                    outputs_real_space=outputs_real_space,
-                )
-            else:
-                projection_integral = downsample_to_shape_with_fourier_cropping(
-                    projection_integral * (n_pixels / upsampled_n_pixels),
-                    downsampled_shape=shape,
-                    outputs_real_space=True,
-                )
-                projection_integral = resize_with_crop_or_pad(
-                    projection_integral, image_config.padded_shape
-                )
-                return (
-                    projection_integral
-                    if outputs_real_space
-                    else rfftn(projection_integral)
-                )
+        if self.shape is None:
+            return (
+                projection_integral if outputs_real_space else rfftn(projection_integral)
+            )
         else:
-            if self.shape is None:
-                return (
-                    projection_integral
-                    if outputs_real_space
-                    else rfftn(projection_integral)
-                )
-            else:
-                projection_integral = resize_with_crop_or_pad(
-                    projection_integral, image_config.padded_shape
-                )
-                return (
-                    projection_integral
-                    if outputs_real_space
-                    else rfftn(projection_integral)
-                )
+            projection_integral = resize_with_crop_or_pad(
+                projection_integral, image_config.padded_shape
+            )
+            return (
+                projection_integral if outputs_real_space else rfftn(projection_integral)
+            )
 
 
 def _gaussians_to_projection(
@@ -297,7 +239,7 @@ def _evaluate_gaussian_integrals(
     gauss_x, gauss_y = (integration_kernel(delta_x), integration_kernel(delta_y))
     # Compute the prefactors for each position and each gaussian per position
     # for the volume
-    prefactor = (4 * jnp.pi * a) / (2 * pixel_size) ** 2
+    prefactor = a / (2 * pixel_size) ** 2
     # Multiply the prefactor onto one of the gaussians for efficiency
     return prefactor * gauss_x, gauss_y
 
@@ -323,7 +265,7 @@ def _evaluate_gaussians(
         * b_inverse[None, :, :]
         * ((grid_y[:, None] - positions.T[1, :]) ** 2)[:, :, None]
     )
-    prefactor = 4 * jnp.pi * a[None, :, :] * b_inverse[None, :, :]
+    prefactor = a[None, :, :] * b_inverse[None, :, :]
 
     return prefactor * gauss_x, gauss_y
 

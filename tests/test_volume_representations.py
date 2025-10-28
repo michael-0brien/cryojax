@@ -1,3 +1,5 @@
+import warnings
+
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -6,21 +8,26 @@ from jaxtyping import Array, Float, install_import_hook
 
 
 with install_import_hook("cryojax", "typeguard.typechecked"):
-    from cryojax.constants import b_factor_to_variance
+    import cryojax.simulator as cxs
+    from cryojax.constants import PengScatteringFactorParameters
     from cryojax.coordinates import make_coordinate_grid
     from cryojax.io import read_atoms_from_pdb
-    from cryojax.ndimage import downsample_with_fourier_cropping, ifftn, irfftn
-    from cryojax.simulator import (
-        BasicImageConfig,
-        FourierVoxelGridVolume,
-        GaussianMixtureProjection,
-        GaussianMixtureVolume,
-        PengAtomicVolume,
-        PengScatteringFactorParameters,
-        RealVoxelGridVolume,
-    )
+    from cryojax.ndimage import fourier_crop_downsample, ifftn, irfftn, operators as op
+
+try:
+    import jax_finufft as jnufft
+
+    JAX_FINUFFT_IMPORT_ERROR = None
+except ModuleNotFoundError as err:
+    jnufft = None
+    JAX_FINUFFT_IMPORT_ERROR = err
 
 config.update("jax_enable_x64", True)
+
+
+@pytest.fixture
+def pdb_info(sample_pdb_path):
+    return read_atoms_from_pdb(sample_pdb_path, center=True, loads_properties=True)
 
 
 @pytest.fixture
@@ -53,55 +60,25 @@ def toy_gaussian_cloud():
     return (atom_positions, ff_a, ff_b, n_voxels_per_side, voxel_size)
 
 
-@pytest.mark.parametrize("shape", ((64, 64), (63, 63), (63, 64), (64, 63)))
-def test_atom_integrator_shape(sample_pdb_path, shape):
-    atom_positions, atom_types, b_factors = read_atoms_from_pdb(
-        sample_pdb_path,
-        center=True,
-        selection_string="not element H",
-        loads_b_factors=True,
-    )
-    atom_potential = PengAtomicVolume.from_tabulated_parameters(
-        atom_positions,
-        parameters=PengScatteringFactorParameters(atom_types),
-        extra_b_factors=b_factors,
-    )
-    pixel_size = 0.5
-
-    integrator = GaussianMixtureProjection(upsampling_factor=2)
-    # # ... and the configuration of the imaging instrument
-    image_config = BasicImageConfig(
-        shape=shape,
-        pixel_size=pixel_size,
-        voltage_in_kilovolts=300.0,
-    )
-    # ... compute the integrated volumetric_potential
-    fourier_integrated_potential = integrator.integrate(
-        atom_potential, image_config, outputs_real_space=False
-    )
-
-    assert fourier_integrated_potential.shape == (shape[0], shape[1] // 2 + 1)
-
-
 #
 # Test different representations
 #
-def test_voxel_potential_loaders():
+def test_voxel_volume_loaders():
     real_voxel_grid = jnp.zeros((10, 10, 10), dtype=float)
-    fourier_potential = FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
-    real_potential = RealVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
+    fourier_volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
+    real_volume = cxs.RealVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
 
     assert isinstance(
-        fourier_potential.frequency_slice_in_pixels,
+        fourier_volume.frequency_slice_in_pixels,
         Float[Array, "1 _ _ 3"],  # type: ignore
     )
-    assert isinstance(real_potential.coordinate_grid_in_pixels, Float[Array, "_ _ _ 3"])  # type: ignore
+    assert isinstance(real_volume.coordinate_grid_in_pixels, Float[Array, "_ _ _ 3"])  # type: ignore
 
 
 #
 # Test rendering
 #
-def test_fourier_vs_real_voxel_potential_agreement(sample_pdb_path):
+def test_fourier_vs_real_voxel_volume_agreement(sample_pdb_path):
     """
     Integration test ensuring that the VoxelGrid classes
     produce comparable electron densities when loaded from PDB.
@@ -113,31 +90,29 @@ def test_fourier_vs_real_voxel_potential_agreement(sample_pdb_path):
     atom_positions, atom_types = read_atoms_from_pdb(
         sample_pdb_path,
         center=True,
-        loads_b_factors=False,
         selection_string="not element H",
     )
-    # Load atomistic potential
-    atom_potential = PengAtomicVolume.from_tabulated_parameters(
+    # Load atomistic volume
+    atom_volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(
         atom_positions,
         parameters=PengScatteringFactorParameters(atom_types),
     )
     # Build the grid
-    potential_as_real_voxel_grid = atom_potential.to_real_voxel_grid(
-        n_voxels_per_side, voxel_size
-    )
-    fourier_potential = FourierVoxelGridVolume.from_real_voxel_grid(
-        potential_as_real_voxel_grid
+    volume_render_fn = cxs.GaussianMixtureRenderFn(n_voxels_per_side, voxel_size)
+    volume_as_real_voxel_grid = volume_render_fn(atom_volume)
+    fourier_volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(
+        volume_as_real_voxel_grid
     )
     # Since Voxelgrid is in Frequency space by default, we have to first
     # transform back into real space.
-    fvg_real = ifftn(jnp.fft.ifftshift(fourier_potential.fourier_voxel_grid)).real
+    fvg_real = ifftn(jnp.fft.ifftshift(fourier_volume.fourier_voxel_grid)).real
 
-    vg = RealVoxelGridVolume.from_real_voxel_grid(potential_as_real_voxel_grid)
+    vg = cxs.RealVoxelGridVolume.from_real_voxel_grid(volume_as_real_voxel_grid)
 
     np.testing.assert_allclose(fvg_real, vg.real_voxel_grid, atol=1e-12)
 
 
-def test_downsampled_voxel_potential_agreement(sample_pdb_path):
+def test_downsampled_voxel_volume_agreement(sample_pdb_path):
     """Integration test ensuring that rasterized voxel grids roughly
     agree with downsampled versions.
     """
@@ -156,113 +131,106 @@ def test_downsampled_voxel_potential_agreement(sample_pdb_path):
     atom_positions, atom_types = read_atoms_from_pdb(
         sample_pdb_path,
         center=True,
-        loads_b_factors=False,
         selection_string="not element H",
     )
-    # Load atomistic potential
-    atom_potential = PengAtomicVolume.from_tabulated_parameters(
+    # Load atomistic volume
+    atom_volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(
         atom_positions,
         parameters=PengScatteringFactorParameters(atom_types),
     )
     # Build the grids
-    low_resolution_potential_grid = atom_potential.to_real_voxel_grid(
+    lowres_render_fn = cxs.GaussianMixtureRenderFn(
         downsampled_shape, downsampled_voxel_size
     )
-    high_resolution_potential_grid = atom_potential.to_real_voxel_grid(shape, voxel_size)
-    downsampled_potential_grid = downsample_with_fourier_cropping(
-        high_resolution_potential_grid, downsampling_factor
+    low_resolution_volume_grid = lowres_render_fn(atom_volume)
+    highres_render_fn = cxs.GaussianMixtureRenderFn(shape, voxel_size)
+    high_resolution_volume_grid = highres_render_fn(atom_volume)
+    downsampled_volume_grid = fourier_crop_downsample(
+        high_resolution_volume_grid, downsampling_factor
     )
 
-    assert low_resolution_potential_grid.shape == downsampled_potential_grid.shape
+    assert low_resolution_volume_grid.shape == downsampled_volume_grid.shape
+
+
+def test_render_options(pdb_info):
+    width, voxel_size, shape = (1.0, 1.0, (31, 32, 33))
+    atom_positions, _, _ = pdb_info
+    volumes, render_fns = [], []
+    gaussian_volume, gaussian_render_fn = (
+        cxs.GaussianMixtureVolume(
+            atom_positions,
+            amplitudes=1.0,
+            variances=width**2,
+        ),
+        cxs.GaussianMixtureRenderFn(shape, voxel_size),
+    )
+    volumes.append(gaussian_volume)
+    render_fns.append(gaussian_render_fn)
+    if jnufft is not None:
+        volumes.append(
+            cxs.IndependentAtomVolume(
+                position_pytree=atom_positions,
+                scattering_factor_pytree=op.FourierGaussian(
+                    amplitude=1.0, b_factor=width**2 * (8 * np.pi**2)
+                ),
+            )
+        )
+        render_fns.append(cxs.FFTAtomRenderFn(shape, voxel_size, eps=1e-16))
+    for volume, render_fn in zip(volumes, render_fns):
+        real_voxel_grid = render_fn(volume, outputs_real_space=True)
+        assert real_voxel_grid.shape == shape
+        assert not jnp.iscomplexobj(real_voxel_grid)
+        fftn_voxel_grid = render_fn(
+            volume,
+            outputs_real_space=False,
+            outputs_rfft=False,
+        )
+        assert fftn_voxel_grid.shape == shape
+        assert jnp.iscomplexobj(fftn_voxel_grid)
+        rfftn_voxel_grid = render_fn(
+            volume,
+            outputs_real_space=False,
+            outputs_rfft=True,
+        )
+        assert rfftn_voxel_grid.shape == (*shape[0:2], shape[2] // 2 + 1)
+        assert jnp.iscomplexobj(rfftn_voxel_grid)
+
+
+@pytest.mark.parametrize(
+    "width, voxel_size, shape",
+    ((1.0, 0.5, (64, 64, 64)), (1.0, 0.5, (63, 63, 63))),
+)
+def test_fft_atom_render(pdb_info, width, voxel_size, shape):
+    if jnufft is not None:
+        atom_positions, _, _ = pdb_info
+        gaussian_volume = cxs.GaussianMixtureVolume(
+            atom_positions,
+            amplitudes=1.0,
+            variances=width**2,
+        )
+        atom_volume = cxs.IndependentAtomVolume(
+            position_pytree=atom_positions,
+            scattering_factor_pytree=op.FourierGaussian(
+                amplitude=1.0, b_factor=width**2 * (8 * np.pi**2)
+            ),
+        )
+        gaussian_render_fn = cxs.GaussianMixtureRenderFn(shape, voxel_size)
+        fft_render_fn = cxs.FFTAtomRenderFn(shape, voxel_size, eps=1e-16)
+        voxels_by_gaussians = gaussian_render_fn(gaussian_volume)
+        voxels_by_fft = fft_render_fn(atom_volume)
+
+        np.testing.assert_allclose(voxels_by_gaussians, voxels_by_fft, atol=1e-8)
+    else:
+        warnings.warn(
+            "Could not test rendering method `FFTAtomRenderFn`, "
+            "most likely because `jax_finufft` is not installed. "
+            f"Error traceback is:\n{JAX_FINUFFT_IMPORT_ERROR}"
+        )
 
 
 #
 # TODO: organize
 #
-def test_downsampled_gmm_potential_agreement(sample_pdb_path):
-    """Integration test ensuring that rasterized voxel grids roughly
-    agree with downsampled versions.
-    """
-    atom_positions, atom_types = read_atoms_from_pdb(
-        sample_pdb_path,
-        loads_b_factors=False,
-        center=True,
-        selection_string="not element H",
-    )
-    atom_potential = PengAtomicVolume.from_tabulated_parameters(
-        atom_positions,
-        parameters=PengScatteringFactorParameters(atom_types),
-    )
-
-    # Parameters for rasterization
-    shape = (128, 128)
-    pixel_size = 0.25
-
-    # Downsampling parameters
-    downsampling_factor = 2
-    downsampled_shape = (
-        int(shape[0] / downsampling_factor),
-        int(shape[1] / downsampling_factor),
-    )
-    downsampled_pixel_size = pixel_size * downsampling_factor
-
-    integrator_int_hires = GaussianMixtureProjection(
-        upsampling_factor=downsampling_factor
-    )
-    integrator_int_lowres = GaussianMixtureProjection(upsampling_factor=1)
-    # ... and the configuration of the imaging instrument
-    image_config = BasicImageConfig(
-        shape=downsampled_shape,
-        pixel_size=downsampled_pixel_size,
-        voltage_in_kilovolts=300.0,
-    )
-    # ... compute the integrated volumetric_potential
-    image_from_hires = integrator_int_hires.integrate(atom_potential, image_config)
-    image_lowres = integrator_int_lowres.integrate(atom_potential, image_config)
-
-    assert image_from_hires.shape == image_lowres.shape
-
-
-def test_peng_vs_gmm_agreement(sample_pdb_path):
-    """Integration test ensuring that Peng Potential and GMM potential agree when
-    gaussians are identical"""
-
-    # Load atoms and build potentials
-    atom_positions, atom_types = read_atoms_from_pdb(
-        sample_pdb_path,
-        loads_b_factors=False,
-        center=True,
-        selection_string="not element H",
-    )
-    atom_potential = PengAtomicVolume.from_tabulated_parameters(
-        atom_positions,
-        parameters=PengScatteringFactorParameters(atom_types),
-    )
-
-    b_factors = atom_potential.b_factors
-    amplitudes = atom_potential.amplitudes
-
-    gmm_potential = GaussianMixtureVolume(
-        atom_positions,
-        amplitudes,
-        b_factor_to_variance(b_factors),
-    )
-
-    # Create instrument configuration
-    shape = (64, 64)
-    pixel_size = 0.5
-    image_config = BasicImageConfig(
-        shape=shape,
-        pixel_size=pixel_size,
-        voltage_in_kilovolts=300.0,
-    )
-
-    # Compute projections
-    integrator = GaussianMixtureProjection(upsampling_factor=1)
-    projection_gmm = integrator.integrate(gmm_potential, image_config)
-    projection_peng = integrator.integrate(atom_potential, image_config)
-
-    np.testing.assert_allclose(projection_gmm, projection_peng)
 
 
 @pytest.mark.parametrize("shape", ((128, 127, 126),))
@@ -273,16 +241,16 @@ def test_compute_rectangular_voxel_grid(sample_pdb_path, shape):
     atom_positions, atom_types = read_atoms_from_pdb(
         sample_pdb_path,
         center=True,
-        loads_b_factors=False,
         selection_string="not element H",
     )
-    # Load atomistic potential
-    atom_potential = PengAtomicVolume.from_tabulated_parameters(
+    # Load atomistic volume
+    atom_volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(
         atom_positions,
         parameters=PengScatteringFactorParameters(atom_types),
     )
     # Build the grid
-    voxels = atom_potential.to_real_voxel_grid(shape, voxel_size)
+    render_fn = cxs.GaussianMixtureRenderFn(shape, voxel_size)
+    voxels = render_fn(atom_volume)
     assert voxels.shape == shape
 
 
@@ -303,18 +271,20 @@ def test_z_plane_batched_vs_non_batched_loop_agreement(
         loads_b_factors=False,
         selection_string="not element H",
     )
-    # Load atomistic potential
-    atom_potential = PengAtomicVolume.from_tabulated_parameters(
+    # Load atomistic volume
+    atom_volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(
         atom_positions,
         parameters=PengScatteringFactorParameters(atom_types),
     )
     # Build the grid
-    voxels = atom_potential.to_real_voxel_grid(shape, voxel_size)
-    voxels_with_batching = atom_potential.to_real_voxel_grid(
+    render_fn = cxs.GaussianMixtureRenderFn(shape, voxel_size)
+    voxels = render_fn(atom_volume)
+    batched_render_fn = cxs.GaussianMixtureRenderFn(
         shape,
         voxel_size,
         batch_options=dict(batch_size=batch_size, n_batches=n_batches),
     )
+    voxels_with_batching = batched_render_fn(atom_volume)
     np.testing.assert_allclose(voxels, voxels_with_batching)
 
 
@@ -322,7 +292,7 @@ class TestIntegrateGMMToPixels:
     @pytest.mark.parametrize("largest_atom", range(0, 3))
     def test_maxima_are_in_right_positions(self, toy_gaussian_cloud, largest_atom):
         """
-        Test that the maxima of the potential are in the correct positions.
+        Test that the maxima of the volume are in the correct positions.
         """
         (
             atom_positions,
@@ -336,19 +306,19 @@ class TestIntegrateGMMToPixels:
         ff_a = ff_a.at[largest_atom].add(1.0)
         coordinate_grid = make_coordinate_grid(n_pixels_per_side, voxel_size)
 
-        # Build the potential
-        atomic_potential = GaussianMixtureVolume(
+        # Build the volume
+        atomic_volume = cxs.GaussianMixtureVolume(
             atom_positions, ff_a, ff_b / (8.0 * jnp.pi**2)
         )
-        image_config = BasicImageConfig(
+        image_config = cxs.BasicImageConfig(
             shape=n_pixels_per_side,
             pixel_size=voxel_size,
             voltage_in_kilovolts=300.0,
         )
-        # Build the potential integrators
-        integrator = GaussianMixtureProjection()
+        # Build the volume integrators
+        integrator = cxs.GaussianMixtureProjection()
         # Compute projections
-        projection = integrator.integrate(atomic_potential, image_config)
+        projection = integrator.integrate(atomic_volume, image_config)
         projection = irfftn(projection)
 
         # Find the maximum
@@ -360,7 +330,7 @@ class TestIntegrateGMMToPixels:
 
     def test_integral_is_correct(self, toy_gaussian_cloud):
         """
-        Test that the maxima of the potential are in the correct positions.
+        Test that the maxima of the volume are in the correct positions.
         """
         (
             atom_positions,
@@ -371,30 +341,30 @@ class TestIntegrateGMMToPixels:
         ) = toy_gaussian_cloud
 
         n_pixels_per_side = n_voxels_per_side[:2]
-        # Build the potential
-        atomic_potential = GaussianMixtureVolume(
+        # Build the volume
+        atomic_volume = cxs.GaussianMixtureVolume(
             atom_positions, ff_a, ff_b / (8.0 * jnp.pi**2)
         )
-        image_config = BasicImageConfig(
+        image_config = cxs.BasicImageConfig(
             shape=n_pixels_per_side,
             pixel_size=voxel_size,
             voltage_in_kilovolts=300.0,
         )
-        # Build the potential integrators
-        integrator = GaussianMixtureProjection()
+        # Build the volume integrators
+        integrator = cxs.GaussianMixtureProjection()
         # Compute projections
-        projection = integrator.integrate(atomic_potential, image_config)
+        projection = integrator.integrate(atomic_volume, image_config)
         projection = irfftn(projection)
 
         integral = jnp.sum(projection) * voxel_size**2
-        assert jnp.isclose(integral, jnp.sum(4 * jnp.pi * ff_a))
+        assert jnp.isclose(integral, jnp.sum(ff_a))
 
 
 class TestRenderGMMToVoxels:
     @pytest.mark.parametrize("largest_atom", range(0, 3))
     def test_maxima_are_in_right_positions(self, toy_gaussian_cloud, largest_atom):
         """
-        Test that the maxima of the potential are in the correct positions.
+        Test that the maxima of the volume are in the correct positions.
         """
         (
             atom_positions,
@@ -405,9 +375,12 @@ class TestRenderGMMToVoxels:
         ) = toy_gaussian_cloud
         ff_a = ff_a.at[largest_atom].add(1.0)
 
-        # Build the potential
-        gmm_volume = GaussianMixtureVolume(atom_positions, ff_a, ff_b / (8 * jnp.pi**2))
-        real_voxel_grid = gmm_volume.to_real_voxel_grid(n_voxels_per_side, voxel_size)
+        # Build the volume
+        gmm_volume = cxs.GaussianMixtureVolume(
+            atom_positions, ff_a, ff_b / (8 * jnp.pi**2)
+        )
+        render_fn = cxs.GaussianMixtureRenderFn(n_voxels_per_side, voxel_size)
+        real_voxel_grid = render_fn(gmm_volume)
         coordinate_grid = make_coordinate_grid(n_voxels_per_side, voxel_size)
 
         # Find the maximum
@@ -419,7 +392,7 @@ class TestRenderGMMToVoxels:
 
     def test_integral_is_correct(self, toy_gaussian_cloud):
         """
-        Test that the maxima of the potential are in the correct positions.
+        Test that the maxima of the volume are in the correct positions.
         """
         (
             atom_positions,
@@ -429,18 +402,21 @@ class TestRenderGMMToVoxels:
             voxel_size,
         ) = toy_gaussian_cloud
 
-        # Build the potential
-        gmm_volume = GaussianMixtureVolume(atom_positions, ff_a, ff_b / (8 * jnp.pi**2))
-        real_voxel_grid = gmm_volume.to_real_voxel_grid(n_voxels_per_side, voxel_size)
+        # Build the volume
+        gmm_volume = cxs.GaussianMixtureVolume(
+            atom_positions, ff_a, ff_b / (8 * jnp.pi**2)
+        )
+        render_fn = cxs.GaussianMixtureRenderFn(n_voxels_per_side, voxel_size)
+        real_voxel_grid = render_fn(gmm_volume)
 
         integral = jnp.sum(real_voxel_grid) * voxel_size**3
-        assert jnp.isclose(integral, jnp.sum(4 * jnp.pi * ff_a))
+        assert jnp.isclose(integral, jnp.sum(ff_a))
 
 
 def test_gmm_shape():
     n_atoms, n_gaussians = 10, 2
     pos = np.zeros((n_atoms, 3))
-    make_gmm = lambda amp, var: GaussianMixtureVolume(pos, amp, var)
+    make_gmm = lambda amp, var: cxs.GaussianMixtureVolume(pos, amp, var)
     gmm = make_gmm(1.0, 1.0)
     assert gmm.variances.shape == gmm.amplitudes.shape == (n_atoms, 1)
     gmm = make_gmm(np.ones((n_atoms,)), np.ones((n_atoms,)))

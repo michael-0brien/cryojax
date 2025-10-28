@@ -11,6 +11,67 @@ with install_import_hook("cryojax", "typeguard.typechecked"):
     from cryojax.coordinates import make_coordinate_grid
 
 
+jax.config.update("jax_enable_x64", True)
+
+
+#
+# Test PyTree transforms
+#
+class Exp(eqx.Module):
+    a: Array = eqx.field(converter=jnp.asarray)
+
+    def __call__(self, x):
+        return jnp.exp(-self.a * x)
+
+
+def test_resolve_transform():
+    pytree = Exp(a=1.0)
+    pytree_with_transform = eqx.tree_at(
+        lambda fn: fn.a,
+        pytree,
+        replace_fn=lambda a: cju.CustomTransform(jnp.exp, jnp.log(a)),
+    )
+    assert eqx.tree_equal(pytree, cju.resolve_transforms(pytree_with_transform))
+
+
+def test_nested_resolve_transform():
+    pytree = Exp(a=1.0)
+    pytree_with_transform = eqx.tree_at(
+        lambda fn: fn.a,
+        pytree,
+        replace_fn=lambda a: cju.CustomTransform(lambda b: 2 * b, a / 2),
+    )
+    pytree_with_nested_transform = eqx.tree_at(
+        lambda fn: fn.a.args[0],
+        pytree_with_transform,
+        replace_fn=lambda a_scaled: cju.CustomTransform(jnp.exp, jnp.log(a_scaled)),
+    )
+    assert eqx.tree_equal(
+        pytree,
+        cju.resolve_transforms(pytree_with_transform),
+        cju.resolve_transforms(pytree_with_nested_transform),
+    )
+
+
+def test_stop_gradient():
+    @jax.value_and_grad
+    def objective_fn(pytree):
+        exp, x = cju.resolve_transforms(pytree)
+        return exp(x)
+
+    x = jnp.asarray(np.random.random())
+    exp = Exp(a=1.0)
+    exp_with_stop_gradient = eqx.tree_at(
+        lambda fn: fn.a, exp, replace_fn=cju.StopGradientTransform
+    )
+    _, grads = objective_fn((exp_with_stop_gradient, x))
+    grads = cju.resolve_transforms(grads)
+    assert grads[0].a == 0.0
+
+
+#
+# Test grid search
+#
 class ExampleModule(eqx.Module):
     a_1: Array
     a_2: Array
@@ -101,3 +162,25 @@ def test_run_grid_search(batch_size, dim, offset, variance):
     solution = cju.run_grid_search(cost_fn, method, grid, (variance, offset))
     np.testing.assert_allclose(solution.state.current_minimum_eval, true_min_eval)
     np.testing.assert_allclose(solution.value, true_min_pos)
+
+
+#
+# Test `filter_bscan` / `filter_bmap`
+#
+@pytest.mark.parametrize(
+    "batch_size,dim",
+    [
+        (1, 200),
+        (10, 200),
+        (33, 200),
+        (200, 200),
+    ],
+)
+def test_bscan_remainder(batch_size, dim):
+    @jax.jit
+    @jax.vmap
+    def f(x):
+        return x + 1
+
+    xs = jnp.zeros(dim)
+    np.testing.assert_allclose(cju.filter_bmap(f, xs, batch_size=batch_size), f(xs))

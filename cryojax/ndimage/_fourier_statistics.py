@@ -7,7 +7,7 @@ import math
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float, Inexact
 
-from ._average import compute_binned_radial_average
+from ._radial_average import compute_binned_radial_average
 
 
 def compute_binned_powerspectrum(

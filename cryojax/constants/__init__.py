@@ -11,6 +11,7 @@ from ._physical_constants import (
     wavelength_from_kilovolts as wavelength_from_kilovolts,
 )
 from ._scattering_factor_parameters import (
-    get_tabulated_scattering_factor_parameters as get_tabulated_scattering_factor_parameters,  # noqa: E501
+    PengScatteringFactorParameters as PengScatteringFactorParameters,
+    extract_scattering_factor_parameters as extract_scattering_factor_parameters,
     read_peng_scattering_factor_parameter_table as read_peng_scattering_factor_parameter_table,  # noqa: E501
 )

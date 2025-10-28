@@ -9,10 +9,7 @@ from .._image_config import AbstractImageConfig
 from .._solvent_2d import AbstractRandomSolvent2D
 from .._transfer_theory import WaveTransferTheory
 from .._volume import AbstractVolumeRepresentation
-from .._volume_integrator import (
-    AbstractVolumeIntegrator,
-    AbstractVoxelVolumeIntegrator,
-)
+from .._volume_integrator import AbstractVolumeIntegrator
 from .base_scattering_theory import AbstractWaveScatteringTheory
 
 
@@ -65,15 +62,6 @@ class StrongPhaseScatteringTheory(AbstractWaveScatteringTheory, strict=True):
         self.transfer_theory = transfer_theory
         self.solvent = solvent
         self.amplitude_contrast_ratio = error_if_not_fractional(amplitude_contrast_ratio)
-
-    def __check_init__(self):
-        if isinstance(self.volume_integrator, AbstractVoxelVolumeIntegrator):
-            if not self.volume_integrator.outputs_integral:
-                raise AttributeError(
-                    "If the `volume_integrator` is voxel-based, "
-                    "it must have `volume_integrator.outputs_integral = True` "
-                    "to be passed to a `StrongPhaseScatteringTheory`."
-                )
 
     @override
     def compute_exit_wave(

@@ -1,4 +1,7 @@
+import warnings
 from collections.abc import Callable
+from typing import Any
+from typing_extensions import Self, override
 
 import equinox as eqx
 import jax
@@ -6,11 +9,228 @@ import jax.numpy as jnp
 import jax.scipy as jsp
 from jaxtyping import Array, Float, PyTree
 
-from cryojax.coordinates import make_1d_coordinate_grid
+from ....constants import (
+    PengScatteringFactorParameters,
+    b_factor_to_variance,
+    variance_to_b_factor,
+)
+from ....coordinates import make_1d_coordinate_grid
+from ....jax_util import NDArrayLike, error_if_not_positive
+from ..._pose import AbstractPose
+from .base_representations import AbstractAtomVolume
+
+
+class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
+    r"""A representation of a volume as a mixture of
+    gaussians, with multiple gaussians used per position.
+
+    The convention of allowing multiple gaussians per position
+    follows "Robust Parameterization of Elastic and Absorptive
+    Electron Atomic Scattering Factors" by Peng et al. (1996). The
+    $a$ and $b$ parameters in this work correspond to
+    `amplitudes = a` and `variances = b / 8\pi^2`.
+
+    !!! info
+        Use the following to load a `GaussianMixtureVolume`
+        from these tabulated electron scattering factors.
+
+        ```python
+        from cryojax.constants import PengScatteringFactorParameters
+        from cryojax.io import read_atoms_from_pdb
+        from cryojax.simulator import GaussianMixtureVolume
+
+        # Load positions of atoms and one-hot encoded atom names
+        atom_positions, atom_types = read_atoms_from_pdb(...)
+        parameters = PengScatteringFactorParameters(atom_types)
+        potential = GaussianMixtureVolume.from_tabulated_parameters(
+            atom_positions, parameters
+        )
+        ```
+    """
+
+    positions: Float[Array, "n_positions 3"]
+    amplitudes: Float[Array, "n_positions n_gaussians"]
+    variances: Float[Array, " n_positions n_gaussians"]
+
+    def __init__(
+        self,
+        positions: Float[NDArrayLike, "n_positions 3"],
+        amplitudes: (
+            float
+            | Float[NDArrayLike, ""]
+            | Float[NDArrayLike, " n_positions"]
+            | Float[NDArrayLike, "n_positions n_gaussians"]
+        ),
+        variances: (
+            float
+            | Float[NDArrayLike, ""]
+            | Float[NDArrayLike, " n_positions"]
+            | Float[NDArrayLike, "n_positions n_gaussians"]
+        ),
+    ):
+        """**Arguments:**
+
+        - `positions`:
+            The coordinates of the gaussians in units of angstroms.
+        - `amplitudes`:
+            The amplitude for each gaussian.
+            To simulate in physical units of a scattering potential,
+            this should have units of angstroms.
+        - `variances`:
+            The variance for each gaussian. This has units of angstroms
+            squared.
+        """
+        n_positions = positions.shape[0]
+        if isinstance(amplitudes, NDArrayLike):
+            if amplitudes.ndim == 2:
+                n_gaussians = amplitudes.shape[-1]
+            elif amplitudes.ndim == 1:
+                n_gaussians = 1
+                amplitudes = amplitudes[:, None]
+            elif amplitudes.ndim == 0:
+                n_gaussians = 1
+                amplitudes = amplitudes[None, None]
+            else:
+                raise ValueError(
+                    "Passed `amplitudes` to `GaussianMixtureVolume` "
+                    f"with shape {amplitudes.shape}, but must be of "
+                    "shape `()`, `(n_positions,)`, or "
+                    "`(n_positions, n_gaussians)`."
+                )
+        else:
+            n_gaussians = 1
+        if isinstance(variances, NDArrayLike):
+            if variances.ndim == 2:
+                n_gaussians = variances.shape[-1]
+            elif variances.ndim == 1:
+                variances = variances[:, None]
+            elif variances.ndim == 0:
+                variances = variances[None, None]
+            else:
+                raise ValueError(
+                    "Passed `variances` to `GaussianMixtureVolume` "
+                    f"with shape {variances.shape}, but must be of "
+                    "shape `()`, `(n_positions,)`, or "
+                    "`(n_positions, n_gaussians)`."
+                )
+
+        self.positions = jnp.asarray(positions, dtype=float)
+        self.amplitudes = jnp.broadcast_to(
+            jnp.asarray(amplitudes, dtype=float), (n_positions, n_gaussians)
+        )
+        self.variances = jnp.broadcast_to(
+            error_if_not_positive(jnp.asarray(variances, dtype=float)),
+            (n_positions, n_gaussians),
+        )
+
+    def __check_init__(self):
+        if not (
+            self.positions.shape[0] == self.amplitudes.shape[0] == self.variances.shape[0]
+        ):
+            raise ValueError(
+                "The number of positions in `GaussianMixtureVolume` was "
+                f"{self.positions.shape[0]}, but `amplitudes` shape was "
+                f"{self.amplitudes.shape} and `variances` shape was "
+                f"{self.variances.shape}. The first dimension must be equal "
+                "to the number of positions."
+            )
+        if not (self.amplitudes.shape == self.variances.shape):
+            raise ValueError(
+                "In `GaussianMixtureVolume`, `amplitudes` and "
+                f"`variances` shape must be equal. Found shapes "
+                f"{self.amplitudes.shape} and {self.variances.shape}, "
+                "respectively."
+            )
+
+    @classmethod
+    def from_tabulated_parameters(
+        cls,
+        atom_positions: Float[NDArrayLike, "n_atoms 3"],
+        parameters: PengScatteringFactorParameters,
+        extra_b_factors: (
+            float | Float[NDArrayLike, ""] | Float[NDArrayLike, " n_atoms"] | None
+        ) = None,
+    ) -> Self:
+        """Initialize a `GaussianMixtureVolume` from tabulated electron
+        scattering factor parameters (Peng et al. 1996). This treats
+        the scattering potential as a mixture of five gaussians
+        per atom.
+
+        **References:**
+
+        - Peng, L-M. "Electron atomic scattering factors and scattering potentials of crystals."
+            Micron 30.6 (1999): 625-648.
+        - Peng, L-M., et al. "Robust parameterization of elastic and absorptive electron atomic
+            scattering factors." Acta Crystallographica Section A: Foundations of Crystallography
+            52.2 (1996): 257-276.
+
+        **Arguments:**
+
+        - `atom_positions`:
+            The coordinates of the atoms in units of angstroms.
+        - `parameters`:
+            A pytree for the scattering factor parameters from
+            Peng et al. (1996).
+        - `extra_b_factors`:
+            Additional per-atom B-factors that are added to
+            the values in `scattering_parameters.b`.
+        """  # noqa: E501
+        amplitudes = jnp.asarray(parameters.a, dtype=float)
+        b_factors = jnp.asarray(parameters.b, dtype=float)
+        if extra_b_factors is not None:
+            extra_b_factors = jnp.asarray(extra_b_factors, dtype=float)
+            if extra_b_factors.ndim == 1:
+                extra_b_factors = extra_b_factors[:, None]
+            b_factors += extra_b_factors
+        return cls(atom_positions, amplitudes, b_factor_to_variance(b_factors))
+
+    @override
+    def rotate_to_pose(self, pose: AbstractPose, inverse: bool = False) -> Self:
+        """Return a new potential with rotated `positions`."""
+        return eqx.tree_at(
+            lambda d: d.positions,
+            self,
+            pose.rotate_coordinates(self.positions, inverse=inverse),
+        )
+
+    @override
+    def translate_to_pose(self, pose: AbstractPose) -> Self:
+        """Return a new potential with rotated `positions`."""
+        offset_in_angstroms = pose.offset_in_angstroms
+        if pose.offset_z_in_angstroms is None:
+            offset_in_angstroms = jnp.concatenate(
+                (offset_in_angstroms, jnp.atleast_1d(0.0))
+            )
+        return eqx.tree_at(
+            lambda d: d.positions, self, self.positions + offset_in_angstroms
+        )
+
+    def to_real_voxel_grid(
+        self,
+        shape: tuple[int, int, int],
+        voxel_size: Float[NDArrayLike, ""] | float,
+        *,
+        batch_options: dict[str, Any] = {},
+    ) -> Float[Array, "{shape[0]} {shape[1]} {shape[2]}"]:
+        warnings.warn(
+            "'GaussianMixtureVolume.to_real_voxel_grid' is deprecated "
+            "and will be removed in cryoJAX 0.6.0. Instead, use "
+            "`cryojax.simulator.GaussianMixtureRenderFn`.",
+            category=DeprecationWarning,
+            stacklevel=2,
+        )
+        return _gaussians_to_real_voxels(
+            shape,
+            jnp.asarray(voxel_size, dtype=float),
+            self.positions,
+            self.amplitudes,
+            variance_to_b_factor(self.variances),
+            **batch_options,
+        )
 
 
 @eqx.filter_jit
-def gaussians_to_real_voxels(
+def _gaussians_to_real_voxels(
     shape: tuple[int, int, int],
     voxel_size: Float[Array, ""],
     positions: Float[Array, "n_positions 3"],
@@ -162,7 +382,7 @@ def _evaluate_gaussian_integrals(
     )
     # Compute the prefactors for each position and each gaussian per position
     # for the potential
-    prefactor = (4 * jnp.pi * amplitudes) / (2 * voxel_size) ** 3
+    prefactor = amplitudes / (2 * voxel_size) ** 3
     # Multiply the prefactor onto one of the gaussians for efficiency
     return prefactor * gauss_x, gauss_y, gauss_z
 

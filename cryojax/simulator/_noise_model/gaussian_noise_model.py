@@ -15,7 +15,7 @@ from ...ndimage import rfftn
 from ...ndimage.operators import Constant, FourierOperatorLike
 from ...ndimage.transforms import FilterLike, MaskLike
 from .._image_model import AbstractImageModel
-from .base_noise_model import AbstractNoiseModel
+from .base_noise_model import AbstractEmpiricalNoiseModel, AbstractLikelihoodNoiseModel
 
 
 RealImageArray = Float[
@@ -29,7 +29,9 @@ FourierImageArray = Complex[
 ImageArray = RealImageArray | FourierImageArray
 
 
-class AbstractGaussianNoiseModel(AbstractNoiseModel, strict=True):
+class AbstractGaussianNoiseModel(
+    AbstractEmpiricalNoiseModel, AbstractLikelihoodNoiseModel, strict=True
+):
     r"""An `AbstractNoiseModel` where images are formed via additive
     gaussian noise.
 
@@ -53,10 +55,11 @@ class AbstractGaussianNoiseModel(AbstractNoiseModel, strict=True):
         """Sample a noisy image from the gaussian noise model.
 
         !!! info
-            If the `AbstractImageModel` has stochastic elements to it,
-            a random number generator key will also be passed to
-            `AbstractImageModel.simulate`. Therefore, this method is
-            not compatible with the `AbstractDetector` class.
+            A random number generator key will *not* be passed to
+            `AbstractImageModel.simulate`, therefore any
+            stochastic elements to the `AbstractImageModel`
+            will not be used.
+
 
         **Arguments:**
 
@@ -68,14 +71,12 @@ class AbstractGaussianNoiseModel(AbstractNoiseModel, strict=True):
         - `filter`:
             A filter to apply to the final image.
         """
-        noise_rng_key, signal_rng_key = jr.split(rng_key, 2)
         return self.compute_signal(
-            rng_key=signal_rng_key,
             outputs_real_space=outputs_real_space,
             mask=mask,
             filter=filter,
         ) + self.compute_noise(
-            noise_rng_key,
+            rng_key,
             outputs_real_space=outputs_real_space,
             mask=mask,
             filter=filter,
@@ -85,7 +86,6 @@ class AbstractGaussianNoiseModel(AbstractNoiseModel, strict=True):
     def compute_signal(
         self,
         *,
-        rng_key: PRNGKeyArray | None = None,
         outputs_real_space: bool = True,
         mask: MaskLike | None = None,
         filter: FilterLike | None = None,
@@ -94,9 +94,6 @@ class AbstractGaussianNoiseModel(AbstractNoiseModel, strict=True):
 
         **Arguments:**
 
-        - `rng_key`:
-            An random number generator key to be passed to
-            the `AbstractImageModel.simulate` method.
         - `outputs_real_space`:
             If `True`, return the signal in real space.
         - `mask`:
@@ -106,7 +103,7 @@ class AbstractGaussianNoiseModel(AbstractNoiseModel, strict=True):
             A filter to apply to the final image.
         """
         simulated_image = self.image_model.simulate(
-            rng_key=rng_key, outputs_real_space=True, mask=None, filter=filter
+            outputs_real_space=True, mask=None, filter=filter
         )
         simulated_image = self.signal_scale_factor * simulated_image + self.signal_offset
         if mask is not None:
@@ -128,7 +125,7 @@ class AbstractGaussianNoiseModel(AbstractNoiseModel, strict=True):
         raise NotImplementedError
 
 
-class UncorrelatedGaussianNoiseModel(AbstractGaussianNoiseModel, strict=True):
+class GaussianWhiteNoiseModel(AbstractGaussianNoiseModel, strict=True):
     r"""A gaussian noise model, where each pixel is independently drawn from
     a zero-mean gaussian of fixed variance (white noise).
 
@@ -258,7 +255,7 @@ class UncorrelatedGaussianNoiseModel(AbstractGaussianNoiseModel, strict=True):
         return log_likelihood
 
 
-class CorrelatedGaussianNoiseModel(AbstractGaussianNoiseModel, strict=True):
+class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
     r"""A gaussian noise model, where pixels are correlated, but each
     frequency is independent (colored noise).
 
@@ -267,14 +264,14 @@ class CorrelatedGaussianNoiseModel(AbstractGaussianNoiseModel, strict=True):
     """
 
     image_model: AbstractImageModel
-    variance_function: FourierOperatorLike
+    power_fn: FourierOperatorLike
     signal_scale_factor: Float[Array, ""]
     signal_offset: Float[Array, ""]
 
     def __init__(
         self,
         image_model: AbstractImageModel,
-        variance_function: FourierOperatorLike | None = None,
+        power_fn: FourierOperatorLike | None = None,
         signal_scale_factor: float | Float[NDArrayLike, ""] = 1.0,
         signal_offset: float | Float[NDArrayLike, ""] = 0.0,
     ):
@@ -282,16 +279,16 @@ class CorrelatedGaussianNoiseModel(AbstractGaussianNoiseModel, strict=True):
 
         - `image_model`:
             The image formation model.
-        - `variance_function`:
+        - `power_fn`:
             The variance of each fourier mode. By default,
-            `cryojax.image.operators.Constant(1.0)`.
+            `cryojax.ndimage.operators.Constant(1.0)`.
         - `signal_scale_factor`:
             A scale factor for the underlying signal simulated from `image_model`.
         - `signal_offset`:
             An offset for the underlying signal simulated from `image_model`.
         """  # noqa: E501
         self.image_model = image_model
-        self.variance_function = variance_function or Constant(1.0)
+        self.power_fn = power_fn or Constant(1.0)
         self.signal_scale_factor = error_if_not_positive(
             jnp.asarray(signal_scale_factor, dtype=float)
         )
@@ -322,7 +319,7 @@ class CorrelatedGaussianNoiseModel(AbstractGaussianNoiseModel, strict=True):
         freqs = image_model.image_config.padded_frequency_grid_in_angstroms
         # Compute the zero mean variance and scale up to be independent of the number of
         # pixels
-        std = jnp.sqrt(n_pixels * self.variance_function(freqs))
+        std = jnp.sqrt(n_pixels * self.power_fn(freqs))
         noise = image_model.postprocess(
             std
             * jr.normal(rng_key, shape=freqs.shape[0:-1])
@@ -371,7 +368,7 @@ class CorrelatedGaussianNoiseModel(AbstractGaussianNoiseModel, strict=True):
         n_pixels = config.n_pixels
         freqs = config.frequency_grid_in_angstroms
         # Compute the variance and scale up to be independent of the number of pixels
-        variance = n_pixels * self.variance_function(freqs)
+        variance = n_pixels * self.power_fn(freqs)
         # Create simulated data
         simulated = self.compute_signal(
             outputs_real_space=False,

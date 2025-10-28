@@ -8,7 +8,7 @@ There are many different volume representations of biological structures for cry
     ::: cryojax.simulator.AbstractVolumeParametrization
         options:
             members:
-                - compute_representation
+                - get_representation
 
 
 ???+ abstract "`cryojax.simulator.AbstractVolumeRepresentation`"
@@ -19,10 +19,10 @@ There are many different volume representations of biological structures for cry
 
 ## Volume representations
 
-### Point clouds
+### Atom-based volumes
 
-??? abstract "`cryojax.simulator.AbstractPointCloudVolume`"
-    ::: cryojax.simulator.AbstractPointCloudVolume
+??? abstract "`cryojax.simulator.AbstractAtomVolume`"
+    ::: cryojax.simulator.AbstractAtomVolume
         options:
             members:
                 - translate_to_pose
@@ -31,36 +31,23 @@ There are many different volume representations of biological structures for cry
     options:
         members:
             - __init__
-            - compute_representation
+            - from_tabulated_parameters
+            - get_representation
             - rotate_to_pose
             - translate_to_pose
-            - to_real_voxel_grid
 
-#### Atomic models
+---
 
-??? abstract "`cryojax.simulator.AbstractTabulatedAtomicVolume`"
-    ::: cryojax.simulator.AbstractTabulatedAtomicVolume
-        options:
-            members:
-                - atom_positions
-                - from_tabulated_parameters
-
-::: cryojax.simulator.PengScatteringFactorParameters
-    options:
-        members:
-            - __init__
-
-::: cryojax.simulator.PengAtomicVolume
+::: cryojax.simulator.IndependentAtomVolume
     options:
         members:
             - __init__
             - from_tabulated_parameters
-            - compute_representation
+            - get_representation
             - rotate_to_pose
             - translate_to_pose
-            - to_real_voxel_grid
 
-### Voxel-based
+### Voxel-based volumes
 
 #### Fourier-space
 
@@ -76,7 +63,7 @@ There are many different volume representations of biological structures for cry
             members:
                 - __init__
                 - from_real_voxel_grid
-                - compute_representation
+                - get_representation
                 - rotate_to_pose
                 - frequency_slice_in_pixels
                 - shape
@@ -88,7 +75,7 @@ There are many different volume representations of biological structures for cry
             members:
                 - __init__
                 - from_real_voxel_grid
-                - compute_representation
+                - get_representation
                 - rotate_to_pose
                 - frequency_slice_in_pixels
                 - shape
@@ -101,7 +88,29 @@ There are many different volume representations of biological structures for cry
             members:
                 - __init__
                 - from_real_voxel_grid
-                - compute_representation
+                - get_representation
                 - rotate_to_pose
                 - coordinate_grid_in_pixels
                 - shape
+
+## Volume rendering
+
+???+ abstract "`cryojax.simulator.AbstractVolumeRenderFn`"
+    ::: cryojax.simulator.AbstractVolumeRenderFn
+        options:
+            members:
+                - __call__
+
+::: cryojax.simulator.GaussianMixtureRenderFn
+        options:
+            members:
+                - __init__
+                - __call__
+
+---
+
+::: cryojax.simulator.FFTAtomRenderFn
+        options:
+            members:
+                - __init__
+                - __call__

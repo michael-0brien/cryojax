@@ -21,14 +21,15 @@ from ._volume import (
     FourierVoxelGridVolume,
     FourierVoxelSplineVolume,
     GaussianMixtureVolume,
-    PengAtomicVolume,
+    IndependentAtomVolume,
     RealVoxelGridVolume,
 )
 from ._volume_integrator import (
     AbstractVolumeIntegrator,
+    FFTAtomProjection,
     FourierSliceExtraction,
     GaussianMixtureProjection,
-    NufftProjection,
+    RealVoxelProjection,
 )
 
 
@@ -45,6 +46,7 @@ def make_image_model(
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
     simulates_quantity: bool = False,
     quantity_mode: Literal["contrast", "intensity", "counts"] = "contrast",
+    translate_mode: Literal["fft", "atom"] = "fft",
 ) -> AbstractImageModel:
     """Construct an `AbstractImageModel` for most common use-cases.
 
@@ -53,8 +55,7 @@ def make_image_model(
     - `volume_parametrization`:
         The representation of the protein volume.
         Common choices are the `FourierVoxelGridVolume`
-        for fourier-space voxel grids or the `PengAtomicVolume`
-        for gaussian mixtures of atoms parameterized by electron scattering factors.
+        for fourier-space voxel grids or the `GaussianMixtureVolume`.
     - `image_config`:
         The configuration for the image and imagining instrument. Unless using
         a model that uses the electron dose as a parameter, choose the
@@ -96,6 +97,11 @@ def make_image_model(
         - 'counts':
             Uses the `ElectronCountsImageModel` to simulate electron counts.
             If this is passed, a `detector` must also be passed.
+    - `translate_mode`:
+        If `'fft'`, apply in-plane translation via phase
+        shifts in the Fourier domain. If `'atoms'` apply translation
+        on atom positions before projection. Does nothing if
+        `applies_translation = False`.
 
     **Returns:**
 
@@ -121,6 +127,7 @@ def make_image_model(
             applies_translation=applies_translation,
             normalizes_signal=normalizes_signal,
             signal_region=signal_region,
+            translate_mode=translate_mode,
         )
     else:
         # Simulate physical observables
@@ -149,6 +156,7 @@ def make_image_model(
                     applies_translation=applies_translation,
                     normalizes_signal=normalizes_signal,
                     signal_region=signal_region,
+                    translate_mode=translate_mode,
                 )
             elif quantity_mode == "contrast":
                 image_model = ContrastImageModel(
@@ -159,6 +167,7 @@ def make_image_model(
                     applies_translation=applies_translation,
                     normalizes_signal=normalizes_signal,
                     signal_region=signal_region,
+                    translate_mode=translate_mode,
                 )
             elif quantity_mode == "intensity":
                 image_model = IntensityImageModel(
@@ -169,6 +178,7 @@ def make_image_model(
                     applies_translation=applies_translation,
                     normalizes_signal=normalizes_signal,
                     signal_region=signal_region,
+                    translate_mode=translate_mode,
                 )
             else:
                 raise ValueError(
@@ -187,6 +197,7 @@ def make_image_model(
                 applies_translation=applies_translation,
                 normalizes_signal=normalizes_signal,
                 signal_region=signal_region,
+                translate_mode=translate_mode,
             )
 
     return image_model
@@ -197,13 +208,12 @@ def _select_default_integrator(
 ) -> AbstractVolumeIntegrator:
     if isinstance(volume, (FourierVoxelGridVolume, FourierVoxelSplineVolume)):
         integrator = FourierSliceExtraction(outputs_integral=simulates_quantity)
-    elif isinstance(
-        volume,
-        (PengAtomicVolume, GaussianMixtureVolume),
-    ):
+    elif isinstance(volume, GaussianMixtureVolume):
         integrator = GaussianMixtureProjection(use_error_functions=True)
     elif isinstance(volume, RealVoxelGridVolume):
-        integrator = NufftProjection(outputs_integral=simulates_quantity)
+        integrator = RealVoxelProjection()
+    elif isinstance(volume, IndependentAtomVolume):
+        integrator = FFTAtomProjection()
     else:
         raise ValueError(
             "Could not select default integrator for volume of "

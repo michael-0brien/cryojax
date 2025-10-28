@@ -1,13 +1,11 @@
 from .base_representations import (
-    AbstractAtomicVolume as AbstractAtomicVolume,
-    AbstractPointCloudVolume as AbstractPointCloudVolume,
+    AbstractAtomVolume as AbstractAtomVolume,
     AbstractVoxelVolume as AbstractVoxelVolume,
 )
-from .gmm_volume import GaussianMixtureVolume as GaussianMixtureVolume
-from .tabulated_volume import (
-    AbstractTabulatedAtomicVolume as AbstractTabulatedAtomicVolume,
-    PengAtomicVolume as PengAtomicVolume,
-    PengScatteringFactorParameters as PengScatteringFactorParameters,
+from .gaussian_volume import GaussianMixtureVolume as GaussianMixtureVolume
+from .independent_atom_volume import (
+    IndependentAtomVolume as IndependentAtomVolume,
+    PengScatteringFactor as PengScatteringFactor,
 )
 from .voxel_volume import (
     FourierVoxelGridVolume as FourierVoxelGridVolume,

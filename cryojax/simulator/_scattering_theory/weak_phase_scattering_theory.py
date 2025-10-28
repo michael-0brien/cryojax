@@ -6,14 +6,11 @@ from .._image_config import AbstractImageConfig
 from .._solvent_2d import AbstractRandomSolvent2D
 from .._transfer_theory import ContrastTransferTheory
 from .._volume import AbstractVolumeRepresentation
-from .._volume_integrator import (
-    AbstractVolumeIntegrator,
-    AbstractVoxelVolumeIntegrator,
-)
-from .base_scattering_theory import AbstractWeakPhaseScatteringTheory
+from .._volume_integrator import AbstractVolumeIntegrator
+from .base_scattering_theory import AbstractScatteringTheory
 
 
-class WeakPhaseScatteringTheory(AbstractWeakPhaseScatteringTheory, strict=True):
+class WeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
     """Base linear image formation theory."""
 
     volume_integrator: AbstractVolumeIntegrator
@@ -36,16 +33,6 @@ class WeakPhaseScatteringTheory(AbstractWeakPhaseScatteringTheory, strict=True):
         self.transfer_theory = transfer_theory
         self.solvent = solvent
 
-    def __check_init__(self):
-        if isinstance(self.volume_integrator, AbstractVoxelVolumeIntegrator):
-            if not self.volume_integrator.outputs_integral:
-                raise AttributeError(
-                    "If the `volume_integrator` is voxel-based, "
-                    "it must have `volume_integrator.outputs_integral = True` "
-                    "to be passed to a `HighEnergyScatteringTheory`."
-                )
-
-    @override
     def compute_object_spectrum(
         self,
         volume_representation: AbstractVolumeRepresentation,
@@ -90,3 +77,23 @@ class WeakPhaseScatteringTheory(AbstractWeakPhaseScatteringTheory, strict=True):
         )
 
         return contrast_spectrum
+
+    @override
+    def compute_intensity_spectrum(
+        self,
+        volume_representation: AbstractVolumeRepresentation,
+        image_config: AbstractImageConfig,
+        rng_key: PRNGKeyArray | None = None,
+        defocus_offset: float | Float[Array, ""] | None = None,
+    ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
+        """Compute the squared wavefunction at the detector plane, given the
+        contrast.
+        """
+        N1, N2 = image_config.padded_shape
+        # ... compute the squared wavefunction directly from the image contrast
+        # as |psi|^2 = 1 + 2C.
+        contrast_spectrum = self.compute_contrast_spectrum(
+            volume_representation, image_config, rng_key, defocus_offset=defocus_offset
+        )
+        intensity_spectrum = (2 * contrast_spectrum).at[0, 0].add(1.0 * N1 * N2)
+        return intensity_spectrum
