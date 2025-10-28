@@ -43,7 +43,6 @@ from ._pose import (
 from ._scattering_theory import (
     AbstractScatteringTheory as AbstractScatteringTheory,
     AbstractWaveScatteringTheory as AbstractWaveScatteringTheory,
-    AbstractWeakPhaseScatteringTheory as AbstractWeakPhaseScatteringTheory,
     StrongPhaseScatteringTheory as StrongPhaseScatteringTheory,
     WeakPhaseScatteringTheory as WeakPhaseScatteringTheory,
 )

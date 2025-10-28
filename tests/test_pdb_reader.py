@@ -162,6 +162,10 @@ def test_consistency_with_mdtraj(pdbfile, center, request):
         selection_string="all",
     )
 
+    import warnings
+
+    warnings.filterwarnings("ignore")
+
     traj = mdtraj.load(pdbfile)
     if center:
         traj.center_coordinates(mass_weighted=True)

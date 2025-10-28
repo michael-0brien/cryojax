@@ -2,7 +2,6 @@
 Image formation models simulated from gaussian noise distributions.
 """
 
-import warnings
 from abc import abstractmethod
 from typing_extensions import override
 
@@ -43,18 +42,6 @@ class AbstractGaussianNoiseModel(
     image_model: AbstractVar[AbstractImageModel]
     signal_scale_factor: AbstractVar[Float[Array, ""]]
     signal_offset: AbstractVar[Float[Array, ""]]
-
-    def __check_init__(self):
-        if not self.image_model.normalizes_signal:
-            cls_name = self.__class__.__name__
-            warnings.warn(
-                f"Instantiated a `{cls_name}` "
-                f"with `{cls_name}.image_model.normalizes_signal = False`. "
-                "This means that noise is calibrated relative to the "
-                "unnormalized output, which may lead to unexpected behavior.",
-                category=UserWarning,
-                stacklevel=2,
-            )
 
     @override
     def sample(
