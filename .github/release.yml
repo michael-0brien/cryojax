@@ -1,0 +1,28 @@
+changelog:
+  exclude:
+    labels:
+      - version-release
+      - duplicate
+    authors:
+      - dependabot
+  categories:
+    - title: "Features"
+      labels:
+        - feature
+        - enhancement
+    - title: "Bug Fixes"
+      labels:
+        - bug
+    - title: "API Changes"
+      labels:
+        - api-change
+    - title: "Refactoring"
+      labels:
+        - refactor
+        - cleanup
+    - title: "Convention changes"
+      labels:
+        - convention-change
+    - title: "Other Changes"
+      labels:
+        - "*"
