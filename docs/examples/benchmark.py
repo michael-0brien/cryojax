@@ -265,43 +265,6 @@ def benchmark_fourier_slice_vs_gmm(
         num_images, path_to_pdb, path_to_starfile
     )
 
-    # pixel_size, shape = 0.5, (64, 64)
-    # pad_options = dict(shape=(128, 128))
-    # image_config = cxs.BasicImageConfig(
-    #     shape, pixel_size, voltage_in_kilovolts=300.0, pad_options=pad_options
-    # )
-    # key = jax.random.PRNGKey(0)
-    # rotation = SO3.sample_uniform(key)
-    # offset_in_angstroms = jnp.zeros(2)
-    # pose = cxs.EulerAnglePose.from_rotation_and_translation(
-    #     rotation, offset_in_angstroms
-    # )
-
-    # defocus_in_angstroms = 15000.0
-    # astigmatism_in_angstroms = 2000.0
-    # astigmatism_angle = jnp.pi / 4
-    # spherical_aberration_in_mm = 2.0
-    # amplitude_contrast_ratio = 0.1
-    # transfer_theory = cxs.ContrastTransferTheory(
-    #     ctf=cxs.AstigmaticCTF(
-    #         defocus_in_angstroms=defocus_in_angstroms,
-    #         astigmatism_in_angstroms=astigmatism_in_angstroms,
-    #         astigmatism_angle=astigmatism_angle,
-    #         spherical_aberration_in_mm=spherical_aberration_in_mm,
-    #     ),
-    #     amplitude_contrast_ratio=amplitude_contrast_ratio,
-    # )
-    # image_model = eqx.filter_jit(cxs.make_image_model)(
-    #     volume_parametrization=atom_volume,
-    #     image_config=image_config,
-    #     pose=pose,
-    #     transfer_theory=transfer_theory,
-    #     volume_integrator=cxs.FFTAtomProjection(eps=1e-16),
-    # )
-    # _ = image_model.simulate()
-
-    # assert False
-
     image_config, pose, transfer_theory = (
         particle_parameters["image_config"],
         particle_parameters["pose"],
@@ -429,7 +392,7 @@ def benchmark_fourier_slice_vs_gmm(
 
 
 if __name__ == "__main__":
-    n_iterations, n_images = 2, 3
+    n_iterations, n_images = 10, 100
     print(
         f"Benchmarking image simulation of {n_images} images "
         f"averaged over {n_iterations} iterations"
