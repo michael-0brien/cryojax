@@ -68,7 +68,7 @@ source = "vcs"
 version-file = "cryojax/cryojax_version.py"
 
 [tool.ruff]
-exclude = ["old"]
+exclude = ["old", "scripts"]
 extend-include = ["*.ipynb"]
 line-length = 90
 src = []

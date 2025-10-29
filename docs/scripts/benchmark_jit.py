@@ -377,6 +377,6 @@ if __name__ == "__main__":
         f"Benchmarking image simulation of {n_images} images "
         f"averaged over {n_iterations} iterations"
     )
-    path_to_pdb = "data/thyroglobulin_initial.pdb"
-    path_to_starfile = "outputs/particles.star"
+    path_to_pdb = "../data/thyroglobulin_initial.pdb"
+    path_to_starfile = "../outputs/particles.star"
     benchmark_fourier_slice_vs_gmm(n_iterations, n_images, path_to_pdb, path_to_starfile)
