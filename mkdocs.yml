@@ -42,6 +42,7 @@ plugins:
             - "examples/.ipynb_checkpoints/"
             - "examples/old"
             - "examples/data"
+            - "examples/scripts"
     - ipynb
     - hippogriffe:
         extra_public_objects:
@@ -75,7 +76,6 @@ nav:
             - Create custom image simulation methods: 'examples/extending-cryojax.ipynb'
         - Your first program:
             - Write a STAR file of simulated data: 'examples/simulate-relion-dataset.ipynb'
-        - Advanced usage:
             - Structural refinement using gradient descent: 'examples/structure-refinement.ipynb'
     - API:
         - cryojax.simulator:

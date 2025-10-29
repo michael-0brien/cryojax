@@ -7,6 +7,7 @@ import jax.numpy as jnp
 from cryojax.constants import PengScatteringFactorParameters
 from cryojax.dataset import RelionParticleParameterFile
 from cryojax.io import read_atoms_from_pdb
+from cryojax.ndimage import operators as op
 from cryojax.rotations import SO3
 from jaxtyping import PRNGKeyArray
 
@@ -106,8 +107,18 @@ def setup(num_images, path_to_pdb, path_to_starfile):
     volume_fourier_grid = cxs.FourierVoxelGridVolume.from_real_voxel_grid(
         real_voxel_grid, pad_scale=2
     )
-
-    return particle_parameters, parameter_file, volume_gmm, volume_fourier_grid
+    # print(atom_properties["b_factors"].mean() * 8 * jnp.pi**2)
+    atom_volume = cxs.IndependentAtomVolume(
+        position_pytree=atom_positions,
+        scattering_factor_pytree=op.FourierGaussian(amplitude=1.0, b_factor=10.0),
+    )
+    return (
+        particle_parameters,
+        parameter_file,
+        volume_gmm,
+        atom_volume,
+        volume_fourier_grid,
+    )
 
 
 # def compute_image(particle_parameters, volume, volume_integrator, rng_key):
@@ -220,9 +231,10 @@ def setup(num_images, path_to_pdb, path_to_starfile):
 #     print(f"JIT, Fourier Slice: {fs_avg_time:.4f} +/- {fs_std_time:.4f} s")
 
 
-@eqx.filter_jit
 @eqx.filter_vmap(in_axes=(eqx.if_array(0), eqx.if_array(0), eqx.if_array(0), None, None))
-def simulate_image(image_config, pose, transfer_theory, potential, volume_integrator):
+def simulate_image_nojit(
+    image_config, pose, transfer_theory, potential, volume_integrator
+):
     image_model = cxs.make_image_model(
         volume_parametrization=potential,
         image_config=image_config,
@@ -233,12 +245,16 @@ def simulate_image(image_config, pose, transfer_theory, potential, volume_integr
     return image_model.simulate()
 
 
+simulate_image_jit = eqx.filter_jit(simulate_image_nojit)
+
+
 def benchmark_fourier_slice_vs_gmm(
     n_iterations, num_images, path_to_pdb, path_to_starfile
 ):
-    particle_parameters, _, volume_gmm, volume_fourier_grid = setup(
+    particle_parameters, _, volume_gmm, atom_volume, volume_fourier_grid = setup(
         num_images, path_to_pdb, path_to_starfile
     )
+
     image_config, pose, transfer_theory = (
         particle_parameters["image_config"],
         particle_parameters["pose"],
@@ -247,17 +263,50 @@ def benchmark_fourier_slice_vs_gmm(
 
     time_list = []
     for _ in range(n_iterations + 1):
-        with jax.disable_jit():
-            start_time = time()
-            gmm_image = simulate_image(
-                image_config,
-                pose,
-                transfer_theory,
-                volume_gmm,
-                cxs.GaussianMixtureProjection(),
-            )
-            gmm_image.block_until_ready()
-            end_time = time()
+        start_time = time()
+        fft_image = simulate_image_nojit(
+            image_config,
+            pose,
+            transfer_theory,
+            atom_volume,
+            cxs.FFTAtomProjection(eps=1e-16),
+        )
+        fft_image.block_until_ready()
+        end_time = time()
+        time_list.append(end_time - start_time)
+    fft_avg_time = jnp.mean(jnp.array(time_list[1:]))
+    fft_std_time = jnp.std(jnp.array(time_list[1:]))
+    print(f"FFTproj (no JIT): {1000 * fft_avg_time:.2f} +/- {1000 * fft_std_time:.2f} ms")
+
+    time_list = []
+    for _ in range(n_iterations + 1):
+        start_time = time()
+        fft_image = simulate_image_jit(
+            image_config,
+            pose,
+            transfer_theory,
+            atom_volume,
+            cxs.FFTAtomProjection(eps=1e-16),
+        )
+        fft_image.block_until_ready()
+        end_time = time()
+        time_list.append(end_time - start_time)
+    fft_avg_time = jnp.mean(jnp.array(time_list[1:]))
+    fft_std_time = jnp.std(jnp.array(time_list[1:]))
+    print(f"FFTproj (JIT): {1000 * fft_avg_time:.2f} +/- {1000 * fft_std_time:.2f} ms")
+
+    time_list = []
+    for _ in range(n_iterations + 1):
+        start_time = time()
+        gmm_image = simulate_image_nojit(
+            image_config,
+            pose,
+            transfer_theory,
+            volume_gmm,
+            cxs.GaussianMixtureProjection(),
+        )
+        gmm_image.block_until_ready()
+        end_time = time()
         time_list.append(end_time - start_time)
     gmm_avg_time = jnp.mean(jnp.array(time_list[1:]))
     gmm_std_time = jnp.std(jnp.array(time_list[1:]))
@@ -266,7 +315,7 @@ def benchmark_fourier_slice_vs_gmm(
     time_list = []
     for _ in range(n_iterations + 1):
         start_time = time()
-        gmm_image = simulate_image(
+        gmm_image = simulate_image_jit(
             image_config,
             pose,
             transfer_theory,
@@ -284,17 +333,16 @@ def benchmark_fourier_slice_vs_gmm(
 
     time_list = []
     for _ in range(n_iterations + 1):
-        with jax.disable_jit():
-            start_time = time()
-            fs_image = simulate_image(
-                image_config,
-                pose,
-                transfer_theory,
-                volume_fourier_grid,
-                cxs.FourierSliceExtraction(),
-            )
-            fs_image.block_until_ready()
-            end_time = time()
+        start_time = time()
+        fs_image = simulate_image_nojit(
+            image_config,
+            pose,
+            transfer_theory,
+            volume_fourier_grid,
+            cxs.FourierSliceExtraction(),
+        )
+        fs_image.block_until_ready()
+        end_time = time()
         time_list.append(end_time - start_time)
     fs_avg_time = jnp.mean(jnp.array(time_list[1:]))
     fs_std_time = jnp.std(jnp.array(time_list[1:]))
@@ -306,7 +354,7 @@ def benchmark_fourier_slice_vs_gmm(
     time_list = []
     for _ in range(n_iterations + 1):
         start_time = time()
-        fs_image = simulate_image(
+        fs_image = simulate_image_jit(
             image_config,
             pose,
             transfer_theory,
@@ -329,6 +377,6 @@ if __name__ == "__main__":
         f"Benchmarking image simulation of {n_images} images "
         f"averaged over {n_iterations} iterations"
     )
-    path_to_pdb = "data/thyroglobulin_initial.pdb"
-    path_to_starfile = "outputs/particles.star"
+    path_to_pdb = "../data/thyroglobulin_initial.pdb"
+    path_to_starfile = "../outputs/particles.star"
     benchmark_fourier_slice_vs_gmm(n_iterations, n_images, path_to_pdb, path_to_starfile)
