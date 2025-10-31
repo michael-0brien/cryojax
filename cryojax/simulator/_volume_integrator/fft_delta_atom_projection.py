@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Any, ClassVar
+from typing import ClassVar
 
 import jax
 import jax.numpy as jnp
@@ -21,22 +21,20 @@ class FFTDeltaAtomProjection(
     the exit plane using non-uniform FFTs plus convolution.
     """
 
-    antialias: bool
+    n_kernel_truncation_pix: int
+    kernel_width_pix: float
     upsample_factor: int | None
     shape: tuple[int, int] | None
-    eps: float
-    opts: Any
 
     is_projection_approximation: ClassVar[bool] = True
 
     def __init__(
         self,
         *,
-        antialias: bool = True,
+        n_kernel_truncation_pix: int = 5,
+        kernel_width_pix: float = 1.0,
         upsample_factor: int | None = None,
         shape: tuple[int, int] | None = None,
-        eps: float = 1e-6,
-        opts: Any = None,
     ):
         """**Arguments:**
 
@@ -62,11 +60,11 @@ class FFTDeltaAtomProjection(
             for documentation.
         """
 
-        self.antialias = antialias
         self.upsample_factor = upsample_factor
         self.shape = shape
-        self.eps = eps
-        self.opts = opts
+
+        self.n_kernel_truncation_pix = n_kernel_truncation_pix
+        self.kernel_width_pix = kernel_width_pix
 
     def __check_init__(self):
         if self.upsample_factor is not None:
@@ -82,8 +80,8 @@ class FFTDeltaAtomProjection(
         image_config: AbstractImageConfig,
         outputs_real_space: bool = True,
     ):
-        n_trunc = 5
-        sigma = 1.0
+        n_kernel_truncation_pix = self.n_kernel_truncation_pix
+        kernel_width_pix = self.kernel_width_pix
         n_batch = 1
         n_atoms = atom_volume.position_pytree.shape[0]
 
@@ -92,13 +90,16 @@ class FFTDeltaAtomProjection(
         n_pix = shape[0]
 
         # Random atom positions
-        scale = 30 / 6.5 * pixel_size
         atom_centers_batch = (
-            atom_volume.position_pytree[:, :2].reshape(n_batch, n_atoms, 2) * scale
+            atom_volume.position_pytree[:, :2].reshape(n_batch, n_atoms, 2) / pixel_size
         )
         amplitudes = jnp.ones((n_batch, n_atoms), dtype=jnp.float32)
         real_space_proj = project_vec_batch_fft_weighted_same_sigma(
-            n_pix, n_trunc, sigma, atom_centers_batch, amplitudes
+            n_pix,
+            n_kernel_truncation_pix,
+            kernel_width_pix,
+            atom_centers_batch,
+            amplitudes,
         )
         if outputs_real_space:
             return real_space_proj
