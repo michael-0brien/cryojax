@@ -16,7 +16,7 @@ def setup_volumes_and_configs(n_iterations, n_atoms, box_size, pixel_size=2.0):
     """Setup volumes and image configs for different test conditions."""
     # Read atoms (subsample to get desired n_atoms)
     atom_positions, atom_types, atom_properties = read_atoms_from_pdb(
-        "data/thyroglobulin_initial.pdb",
+        "../data/thyroglobulin_initial.pdb",
         center=True,
         loads_properties=True,
         selection_string="name CA",
@@ -178,6 +178,23 @@ def benchmark_projection_methods(
                 fs_time_per_projection = np.mean(times[1:])
                 fs_total_time = volume_render_time + fs_time_per_projection
 
+                # Benchmark Atom Projection (Delta FFT)
+                times = []
+                integrator = cxs.FFTDeltaAtomProjection(eps=1e-16, antialias=antialias)
+                for _ in range(n_iterations + 1):
+                    start_time = time()
+                    images = simulate_image_batch(
+                        configs,
+                        poses,
+                        transfer_theories,
+                        atom_volume,
+                        integrator,
+                    )
+                    images.block_until_ready()
+                    times.append(time() - start_time)
+
+                delta_atom_time_total = np.mean(times[1:])
+
                 # Benchmark Atom Projection (FFT)
                 times = []
                 integrator = cxs.FFTAtomProjection(eps=1e-16, antialias=antialias)
@@ -221,6 +238,7 @@ def benchmark_projection_methods(
                         "n_projections": n_projections,
                         "fourier_slice_time": fs_total_time,
                         "atom_projection_time": atom_time_total,
+                        "delta_atom_projection_time": delta_atom_time_total,
                         "fs_volume_render_time": volume_render_time,
                         "fs_projection_time": fs_time_per_projection,
                         "gmm_projection_time": gmm_time_total,
@@ -270,6 +288,14 @@ def plot_crossover_analysis(df, datetimestamp, antialias, use_error_functions):
                 "^-",
                 label=f"GMM Projection (use_error_functions={use_error_functions})",
                 color="green",
+                linewidth=2,
+            )
+            ax.plot(
+                subset["n_projections"],
+                subset["delta_atom_projection_time"] * 1000,
+                "x-",
+                label=f"Delta Atom Projection (kernel size=5, sigma=1.0)",
+                color="gray",
                 linewidth=2,
             )
 

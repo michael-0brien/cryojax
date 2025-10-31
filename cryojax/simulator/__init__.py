@@ -68,6 +68,7 @@ from ._volume import (
 from ._volume_integrator import (
     AbstractVolumeIntegrator as AbstractVolumeIntegrator,
     FFTAtomProjection as FFTAtomProjection,
+    FFTDeltaAtomProjection as FFTDeltaAtomProjection,
     FourierSliceExtraction as FourierSliceExtraction,
     GaussianMixtureProjection as GaussianMixtureProjection,
     RealVoxelProjection as RealVoxelProjection,
