@@ -4,12 +4,10 @@ import jax.numpy as jnp
 import scipy
 from jaxtyping import Array, Float
 
-from ..jax_util import NDArrayLike
+from ..jax_util import FloatLike
 
 
-def wavelength_from_kilovolts(
-    voltage_in_kilovolts: Float[NDArrayLike, ""] | float,
-) -> Float[Array, ""]:
+def wavelength_from_kilovolts(voltage_in_kilovolts: FloatLike) -> Float[Array, ""]:
     """Get the relativistic electron wavelength at a given accelerating voltage. For
     reference, see Equation 2.5 in Section 2.1 from *Spence, John CH. High-resolution
     electron microscopy. OUP Oxford, 2013.*.
@@ -31,9 +29,7 @@ def wavelength_from_kilovolts(
     )
 
 
-def lorentz_factor_from_kilovolts(
-    voltage_in_kilovolts: Float[NDArrayLike, ""] | float,
-) -> Float[Array, ""]:
+def lorentz_factor_from_kilovolts(voltage_in_kilovolts: FloatLike) -> Float[Array, ""]:
     """Get the Lorentz factor given an accelerating voltage.
 
     **Arguments:**
@@ -54,7 +50,7 @@ def lorentz_factor_from_kilovolts(
 
 
 def interaction_constant_from_kilovolts(
-    voltage_in_kilovolts: Float[NDArrayLike, ""] | float,
+    voltage_in_kilovolts: FloatLike,
 ) -> Float[Array, ""]:
     """Get the electron interaction constant given an accelerating voltage.
 

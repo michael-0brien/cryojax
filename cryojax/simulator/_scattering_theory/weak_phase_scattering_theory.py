@@ -1,7 +1,8 @@
 from typing_extensions import override
 
-from jaxtyping import Array, Complex, Float, PRNGKeyArray
+from jaxtyping import Array, Complex, PRNGKeyArray
 
+from ...jax_util import FloatLike
 from .._image_config import AbstractImageConfig
 from .._solvent_2d import AbstractRandomSolvent2D
 from .._transfer_theory import ContrastTransferTheory
@@ -64,7 +65,7 @@ class WeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
         volume_representation: AbstractVolumeRepresentation,
         image_config: AbstractImageConfig,
         rng_key: PRNGKeyArray | None = None,
-        defocus_offset: float | Float[Array, ""] | None = None,
+        defocus_offset: FloatLike | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         object_spectrum = self.compute_object_spectrum(
             volume_representation, image_config, rng_key
@@ -84,7 +85,7 @@ class WeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
         volume_representation: AbstractVolumeRepresentation,
         image_config: AbstractImageConfig,
         rng_key: PRNGKeyArray | None = None,
-        defocus_offset: float | Float[Array, ""] | None = None,
+        defocus_offset: FloatLike | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         """Compute the squared wavefunction at the detector plane, given the
         contrast.

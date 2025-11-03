@@ -11,7 +11,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float, Inexact
 
 from ...coordinates import make_frequency_grid
-from ...jax_util import NDArrayLike
+from ...jax_util import FloatLike, NDArrayLike
 from .._edges import resize_with_crop_or_pad
 from .._fft import irfftn, rfftn
 from .._fourier_statistics import compute_binned_powerspectrum
@@ -67,9 +67,9 @@ class LowpassFilter(AbstractFilter, strict=True):
         frequency_grid_in_angstroms_or_pixels: (
             Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
         ),
-        grid_spacing: float | Float[NDArrayLike, ""] = 1.0,
-        frequency_cutoff_fraction: float | Float[NDArrayLike, ""] = 0.95,
-        rolloff_width_fraction: float | Float[NDArrayLike, ""] = 0.05,
+        grid_spacing: FloatLike = 1.0,
+        frequency_cutoff_fraction: FloatLike = 0.95,
+        rolloff_width_fraction: FloatLike = 0.05,
     ):
         """**Arguments:**
 
@@ -108,9 +108,9 @@ class HighpassFilter(AbstractFilter, strict=True):
         frequency_grid_in_angstroms_or_pixels: (
             Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
         ),
-        grid_spacing: float | Float[NDArrayLike, ""] = 1.0,
-        frequency_cutoff_fraction: float | Float[NDArrayLike, ""] = 0.95,
-        rolloff_width_fraction: float | Float[NDArrayLike, ""] = 0.05,
+        grid_spacing: FloatLike = 1.0,
+        frequency_cutoff_fraction: FloatLike = 0.95,
+        rolloff_width_fraction: FloatLike = 0.05,
     ):
         """**Arguments:**
 

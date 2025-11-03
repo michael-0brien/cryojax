@@ -5,7 +5,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
 from ...constants import wavelength_from_kilovolts
-from ...jax_util import NDArrayLike, error_if_negative
+from ...jax_util import FloatLike, error_if_negative
 from .common_functions import (
     compute_phase_shift_from_amplitude_contrast_ratio,
     compute_phase_shifts_with_spherical_aberration,
@@ -19,19 +19,19 @@ class AbstractCTF(eqx.Module, strict=True):
     def compute_aberration_phase_shifts(
         self,
         frequency_grid_in_angstroms: Float[Array, "y_dim x_dim 2"],
-        wavelength_in_angstroms: Float[NDArrayLike, ""] | float,
-        defocus_offset: Float[NDArrayLike, ""] | float | None = None,
+        wavelength_in_angstroms: FloatLike,
+        defocus_offset: FloatLike | None = None,
     ) -> Float[Array, "y_dim x_dim"]:
         raise NotImplementedError
 
     def __call__(
         self,
         frequency_grid_in_angstroms: Float[Array, "y_dim x_dim 2"],
-        voltage_in_kilovolts: Float[NDArrayLike, ""] | float,
-        amplitude_contrast_ratio: Float[NDArrayLike, ""] | float = 0.1,
-        phase_shift: Float[NDArrayLike, ""] | float = 0.0,
+        voltage_in_kilovolts: FloatLike,
+        amplitude_contrast_ratio: FloatLike = 0.1,
+        phase_shift: FloatLike = 0.0,
         outputs_exp: bool = False,
-        defocus_offset: Float[NDArrayLike, ""] | float | None = None,
+        defocus_offset: FloatLike | None = None,
     ) -> Float[Array, "y_dim x_dim"] | Complex[Array, "y_dim x_dim"]:
         """Compute the CTF as a JAX array.
 
@@ -108,10 +108,10 @@ class AstigmaticCTF(AbstractCTF, strict=True):
 
     def __init__(
         self,
-        defocus_in_angstroms: float | Float[Array, ""] = 10000.0,
-        astigmatism_in_angstroms: float | Float[Array, ""] = 0.0,
-        astigmatism_angle: float | Float[Array, ""] = 0.0,
-        spherical_aberration_in_mm: float | Float[Array, ""] = 2.7,
+        defocus_in_angstroms: FloatLike = 10000.0,
+        astigmatism_in_angstroms: FloatLike = 0.0,
+        astigmatism_angle: FloatLike = 0.0,
+        spherical_aberration_in_mm: FloatLike = 2.7,
     ):
         """**Arguments:**
 
@@ -130,8 +130,8 @@ class AstigmaticCTF(AbstractCTF, strict=True):
     def compute_aberration_phase_shifts(
         self,
         frequency_grid_in_angstroms: Float[Array, "y_dim x_dim 2"],
-        wavelength_in_angstroms: Float[NDArrayLike, ""] | float,
-        defocus_offset: Float[NDArrayLike, ""] | float | None = None,
+        wavelength_in_angstroms: FloatLike,
+        defocus_offset: FloatLike | None = None,
     ) -> Float[Array, "y_dim x_dim"]:
         """Compute the frequency-dependent phase shifts due to wave aberration.
 

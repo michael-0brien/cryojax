@@ -2,7 +2,7 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
-from ...jax_util import NDArrayLike, error_if_not_fractional
+from ...jax_util import FloatLike, error_if_not_fractional
 from ...ndimage.operators import FourierOperatorLike
 from .._image_config import AbstractImageConfig
 from .transfer_function import AbstractCTF
@@ -34,8 +34,8 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
         self,
         ctf: AbstractCTF,
         envelope: FourierOperatorLike | None = None,
-        amplitude_contrast_ratio: float | Float[NDArrayLike, ""] = 0.1,
-        phase_shift: float | Float[NDArrayLike, ""] = 0.0,
+        amplitude_contrast_ratio: FloatLike = 0.1,
+        phase_shift: FloatLike = 0.0,
     ):
         """**Arguments:**
 
@@ -64,7 +64,7 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
         ),
         image_config: AbstractImageConfig,
         *,
-        defocus_offset: Float[NDArrayLike, ""] | float | None = None,
+        defocus_offset: FloatLike | None = None,
         is_projection_approximation: bool = True,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         """Apply the CTF directly to the phase shifts in the exit plane.
@@ -144,7 +144,7 @@ class WaveTransferTheory(AbstractTransferTheory, strict=True):
         ],
         image_config: AbstractImageConfig,
         *,
-        defocus_offset: Float[NDArrayLike, ""] | float | None = None,
+        defocus_offset: FloatLike | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]:
         """Apply the wave transfer function to the wavefunction in the exit plane."""
         frequency_grid = image_config.padded_full_frequency_grid_in_angstroms

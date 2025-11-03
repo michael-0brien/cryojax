@@ -18,7 +18,7 @@ from typing_extensions import override
 import jax.numpy as jnp
 from jaxtyping import Array, Float, Inexact
 
-from ...jax_util import NDArrayLike, error_if_negative, error_if_not_positive
+from ...jax_util import FloatLike, error_if_negative, error_if_not_positive
 from ._base_operator import AbstractImageOperator
 
 
@@ -312,7 +312,7 @@ class FourierSinc(AbstractFourierOperator, strict=True):
 
     box_width: Float[Array, ""]
 
-    def __init__(self, box_width: float | Float[NDArrayLike, ""] = 1.0):
+    def __init__(self, box_width: FloatLike = 1.0):
         """**Arguments:**
 
         - `box_width`:

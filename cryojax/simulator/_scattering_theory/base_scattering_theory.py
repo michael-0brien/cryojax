@@ -3,8 +3,9 @@ from typing_extensions import override
 
 import equinox as eqx
 import jax.numpy as jnp
-from jaxtyping import Array, Complex, Float, PRNGKeyArray
+from jaxtyping import Array, Complex, PRNGKeyArray
 
+from ...jax_util import FloatLike
 from ...ndimage import fftn, ifftn, rfftn
 from .._image_config import AbstractImageConfig
 from .._transfer_theory import (
@@ -22,7 +23,7 @@ class AbstractScatteringTheory(eqx.Module, strict=True):
         volume_representation: AbstractVolumeRepresentation,
         image_config: AbstractImageConfig,
         rng_key: PRNGKeyArray | None = None,
-        defocus_offset: float | Float[Array, ""] | None = None,
+        defocus_offset: FloatLike | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         raise NotImplementedError
 
@@ -32,7 +33,7 @@ class AbstractScatteringTheory(eqx.Module, strict=True):
         volume_representation: AbstractVolumeRepresentation,
         image_config: AbstractImageConfig,
         rng_key: PRNGKeyArray | None = None,
-        defocus_offset: float | Float[Array, ""] | None = None,
+        defocus_offset: FloatLike | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         raise NotImplementedError
 
@@ -57,7 +58,7 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
         volume_representation: AbstractVolumeRepresentation,
         image_config: AbstractImageConfig,
         rng_key: PRNGKeyArray | None = None,
-        defocus_offset: float | Float[Array, ""] | None = None,
+        defocus_offset: FloatLike | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         # ... compute the exit wave
         fourier_wavefunction = fftn(
@@ -81,7 +82,7 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
         volume_representation: AbstractVolumeRepresentation,
         image_config: AbstractImageConfig,
         rng_key: PRNGKeyArray | None = None,
-        defocus_offset: float | Float[Array, ""] | None = None,
+        defocus_offset: FloatLike | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         """Compute the contrast at the detector plane, given the squared wavefunction."""
         # ... compute the exit wave

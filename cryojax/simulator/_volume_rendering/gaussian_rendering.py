@@ -10,7 +10,7 @@ from jaxtyping import Array, Float, PyTree
 
 from ...constants import variance_to_b_factor
 from ...coordinates import make_1d_coordinate_grid
-from ...jax_util import NDArrayLike, error_if_not_positive
+from ...jax_util import FloatLike, error_if_not_positive
 from ...ndimage import fftn, rfftn
 from .._volume import GaussianMixtureVolume
 from .base_rendering import AbstractVolumeRenderFn
@@ -71,7 +71,7 @@ class GaussianMixtureRenderFn(AbstractVolumeRenderFn[GaussianMixtureVolume], str
     def __init__(
         self,
         shape: tuple[int, int, int],
-        voxel_size: Float[NDArrayLike, ""] | float,
+        voxel_size: FloatLike,
         *,
         batch_options: dict[str, Any] = {},
     ):

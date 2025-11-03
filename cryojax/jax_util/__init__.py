@@ -28,4 +28,11 @@ from ._pytree_transforms import (
     StopGradientTransform as StopGradientTransform,
     resolve_transforms as resolve_transforms,
 )
-from ._typing import NDArrayLike as NDArrayLike
+from ._typing import (
+    BoolLike as BoolLike,
+    ComplexLike as ComplexLike,
+    FloatLike as FloatLike,
+    InexactLike as InexactLike,
+    IntLike as IntLike,
+    NDArrayLike as NDArrayLike,
+)

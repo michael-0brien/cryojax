@@ -15,7 +15,7 @@ from ....constants import (
     variance_to_b_factor,
 )
 from ....coordinates import make_1d_coordinate_grid
-from ....jax_util import NDArrayLike, error_if_not_positive
+from ....jax_util import FloatLike, NDArrayLike, error_if_not_positive
 from ..._pose import AbstractPose
 from .base_representations import AbstractAtomVolume
 
@@ -147,9 +147,7 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
         cls,
         atom_positions: Float[NDArrayLike, "n_atoms 3"],
         parameters: PengScatteringFactorParameters,
-        extra_b_factors: (
-            float | Float[NDArrayLike, ""] | Float[NDArrayLike, " n_atoms"] | None
-        ) = None,
+        extra_b_factors: FloatLike | Float[NDArrayLike, " n_atoms"] | None = None,
     ) -> Self:
         """Initialize a `GaussianMixtureVolume` from tabulated electron
         scattering factor parameters (Peng et al. 1996). This treats

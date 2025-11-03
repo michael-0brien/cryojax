@@ -3,6 +3,7 @@ Representations of rigid body rotations and translations of 3D coordinate system
 """
 
 from abc import abstractmethod
+from collections.abc import Sequence
 from functools import cached_property
 from typing_extensions import Self, override
 
@@ -12,7 +13,7 @@ import jax.numpy as jnp
 from equinox import AbstractVar, Module
 from jaxtyping import Array, Complex, Float
 
-from ..jax_util import NDArrayLike
+from ..jax_util import FloatLike, NDArrayLike
 from ..ndimage import enforce_self_conjugate_rfftn_components
 from ..rotations import SO3, convert_quaternion_to_euler_angles
 
@@ -222,13 +223,13 @@ class EulerAnglePose(AbstractPose, strict=True):
 
     def __init__(
         self,
-        offset_x_in_angstroms: float | Float[NDArrayLike, ""] = 0.0,
-        offset_y_in_angstroms: float | Float[NDArrayLike, ""] = 0.0,
-        phi_angle: float | Float[NDArrayLike, ""] = 0.0,
-        theta_angle: float | Float[NDArrayLike, ""] = 0.0,
-        psi_angle: float | Float[NDArrayLike, ""] = 0.0,
+        offset_x_in_angstroms: FloatLike = 0.0,
+        offset_y_in_angstroms: FloatLike = 0.0,
+        phi_angle: FloatLike = 0.0,
+        theta_angle: FloatLike = 0.0,
+        psi_angle: FloatLike = 0.0,
         *,
-        offset_z_in_angstroms: float | Float[NDArrayLike, ""] | None = None,
+        offset_z_in_angstroms: FloatLike | None = None,
     ):
         """**Arguments:**
 
@@ -288,8 +289,8 @@ class QuaternionPose(AbstractPose, strict=True):
 
     def __init__(
         self,
-        offset_x_in_angstroms: float | Float[NDArrayLike, ""] = 0.0,
-        offset_y_in_angstroms: float | Float[NDArrayLike, ""] = 0.0,
+        offset_x_in_angstroms: FloatLike = 0.0,
+        offset_y_in_angstroms: FloatLike = 0.0,
         wxyz: tuple[float, float, float, float] | Float[NDArrayLike, "4"] = (
             1.0,
             0.0,
@@ -297,7 +298,7 @@ class QuaternionPose(AbstractPose, strict=True):
             0.0,
         ),
         *,
-        offset_z_in_angstroms: float | Float[NDArrayLike, ""] | None = None,
+        offset_z_in_angstroms: FloatLike | None = None,
     ):
         """**Arguments:**
 
@@ -352,15 +353,11 @@ class AxisAnglePose(AbstractPose, strict=True):
 
     def __init__(
         self,
-        offset_x_in_angstroms: float | Float[NDArrayLike, ""] = 0.0,
-        offset_y_in_angstroms: float | Float[NDArrayLike, ""] = 0.0,
-        euler_vector: tuple[float, float, float] | Float[NDArrayLike, "3"] = (
-            0.0,
-            0.0,
-            0.0,
-        ),
+        offset_x_in_angstroms: FloatLike = 0.0,
+        offset_y_in_angstroms: FloatLike = 0.0,
+        euler_vector: Sequence[float] | Float[NDArrayLike, "3"] = (0.0, 0.0, 0.0),
         *,
-        offset_z_in_angstroms: float | Float[NDArrayLike, ""] | None = None,
+        offset_z_in_angstroms: FloatLike | None = None,
     ):
         """**Arguments:**
 
@@ -379,6 +376,11 @@ class AxisAnglePose(AbstractPose, strict=True):
             self.offset_in_angstroms = jnp.asarray(
                 (offset_x_in_angstroms, offset_y_in_angstroms, offset_z_in_angstroms),
                 dtype=float,
+            )
+        if len(euler_vector) != 3:
+            raise ValueError(
+                "Expected `euler_vector` to be a sequence of floats with "
+                f"length 3, but found `len(euler_vector) = {len(euler_vector)}`."
             )
         self.euler_vector = jnp.asarray(euler_vector, dtype=float)
 

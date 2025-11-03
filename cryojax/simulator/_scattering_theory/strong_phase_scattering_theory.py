@@ -3,7 +3,7 @@ from typing_extensions import override
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float, Inexact, PRNGKeyArray
 
-from ...jax_util import error_if_not_fractional
+from ...jax_util import FloatLike, error_if_not_fractional
 from ...ndimage import ifftn, irfftn
 from .._image_config import AbstractImageConfig
 from .._solvent_2d import AbstractRandomSolvent2D
@@ -49,7 +49,7 @@ class StrongPhaseScatteringTheory(AbstractWaveScatteringTheory, strict=True):
         volume_integrator: AbstractVolumeIntegrator,
         transfer_theory: WaveTransferTheory,
         solvent: AbstractRandomSolvent2D | None = None,
-        amplitude_contrast_ratio: float | Float[Array, ""] = 0.1,
+        amplitude_contrast_ratio: FloatLike = 0.1,
     ):
         """**Arguments:**
 

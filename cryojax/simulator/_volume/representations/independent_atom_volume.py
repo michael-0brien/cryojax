@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import TypeVar
 from typing_extensions import Self, override
 
@@ -7,7 +8,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Float, PyTree
 
 from ....constants import PengScatteringFactorParameters
-from ....jax_util import NDArrayLike
+from ....jax_util import FloatLike, NDArrayLike
 from ....ndimage.operators import AbstractFourierOperator
 from ..._pose import AbstractPose
 from .base_representations import AbstractAtomVolume
@@ -25,7 +26,7 @@ class PengScatteringFactor(AbstractFourierOperator, strict=True):
         self,
         a: Float[NDArrayLike, "5"],
         b: Float[NDArrayLike, "5"],
-        b_factor: float | Float[NDArrayLike, ""] | None = None,
+        b_factor: FloatLike | None = None,
     ):
         self.a = jnp.asarray(a, dtype=float)
         self.b = jnp.asarray(b, dtype=float)
@@ -99,7 +100,7 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
         positions_by_element: tuple[Float[NDArrayLike, "_ 3"], ...],
         parameters: PengScatteringFactorParameters,
         *,
-        b_factor_by_element: tuple[float | Float[NDArrayLike, ""], ...] | None = None,
+        b_factor_by_element: FloatLike | tuple[FloatLike, ...] | None = None,
     ) -> Self:
         n_elements = len(positions_by_element)
         a, b = parameters.a, parameters.b
@@ -113,13 +114,18 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
                 "in `positions_by_element.`"
             )
         if b_factor_by_element is not None:
-            if len(b_factor_by_element) != n_elements:
-                raise ValueError(
-                    "When constructing an `IndependentAtomVolume` via "
-                    "`from_tabulated_parameters`, found that "
-                    "`len(b_factor_by_element) != len(positions_by_element)`. "
-                    "Make sure that `b_factor_by_element` is a tuple with "
-                    "length matching the number of atom types."
+            if isinstance(b_factor_by_element, Sequence):
+                if len(b_factor_by_element) != n_elements:
+                    raise ValueError(
+                        "When constructing an `IndependentAtomVolume` via "
+                        "`from_tabulated_parameters`, found that "
+                        "`len(b_factor_by_element) != len(positions_by_element)`. "
+                        "Make sure that `b_factor_by_element` is a tuple with "
+                        "length matching the number of atom types."
+                    )
+            else:
+                b_factor_by_element = tuple(
+                    b_factor_by_element for _ in range(n_elements)
                 )
             scattering_factors_by_element = tuple(
                 PengScatteringFactor(a_i, b_i, b_factor)

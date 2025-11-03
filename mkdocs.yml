@@ -115,7 +115,4 @@ nav:
         - cryojax.atom_util:
             - 'api/atom_util.md'
         - cryojax.jax_util:
-            - 'api/jax_util/filter_specs.md'
-            - 'api/jax_util/grid_search.md'
-            - 'api/jax_util/pytree_transforms.md'
-            - 'api/jax_util/useful_functions.md'
+            - 'api/jax_util.md'

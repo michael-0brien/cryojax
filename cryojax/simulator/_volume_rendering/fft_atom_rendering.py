@@ -6,7 +6,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from ...coordinates import make_frequency_grid
-from ...jax_util import NDArrayLike, error_if_not_positive
+from ...jax_util import FloatLike, error_if_not_positive
 from ...ndimage import convert_fftn_to_rfftn, ifftn, operators as op
 from .._volume import IndependentAtomVolume
 from .base_rendering import AbstractVolumeRenderFn
@@ -34,7 +34,7 @@ class FFTAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True
     def __init__(
         self,
         shape: tuple[int, int, int],
-        voxel_size: Float[NDArrayLike, ""] | float,
+        voxel_size: FloatLike,
         *,
         frequency_grid: Float[Array, "_ _ _ 3"] | None = None,
         antialias: bool = True,

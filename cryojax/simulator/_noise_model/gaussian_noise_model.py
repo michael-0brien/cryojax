@@ -10,7 +10,7 @@ import jax.random as jr
 from equinox import AbstractVar
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
-from ...jax_util import NDArrayLike, error_if_not_positive
+from ...jax_util import FloatLike, error_if_not_positive
 from ...ndimage import rfftn
 from ...ndimage.operators import Constant, FourierOperatorLike
 from ...ndimage.transforms import FilterLike, MaskLike
@@ -141,9 +141,9 @@ class GaussianWhiteNoiseModel(AbstractGaussianNoiseModel, strict=True):
     def __init__(
         self,
         image_model: AbstractImageModel,
-        variance: float | Float[NDArrayLike, ""] = 1.0,
-        signal_scale_factor: float | Float[NDArrayLike, ""] = 1.0,
-        signal_offset: float | Float[NDArrayLike, ""] = 0.0,
+        variance: FloatLike = 1.0,
+        signal_scale_factor: FloatLike = 1.0,
+        signal_offset: FloatLike = 0.0,
     ):
         """**Arguments:**
 
@@ -186,8 +186,8 @@ class GaussianWhiteNoiseModel(AbstractGaussianNoiseModel, strict=True):
             A filter to apply to the final image.
         """
         image_model = self.image_model
-        n_pixels = image_model.image_config.padded_n_pixels
-        freqs = image_model.image_config.padded_frequency_grid_in_angstroms
+        n_pixels = image_model.get_image_config().padded_n_pixels
+        freqs = image_model.get_image_config().padded_frequency_grid_in_angstroms
         # Compute the zero mean variance and scale up to be independent of the number of
         # pixels
         std = jnp.sqrt(n_pixels * self.variance)
@@ -264,22 +264,22 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
     """
 
     image_model: AbstractImageModel
-    power_fn: FourierOperatorLike
+    variance_fn: FourierOperatorLike
     signal_scale_factor: Float[Array, ""]
     signal_offset: Float[Array, ""]
 
     def __init__(
         self,
         image_model: AbstractImageModel,
-        power_fn: FourierOperatorLike | None = None,
-        signal_scale_factor: float | Float[NDArrayLike, ""] = 1.0,
-        signal_offset: float | Float[NDArrayLike, ""] = 0.0,
+        variance_fn: FourierOperatorLike | None = None,
+        signal_scale_factor: FloatLike = 1.0,
+        signal_offset: FloatLike = 0.0,
     ):
         """**Arguments:**
 
         - `image_model`:
             The image formation model.
-        - `power_fn`:
+        - `variance_fn`:
             The variance of each fourier mode. By default,
             `cryojax.ndimage.operators.Constant(1.0)`.
         - `signal_scale_factor`:
@@ -288,7 +288,7 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
             An offset for the underlying signal simulated from `image_model`.
         """  # noqa: E501
         self.image_model = image_model
-        self.power_fn = power_fn or Constant(1.0)
+        self.variance_fn = variance_fn or Constant(1.0)
         self.signal_scale_factor = error_if_not_positive(
             jnp.asarray(signal_scale_factor, dtype=float)
         )
@@ -315,11 +315,11 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
             A filter to apply to the final image.
         """
         image_model = self.image_model
-        n_pixels = image_model.image_config.padded_n_pixels
-        freqs = image_model.image_config.padded_frequency_grid_in_angstroms
+        n_pixels = image_model.get_image_config().padded_n_pixels
+        freqs = image_model.get_image_config().padded_frequency_grid_in_angstroms
         # Compute the zero mean variance and scale up to be independent of the number of
         # pixels
-        std = jnp.sqrt(n_pixels * self.power_fn(freqs))
+        std = jnp.sqrt(n_pixels * self.variance_fn(freqs))
         noise = image_model.postprocess(
             std
             * jr.normal(rng_key, shape=freqs.shape[0:-1])
@@ -364,11 +364,11 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
         - `filter`:
             A filter to apply to the final image.
         """
-        config = self.image_model.image_config
+        config = self.image_model.get_image_config()
         n_pixels = config.n_pixels
         freqs = config.frequency_grid_in_angstroms
         # Compute the variance and scale up to be independent of the number of pixels
-        variance = n_pixels * self.power_fn(freqs)
+        variance = n_pixels * self.variance_fn(freqs)
         # Create simulated data
         simulated = self.compute_signal(
             outputs_real_space=False,
