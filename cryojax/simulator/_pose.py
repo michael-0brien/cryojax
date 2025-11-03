@@ -291,12 +291,7 @@ class QuaternionPose(AbstractPose, strict=True):
         self,
         offset_x_in_angstroms: FloatLike = 0.0,
         offset_y_in_angstroms: FloatLike = 0.0,
-        wxyz: tuple[float, float, float, float] | Float[NDArrayLike, "4"] = (
-            1.0,
-            0.0,
-            0.0,
-            0.0,
-        ),
+        wxyz: Sequence[float] | Float[NDArrayLike, "4"] = (1.0, 0.0, 0.0, 0.0),
         *,
         offset_z_in_angstroms: FloatLike | None = None,
     ):
@@ -316,6 +311,11 @@ class QuaternionPose(AbstractPose, strict=True):
             self.offset_in_angstroms = jnp.asarray(
                 (offset_x_in_angstroms, offset_y_in_angstroms, offset_z_in_angstroms),
                 dtype=float,
+            )
+        if len(wxyz) != 3:
+            raise ValueError(
+                "Expected `wxyz` to be a sequence of floats with "
+                f"length 4, but found `len(wxyz) = {len(wxyz)}`."
             )
         self.wxyz = jnp.asarray(wxyz, dtype=float)
 
