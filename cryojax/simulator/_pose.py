@@ -312,7 +312,7 @@ class QuaternionPose(AbstractPose, strict=True):
                 (offset_x_in_angstroms, offset_y_in_angstroms, offset_z_in_angstroms),
                 dtype=float,
             )
-        if len(wxyz) != 3:
+        if len(wxyz) != 4:
             raise ValueError(
                 "Expected `wxyz` to be a sequence of floats with "
                 f"length 4, but found `len(wxyz) = {len(wxyz)}`."
