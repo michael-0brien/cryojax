@@ -54,7 +54,7 @@ tests = [
     "typeguard==2.13.3"
 ]
 extras = [
-    "jax-finufft"
+    "jax-finufft>=1.2.0"
 ]
 
 [build-system]
