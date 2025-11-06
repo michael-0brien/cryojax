@@ -16,7 +16,7 @@ def setup_volumes_and_configs(n_iterations, n_atoms, box_size, pixel_size=2.0):
     """Setup volumes and image configs for different test conditions."""
     # Read atoms (subsample to get desired n_atoms)
     atom_positions, atom_types, atom_properties = read_atoms_from_pdb(
-        "data/thyroglobulin_initial.pdb",
+        "../data/thyroglobulin_initial.pdb",
         center=True,
         loads_properties=True,
         selection_string="name CA",
@@ -139,6 +139,8 @@ def benchmark_projection_methods(
     n_iterations,
     antialias,
     use_error_functions,
+    n_kernel_truncation_pix,
+    kernel_width_pix,
 ):
     """Benchmark both projection methods across different conditions."""
     results = []
@@ -177,6 +179,24 @@ def benchmark_projection_methods(
 
                 fs_time_per_projection = np.mean(times[1:])
                 fs_total_time = volume_render_time + fs_time_per_projection
+
+                # Benchmark Atom Projection (Delta FFT)
+                times = []
+                integrator = cxs.FFTDeltaAtomProjection(n_kernel_truncation_pix=n_kernel_truncation_pix,
+                                                        kernel_width_pix=kernel_width_pix)
+                for _ in range(n_iterations + 1):
+                    start_time = time()
+                    images = simulate_image_batch(
+                        configs,
+                        poses,
+                        transfer_theories,
+                        atom_volume,
+                        integrator,
+                    )
+                    images.block_until_ready()
+                    times.append(time() - start_time)
+
+                delta_atom_time_total = np.mean(times[1:])
 
                 # Benchmark Atom Projection (FFT)
                 times = []
@@ -221,6 +241,7 @@ def benchmark_projection_methods(
                         "n_projections": n_projections,
                         "fourier_slice_time": fs_total_time,
                         "atom_projection_time": atom_time_total,
+                        "delta_atom_projection_time": delta_atom_time_total,
                         "fs_volume_render_time": volume_render_time,
                         "fs_projection_time": fs_time_per_projection,
                         "gmm_projection_time": gmm_time_total,
@@ -230,26 +251,33 @@ def benchmark_projection_methods(
     return pd.DataFrame(results)
 
 
-def plot_crossover_analysis(df, datetimestamp, antialias, use_error_functions):
+def plot_crossover_analysis(df, datetimestamp, antialias, use_error_functions, n_kernel_truncation_pix, kernel_width_pix, x_axis_label):
     """Plot the crossover analysis showing when each method is faster."""
-    n_atoms_list = df["n_atoms"].unique()
+
+    if x_axis_label == "n_atoms":
+        group_list_label = "n_projections"
+    elif x_axis_label == "n_projections":
+        group_list_label = "n_atoms"
+    else:
+        raise ValueError("x_axis must be 'n_atoms' or 'n_projections'")
+    n_group_list = df[group_list_label].unique()
     box_sizes = df["box_size"].unique()
 
     fig, axes = plt.subplots(
-        len(n_atoms_list),
+        len(n_projections_list),
         len(box_sizes),
-        figsize=(4 * len(box_sizes), 4 * len(n_atoms_list)),
+        figsize=(4 * len(box_sizes), 4 * len(n_projections_list)),
         squeeze=False,
     )
 
-    for i, n_atoms in enumerate(n_atoms_list):
+    for i, n_group in enumerate(n_group_list):
         for j, box_size in enumerate(box_sizes):
             ax = axes[i, j]
 
-            subset = df[(df["n_atoms"] == n_atoms) & (df["box_size"] == box_size)]
+            subset = df[(df[group_list_label] == n_group) & (df["box_size"] == box_size)]
 
             ax.plot(
-                subset["n_projections"],
+                subset[x_axis_label],
                 subset["fourier_slice_time"] * 1000,
                 "o-",
                 label="Fourier Slice",
@@ -257,7 +285,7 @@ def plot_crossover_analysis(df, datetimestamp, antialias, use_error_functions):
                 linewidth=2,
             )
             ax.plot(
-                subset["n_projections"],
+                subset[x_axis_label],
                 subset["atom_projection_time"] * 1000,
                 "s-",
                 label=f"Atom Projection (antialias={antialias})",
@@ -265,17 +293,25 @@ def plot_crossover_analysis(df, datetimestamp, antialias, use_error_functions):
                 linewidth=2,
             )
             ax.plot(
-                subset["n_projections"],
+                subset[x_axis_label],
                 subset["gmm_projection_time"] * 1000,
                 "^-",
                 label=f"GMM Projection (use_error_functions={use_error_functions})",
                 color="green",
                 linewidth=2,
             )
+            ax.plot(
+                subset[x_axis_label],
+                subset["delta_atom_projection_time"] * 1000,
+                "x-",
+                label=f"Delta Atom Projection (kernel_size={n_kernel_truncation_pix}, sigma={kernel_width_pix})",
+                color="gray",
+                linewidth=2,
+            )
 
-            ax.set_xlabel("Number of Projections")
+            ax.set_xlabel(x_axis_label.replace("_", " ").title())
             ax.set_ylabel("Total Time (ms)")
-            ax.set_title(f"{n_atoms} atoms, {box_size}×{box_size} box")
+            ax.set_title(f"{n_group} {group_list_label[2:]}, {box_size}×{box_size} box")
             ax.legend()
             ax.grid(True, alpha=0.3)
             ax.set_xscale("log")
@@ -283,23 +319,30 @@ def plot_crossover_analysis(df, datetimestamp, antialias, use_error_functions):
 
     plt.tight_layout()
     plt.savefig(
-        f"benchmark_projection_method_tradeoff_{datetimestamp}.png",
+        f"benchmark_projection_method_tradeoff_{x_axis_label}_{datetimestamp}.png",
         dpi=300,
         bbox_inches="tight",
     )
     plt.show()
 
 
-def find_crossover_points(df):
+def find_crossover_points(df, x_axis_label):
     """Find crossover points where methods have equal performance."""
     crossovers = []
 
-    for (n_atoms, box_size), group in df.groupby(["n_atoms", "box_size"]):
-        group = group.sort_values("n_projections")
+    if x_axis_label == "n_atoms":
+        group_list_label = "n_projections"
+    elif x_axis_label == "n_projections":
+        group_list_label = "n_atoms"
+    else:
+        raise ValueError("x_axis must be 'n_atoms' or 'n_projections'")
+
+    for (n_proj, box_size), group in df.groupby([group_list_label, "box_size"]):
+        group = group.sort_values(group_list_label)
 
         fs_times = group["fourier_slice_time"].values
         gmm_times = group["gmm_projection_time"].values
-        n_proj = group["n_projections"].values
+        x_axis = group[x_axis_label].values
 
         # Find where lines cross
         diff = fs_times - gmm_times
@@ -307,13 +350,13 @@ def find_crossover_points(df):
 
         for idx in sign_changes:
             # Linear interpolation to find precise crossover
-            x1, x2 = n_proj[idx], n_proj[idx + 1]
+            x1, x2 = x_axis[idx], x_axis[idx + 1]
             y1, y2 = diff[idx], diff[idx + 1]
             crossover_n_proj = x1 - y1 * (x2 - x1) / (y2 - y1)
 
             crossovers.append(
                 {
-                    "n_atoms": n_atoms,
+                    "n_projections": n_proj,
                     "box_size": box_size,
                     "crossover_n_projections": crossover_n_proj,
                 }
@@ -324,19 +367,19 @@ def find_crossover_points(df):
 
 if __name__ == "__main__":
     # Test parameters
-    n_projections_list = [1, 3, 10, 30, 100]
-    n_atoms_list = [30, 100, 300]
-    box_sizes = [
-        32,
-        64,
-    ]
+    n_projections_list = [10, 30]
+    n_atoms_list = [30, 100, ]
+    box_sizes = [64,]
 
     print("Running projection method crossover benchmark...")
-    print("This will test Fourier slicing vs GMM projection across different conditions")
+    print("This will test Fourier slicing vs Coordinate projection across different conditions")
 
     # Run benchmark
     antialias = False
     use_error_functions = True
+    n_kernel_truncation_pix = 5
+    kernel_width_pix = 1.0
+    kernel_width_pix = 5
     results_df = benchmark_projection_methods(
         n_projections_list,
         n_atoms_list,
@@ -344,6 +387,8 @@ if __name__ == "__main__":
         n_iterations=3,
         antialias=antialias,
         use_error_functions=use_error_functions,
+        n_kernel_truncation_pix=n_kernel_truncation_pix,
+        kernel_width_pix=kernel_width_pix,
     )
 
     # Save results
@@ -353,21 +398,9 @@ if __name__ == "__main__":
     )
     print(f"Results saved to benchmark_projection_method_tradeoff_{datetimestamp}.csv")
 
-    # Plot results
-    plot_crossover_analysis(results_df, datetimestamp, antialias, use_error_functions)
+    for x_axis_label in ["n_atoms", "n_projections"]:
+        plot_crossover_analysis(results_df, datetimestamp, antialias, use_error_functions, n_kernel_truncation_pix, kernel_width_pix, x_axis_label)
 
-    # Find and display crossover points
-    crossovers = find_crossover_points(results_df)
-    print("\nCrossover points (where methods have equal performance):")
-    print(crossovers)
-
-    # Summary statistics
-    print("\nSummary:")
-    for (n_atoms, box_size), group in results_df.groupby(["n_atoms", "box_size"]):
-        fs_faster = (group["fourier_slice_time"] < group["gmm_projection_time"]).sum()
-        gmm_faster = len(group) - fs_faster
-        print(
-            f"{n_atoms} atoms, {box_size}×{box_size}: "
-            f"Fourier slice faster in {fs_faster}/{len(group)} cases, "
-            f"GMM projection faster in {gmm_faster}/{len(group)} cases"
-        )
+        crossovers = find_crossover_points(results_df, x_axis_label)
+        print("\nCrossover points (where methods have equal performance):")
+        print(crossovers)
