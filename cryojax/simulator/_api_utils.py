@@ -209,7 +209,7 @@ def _select_default_integrator(
     if isinstance(volume, (FourierVoxelGridVolume, FourierVoxelSplineVolume)):
         integrator = FourierSliceExtraction(outputs_integral=simulates_quantity)
     elif isinstance(volume, GaussianMixtureVolume):
-        integrator = GaussianMixtureProjection(use_error_functions=True)
+        integrator = GaussianMixtureProjection(sampling_mode="average")
     elif isinstance(volume, RealVoxelGridVolume):
         integrator = RealVoxelProjection()
     elif isinstance(volume, IndependentAtomVolume):

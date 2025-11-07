@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 from typing_extensions import override
 
 import jax
@@ -27,7 +27,7 @@ class FFTAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True
     shape: tuple[int, int, int]
     voxel_size: Float[Array, ""]
     frequency_grid: Float[Array, "_ _ _ 3"] | None
-    antialias: bool
+    sampling_mode: Literal["average", "point"]
     eps: float
     opts: Any
 
@@ -37,7 +37,7 @@ class FFTAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True
         voxel_size: FloatLike,
         *,
         frequency_grid: Float[Array, "_ _ _ 3"] | None = None,
-        antialias: bool = True,
+        sampling_mode: Literal["average", "point"] = "average",
         eps: float = 1e-6,
         opts: Any = None,
     ):
@@ -60,9 +60,11 @@ class FFTAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True
             )
             ```
 
-        - `antialias`:
-            If `True`, apply an anti-aliasing filter to more accurately
-            sample the volume.
+        - `sampling_mode`:
+            If `'average'`, convolve with a box function to sample the
+            projected volume at a pixel to be the average value of the
+            underlying continuous function. If `'point'`, the volume at
+            a pixel will be point sampled.
         - `eps`:
             See [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft)
             for documentation.
@@ -75,7 +77,7 @@ class FFTAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True
         self.shape = shape
         self.voxel_size = error_if_not_positive(jnp.asarray(voxel_size, dtype=float))
         self.frequency_grid = frequency_grid
-        self.antialias = antialias
+        self.sampling_mode = sampling_mode
         self.eps = eps
         self.opts = opts
 
@@ -131,7 +133,7 @@ class FFTAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True
                 is_leaf=lambda x: isinstance(x, op.AbstractFourierOperator),
             ),
         )
-        if self.antialias:
+        if self.sampling_mode == "average":
             antialias_fn = op.FourierSinc(box_width=self.voxel_size)
             fourier_voxel_grid *= antialias_fn(frequency_grid)
 

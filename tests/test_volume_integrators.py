@@ -88,7 +88,7 @@ def test_fft_atom_projection_exact(pdb_info, pixel_size, shape):
                 amplitudes=amplitude,
                 variances=b_factor / (8 * np.pi**2),
             ),
-            cxs.GaussianMixtureProjection(use_error_functions=False),
+            cxs.GaussianMixtureProjection(sampling_mode="point"),
         )
         atom_volume, fft_integrator = (
             cxs.IndependentAtomVolume(
@@ -97,7 +97,7 @@ def test_fft_atom_projection_exact(pdb_info, pixel_size, shape):
                     amplitude=amplitude, b_factor=b_factor
                 ),
             ),
-            cxs.FFTAtomProjection(antialias=False, eps=1e-16),
+            cxs.FFTAtomProjection(sampling_mode="point", eps=1e-16),
         )
         proj_by_gaussians = compute_projection(
             gaussian_volume, gaussian_integrator, image_config
@@ -130,7 +130,7 @@ def test_fft_atom_projection_antialias(pdb_info, width, pixel_size, shape):
                 amplitude=1.0, b_factor=width**2 * (8 * np.pi**2)
             ),
         )
-        gaussian_integrator = cxs.GaussianMixtureProjection(use_error_functions=True)
+        gaussian_integrator = cxs.GaussianMixtureProjection(sampling_mode="average")
         fft_integrator = cxs.FFTAtomProjection(eps=1e-16)
         pad_options = dict(shape=(2 * shape[0], 2 * shape[1]))
         image_config = cxs.BasicImageConfig(
@@ -174,9 +174,9 @@ def test_fft_atom_projection_peng(pdb_info, pixel_size, shape, upsample_factor):
         image_config = cxs.BasicImageConfig(shape, pixel_size, voltage_in_kilovolts=300.0)
         # Check to make sure the implementations are identical, up to the
         # nufft (don't include anti-aliasing)
-        gaussian_integrator = cxs.GaussianMixtureProjection(use_error_functions=True)
+        gaussian_integrator = cxs.GaussianMixtureProjection(sampling_mode="average")
         fft_integrator = cxs.FFTAtomProjection(
-            antialias=True, upsample_factor=upsample_factor, eps=1e-16
+            sampling_mode="average", upsample_factor=upsample_factor, eps=1e-16
         )
         proj_by_gaussians = compute_projection(
             gaussian_volume, gaussian_integrator, image_config
@@ -216,7 +216,7 @@ def test_analytic_vs_voxels_nopose(pdb_info, pixel_size, shape):
         peng_parameters,
         extra_b_factors=atom_properties["b_factors"],
     )
-    base_method = cxs.GaussianMixtureProjection(use_error_functions=True)
+    base_method = cxs.GaussianMixtureProjection(sampling_mode="average")
     render_volume_fn = cxs.GaussianMixtureRenderFn((dim, dim, dim), pixel_size)
     real_voxel_grid = render_volume_fn(base_volume)
     other_volumes = [
@@ -287,7 +287,7 @@ def test_analytic_vs_voxels_nopose(pdb_info, pixel_size, shape):
 #         scattering_factor_b=scattering_factor_parameters["b"],
 #         b_factors=b_factors,
 #     )
-#     base_method = cxs.GaussianMixtureProjection(use_error_functions=True)
+#     base_method = cxs.GaussianMixtureProjection(sampling_mode="average")
 
 #     real_voxel_grid = base_potential.as_real_voxel_grid((dim, dim, dim), pixel_size)
 #     other_potentials = [

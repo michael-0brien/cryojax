@@ -79,12 +79,12 @@ def test_scattering_theories_no_pose(
     #     amplitude_contrast_ratio=ac,
     # )
     high_energy_scattering_theory = cxs.StrongPhaseScatteringTheory(
-        cxs.GaussianMixtureProjection(use_error_functions=True),
+        cxs.GaussianMixtureProjection(sampling_mode="average"),
         cxs.WaveTransferTheory(ctf),
         amplitude_contrast_ratio=ac,
     )
     weak_phase_scattering_theory = cxs.WeakPhaseScatteringTheory(
-        cxs.GaussianMixtureProjection(use_error_functions=True),
+        cxs.GaussianMixtureProjection(sampling_mode="average"),
         cxs.ContrastTransferTheory(ctf, amplitude_contrast_ratio=ac),
     )
 
@@ -199,12 +199,12 @@ def test_scattering_theories_pose(
     #     amplitude_contrast_ratio=ac,
     # )
     high_energy_scattering_theory = cxs.StrongPhaseScatteringTheory(
-        cxs.GaussianMixtureProjection(use_error_functions=True),
+        cxs.GaussianMixtureProjection(sampling_mode="average"),
         cxs.WaveTransferTheory(ctf),
         amplitude_contrast_ratio=ac,
     )
     weak_phase_scattering_theory = cxs.WeakPhaseScatteringTheory(
-        cxs.GaussianMixtureProjection(use_error_functions=True),
+        cxs.GaussianMixtureProjection(sampling_mode="average"),
         cxs.ContrastTransferTheory(ctf, amplitude_contrast_ratio=ac),
     )
     # multislice_image_model_voxel = cxs.IntensityImageModel(
