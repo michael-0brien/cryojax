@@ -1,4 +1,5 @@
-from typing import ClassVar
+import warnings
+from typing import ClassVar, Literal
 from typing_extensions import override
 
 import jax
@@ -18,7 +19,7 @@ class GaussianMixtureProjection(
     AbstractVolumeIntegrator[GaussianMixtureVolume],
     strict=True,
 ):
-    use_error_functions: bool
+    sampling_mode: Literal["average", "point"]
     shape: tuple[int, int] | None
     n_batches: int
 
@@ -29,7 +30,8 @@ class GaussianMixtureProjection(
         *,
         upsampling_factor: int | None = None,
         shape: tuple[int, int] | None = None,
-        use_error_functions: bool = True,
+        sampling_mode: Literal["average", "point"] = "average",
+        use_error_functions: bool = False,
         n_batches: int = 1,
     ):
         """**Arguments:**
@@ -38,25 +40,40 @@ class GaussianMixtureProjection(
             The shape of the plane on which projections are computed before padding or
             cropping to the `AbstractImageConfig.padded_shape`. This argument is particularly
             useful if the `AbstractImageConfig.padded_shape` is much larger than the protein.
-        - `use_error_functions`:
-            If `True`, use error functions to evaluate the projected volume at
-            a pixel to be the average value within the pixel using gaussian
-            integrals (i.e. apply antialiasing). If `False`, the volume at a pixel will
-            be evaluated as a gaussian.
+        - `sampling_mode`:
+            If `'average'`, use error functions to sample the projected volume at
+            a pixel to be the average value using gaussian
+            integrals. If `'point'`, the volume at a pixel will
+            be evaluated by evaluating the gaussian at a point.
         - `n_batches`:
             The number of batches over groups of positions
             used to evaluate the projection. By default, `n_batches = 1`,
             which computes a projection for all positions at once.
             This is useful to decrease GPU memory usage.
         """  # noqa: E501
+        if use_error_functions:
+            warnings.warn(
+                "`use_error_functions` in `GaussianMixtureProjection` has "
+                "been deprecated and will be removed in cryoJAX 0.6.0. "
+                "This has been renamed to `sampling_mode = 'average'`.",
+                category=DeprecationWarning,
+                stacklevel=2,
+            )
         if upsampling_factor is not None:
             raise ValueError(
                 "`upsampling_factor` in `GaussianMixtureProjection` "
                 "has been deprecated as of cryoJAX 0.5.1. The "
                 "functionality this implemented was not as intended."
             )
+        if sampling_mode not in ["average", "point"]:
+            raise ValueError(
+                "`sampling_mode` in `GaussianMixtureProjection` "
+                "must be either 'average' for averaging within a "
+                "pixel or 'point' for point sampling. Got "
+                f"`sampling_mode = {sampling_mode}`."
+            )
         self.shape = shape
-        self.use_error_functions = use_error_functions
+        self.sampling_mode = sampling_mode
         self.n_batches = n_batches
 
     @override
@@ -97,13 +114,14 @@ class GaussianMixtureProjection(
         amplitudes = volume_representation.amplitudes
         b_factors = variance_to_b_factor(volume_representation.variances)
         # Compute the projection
+        use_erf = True if self.sampling_mode == "average" else False
         projection_integral = _gaussians_to_projection(
             shape,
             pixel_size,
             positions,
             amplitudes,
             b_factors,
-            self.use_error_functions,
+            use_erf,
             self.n_batches,
         )
         if self.shape is None:
@@ -125,7 +143,7 @@ def _gaussians_to_projection(
     positions: Float[Array, "n_positions 3"],
     a: Float[Array, "n_positions n_gaussians_per_position"],
     b: Float[Array, "n_positions n_gaussians_per_position"],
-    use_error_functions: bool,
+    use_erf: bool,
     n_batches: int,
 ) -> Float[Array, "dim_y dim_x"]:
     # Make the grid on which to evaluate the result
@@ -140,7 +158,7 @@ def _gaussians_to_projection(
         xs[0],
         xs[1],
         xs[2],
-        use_error_functions,
+        use_erf,
     )
     # Compute projection with a call to `jax.lax.map` in batches
     if n_batches > positions.shape[0]:
@@ -172,11 +190,11 @@ def _gaussians_to_projection_kernel(
     positions: Float[Array, "n_positions 3"],
     a: Float[Array, "n_positions n_gaussians_per_position"],
     b: Float[Array, "n_positions n_gaussians_per_position"],
-    use_error_functions: bool,
+    use_erf: bool,
 ) -> Float[Array, "dim_y dim_x"]:
     # Evaluate 1D gaussian integrals for each of x, y, and z dimensions
 
-    if use_error_functions:
+    if use_erf:
         gaussians_times_prefactor_x, gaussians_y = _evaluate_gaussian_integrals(
             grid_x, grid_y, positions, a, b, pixel_size
         )

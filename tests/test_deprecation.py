@@ -67,6 +67,10 @@ def test_future_deprecated(sample_pdb_path):
         assert not should_be_removed(record)
 
     with pytest.warns(DeprecationWarning) as record:
+        volume = cxs.GaussianMixtureProjection(use_error_functions=True)  # type: ignore
+        assert not should_be_removed(record)
+
+    with pytest.warns(DeprecationWarning) as record:
         func = cx.ndimage.downsample_with_fourier_cropping
         assert func is cx.ndimage.fourier_crop_downsample
         assert not should_be_removed(record)

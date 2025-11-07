@@ -1,4 +1,4 @@
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Literal
 from typing_extensions import override
 
 import jax
@@ -36,7 +36,7 @@ class FFTAtomProjection(
     the exit plane using non-uniform FFTs plus convolution.
     """
 
-    antialias: bool
+    sampling_mode: Literal["average", "point"]
     upsample_factor: int | None
     shape: tuple[int, int] | None
     eps: float
@@ -47,7 +47,7 @@ class FFTAtomProjection(
     def __init__(
         self,
         *,
-        antialias: bool = True,
+        sampling_mode: Literal["average", "point"] = "average",
         upsample_factor: int | None = None,
         shape: tuple[int, int] | None = None,
         eps: float = 1e-6,
@@ -55,9 +55,11 @@ class FFTAtomProjection(
     ):
         """**Arguments:**
 
-        - `antialias`:
-            If `True`, apply an anti-aliasing filter to more accurately
-            sample the volume.
+        - `sampling_mode`:
+            If `'average'`, convolve with a box function to sample the
+            projected volume at a pixel to be the average value of the
+            underlying continuous function. If `'point'`, the volume at
+            a pixel will be point sampled.
         - `upsample_factor`:
             If provided, first compute an upsampled version of the
             image at pixel size `image_config.pixel_size / upsample_factor`.
@@ -83,7 +85,14 @@ class FFTAtomProjection(
                 "See https://github.com/flatironinstitute/jax-finufft "
                 "for installation instructions."
             ) from JAX_FINUFFT_IMPORT_ERROR
-        self.antialias = antialias
+        if sampling_mode not in ["average", "point"]:
+            raise ValueError(
+                "`sampling_mode` in `FFTAtomProjection` "
+                "must be either 'average' for averaging within a "
+                "pixel or 'point' for point sampling. Got "
+                f"`sampling_mode = {sampling_mode}`."
+            )
+        self.sampling_mode = sampling_mode
         self.upsample_factor = upsample_factor
         self.shape = shape
         self.eps = eps
@@ -162,7 +171,7 @@ class FFTAtomProjection(
             ),
         )
         # Apply anti-aliasing filter
-        if self.antialias:
+        if self.sampling_mode == "average":
             antialias_fn = op.FourierSinc(box_width=pixel_size_u)
             fourier_projection *= antialias_fn(frequency_grid)
         # Shift zero frequency component to corner and convert to
