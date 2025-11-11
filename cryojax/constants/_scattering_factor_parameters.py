@@ -6,41 +6,46 @@ Large amounts of the code are adapted from the ioSPI package
 import importlib.resources as pkg_resources
 import os
 
+import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
 import xarray as xr
 from jaxtyping import Float, Int
 
 
-def get_tabulated_scattering_factor_parameters(
-    atom_types: Int[np.ndarray, " n_atoms"],
-    scattering_factor_parameter_table: xr.Dataset | None = None,
-) -> dict[str, Float[np.ndarray, " n_atoms n_scattering_factors"]]:
-    """Gets the parameters for the scattering factor for each atom in
-    `atom_types`.
+class PengScatteringFactorParameters(eqx.Module, strict=True):
+    """A convenience wrapper for instantiating the
+    scattering factor parameters from Peng et al. (1996).
 
-    **Arguments:**
+    To access scattering factors $a_i$ and $b_i$ given in
+    the citation,
 
-    - `atom_identitites`:
-        Array containing the index of the one-hot encoded atom names.
-        By default, Hydrogen is "1", Carbon is "6", Nitrogen is "7", etc.
-    - `scattering_factor_parameter_table`:
-        The table of scattering factors as an `xarray.Dataset`. By default, this
-        is the tabulation from "Robust Parameterization of Elastic and
-        Absorptive Electron Atomic Scattering Factors" by Peng et al. (1996),
-        given by [`read_peng_element_scattering_factor_parameter_table`](https://michael-0brien.github.io/cryojax/api/constants/scattering_factor_parameters/#cryojax.constants.read_peng_element_scattering_factor_parameter_table).
+    ```python
+    from cryojax.io import read_atoms_from_pdb
+    from cryojax.constants import PengScatteringFactorParameters
 
-    **Returns:**
+    # Load positions of atoms and one-hot encoded atom names
+    atom_positions, atom_types = read_atoms_from_pdb(...)
+    parameters = PengScatteringFactorParameters(atom_types)
+    print(parameters.a, parameters.b)  # a_i and b_i
+    ```
+    """
 
-    The particular scattering factor parameters stored in
-    `scattering_factor_parameter_table` for `atom_types`.
-    """  # noqa: E501
-    if scattering_factor_parameter_table is None:
+    a: Float[np.ndarray, " n_atoms 5"]
+    b: Float[np.ndarray, " n_atoms 5"]
+
+    def __init__(self, atomic_numbers: Int[np.ndarray, " n_atoms"]):
+        """**Arguments:**
+
+        - `atomic_numbers`:
+            The atom types as an integer array.
+        """
         scattering_factor_parameter_table = read_peng_scattering_factor_parameter_table()
-    return {
-        str(k): np.asarray(v.data[np.asarray(atom_types), ...])
-        for k, v in scattering_factor_parameter_table.items()
-    }
+        parameter_dict = extract_scattering_factor_parameters(
+            atomic_numbers, scattering_factor_parameter_table
+        )
+        self.a = parameter_dict["a"]
+        self.b = parameter_dict["b"]
 
 
 def read_peng_scattering_factor_parameter_table() -> xr.Dataset:
@@ -70,3 +75,34 @@ def read_peng_scattering_factor_parameter_table() -> xr.Dataset:
     )
 
     return scattering_factor_parameter_table
+
+
+def extract_scattering_factor_parameters(
+    atom_types: Int[np.ndarray, " n_atoms"],
+    scattering_factor_parameter_table: xr.Dataset | None = None,
+) -> dict[str, Float[np.ndarray, " n_atoms n_scattering_factors"]]:
+    """Gets the parameters for the scattering factor for each atom in
+    `atom_types`.
+
+    **Arguments:**
+
+    - `atom_identitites`:
+        Array containing the index of the one-hot encoded atom names.
+        By default, Hydrogen is "1", Carbon is "6", Nitrogen is "7", etc.
+    - `scattering_factor_parameter_table`:
+        The table of scattering factors as an `xarray.Dataset`. By default, this
+        is the tabulation from "Robust Parameterization of Elastic and
+        Absorptive Electron Atomic Scattering Factors" by Peng et al. (1996),
+        given by [`read_peng_element_scattering_factor_parameter_table`](https://michael-0brien.github.io/cryojax/api/constants/scattering_factor_parameters/#cryojax.constants.read_peng_element_scattering_factor_parameter_table).
+
+    **Returns:**
+
+    The particular scattering factor parameters stored in
+    `scattering_factor_parameter_table` for `atom_types`.
+    """  # noqa: E501
+    if scattering_factor_parameter_table is None:
+        scattering_factor_parameter_table = read_peng_scattering_factor_parameter_table()
+    return {
+        str(k): np.asarray(v.data[np.asarray(atom_types), ...])
+        for k, v in scattering_factor_parameter_table.items()
+    }

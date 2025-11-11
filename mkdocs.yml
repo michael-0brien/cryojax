@@ -42,10 +42,12 @@ plugins:
             - "examples/.ipynb_checkpoints/"
             - "examples/old"
             - "examples/data"
+            - "examples/scripts"
     - ipynb
     - hippogriffe:
         extra_public_objects:
             - xarray.core.dataset.Dataset
+            - numpy.ndarray
     - mkdocstrings:
         handlers:
           python:
@@ -74,7 +76,6 @@ nav:
             - Create custom image simulation methods: 'examples/extending-cryojax.ipynb'
         - Your first program:
             - Write a STAR file of simulated data: 'examples/simulate-relion-dataset.ipynb'
-        - Advanced usage:
             - Structural refinement using gradient descent: 'examples/structure-refinement.ipynb'
     - API:
         - cryojax.simulator:
@@ -111,8 +112,7 @@ nav:
             - 'api/constants/units.md'
             - 'api/constants/scattering_factor_parameters.md'
             - 'api/constants/conventions.md'
+        - cryojax.atom_util:
+            - 'api/atom_util.md'
         - cryojax.jax_util:
-            - 'api/jax_util/filter_specs.md'
-            - 'api/jax_util/grid_search.md'
-            - 'api/jax_util/pytree_transforms.md'
-            - 'api/jax_util/useful_functions.md'
+            - 'api/jax_util.md'

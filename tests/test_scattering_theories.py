@@ -1,6 +1,7 @@
 import cryojax.simulator as cxs
 import numpy as np
 import pytest
+from cryojax.constants import PengScatteringFactorParameters
 from cryojax.io import read_atoms_from_pdb
 
 
@@ -38,16 +39,16 @@ def test_scattering_theories_no_pose(
         astigmatism_angle,
     ) = ctf_params
 
-    atom_positions, atom_types, b_factors = read_atoms_from_pdb(
+    atom_positions, atom_types, atom_properties = read_atoms_from_pdb(
         sample_pdb_path,
         center=True,
         selection_string="not element H",
-        loads_b_factors=True,
+        loads_properties=True,
     )
-    atom_potential = cxs.PengAtomicVolume.from_tabulated_parameters(
+    atom_potential = cxs.GaussianMixtureVolume.from_tabulated_parameters(
         atom_positions,
-        parameters=cxs.PengScatteringFactorParameters(atom_types),
-        extra_b_factors=b_factors,
+        parameters=PengScatteringFactorParameters(atom_types),
+        extra_b_factors=atom_properties["b_factors"],
     )
 
     instrument_config = cxs.BasicImageConfig(
@@ -78,12 +79,12 @@ def test_scattering_theories_no_pose(
     #     amplitude_contrast_ratio=ac,
     # )
     high_energy_scattering_theory = cxs.StrongPhaseScatteringTheory(
-        cxs.GaussianMixtureProjection(use_error_functions=True),
+        cxs.GaussianMixtureProjection(sampling_mode="average"),
         cxs.WaveTransferTheory(ctf),
         amplitude_contrast_ratio=ac,
     )
     weak_phase_scattering_theory = cxs.WeakPhaseScatteringTheory(
-        cxs.GaussianMixtureProjection(use_error_functions=True),
+        cxs.GaussianMixtureProjection(sampling_mode="average"),
         cxs.ContrastTransferTheory(ctf, amplitude_contrast_ratio=ac),
     )
 
@@ -157,17 +158,17 @@ def test_scattering_theories_pose(
         astigmatism_angle,
     ) = ctf_params
 
-    atom_positions, atom_types, b_factors = read_atoms_from_pdb(
+    atom_positions, atom_types, atom_properties = read_atoms_from_pdb(
         sample_pdb_path,
         center=True,
         selection_string="name CA ",
-        loads_b_factors=True,
+        loads_properties=True,
     )
 
-    atom_potential = cxs.PengAtomicVolume.from_tabulated_parameters(
+    atom_potential = cxs.GaussianMixtureVolume.from_tabulated_parameters(
         atom_positions,
-        parameters=cxs.PengScatteringFactorParameters(atom_types),
-        extra_b_factors=b_factors,
+        parameters=PengScatteringFactorParameters(atom_types),
+        extra_b_factors=atom_properties["b_factors"],
     )
     instrument_config = cxs.BasicImageConfig(
         shape=shape,
@@ -198,12 +199,12 @@ def test_scattering_theories_pose(
     #     amplitude_contrast_ratio=ac,
     # )
     high_energy_scattering_theory = cxs.StrongPhaseScatteringTheory(
-        cxs.GaussianMixtureProjection(use_error_functions=True),
+        cxs.GaussianMixtureProjection(sampling_mode="average"),
         cxs.WaveTransferTheory(ctf),
         amplitude_contrast_ratio=ac,
     )
     weak_phase_scattering_theory = cxs.WeakPhaseScatteringTheory(
-        cxs.GaussianMixtureProjection(use_error_functions=True),
+        cxs.GaussianMixtureProjection(sampling_mode="average"),
         cxs.ContrastTransferTheory(ctf, amplitude_contrast_ratio=ac),
     )
     # multislice_image_model_voxel = cxs.IntensityImageModel(

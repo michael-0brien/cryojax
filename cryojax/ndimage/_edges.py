@@ -3,29 +3,19 @@ Routines for dealing with image cropping and padding.
 """
 
 import warnings
-from typing import Any, overload
+from typing import Any
 
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Inexact, Int
 
-
-@overload
-def crop_to_shape(
-    image_or_volume: Inexact[Array, "y_dim x_dim"],
-    shape: tuple[int, int],
-) -> Inexact[Array, " {shape[0]} {shape[1]}"]: ...
-
-
-@overload
-def crop_to_shape(
-    image_or_volume: Inexact[Array, "z_dim y_dim x_dim"],
-    shape: tuple[int, int, int],
-) -> Inexact[Array, " {shape[0]} {shape[1]} {shape[2]}"]: ...
+from ..jax_util import NDArrayLike
 
 
 def crop_to_shape(
-    image_or_volume: Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"],
+    image_or_volume: (
+        Inexact[NDArrayLike, "y_dim x_dim"] | Inexact[NDArrayLike, "z_dim y_dim x_dim"]
+    ),
     shape: tuple[int, int] | tuple[int, int, int],
 ) -> (
     Inexact[Array, " {shape[0]} {shape[1]}"]
@@ -69,13 +59,13 @@ def crop_to_shape(
             "crop_to_shape can only crop images and volumes. Got desired crop shape of "
             f"of {shape}."
         )
-    return cropped
+    return jnp.asarray(cropped)
 
 
 def crop_to_shape_with_center(
-    image: Inexact[Array, "y_dim x_dim"],
+    image: Inexact[NDArrayLike, "y_dim x_dim"],
     shape: tuple[int, int],
-    center: tuple[int, int] | tuple[Int[Array, ""], Int[Array, ""]],
+    center: tuple[int, int] | tuple[Int[NDArrayLike, ""], Int[NDArrayLike, ""]],
     do_safe_crop: bool = True,
 ) -> Inexact[Array, "{shape[0]} {shape[1]}"]:
     """Crop an image to a new shape, given a center."""
@@ -114,27 +104,13 @@ def crop_to_shape_with_center(
             "crop_to_shape_with_center. Usually, this happens because the crop was "
             "near the image edges."
         )
-    return cropped
-
-
-@overload
-def pad_to_shape(
-    image_or_volume: Inexact[Array, "y_dim x_dim"],
-    shape: tuple[int, int],
-    **kwargs: Any,
-) -> Inexact[Array, " {shape[0]} {shape[1]}"]: ...
-
-
-@overload
-def pad_to_shape(
-    image_or_volume: Inexact[Array, "z_dim y_dim x_dim"],
-    shape: tuple[int, int, int],
-    **kwargs: Any,
-) -> Inexact[Array, " {shape[0]} {shape[1]} {shape[2]}"]: ...
+    return jnp.asarray(cropped)
 
 
 def pad_to_shape(
-    image_or_volume: Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"],
+    image_or_volume: (
+        Inexact[NDArrayLike, "y_dim x_dim"] | Inexact[NDArrayLike, "z_dim y_dim x_dim"]
+    ),
     shape: tuple[int, int] | tuple[int, int, int],
     **kwargs: Any,
 ) -> (
@@ -172,7 +148,7 @@ def pad_to_shape(
 
 
 def resize_with_crop_or_pad(
-    image: Inexact[Array, "y_dim x_dim"], shape: tuple[int, int], **kwargs
+    image: Inexact[NDArrayLike, "y_dim x_dim"], shape: tuple[int, int], **kwargs
 ) -> Inexact[Array, " {shape[0]} {shape[1]}"]:
     """Resize an image to a new shape using padding and cropping."""
     if image.ndim != 2 or len(shape) != 2:

@@ -795,7 +795,11 @@ def test_bad_pytree_error():
         jnp.atleast_1d(2.0),
         jnp.atleast_1d(3.0),
     )
-    pose = eqx.tree_at(lambda x: x.offset_x_in_angstroms, pose, jnp.asarray((1.0, 2.0)))
+    pose = eqx.tree_at(
+        lambda x: x.offset_in_angstroms,
+        pose,
+        jnp.stack(2 * [np.asarray((1.0, 2.0))], axis=-1),
+    )
     transfer_theory = cxs.ContrastTransferTheory(ctf=cxs.AstigmaticCTF())
     image_config = cxs.BasicImageConfig(
         shape=(4, 4), pixel_size=1.1, voltage_in_kilovolts=300.0

@@ -19,7 +19,6 @@ urls = {repository = "https://github.com/michael-0brien/cryojax" }
 dynamic = ["version"]
 dependencies = [
     "jax",
-    "jaxlib",
     "equinox>=0.11.0",
     "jaxtyping>=0.2.23",
     "lineax",
@@ -29,6 +28,7 @@ dependencies = [
     "xarray",
     "typing_extensions>=4.5.0",
     "tqdm",
+    "mmdf",
     "mdtraj",
 ]
 
@@ -53,6 +53,9 @@ tests = [
     "pycistem; sys_platform == 'linux' and python_version < '3.12'",
     "typeguard==2.13.3"
 ]
+extras = [
+    "jax-finufft>=1.2.0"
+]
 
 [build-system]
 requires = ["hatchling", "hatch-vcs"]
@@ -65,7 +68,7 @@ source = "vcs"
 version-file = "cryojax/cryojax_version.py"
 
 [tool.ruff]
-exclude = ["old"]
+exclude = ["old", "scripts"]
 extend-include = ["*.ipynb"]
 line-length = 90
 src = []

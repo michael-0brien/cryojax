@@ -601,9 +601,6 @@ class RelionParticleStackDataset(
             parameter_file.starfile_data["particles"],
             parameter_file.starfile_data["optics"],
         )
-        images_exist = "rlnImageName" in particle_data.columns
-        if mode == "w" and images_exist:
-            parameter_file = parameter_file.copy()
         self._parameter_file = parameter_file
         # ... properties common to reading and writing images
         self._path_to_relion_project = pathlib.Path(path_to_relion_project)
@@ -612,6 +609,7 @@ class RelionParticleStackDataset(
         # ... properties for writing images
         self._mrcfile_settings = _dict_to_mrcfile_settings(mrcfile_settings)
         # Now, initialize for `mode = 'r'` vs `mode = 'w'`
+        images_exist = "rlnImageName" in particle_data.columns
         project_exists = self.path_to_relion_project.exists()
         if mode == "w":
             # Write empty "rlnImageName" column (defaults to NaN values)
@@ -1147,13 +1145,12 @@ def _make_config(
 
 
 def _make_pose(offset_x, offset_y, phi, theta, psi):
-    return EulerAnglePose(
-        offset_x_in_angstroms=offset_x,
-        offset_y_in_angstroms=offset_y,
-        phi_angle=phi,
-        theta_angle=theta,
-        psi_angle=psi,
+    _make_fn = lambda _x, _y, _phi, _theta, _psi: EulerAnglePose(
+        _x, _y, _phi, _theta, _psi
     )
+    if offset_x.ndim == 1:
+        _make_fn = eqx.filter_vmap(_make_fn)
+    return _make_fn(offset_x, offset_y, phi, theta, psi)
 
 
 def _make_envelope_function(amp, b_factor):
@@ -1462,8 +1459,16 @@ def _parameters_to_particle_data(
                 "`EulerAnglePose`. Instead, got type "
                 f"{type(pose).__name__}."
             )
-        particles_dict["rlnOriginXAngst"] = -pose.offset_x_in_angstroms
-        particles_dict["rlnOriginYAngst"] = -pose.offset_y_in_angstroms
+        if pose.offset_in_angstroms.ndim == 2:
+            particles_dict["rlnOriginXAngst"] = -pose.offset_in_angstroms[:, 0]
+            particles_dict["rlnOriginYAngst"] = -pose.offset_in_angstroms[:, 1]
+        elif pose.offset_in_angstroms.ndim == 1:
+            particles_dict["rlnOriginXAngst"] = -pose.offset_in_angstroms[0]
+            particles_dict["rlnOriginYAngst"] = -pose.offset_in_angstroms[1]
+        else:
+            raise RuntimeError(
+                "Internal `cryojax` error when loading translations to STAR file."
+            )
         particles_dict["rlnAngleRot"] = -pose.phi_angle
         particles_dict["rlnAngleTilt"] = -pose.theta_angle
         particles_dict["rlnAnglePsi"] = -pose.psi_angle

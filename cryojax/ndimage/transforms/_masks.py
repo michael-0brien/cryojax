@@ -11,7 +11,7 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
-from ...jax_util import NDArrayLike
+from ...jax_util import FloatLike, NDArrayLike
 from ._base_transform import AbstractImageTransform
 
 
@@ -56,8 +56,8 @@ class CircularCosineMask(AbstractMask, strict=True):
     def __init__(
         self,
         coordinate_grid: Float[Array, "y_dim x_dim 2"],
-        radius: float | Float[NDArrayLike, ""],
-        rolloff_width: float | Float[NDArrayLike, ""],
+        radius: FloatLike,
+        rolloff_width: FloatLike,
         xy_offset: tuple[float, float] | Float[NDArrayLike, " 2"] = (0.0, 0.0),
     ):
         """**Arguments:**
@@ -91,8 +91,8 @@ class SphericalCosineMask(AbstractMask, strict=True):
     def __init__(
         self,
         coordinate_grid: Float[Array, "z_dim y_dim x_dim 3"],
-        radius: float | Float[NDArrayLike, ""],
-        rolloff_width: float | Float[NDArrayLike, ""],
+        radius: FloatLike,
+        rolloff_width: FloatLike,
     ):
         """**Arguments:**
 
@@ -125,8 +125,8 @@ class SquareCosineMask(AbstractMask, strict=True):
     def __init__(
         self,
         coordinate_grid: Float[Array, "y_dim x_dim 2"],
-        side_length: float | Float[NDArrayLike, ""],
-        rolloff_width: float | Float[NDArrayLike, ""],
+        side_length: FloatLike,
+        rolloff_width: FloatLike,
     ):
         """**Arguments:**
 
@@ -157,10 +157,10 @@ class Cylindrical2DCosineMask(AbstractMask, strict=True):
     def __init__(
         self,
         coordinate_grid: Float[Array, "y_dim x_dim 2"],
-        radius: float | Float[NDArrayLike, ""],
-        rolloff_width: float | Float[NDArrayLike, ""],
-        in_plane_rotation_angle: float | Float[NDArrayLike, ""] = 0.0,
-        length: float | Float[NDArrayLike, ""] | None = None,
+        radius: FloatLike,
+        rolloff_width: FloatLike,
+        in_plane_rotation_angle: FloatLike = 0.0,
+        length: FloatLike | None = None,
     ):
         """**Arguments:**
 
@@ -208,10 +208,10 @@ class Rectangular2DCosineMask(AbstractMask, strict=True):
     def __init__(
         self,
         coordinate_grid: Float[Array, "y_dim x_dim 2"],
-        x_width: float | Float[NDArrayLike, ""],
-        y_width: float | Float[NDArrayLike, ""],
-        rolloff_width: float | Float[NDArrayLike, ""],
-        in_plane_rotation_angle: float | Float[NDArrayLike, ""] = 0.0,
+        x_width: FloatLike,
+        y_width: FloatLike,
+        rolloff_width: FloatLike,
+        in_plane_rotation_angle: FloatLike = 0.0,
     ):
         """**Arguments:**
 
@@ -250,10 +250,10 @@ class Rectangular3DCosineMask(AbstractMask, strict=True):
     def __init__(
         self,
         coordinate_grid: Float[Array, "z_dim y_dim x_dim 3"],
-        x_width: float | Float[NDArrayLike, ""],
-        y_width: float | Float[NDArrayLike, ""],
-        z_width: float | Float[NDArrayLike, ""],
-        rolloff_width: float | Float[NDArrayLike, ""],
+        x_width: FloatLike,
+        y_width: FloatLike,
+        z_width: FloatLike,
+        rolloff_width: FloatLike,
     ):
         """**Arguments:**
 

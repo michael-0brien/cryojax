@@ -2,6 +2,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from ...coordinates import cartesian_to_polar
+from ...jax_util import FloatLike
 
 
 # Not currently public API
@@ -31,7 +32,7 @@ def compute_phase_shifts_with_spherical_aberration(
 
 # Not currently public API
 def compute_phase_shift_from_amplitude_contrast_ratio(
-    amplitude_contrast_ratio: float | Float[Array, ""],
+    amplitude_contrast_ratio: FloatLike,
 ) -> Float[Array, ""]:
     amplitude_contrast_ratio = jnp.asarray(amplitude_contrast_ratio, dtype=float)
     return jnp.arctan(

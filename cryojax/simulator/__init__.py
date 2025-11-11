@@ -1,5 +1,6 @@
 # Deprecation warnings
 import warnings as _warnings
+from typing import Any as _Any
 
 from ._api_utils import make_image_model as make_image_model
 from ._detector import (
@@ -26,10 +27,12 @@ from ._image_model import (
     ProjectionImageModel as ProjectionImageModel,
 )
 from ._noise_model import (
+    AbstractEmpiricalNoiseModel as AbstractEmpiricalNoiseModel,
     AbstractGaussianNoiseModel as AbstractGaussianNoiseModel,
+    AbstractLikelihoodNoiseModel as AbstractLikelihoodNoiseModel,
     AbstractNoiseModel as AbstractNoiseModel,
-    CorrelatedGaussianNoiseModel as CorrelatedGaussianNoiseModel,
-    UncorrelatedGaussianNoiseModel as UncorrelatedGaussianNoiseModel,
+    GaussianColoredNoiseModel as GaussianColoredNoiseModel,
+    GaussianWhiteNoiseModel as GaussianWhiteNoiseModel,
 )
 from ._pose import (
     AbstractPose as AbstractPose,
@@ -40,7 +43,6 @@ from ._pose import (
 from ._scattering_theory import (
     AbstractScatteringTheory as AbstractScatteringTheory,
     AbstractWaveScatteringTheory as AbstractWaveScatteringTheory,
-    AbstractWeakPhaseScatteringTheory as AbstractWeakPhaseScatteringTheory,
     StrongPhaseScatteringTheory as StrongPhaseScatteringTheory,
     WeakPhaseScatteringTheory as WeakPhaseScatteringTheory,
 )
@@ -53,28 +55,31 @@ from ._transfer_theory import (
     WaveTransferTheory as WaveTransferTheory,
 )
 from ._volume import (
-    AbstractAtomicVolume as AbstractAtomicVolume,
-    AbstractPointCloudVolume as AbstractPointCloudVolume,
-    AbstractTabulatedAtomicVolume as AbstractTabulatedAtomicVolume,
+    AbstractAtomVolume as AbstractAtomVolume,
     AbstractVolumeParametrization as AbstractVolumeParametrization,
     AbstractVolumeRepresentation as AbstractVolumeRepresentation,
+    AbstractVoxelVolume as AbstractVoxelVolume,
     FourierVoxelGridVolume as FourierVoxelGridVolume,
     FourierVoxelSplineVolume as FourierVoxelSplineVolume,
     GaussianMixtureVolume as GaussianMixtureVolume,
-    PengAtomicVolume as PengAtomicVolume,
-    PengScatteringFactorParameters as PengScatteringFactorParameters,
+    IndependentAtomVolume as IndependentAtomVolume,
     RealVoxelGridVolume as RealVoxelGridVolume,
 )
 from ._volume_integrator import (
     AbstractVolumeIntegrator as AbstractVolumeIntegrator,
-    AbstractVoxelVolumeIntegrator as AbstractVoxelVolumeIntegrator,
+    FFTAtomProjection as FFTAtomProjection,
     FourierSliceExtraction as FourierSliceExtraction,
     GaussianMixtureProjection as GaussianMixtureProjection,
-    NufftProjection as NufftProjection,
+    RealVoxelProjection as RealVoxelProjection,
+)
+from ._volume_rendering import (
+    AbstractVolumeRenderFn as AbstractVolumeRenderFn,
+    FFTAtomRenderFn as FFTAtomRenderFn,
+    GaussianMixtureRenderFn as GaussianMixtureRenderFn,
 )
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> _Any:
     # Future deprecations
     if name == "AberratedAstigmaticCTF":
         _warnings.warn(
@@ -92,6 +97,54 @@ def __getattr__(name: str):
             stacklevel=2,
         )
         return AstigmaticCTF
+    if name == "NufftProjection":
+        _warnings.warn(
+            "'NufftProjection' is deprecated and will be removed in "
+            "cryoJAX 0.6.0. Use 'RealVoxelProjection' instead.",
+            category=DeprecationWarning,
+            stacklevel=2,
+        )
+        return RealVoxelProjection
+    if name == "PengScatteringFactorParameters":
+        _warnings.warn(
+            "'PengScatteringFactorParameters' has been moved to `cryojax.constants` "
+            "will be removed from `cryojax.simulator` in "
+            "cryoJAX 0.6.0.",
+            category=DeprecationWarning,
+            stacklevel=2,
+        )
+        from ..constants import PengScatteringFactorParameters
+
+        return PengScatteringFactorParameters
+    if name == "PengAtomicVolume":
+        _warnings.warn(
+            "'PengAtomicVolume' is deprecated and will be removed in "
+            "cryoJAX 0.6.0. To achieve identical functionality, use "
+            "`GaussianMixtureVolume.from_tabulated_parameters`. "
+            "This is a breaking change if you are "
+            "directly using `PengAtomicVolume.__init__`.",
+            category=DeprecationWarning,
+            stacklevel=2,
+        )
+        return GaussianMixtureVolume
+    if name == "UncorrelatedGaussianNoiseModel":
+        _warnings.warn(
+            "'UncorrelatedGaussianNoiseModel' is deprecated and "
+            "will be removed in cryoJAX 0.6.0. Instead, use "
+            "'GaussianWhiteNoiseModel'.",
+            category=DeprecationWarning,
+            stacklevel=2,
+        )
+        return GaussianWhiteNoiseModel
+    if name == "CorrelatedGaussianNoiseModel":
+        _warnings.warn(
+            "'CorrelatedGaussianNoiseModel' is deprecated and "
+            "will be removed in cryoJAX 0.6.0. Instead, use "
+            "'GaussianColoredNoiseModel'.",
+            category=DeprecationWarning,
+            stacklevel=2,
+        )
+        return GaussianColoredNoiseModel
     # Deprecated in previous versions
     if name == "DiscreteStructuralEnsemble":
         raise ValueError(
