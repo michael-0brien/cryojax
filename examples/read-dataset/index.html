@@ -1848,7 +1848,7 @@ This abstract interface are part of the <code>cryojax</code> public API!</p>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code>Image mean: 3.814697e-09 Image standard deviation: 1.0000001
 </code></pre></div>
-<p><img alt="img" src="../_data/268f514809b6444fa66ddc20166b41f2.png" /></p>
+<p><img alt="img" src="../_data/dde72674044347718e07764dc94cac79.png" /></p>
 <p>This image happens to be simulated with <code>cryojax</code> from the structure of the human 80S ribosome (PDB id 4gu0).</p>
 <p>We can also use fancy indexing to access multiple particles at once.</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Access multiple images in the stack</span>
@@ -1879,7 +1879,7 @@ This abstract interface are part of the <code>cryojax</code> public API!</p>
 <span class="p">[</span><span class="n">plot_image</span><span class="p">(</span><span class="n">particle_info</span><span class="p">[</span><span class="s2">&quot;images&quot;</span><span class="p">][</span><span class="n">idx</span><span class="p">],</span> <span class="n">fig</span><span class="p">,</span> <span class="n">axes</span><span class="p">[</span><span class="n">idx</span><span class="p">])</span> <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">)]</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/265788599d90492bb83d1105229d428e.png" /></p>
+<p><img alt="img" src="../_data/12e95b060fbd4b458f54cc36fd5a89cf.png" /></p>
 <p>Computing the power spectrum of an image is a common analysis tool in cryo-EM. This can be done in <code>cryojax</code>!</p>
 <p>First, we simply have to compute our image in fourier space and a grid of wave vector magnitudes.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">cryojax.ndimage</span><span class="w"> </span><span class="kn">import</span> <span class="n">rfftn</span>
@@ -1915,7 +1915,7 @@ This abstract interface are part of the <code>cryojax</code> public API!</p>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code>(100, 100)
 </code></pre></div>
-<p><img alt="img" src="../_data/21b450c8ee4043c0a1249a3a32d23d99.png" /></p>
+<p><img alt="img" src="../_data/417211b4188543b3830b926fe0dd95ca.png" /></p>
 <p>We are now ready to compute and plot the radially averaged power spectrum profile! This simply bins the squared fourier amplitudes according to the <code>radial_frequency_grid</code>.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">cryojax.ndimage</span><span class="w"> </span><span class="kn">import</span> <span class="n">compute_binned_powerspectrum</span>
 
@@ -1939,7 +1939,7 @@ This abstract interface are part of the <code>cryojax</code> public API!</p>
  Text(0, 0.5, &#39;radially averaged power spectrum&#39;),
  None]
 </code></pre></div>
-<p><img alt="img" src="../_data/1444ae5dfc4f47248faf88f8fd17b9c0.png" /></p>
+<p><img alt="img" src="../_data/9f71032b90a849c29ba23f4a1f8737a8.png" /></p>
 <p>Here, we see that the Thon rings in our power spectrum are faint since the pixel since of our images is <span class="arithmatex">\(4 \ \AA\)</span>.</p>
 
 

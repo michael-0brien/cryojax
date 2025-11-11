@@ -1865,7 +1865,7 @@ define to be</p>
 <div class="highlight"><pre><span></span><code>(&lt;Figure size 300x300 with 2 Axes&gt;,
  &lt;Axes: title={&#39;center&#39;: &#39;Integrated potential, $U_z(x, y)$&#39;}&gt;)
 </code></pre></div>
-<p><img alt="img" src="../_data/c25e8ec3d8374ebdbd2ae2f87f79c0d0.png" /></p>
+<p><img alt="img" src="../_data/bb2955b8c7fc4f58b346fe7bc6f8366f.png" /></p>
 <p>We can also inspect a different viewing angle by rotating the <code>voxel_potential</code> to a different pose. This involves instantiating a <code>cryojax</code> representation of a pose, which here is the <code>cryojax.simulator.EulerAnglePose</code>. The three euler angles in this object are:</p>
 <ul>
 <li>The first euler angle <span class="arithmatex">\(\phi\)</span>, denoted <code>phi_angle</code></li>
@@ -1886,7 +1886,7 @@ define to be</p>
 <div class="highlight"><pre><span></span><code>(&lt;Figure size 300x300 with 2 Axes&gt;,
  &lt;Axes: title={&#39;center&#39;: &#39;Integrated potential, $U_z(x, y)$&#39;}&gt;)
 </code></pre></div>
-<p><img alt="img" src="../_data/75704e3559a24eb58c1949848d2442e3.png" /></p>
+<p><img alt="img" src="../_data/333eb578ab6c47f88295c2134677d62b.png" /></p>
 <p>Another good sanity check is to check that the potential is relatively weak compared to a typical incident electron beam energy in cryo-EM. For an electron beam with incident wavenumber <span class="arithmatex">\(k\)</span>, this can be checked with the condition</p>
 <div class="arithmatex">\[4 \pi U / k^2 &lt;&lt; 1,\]</div>
 <p>where again <span class="arithmatex">\(U = m_0 e V / 2 \pi \hbar^2\)</span> is the rescaled potential. Below, we consider an incident energy of <span class="arithmatex">\(300 \ \textrm{keV}\)</span>.</p>
