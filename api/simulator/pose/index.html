@@ -463,52 +463,6 @@
 
               
             
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-    
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_3" >
-        
-          
-          <label class="md-nav__link" for="__nav_2_3" id="__nav_2_3_label" tabindex="0">
-            
-  
-  <span class="md-ellipsis">
-    Advanced usage
-    
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2_3">
-            <span class="md-nav__icon md-icon"></span>
-            Advanced usage
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
               
                 
   
@@ -1819,77 +1773,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../../jax_util/filter_specs/" class="md-nav__link">
+      <a href="../../jax_util/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Helper functions for Equinox filtering
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../jax_util/grid_search/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Grid search interface
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../jax_util/pytree_transforms/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Reparameterizing pytrees
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../jax_util/useful_functions/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Useful JAX functions
+    Utilities for working with JAX/Equinox
     
   </span>
   
@@ -1970,7 +1858,7 @@ angles in degrees, e.g.</p>
 
 <h4 id="cryojax.simulator.AbstractPose" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.AbstractPose</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/f43884d2c47fe8369c931f61ed10e41064b7e5f9/cryojax/simulator/_pose.py#L20-L199"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/28cfc4b9bb87d6185c8b7d9a916401e480c6c95d/cryojax/simulator/_pose.py#L21-L200"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.AbstractPose" class="headerlink" title="Permanent link">¤</a></h4>
@@ -2205,7 +2093,7 @@ representation.</p>
 
 <h4 id="cryojax.simulator.EulerAnglePose" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.EulerAnglePose(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractPose">cryojax.simulator.AbstractPose</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/f43884d2c47fe8369c931f61ed10e41064b7e5f9/cryojax/simulator/_pose.py#L202-L279"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/28cfc4b9bb87d6185c8b7d9a916401e480c6c95d/cryojax/simulator/_pose.py#L203-L280"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.EulerAnglePose" class="headerlink" title="Permanent link">¤</a></h4>
@@ -2289,7 +2177,7 @@ simply <strong>negate each euler angle</strong>.</p>
 
 <h4 id="cryojax.simulator.QuaternionPose" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.QuaternionPose(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractPose">cryojax.simulator.AbstractPose</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/f43884d2c47fe8369c931f61ed10e41064b7e5f9/cryojax/simulator/_pose.py#L282-L334"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/28cfc4b9bb87d6185c8b7d9a916401e480c6c95d/cryojax/simulator/_pose.py#L283-L335"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.QuaternionPose" class="headerlink" title="Permanent link">¤</a></h4>
@@ -2323,7 +2211,7 @@ simply <strong>negate each euler angle</strong>.</p>
 
 
 <h5 id="cryojax.simulator.QuaternionPose.__init__" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">offset_x_in_angstroms</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">offset_y_in_angstroms</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">wxyz</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;4&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;4&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span> <span class="o">*</span><span class="p">,</span> <span class="n">offset_z_in_angstroms</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">offset_x_in_angstroms</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">offset_y_in_angstroms</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">wxyz</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;4&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;4&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span> <span class="o">*</span><span class="p">,</span> <span class="n">offset_z_in_angstroms</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span></code>
   
 
 
@@ -2361,7 +2249,7 @@ simply <strong>negate each euler angle</strong>.</p>
 
 <h4 id="cryojax.simulator.AxisAnglePose" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.AxisAnglePose(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractPose">cryojax.simulator.AbstractPose</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/f43884d2c47fe8369c931f61ed10e41064b7e5f9/cryojax/simulator/_pose.py#L337-L401"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/28cfc4b9bb87d6185c8b7d9a916401e480c6c95d/cryojax/simulator/_pose.py#L338-L403"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.AxisAnglePose" class="headerlink" title="Permanent link">¤</a></h4>
@@ -2401,7 +2289,7 @@ the matrix exponential.</p>
 
 
 <h5 id="cryojax.simulator.AxisAnglePose.__init__" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">offset_x_in_angstroms</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">offset_y_in_angstroms</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">euler_vector</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;3&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;3&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span> <span class="o">*</span><span class="p">,</span> <span class="n">offset_z_in_angstroms</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">offset_x_in_angstroms</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">offset_y_in_angstroms</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">euler_vector</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;3&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;3&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span> <span class="o">*</span><span class="p">,</span> <span class="n">offset_z_in_angstroms</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span></code>
   
 
 

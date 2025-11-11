@@ -470,52 +470,6 @@
 
               
             
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-    
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_3" >
-        
-          
-          <label class="md-nav__link" for="__nav_2_3" id="__nav_2_3_label" tabindex="0">
-            
-  
-  <span class="md-ellipsis">
-    Advanced usage
-    
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2_3">
-            <span class="md-nav__icon md-icon"></span>
-            Advanced usage
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
               
                 
   
@@ -1743,77 +1697,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/jax_util/filter_specs/" class="md-nav__link">
+      <a href="../../api/jax_util/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Helper functions for Equinox filtering
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api/jax_util/grid_search/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Grid search interface
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api/jax_util/pytree_transforms/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Reparameterizing pytrees
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api/jax_util/useful_functions/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Useful JAX functions
+    Utilities for working with JAX/Equinox
     
   </span>
   
@@ -2040,7 +1928,7 @@ Simulate an image with JIT
 <span class="n">images</span> <span class="o">=</span> <span class="n">simulate_batch_fn</span><span class="p">(</span><span class="n">model_vmap</span><span class="p">,</span> <span class="n">model_novmap</span><span class="p">)</span>
 <span class="n">plot_image_stack</span><span class="p">(</span><span class="n">images</span><span class="p">)</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/8909ee543b2a453fad143e000dc3ed21.png" /></p>
+<p><img alt="img" src="../_data/a70bfd16a60b482e862d5e2477cc6ddb.png" /></p>
 <p>Here, we use a <code>eqx.filter_vmap</code> for model instantiation and image simulation.</p>
 <div class="admonition info">
 <p class="admonition-title">Why do we set <code>out_axes=(0, None)</code>?</p>

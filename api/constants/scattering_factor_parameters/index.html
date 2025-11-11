@@ -463,52 +463,6 @@
 
               
             
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-    
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_3" >
-        
-          
-          <label class="md-nav__link" for="__nav_2_3" id="__nav_2_3_label" tabindex="0">
-            
-  
-  <span class="md-ellipsis">
-    Advanced usage
-    
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2_3">
-            <span class="md-nav__icon md-icon"></span>
-            Advanced usage
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
               
                 
   
@@ -1823,77 +1777,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../../jax_util/filter_specs/" class="md-nav__link">
+      <a href="../../jax_util/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Helper functions for Equinox filtering
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../jax_util/grid_search/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Grid search interface
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../jax_util/pytree_transforms/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Reparameterizing pytrees
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../jax_util/useful_functions/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Useful JAX functions
+    Utilities for working with JAX/Equinox
     
   </span>
   
@@ -1944,7 +1832,7 @@
 
 <h4 id="cryojax.constants.extract_scattering_factor_parameters" class="doc doc-heading">
   <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">constants</span><span class="o">.</span><span class="n">extract_scattering_factor_parameters</span><span class="p">(</span><span class="n">atom_types</span><span class="p">:</span> <span class="n">Int</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;n_atoms&#39;</span><span class="p">],</span> <span class="n">scattering_factor_parameter_table</span><span class="p">:</span> <span class="n">xarray</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">dataset</span><span class="o">.</span><span class="n">Dataset</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;n_atoms n_scattering_factors&#39;</span><span class="p">]]</span></code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/f43884d2c47fe8369c931f61ed10e41064b7e5f9/cryojax/constants/_scattering_factor_parameters.py#L80-L108"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/28cfc4b9bb87d6185c8b7d9a916401e480c6c95d/cryojax/constants/_scattering_factor_parameters.py#L80-L108"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.constants.extract_scattering_factor_parameters" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1981,7 +1869,7 @@
 
 <h4 id="cryojax.constants.PengScatteringFactorParameters" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.constants.PengScatteringFactorParameters</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/f43884d2c47fe8369c931f61ed10e41064b7e5f9/cryojax/constants/_scattering_factor_parameters.py#L16-L48"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/28cfc4b9bb87d6185c8b7d9a916401e480c6c95d/cryojax/constants/_scattering_factor_parameters.py#L16-L48"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.constants.PengScatteringFactorParameters" class="headerlink" title="Permanent link">¤</a></h4>
@@ -2060,7 +1948,7 @@ the citation,</p>
 
 <h4 id="cryojax.constants.read_peng_scattering_factor_parameter_table" class="doc doc-heading">
   <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">constants</span><span class="o">.</span><span class="n">read_peng_scattering_factor_parameter_table</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">xarray</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">dataset</span><span class="o">.</span><span class="n">Dataset</span></code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/f43884d2c47fe8369c931f61ed10e41064b7e5f9/cryojax/constants/_scattering_factor_parameters.py#L51-L77"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/28cfc4b9bb87d6185c8b7d9a916401e480c6c95d/cryojax/constants/_scattering_factor_parameters.py#L51-L77"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.constants.read_peng_scattering_factor_parameter_table" class="headerlink" title="Permanent link">¤</a></h4>

@@ -463,52 +463,6 @@
 
               
             
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-    
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_3" >
-        
-          
-          <label class="md-nav__link" for="__nav_2_3" id="__nav_2_3_label" tabindex="0">
-            
-  
-  <span class="md-ellipsis">
-    Advanced usage
-    
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2_3">
-            <span class="md-nav__icon md-icon"></span>
-            Advanced usage
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
               
                 
   
@@ -1840,77 +1794,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../../jax_util/filter_specs/" class="md-nav__link">
+      <a href="../../jax_util/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Helper functions for Equinox filtering
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../jax_util/grid_search/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Grid search interface
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../jax_util/pytree_transforms/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Reparameterizing pytrees
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../jax_util/useful_functions/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Useful JAX functions
+    Utilities for working with JAX/Equinox
     
   </span>
   
@@ -1991,7 +1879,7 @@
 
 <h4 id="cryojax.simulator.AbstractCTF" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.AbstractCTF</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/f43884d2c47fe8369c931f61ed10e41064b7e5f9/cryojax/simulator/_transfer_theory/transfer_function.py#L15-L81"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/28cfc4b9bb87d6185c8b7d9a916401e480c6c95d/cryojax/simulator/_transfer_theory/transfer_function.py#L15-L81"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.AbstractCTF" class="headerlink" title="Permanent link">¤</a></h4>
@@ -2025,7 +1913,7 @@
 
 
 <h5 id="cryojax.simulator.AbstractCTF.compute_aberration_phase_shifts" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">compute_aberration_phase_shifts</span><span class="p">(</span><span class="n">frequency_grid_in_angstroms</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim 2&#39;</span><span class="p">],</span> <span class="n">wavelength_in_angstroms</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="nb">float</span><span class="p">,</span> <span class="n">defocus_offset</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim&#39;</span><span class="p">]</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">compute_aberration_phase_shifts</span><span class="p">(</span><span class="n">frequency_grid_in_angstroms</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim 2&#39;</span><span class="p">],</span> <span class="n">wavelength_in_angstroms</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">],</span> <span class="n">defocus_offset</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim&#39;</span><span class="p">]</span></code>
   
 
 
@@ -2054,7 +1942,7 @@
 
 <h4 id="cryojax.simulator.AstigmaticCTF" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.AstigmaticCTF(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractCTF">cryojax.simulator.AbstractCTF</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/f43884d2c47fe8369c931f61ed10e41064b7e5f9/cryojax/simulator/_transfer_theory/transfer_function.py#L84-L169"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/28cfc4b9bb87d6185c8b7d9a916401e480c6c95d/cryojax/simulator/_transfer_theory/transfer_function.py#L84-L169"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.AstigmaticCTF" class="headerlink" title="Permanent link">¤</a></h4>
@@ -2103,7 +1991,7 @@ from CTFFIND to <code>cryojax</code>,</p>
 
 
 <h5 id="cryojax.simulator.AstigmaticCTF.__init__" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">defocus_in_angstroms</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">10000.0</span><span class="p">,</span> <span class="n">astigmatism_in_angstroms</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">astigmatism_angle</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">spherical_aberration_in_mm</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">2.7</span><span class="p">)</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">defocus_in_angstroms</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">10000.0</span><span class="p">,</span> <span class="n">astigmatism_in_angstroms</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">astigmatism_angle</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">spherical_aberration_in_mm</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">2.7</span><span class="p">)</span></code>
   
 
 
@@ -2129,7 +2017,7 @@ from CTFFIND to <code>cryojax</code>,</p>
 
 
 <h5 id="cryojax.simulator.AstigmaticCTF.compute_aberration_phase_shifts" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">compute_aberration_phase_shifts</span><span class="p">(</span><span class="n">frequency_grid_in_angstroms</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim 2&#39;</span><span class="p">],</span> <span class="n">wavelength_in_angstroms</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="nb">float</span><span class="p">,</span> <span class="n">defocus_offset</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim&#39;</span><span class="p">]</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">compute_aberration_phase_shifts</span><span class="p">(</span><span class="n">frequency_grid_in_angstroms</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim 2&#39;</span><span class="p">],</span> <span class="n">wavelength_in_angstroms</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">],</span> <span class="n">defocus_offset</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim&#39;</span><span class="p">]</span></code>
   
 
 
@@ -2163,7 +2051,7 @@ spatial frequency <span class="arithmatex">\(\boldsymbol{q}\)</span>.</p>
 
 
 <h5 id="cryojax.simulator.AstigmaticCTF.__call__" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__call__</span><span class="p">(</span><span class="n">frequency_grid_in_angstroms</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim 2&#39;</span><span class="p">],</span> <span class="n">voltage_in_kilovolts</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="nb">float</span><span class="p">,</span> <span class="n">amplitude_contrast_ratio</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span> <span class="n">phase_shift</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">outputs_exp</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">defocus_offset</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim&#39;</span><span class="p">]</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__call__</span><span class="p">(</span><span class="n">frequency_grid_in_angstroms</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim 2&#39;</span><span class="p">],</span> <span class="n">voltage_in_kilovolts</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">],</span> <span class="n">amplitude_contrast_ratio</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span> <span class="n">phase_shift</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">outputs_exp</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">defocus_offset</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim&#39;</span><span class="p">]</span></code>
   
 
 
@@ -2212,7 +2100,7 @@ spatial frequency <span class="arithmatex">\(\boldsymbol{q}\)</span>.</p>
 
 <h4 id="cryojax.simulator.ContrastTransferTheory" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.ContrastTransferTheory</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/f43884d2c47fe8369c931f61ed10e41064b7e5f9/cryojax/simulator/_transfer_theory/transfer_theory.py#L21-L120"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/28cfc4b9bb87d6185c8b7d9a916401e480c6c95d/cryojax/simulator/_transfer_theory/transfer_theory.py#L21-L120"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.ContrastTransferTheory" class="headerlink" title="Permanent link">¤</a></h4>
@@ -2275,7 +2163,7 @@ image from a 2D projection.</p>
 
 
 <h5 id="cryojax.simulator.ContrastTransferTheory.propagate_object" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">propagate_object</span><span class="p">(</span><span class="n">object_spectrum</span><span class="p">:</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> {image_config.padded_x_dim//2+1}&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> </span><span class="si">{image_config.padded_x_dim}</span><span class="s1">&#39;</span><span class="p">],</span> <span class="n">image_config</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractImageConfig</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">defocus_offset</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">is_projection_approximation</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> {image_config.padded_x_dim//2+1}&#39;</span><span class="p">]</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">propagate_object</span><span class="p">(</span><span class="n">object_spectrum</span><span class="p">:</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> {image_config.padded_x_dim//2+1}&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> </span><span class="si">{image_config.padded_x_dim}</span><span class="s1">&#39;</span><span class="p">],</span> <span class="n">image_config</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractImageConfig</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">defocus_offset</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">is_projection_approximation</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> {image_config.padded_x_dim//2+1}&#39;</span><span class="p">]</span></code>
   
 
 

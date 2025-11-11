@@ -12,25 +12,23 @@
         <meta name="author" content="Michael O'Brien">
       
       
-        <link rel="canonical" href="https://michael-0brien.github.io/cryojax/api/jax_util/filter_specs/">
+        <link rel="canonical" href="https://michael-0brien.github.io/cryojax/api/jax_util/">
       
       
-        <link rel="prev" href="../../atom_util/">
+        <link rel="prev" href="../atom_util/">
       
       
-        <link rel="next" href="../grid_search/">
       
-      
-      <link rel="icon" href="../../../assets/images/favicon.png">
+      <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.7">
     
     
       
-        <title>Helper functions for Equinox filtering - cryoJAX</title>
+        <title>Utilities for working with JAX/Equinox - cryoJAX</title>
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.8608ea7d.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.8608ea7d.min.css">
       
       
 
@@ -49,13 +47,13 @@
       
     
     
-      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
     
-      <link rel="stylesheet" href="../../../assets/_hippogriffe.css">
+      <link rel="stylesheet" href="../../assets/_hippogriffe.css">
     
-      <link rel="stylesheet" href="../../../_static/custom_css.css">
+      <link rel="stylesheet" href="../../_static/custom_css.css">
     
-    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -74,7 +72,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#helper-functions-for-equinox-filtering" class="md-skip">
+        <a href="#utilities-for-working-with-jaxequinox" class="md-skip">
           Skip to content
         </a>
       
@@ -90,7 +88,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../../.." title="cryoJAX" class="md-header__button md-logo" aria-label="cryoJAX" data-md-component="logo">
+    <a href="../.." title="cryoJAX" class="md-header__button md-logo" aria-label="cryoJAX" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m20.79 13.95-2.33.62-2-1.13v-2.88l2-1.13 2.33.62.52-1.93-1.77-.47.46-1.77-1.93-.52-.62 2.33-2 1.13L13 7.38V5.12l1.71-1.71L13.29 2 12 3.29 10.71 2 9.29 3.41 11 5.12v2.26L8.5 8.82l-2-1.13-.58-2.33L4 5.88l.47 1.77-1.77.47.52 1.93 2.33-.62 2 1.13v2.89l-2 1.13-2.33-.62-.52 1.93 1.77.47L4 18.12l1.93.52.62-2.33 2-1.13L11 16.62v2.26l-1.71 1.71L10.71 22 12 20.71 13.29 22l1.41-1.41-1.7-1.71v-2.26l2.5-1.45 2 1.13.62 2.33 1.88-.51-.47-1.77 1.77-.47zM9.5 10.56 12 9.11l2.5 1.45v2.88L12 14.89l-2.5-1.45z"/></svg>
@@ -110,7 +108,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Helper functions for Equinox filtering
+              Utilities for working with JAX/Equinox
             
           </span>
         </div>
@@ -162,7 +160,7 @@
 
 <nav class="md-nav md-nav--primary md-nav--integrated" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../../.." title="cryoJAX" class="md-nav__button md-logo" aria-label="cryoJAX" data-md-component="logo">
+    <a href="../.." title="cryoJAX" class="md-nav__button md-logo" aria-label="cryoJAX" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m20.79 13.95-2.33.62-2-1.13v-2.88l2-1.13 2.33.62.52-1.93-1.77-.47.46-1.77-1.93-.52-.62 2.33-2 1.13L13 7.38V5.12l1.71-1.71L13.29 2 12 3.29 10.71 2 9.29 3.41 11 5.12v2.26L8.5 8.82l-2-1.13-.58-2.33L4 5.88l.47 1.77-1.77.47.52 1.93 2.33-.62 2 1.13v2.89l-2 1.13-2.33-.62-.52 1.93 1.77.47L4 18.12l1.93.52.62-2.33 2-1.13L11 16.62v2.26l-1.71 1.71L10.71 22 12 20.71 13.29 22l1.41-1.41-1.7-1.71v-2.26l2.5-1.45 2 1.13.62 2.33 1.88-.51-.47-1.77 1.77-.47zM9.5 10.56 12 9.11l2.5 1.45v2.88L12 14.89l-2.5-1.45z"/></svg>
@@ -192,7 +190,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../.." class="md-nav__link">
+      <a href="../.." class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -292,7 +290,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../examples/simulate-image/" class="md-nav__link">
+      <a href="../../examples/simulate-image/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -314,7 +312,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../examples/jax-transformations/" class="md-nav__link">
+      <a href="../../examples/jax-transformations/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -336,7 +334,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../examples/compute-potential/" class="md-nav__link">
+      <a href="../../examples/compute-potential/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -358,7 +356,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../examples/read-dataset/" class="md-nav__link">
+      <a href="../../examples/read-dataset/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -380,7 +378,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../examples/extending-cryojax/" class="md-nav__link">
+      <a href="../../examples/extending-cryojax/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -448,7 +446,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../examples/simulate-relion-dataset/" class="md-nav__link">
+      <a href="../../examples/simulate-relion-dataset/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -463,52 +461,6 @@
 
               
             
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-    
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_3" >
-        
-          
-          <label class="md-nav__link" for="__nav_2_3" id="__nav_2_3_label" tabindex="0">
-            
-  
-  <span class="md-ellipsis">
-    Advanced usage
-    
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2_3">
-            <span class="md-nav__icon md-icon"></span>
-            Advanced usage
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
               
                 
   
@@ -516,7 +468,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../examples/structure-refinement/" class="md-nav__link">
+      <a href="../../examples/structure-refinement/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -634,7 +586,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../simulator/api/" class="md-nav__link">
+      <a href="../simulator/api/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -694,7 +646,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../simulator/pose/" class="md-nav__link">
+      <a href="../simulator/pose/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -716,7 +668,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../simulator/volume/" class="md-nav__link">
+      <a href="../simulator/volume/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -784,7 +736,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../simulator/integrator/" class="md-nav__link">
+      <a href="../simulator/integrator/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -806,7 +758,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../simulator/transfer_theory/" class="md-nav__link">
+      <a href="../simulator/transfer_theory/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -828,7 +780,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../simulator/scattering_theory/" class="md-nav__link">
+      <a href="../simulator/scattering_theory/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -896,7 +848,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../simulator/config/" class="md-nav__link">
+      <a href="../simulator/config/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -918,7 +870,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../simulator/image_model/" class="md-nav__link">
+      <a href="../simulator/image_model/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -940,7 +892,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../simulator/noise_model/" class="md-nav__link">
+      <a href="../simulator/noise_model/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1016,7 +968,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dataset/relion/" class="md-nav__link">
+      <a href="../dataset/relion/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1084,7 +1036,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../io/mrc/" class="md-nav__link">
+      <a href="../io/mrc/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1106,7 +1058,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../io/atom_loading/" class="md-nav__link">
+      <a href="../io/atom_loading/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1174,7 +1126,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ndimage/functions/" class="md-nav__link">
+      <a href="../ndimage/functions/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1234,7 +1186,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ndimage/operators/" class="md-nav__link">
+      <a href="../ndimage/operators/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1302,7 +1254,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ndimage/transforms/" class="md-nav__link">
+      <a href="../ndimage/transforms/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1378,7 +1330,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../coordinates/making_coordinates/" class="md-nav__link">
+      <a href="../coordinates/making_coordinates/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1400,7 +1352,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../coordinates/transforming_coordinates/" class="md-nav__link">
+      <a href="../coordinates/transforming_coordinates/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1468,7 +1420,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../rotations/lie_groups/" class="md-nav__link">
+      <a href="../rotations/lie_groups/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1490,7 +1442,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../rotations/conversions/" class="md-nav__link">
+      <a href="../rotations/conversions/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1558,7 +1510,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../constants/units/" class="md-nav__link">
+      <a href="../constants/units/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1580,7 +1532,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../constants/scattering_factor_parameters/" class="md-nav__link">
+      <a href="../constants/scattering_factor_parameters/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1602,7 +1554,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../constants/conventions/" class="md-nav__link">
+      <a href="../constants/conventions/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1670,7 +1622,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../atom_util/" class="md-nav__link">
+      <a href="../atom_util/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1753,7 +1705,7 @@
           
   
   <span class="md-ellipsis">
-    Helper functions for Equinox filtering
+    Utilities for working with JAX/Equinox
     
   </span>
   
@@ -1765,7 +1717,7 @@
         
   
   <span class="md-ellipsis">
-    Helper functions for Equinox filtering
+    Utilities for working with JAX/Equinox
     
   </span>
   
@@ -1788,9 +1740,99 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#equinox-extensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Equinox extensions
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Equinox extensions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#helpers-for-filtering" class="md-nav__link">
+    <span class="md-ellipsis">
+      Helpers for filtering
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Helpers for filtering">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#cryojax.jax_util.make_filter_spec" class="md-nav__link">
     <span class="md-ellipsis">
       <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;make_filter_spec
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#batched-loops" class="md-nav__link">
+    <span class="md-ellipsis">
+      Batched loops
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Batched loops">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cryojax.jax_util.filter_bmap" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;filter_bmap
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cryojax.jax_util.filter_bscan" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;filter_bscan
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#grid-search-interface" class="md-nav__link">
+    <span class="md-ellipsis">
+      Grid search interface
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reparameterizing-pytrees" class="md-nav__link">
+    <span class="md-ellipsis">
+      Reparameterizing pytrees
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#extra-type-hints-using-jaxtyping" class="md-nav__link">
+    <span class="md-ellipsis">
+      Extra type hints using jaxtyping
     </span>
   </a>
   
@@ -1800,72 +1842,6 @@
   
 </nav>
       
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../grid_search/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Grid search interface
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../pytree_transforms/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Reparameterizing pytrees
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../useful_functions/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Useful JAX functions
-    
-  </span>
-  
-
-      </a>
     </li>
   
 
@@ -1902,7 +1878,9 @@
 
 
 
-<h1 id="helper-functions-for-equinox-filtering">Helper functions for Equinox filtering<a class="headerlink" href="#helper-functions-for-equinox-filtering" title="Permanent link">¤</a></h1>
+<h1 id="utilities-for-working-with-jaxequinox">Utilities for working with JAX/Equinox<a class="headerlink" href="#utilities-for-working-with-jaxequinox" title="Permanent link">¤</a></h1>
+<h2 id="equinox-extensions">Equinox extensions<a class="headerlink" href="#equinox-extensions" title="Permanent link">¤</a></h2>
+<h3 id="helpers-for-filtering">Helpers for filtering<a class="headerlink" href="#helpers-for-filtering" title="Permanent link">¤</a></h3>
 <p>To make use of the full power of JAX, it is highly recommended to learn about <a href="https://docs.kidger.site/equinox/all-of-equinox/">equinox</a>. Using <code>equinox</code>, cryoJAX implements its <a href="https://docs.kidger.site/equinox/all-of-equinox/#1-models-as-pytrees">models as pytrees</a> using <code>equinox.Module</code>s. These pytrees can be operated on similarly to any pytree with JAX (e.g. with <code>jax.tree.map</code>). Complementary to the <code>equinox.Module</code> interface, <code>equinox</code> introduces the idea of <a href="https://docs.kidger.site/equinox/all-of-equinox/#2-filtering"><em>filtering</em></a> in order to separate pytree leaves into different groups, a core task in using JAX (e.g. separating traced and static arguments to <code>jax.jit</code>). In particular, this grouping is achieved with the functions <a href="https://docs.kidger.site/equinox/api/manipulation/#equinox.partition">eqx.partition and eqx.combine</a>. This documentation describes utilities in <code>cryojax</code> for working with <code>equinox.partition</code> and <code>equinox.combine</code>.</p>
 
 
@@ -1911,7 +1889,7 @@
 
 <h4 id="cryojax.jax_util.make_filter_spec" class="doc doc-heading">
   <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">make_filter_spec</span><span class="p">(</span><span class="n">pytree</span><span class="p">:</span> <span class="n">PyTree</span><span class="p">,</span> <span class="n">where</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">PyTree</span><span class="p">],</span> <span class="n">Any</span> <span class="o">|</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">]],</span> <span class="o">*</span><span class="p">,</span> <span class="n">inverse</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">is_leaf</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Any</span><span class="p">],</span> <span class="nb">bool</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PyTree</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span></code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/f43884d2c47fe8369c931f61ed10e41064b7e5f9/cryojax/jax_util/_filter_specs.py#L13-L47"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/28cfc4b9bb87d6185c8b7d9a916401e480c6c95d/cryojax/jax_util/_filter_specs.py#L13-L47"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.jax_util.make_filter_spec" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1936,7 +1914,89 @@ in the <code>equinox</code> documentation for an example.</p>
 
     </div>
 
+</div><h3 id="batched-loops">Batched loops<a class="headerlink" href="#batched-loops" title="Permanent link">¤</a></h3>
+<p><code>cryojax</code> provides a collection of useful functions not found in JAX that tend to be important for tasks in cryo-EM. Depending on developments with core JAX/Equinox and other factors, these functions could be removed in future releases of <code>cryojax</code>. Use with caution!</p>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="cryojax.jax_util.filter_bmap" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">filter_bmap</span><span class="p">(</span><span class="n">f</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">PyTree</span><span class="p">[</span><span class="n">Shaped</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;_ ...&#39;</span><span class="p">],</span> <span class="s1">&#39;X&#39;</span><span class="p">]],</span> <span class="n">PyTree</span><span class="p">[</span><span class="n">Shaped</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;_ ...&#39;</span><span class="p">],</span> <span class="s1">&#39;Y&#39;</span><span class="p">]],</span> <span class="n">xs</span><span class="p">:</span> <span class="n">PyTree</span><span class="p">[</span><span class="n">Shaped</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;_ ...&#39;</span><span class="p">],</span> <span class="s1">&#39;X&#39;</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PyTree</span><span class="p">[</span><span class="n">Shaped</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;_ ...&#39;</span><span class="p">],</span> <span class="s1">&#39;Y&#39;</span><span class="p">]</span></code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/28cfc4b9bb87d6185c8b7d9a916401e480c6c95d/cryojax/jax_util/_batched_loop.py#L16-L48"><code class='hippogriffe-repo-url'></code></a>
+
+
+<a href="#cryojax.jax_util.filter_bmap" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+        <p>Like <code>jax.lax.map(..., batch_size=...)</code>, but accepts <code>x</code>
+with the same rank as <code>xs</code>. <code>xs</code> is filtered in the usual
+<code>equinox.filter_*</code> way.</p>
+<p><strong>Arguments:</strong></p>
+<ul>
+<li><code>f</code>:
+    As <code>jax.lax.map</code> with format <code>f(x)</code>, except
+    vmapped over the first axis of the arrays of <code>x</code>.</li>
+<li><code>xs</code>:
+    As <code>jax.lax.map</code>.</li>
+<li><code>batch_size</code>:
+    Compute a loop of vmaps over <code>xs</code> in chunks of <code>batch_size</code>.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p>As <code>jax.lax.map</code>.</p>
+
+
+    </div>
+
 </div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="cryojax.jax_util.filter_bscan" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">filter_bscan</span><span class="p">(</span><span class="n">f</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="o">~</span><span class="n">Carry</span><span class="p">,</span> <span class="o">~</span><span class="n">X</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">[</span><span class="o">~</span><span class="n">Carry</span><span class="p">,</span> <span class="o">~</span><span class="n">Y</span><span class="p">]],</span> <span class="n">init</span><span class="p">:</span> <span class="o">~</span><span class="n">Carry</span><span class="p">,</span> <span class="n">xs</span><span class="p">:</span> <span class="o">~</span><span class="n">X</span><span class="p">,</span> <span class="n">length</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">unroll</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">bool</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="o">~</span><span class="n">Carry</span><span class="p">,</span> <span class="o">~</span><span class="n">Y</span><span class="p">]</span></code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/28cfc4b9bb87d6185c8b7d9a916401e480c6c95d/cryojax/jax_util/_batched_loop.py#L51-L146"><code class='hippogriffe-repo-url'></code></a>
+
+
+<a href="#cryojax.jax_util.filter_bscan" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+        <p>Like <code>jax.lax.map(..., batch_size=...)</code>, except adding
+a <code>batch_size</code> to <code>jax.lax.scan</code>. Additionally, unlike
+<code>jax.lax.map</code>, <code>f(carry, x)</code> accepts <code>x</code> with the same
+rank as <code>xs</code> (e.g. perhaps it is vmapped over <code>x</code>).
+<code>xs</code> and <code>carry</code> are filtered in the usual <code>equinox.filter_*</code> way.</p>
+<p><strong>Arguments:</strong></p>
+<ul>
+<li><code>f</code>:
+    As <code>jax.lax.scan</code> with format <code>f(carry, x)</code>.</li>
+<li><code>init</code>:
+    As <code>jax.lax.scan</code>.</li>
+<li><code>xs</code>:
+    As <code>jax.lax.scan</code>.</li>
+<li><code>length</code>:
+    As <code>jax.lax.scan</code>.</li>
+<li><code>unroll</code>:
+    As <code>jax.lax.scan</code>.</li>
+<li><code>batch_size</code>:
+    Compute a loop of vmaps over <code>xs</code> in chunks of <code>batch_size</code>.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p>As <code>jax.lax.scan</code>.</p>
+
+
+    </div>
+
+</div><h2 id="grid-search-interface">Grid search interface<a class="headerlink" href="#grid-search-interface" title="Permanent link">¤</a></h2>
+<h2 id="reparameterizing-pytrees">Reparameterizing pytrees<a class="headerlink" href="#reparameterizing-pytrees" title="Permanent link">¤</a></h2>
+<h2 id="extra-type-hints-using-jaxtyping">Extra type hints using <code>jaxtyping</code><a class="headerlink" href="#extra-type-hints-using-jaxtyping" title="Permanent link">¤</a></h2>
+<!-- ::: cryojax.jax_util.NDArrayLike
+
+::: cryojax.jax_util.FloatLike -->
 
 
 
@@ -1983,12 +2043,12 @@ in the <code>equinox</code> documentation for an example.</p>
     </div>
     
     
-    <script id="__config" type="application/json">{"base": "../../..", "features": ["navigation.sections", "toc.integrate"], "search": "../../../assets/javascripts/workers/search.f8cc74c7.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.sections", "toc.integrate"], "search": "../../assets/javascripts/workers/search.f8cc74c7.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.c8b220af.min.js"></script>
+      <script src="../../assets/javascripts/bundle.c8b220af.min.js"></script>
       
-        <script src="../../../javascripts/mathjax.js"></script>
+        <script src="../../javascripts/mathjax.js"></script>
       
         <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
       

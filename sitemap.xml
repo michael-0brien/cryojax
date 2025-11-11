@@ -2,142 +2,130 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://michael-0brien.github.io/cryojax/</loc>
-         <lastmod>2025-10-28</lastmod>
+         <lastmod>2025-11-11</lastmod>
     </url>
     <url>
          <loc>https://michael-0brien.github.io/cryojax/api/atom_util/</loc>
-         <lastmod>2025-10-28</lastmod>
+         <lastmod>2025-11-11</lastmod>
+    </url>
+    <url>
+         <loc>https://michael-0brien.github.io/cryojax/api/jax_util/</loc>
+         <lastmod>2025-11-11</lastmod>
     </url>
     <url>
          <loc>https://michael-0brien.github.io/cryojax/api/constants/conventions/</loc>
-         <lastmod>2025-10-28</lastmod>
+         <lastmod>2025-11-11</lastmod>
     </url>
     <url>
          <loc>https://michael-0brien.github.io/cryojax/api/constants/scattering_factor_parameters/</loc>
-         <lastmod>2025-10-28</lastmod>
+         <lastmod>2025-11-11</lastmod>
     </url>
     <url>
          <loc>https://michael-0brien.github.io/cryojax/api/constants/units/</loc>
-         <lastmod>2025-10-28</lastmod>
+         <lastmod>2025-11-11</lastmod>
     </url>
     <url>
          <loc>https://michael-0brien.github.io/cryojax/api/coordinates/making_coordinates/</loc>
-         <lastmod>2025-10-28</lastmod>
+         <lastmod>2025-11-11</lastmod>
     </url>
     <url>
          <loc>https://michael-0brien.github.io/cryojax/api/coordinates/transforming_coordinates/</loc>
-         <lastmod>2025-10-28</lastmod>
+         <lastmod>2025-11-11</lastmod>
     </url>
     <url>
          <loc>https://michael-0brien.github.io/cryojax/api/dataset/relion/</loc>
-         <lastmod>2025-10-28</lastmod>
+         <lastmod>2025-11-11</lastmod>
     </url>
     <url>
          <loc>https://michael-0brien.github.io/cryojax/api/io/atom_loading/</loc>
-         <lastmod>2025-10-28</lastmod>
+         <lastmod>2025-11-11</lastmod>
     </url>
     <url>
          <loc>https://michael-0brien.github.io/cryojax/api/io/mrc/</loc>
-         <lastmod>2025-10-28</lastmod>
-    </url>
-    <url>
-         <loc>https://michael-0brien.github.io/cryojax/api/jax_util/filter_specs/</loc>
-         <lastmod>2025-10-28</lastmod>
-    </url>
-    <url>
-         <loc>https://michael-0brien.github.io/cryojax/api/jax_util/grid_search/</loc>
-         <lastmod>2025-10-28</lastmod>
-    </url>
-    <url>
-         <loc>https://michael-0brien.github.io/cryojax/api/jax_util/pytree_transforms/</loc>
-         <lastmod>2025-10-28</lastmod>
-    </url>
-    <url>
-         <loc>https://michael-0brien.github.io/cryojax/api/jax_util/useful_functions/</loc>
-         <lastmod>2025-10-28</lastmod>
+         <lastmod>2025-11-11</lastmod>
     </url>
     <url>
          <loc>https://michael-0brien.github.io/cryojax/api/ndimage/functions/</loc>
-         <lastmod>2025-10-28</lastmod>
+         <lastmod>2025-11-11</lastmod>
     </url>
     <url>
          <loc>https://michael-0brien.github.io/cryojax/api/ndimage/operators/</loc>
-         <lastmod>2025-10-28</lastmod>
+         <lastmod>2025-11-11</lastmod>
     </url>
     <url>
          <loc>https://michael-0brien.github.io/cryojax/api/ndimage/transforms/</loc>
-         <lastmod>2025-10-28</lastmod>
+         <lastmod>2025-11-11</lastmod>
     </url>
     <url>
          <loc>https://michael-0brien.github.io/cryojax/api/rotations/conversions/</loc>
-         <lastmod>2025-10-28</lastmod>
+         <lastmod>2025-11-11</lastmod>
     </url>
     <url>
          <loc>https://michael-0brien.github.io/cryojax/api/rotations/lie_groups/</loc>
-         <lastmod>2025-10-28</lastmod>
+         <lastmod>2025-11-11</lastmod>
     </url>
     <url>
          <loc>https://michael-0brien.github.io/cryojax/api/simulator/api/</loc>
-         <lastmod>2025-10-28</lastmod>
+         <lastmod>2025-11-11</lastmod>
     </url>
     <url>
          <loc>https://michael-0brien.github.io/cryojax/api/simulator/config/</loc>
-         <lastmod>2025-10-28</lastmod>
+         <lastmod>2025-11-11</lastmod>
     </url>
     <url>
          <loc>https://michael-0brien.github.io/cryojax/api/simulator/image_model/</loc>
-         <lastmod>2025-10-28</lastmod>
+         <lastmod>2025-11-11</lastmod>
     </url>
     <url>
          <loc>https://michael-0brien.github.io/cryojax/api/simulator/integrator/</loc>
-         <lastmod>2025-10-28</lastmod>
+         <lastmod>2025-11-11</lastmod>
     </url>
     <url>
          <loc>https://michael-0brien.github.io/cryojax/api/simulator/noise_model/</loc>
-         <lastmod>2025-10-28</lastmod>
+         <lastmod>2025-11-11</lastmod>
     </url>
     <url>
          <loc>https://michael-0brien.github.io/cryojax/api/simulator/pose/</loc>
-         <lastmod>2025-10-28</lastmod>
+         <lastmod>2025-11-11</lastmod>
     </url>
     <url>
          <loc>https://michael-0brien.github.io/cryojax/api/simulator/scattering_theory/</loc>
-         <lastmod>2025-10-28</lastmod>
+         <lastmod>2025-11-11</lastmod>
     </url>
     <url>
          <loc>https://michael-0brien.github.io/cryojax/api/simulator/transfer_theory/</loc>
-         <lastmod>2025-10-28</lastmod>
+         <lastmod>2025-11-11</lastmod>
     </url>
     <url>
          <loc>https://michael-0brien.github.io/cryojax/api/simulator/volume/</loc>
-         <lastmod>2025-10-28</lastmod>
+         <lastmod>2025-11-11</lastmod>
     </url>
     <url>
          <loc>https://michael-0brien.github.io/cryojax/examples/compute-potential/</loc>
-         <lastmod>2025-10-28</lastmod>
+         <lastmod>2025-11-11</lastmod>
     </url>
     <url>
          <loc>https://michael-0brien.github.io/cryojax/examples/extending-cryojax/</loc>
-         <lastmod>2025-10-28</lastmod>
+         <lastmod>2025-11-11</lastmod>
     </url>
     <url>
          <loc>https://michael-0brien.github.io/cryojax/examples/jax-transformations/</loc>
-         <lastmod>2025-10-28</lastmod>
+         <lastmod>2025-11-11</lastmod>
     </url>
     <url>
          <loc>https://michael-0brien.github.io/cryojax/examples/read-dataset/</loc>
-         <lastmod>2025-10-28</lastmod>
+         <lastmod>2025-11-11</lastmod>
     </url>
     <url>
          <loc>https://michael-0brien.github.io/cryojax/examples/simulate-image/</loc>
-         <lastmod>2025-10-28</lastmod>
+         <lastmod>2025-11-11</lastmod>
     </url>
     <url>
          <loc>https://michael-0brien.github.io/cryojax/examples/simulate-relion-dataset/</loc>
-         <lastmod>2025-10-28</lastmod>
+         <lastmod>2025-11-11</lastmod>
     </url>
     <url>
          <loc>https://michael-0brien.github.io/cryojax/examples/structure-refinement/</loc>
-         <lastmod>2025-10-28</lastmod>
+         <lastmod>2025-11-11</lastmod>
     </url>
 </urlset>

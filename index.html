@@ -571,52 +571,6 @@
 
               
             
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-    
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_3" >
-        
-          
-          <label class="md-nav__link" for="__nav_2_3" id="__nav_2_3_label" tabindex="0">
-            
-  
-  <span class="md-ellipsis">
-    Advanced usage
-    
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2_3">
-            <span class="md-nav__icon md-icon"></span>
-            Advanced usage
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
               
                 
   
@@ -1844,77 +1798,11 @@
   
   
     <li class="md-nav__item">
-      <a href="api/jax_util/filter_specs/" class="md-nav__link">
+      <a href="api/jax_util/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Helper functions for Equinox filtering
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="api/jax_util/grid_search/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Grid search interface
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="api/jax_util/pytree_transforms/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Reparameterizing pytrees
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="api/jax_util/useful_functions/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Useful JAX functions
+    Utilities for working with JAX/Equinox
     
   </span>
   
@@ -1963,12 +1851,13 @@
 <p>Installing <code>cryojax</code> is simple. To start, I recommend creating a new virtual environment. For example, you could do this with <code>conda</code>.</p>
 <div class="highlight"><pre><span></span><code>conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>cryojax-env<span class="w"> </span>-c<span class="w"> </span>conda-forge<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.11
 </code></pre></div>
-<p>Note that <code>python&gt;=3.10</code> is required. After creating a new environment, <a href="https://github.com/google/jax#installation">install JAX</a> with either CPU or GPU support. Then, install <code>cryojax</code>. For the latest stable release, install using <code>pip</code>.</p>
+<p>Note that <code>python&gt;=3.10</code> is required. After creating and activating the new environment, <a href="https://github.com/google/jax#installation">install JAX</a> with either CPU or GPU support. Then, install <code>cryojax</code>. For the latest stable release, install using <code>pip</code>.</p>
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>cryojax
 </code></pre></div>
 <p>To install the latest commit, you can build the repository directly.</p>
 <div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/michael-0brien/cryojax
 <span class="nb">cd</span><span class="w"> </span>cryojax
+git<span class="w"> </span>checkout<span class="w"> </span>dev
 python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>.
 </code></pre></div>
 <p>The <a href="https://github.com/dfm/jax-finufft"><code>jax-finufft</code></a> package is an optional dependency used for non-uniform fast fourier transforms. This is used in select methods for computing image projections from atoms and voxels. If you would like to use these methods, we recommend first following the <code>jax_finufft</code> installation instructions and then installing <code>cryojax</code>.</p>
