@@ -5,6 +5,7 @@ changelog:
       - duplicate
     authors:
       - dependabot
+      - pre-commit-ci
   categories:
     - title: "Breaking changes"
       labels:
@@ -13,14 +14,15 @@ changelog:
     - title: "Bug Fixes"
       labels:
         - bug
-    - title: "API Changes"
+    - title: "Deprecations / API updates"
       labels:
-        - api-change
+        - deprecation
+        - api-update
     - title: "Features"
       labels:
         - feature
         - enhancement
-    - title: "Maintanence"
+    - title: "Maintenance"
       labels:
         - refactor
         - cleanup
