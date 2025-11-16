@@ -6,7 +6,7 @@ Contributions to this repository are welcome. It would be great for cryoJAX to b
 
 To submit a feature request, open an a thread on the [issues](https://github.com/michael-0brien/cryojax/issues) page. There we can discuss if something is appropriate for the cryoJAX core library, or if it belongs in a separate library or workflow.
 
-After discussing the contribution and please implement a draft of it in your local fork of cryoJAX. Then, open a [pull request](https://github.com/michael-0brien/cryojax/pulls). If this is too cumbersome, you could provide the code from a script where you've implemented the feature in the [issues](https://github.com/michael-0brien/cryojax/issues) discussion thread. The cryoJAX developers can figure out how to place it in the package.
+After discussing the contribution and please implement a draft of it in your local fork of cryoJAX. Then, open a [pull request](https://github.com/michael-0brien/cryojax/pulls). If this is too cumbersome, you could provide the code from a script where you've implemented the feature in the [issues](https://github.com/michael-0brien/cryojax/issues) discussion thread. The cryoJAX developers can help figure out how to place it in the package. Please open pull requests to the repository's `dev` branch. 
 
 ### What belongs in the cryoJAX core library?
 
@@ -29,6 +29,7 @@ Let's say you are submitted a bug fix or a feature request to cryoJAX. To contri
 ```
 git clone https://github.com/your-username-here/cryojax.git
 cd cryojax
+git checkout dev
 python -m pip install -e '.[dev, tests]'
 ```
 
@@ -52,7 +53,7 @@ python -m pytest
 
 ### Submitting changes
 
-If the tests look okay, open a [Pull Request](https://github.com/michael-0brien/cryojax/pulls) from your fork. The developers can review your PR and request changes / add further tweaks if necessary.
+If the tests look okay, open a [pull request](https://github.com/michael-0brien/cryojax/pulls) from your fork the `dev` branch. The developers can review your PR and request changes / add further tweaks if necessary.
 
 ### Optional: build documentation
 
