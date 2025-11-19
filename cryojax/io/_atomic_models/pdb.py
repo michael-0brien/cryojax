@@ -287,7 +287,7 @@ def mmdf_to_atoms(
             warnings.warn(
                 "`loads_b_factor` option is deprecated and will be removed in "
                 "cryoJAX 0.6.0. Use `loads_properties` instead.",
-                category=DeprecationWarning,
+                category=FutureWarning,
                 stacklevel=2,
             )
             return atom_positions, atomic_numbers, atom_properties["b_factors"]

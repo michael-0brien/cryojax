@@ -9,15 +9,16 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
-from ....coordinates import make_coordinate_grid, make_frequency_slice
 from ....jax_util import NDArrayLike
 from ....ndimage import (
+    AbstractFilter,
     compute_spline_coefficients,
     crop_to_shape,
     fftn,
+    make_coordinate_grid,
+    make_frequency_slice,
     pad_to_shape,
 )
-from ....ndimage.transforms import AbstractFilter
 from ..._pose import AbstractPose
 from .base_representations import AbstractVoxelVolume
 

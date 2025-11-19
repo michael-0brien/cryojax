@@ -9,6 +9,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
 from ...ndimage import (
+    InverseSincMask,
     convert_fftn_to_rfftn,
     fftn,
     ifftn,
@@ -17,7 +18,6 @@ from ...ndimage import (
     map_coordinates_spline,
     rfftn,
 )
-from ...ndimage.transforms import InverseSincMask
 from .._image_config import AbstractImageConfig
 from .._volume import FourierVoxelGridVolume, FourierVoxelSplineVolume
 from .base_integrator import AbstractVolumeIntegrator

@@ -8,8 +8,7 @@ import jax.scipy as jsp
 from jaxtyping import Array, Complex, Float
 
 from ...constants import variance_to_b_factor
-from ...coordinates import make_1d_coordinate_grid
-from ...ndimage import resize_with_crop_or_pad, rfftn
+from ...ndimage import make_1d_coordinate_grid, resize_with_crop_or_pad, rfftn
 from .._image_config import AbstractImageConfig
 from .._volume import GaussianMixtureVolume
 from .base_integrator import AbstractVolumeIntegrator
@@ -56,7 +55,7 @@ class GaussianMixtureProjection(
                 "`use_error_functions` in `GaussianMixtureProjection` has "
                 "been deprecated and will be removed in cryoJAX 0.6.0. "
                 "This has been renamed to `sampling_mode = 'average'`.",
-                category=DeprecationWarning,
+                category=FutureWarning,
                 stacklevel=2,
             )
         if upsampling_factor is not None:

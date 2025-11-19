@@ -14,8 +14,8 @@ from ....constants import (
     b_factor_to_variance,
     variance_to_b_factor,
 )
-from ....coordinates import make_1d_coordinate_grid
 from ....jax_util import FloatLike, NDArrayLike, error_if_not_positive
+from ....ndimage import make_1d_coordinate_grid
 from ..._pose import AbstractPose
 from .base_representations import AbstractAtomVolume
 
@@ -214,7 +214,7 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
             "'GaussianMixtureVolume.to_real_voxel_grid' is deprecated "
             "and will be removed in cryoJAX 0.6.0. Instead, use "
             "`cryojax.simulator.GaussianMixtureRenderFn`.",
-            category=DeprecationWarning,
+            category=FutureWarning,
             stacklevel=2,
         )
         return _gaussians_to_real_voxels(

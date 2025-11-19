@@ -14,8 +14,7 @@ from jaxtyping import Array, Bool, Complex, Float, PRNGKeyArray
 from cryojax.simulator._volume.base_volume import AbstractVolumeRepresentation
 
 from ...jax_util import NDArrayLike
-from ...ndimage import irfftn, rfftn
-from ...ndimage.transforms import FilterLike, MaskLike
+from ...ndimage import FilterLike, MaskLike, irfftn, rfftn
 from .._image_config import AbstractImageConfig
 from .._pose import AbstractPose
 from .._transfer_theory import ContrastTransferTheory

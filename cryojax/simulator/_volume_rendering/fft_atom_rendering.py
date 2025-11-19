@@ -5,9 +5,14 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
-from ...coordinates import make_frequency_grid
 from ...jax_util import FloatLike, error_if_not_positive
-from ...ndimage import convert_fftn_to_rfftn, ifftn, operators as op
+from ...ndimage import (
+    AbstractFourierOperator,
+    FourierSinc,
+    convert_fftn_to_rfftn,
+    ifftn,
+    make_frequency_grid,
+)
 from .._volume import IndependentAtomVolume
 from .base_rendering import AbstractVolumeRenderFn
 
@@ -130,11 +135,11 @@ class FFTAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True
                 proj_kernel,
                 volume_representation.position_pytree,
                 volume_representation.scattering_factor_pytree,
-                is_leaf=lambda x: isinstance(x, op.AbstractFourierOperator),
+                is_leaf=lambda x: isinstance(x, AbstractFourierOperator),
             ),
         )
         if self.sampling_mode == "average":
-            antialias_fn = op.FourierSinc(box_width=self.voxel_size)
+            antialias_fn = FourierSinc(box_width=self.voxel_size)
             fourier_voxel_grid *= antialias_fn(frequency_grid)
 
         if outputs_real_space:

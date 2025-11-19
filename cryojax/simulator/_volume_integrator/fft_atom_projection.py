@@ -5,12 +5,13 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
-from ...coordinates import make_frequency_grid
 from ...ndimage import (
+    AbstractFourierOperator,
+    FourierSinc,
     block_reduce_downsample,
     convert_fftn_to_rfftn,
     irfftn,
-    operators as op,
+    make_frequency_grid,
     resize_with_crop_or_pad,
     rfftn,
 )
@@ -167,12 +168,12 @@ class FFTAtomProjection(
                 proj_kernel,
                 volume_representation.position_pytree,
                 volume_representation.scattering_factor_pytree,
-                is_leaf=lambda x: isinstance(x, op.AbstractFourierOperator),
+                is_leaf=lambda x: isinstance(x, AbstractFourierOperator),
             ),
         )
         # Apply anti-aliasing filter
         if self.sampling_mode == "average":
-            antialias_fn = op.FourierSinc(box_width=pixel_size_u)
+            antialias_fn = FourierSinc(box_width=pixel_size_u)
             fourier_projection *= antialias_fn(frequency_grid)
         # Shift zero frequency component to corner and convert to
         # rfft

@@ -8,6 +8,7 @@ import shutil
 from functools import partial
 from typing import cast
 
+import cryojax.ndimage as im
 import cryojax.simulator as cxs
 import equinox as eqx
 import jax
@@ -25,7 +26,6 @@ from cryojax.dataset._particle_data.relion import (
     _validate_starfile_data,
 )
 from cryojax.io import read_array_from_mrc
-from cryojax.ndimage import operators as op
 from cryojax.rotations import SO3
 from jaxtyping import TypeCheckError
 
@@ -565,7 +565,7 @@ def test_append_particle_parameters(index, loads_envelope):
         pose = cxs.EulerAnglePose()
         transfer_theory = cxs.ContrastTransferTheory(
             ctf=cxs.AstigmaticCTF(),
-            envelope=op.FourierGaussian() if loads_envelope else None,
+            envelope=im.FourierGaussian() if loads_envelope else None,
         )
         return dict(
             image_config=image_config,
@@ -645,7 +645,7 @@ def test_set_particle_parameters(
             transfer_theory=cxs.ContrastTransferTheory(
                 cxs.AstigmaticCTF(defocus_in_angstroms=1234.0),
                 amplitude_contrast_ratio=0.1234,
-                envelope=op.FourierGaussian(b_factor=12.34) if sets_envelope else None,
+                envelope=im.FourierGaussian(b_factor=12.34) if sets_envelope else None,
             ),
         )
 
@@ -747,7 +747,7 @@ def test_set_wrong_parameters_error():
     # Wrong parameters
     wrong_pose = cxs.QuaternionPose()
     wrong_transfer_theory = cxs.ContrastTransferTheory(
-        ctf=cxs.AstigmaticCTF(), envelope=op.ZeroMode()
+        ctf=cxs.AstigmaticCTF(), envelope=im.ZeroMode()
     )
     # Right parameters
     right_pose = cxs.EulerAnglePose()
@@ -894,7 +894,7 @@ def test_write_particle_batched_particle_parameters():
 
         pose = cxs.EulerAnglePose()
         transfer_theory = cxs.ContrastTransferTheory(
-            ctf=cxs.AstigmaticCTF(), envelope=op.FourierGaussian()
+            ctf=cxs.AstigmaticCTF(), envelope=im.FourierGaussian()
         )
         return {
             "image_config": image_config,
@@ -960,7 +960,7 @@ def test_write_starfile_different_envs():
             "metadata": None,
         }
 
-    particle_params = _make_particle_params(op.FourierGaussian())
+    particle_params = _make_particle_params(im.FourierGaussian())
     new_parameters_file = RelionParticleParameterFile(
         path_to_starfile="tests/outputs/starfile_writing/test_particle_parameters.star",
         mode="w",
@@ -969,7 +969,7 @@ def test_write_starfile_different_envs():
         loads_envelope=True,
     )
 
-    particle_params = _make_particle_params(op.Constant(1.0))
+    particle_params = _make_particle_params(im.Constant(1.0))
     new_parameters_file = RelionParticleParameterFile(
         path_to_starfile="tests/outputs/starfile_writing/test_particle_parameters.star",
         mode="w",
@@ -992,7 +992,7 @@ def test_write_starfile_different_envs():
     new_parameters_file.save(overwrite=True)
 
     with pytest.raises(ValueError):
-        particle_params = _make_particle_params(op.ZeroMode(1.0))
+        particle_params = _make_particle_params(im.ZeroMode(1.0))
         new_parameters_file = RelionParticleParameterFile(
             path_to_starfile="tests/outputs/starfile_writing/test_particle_parameters.star",
             mode="w",
@@ -1214,7 +1214,7 @@ def test_load_multiple_mrcs():
 
         pose = cxs.EulerAnglePose()
         transfer_theory = cxs.ContrastTransferTheory(
-            ctf=cxs.AstigmaticCTF(), envelope=op.FourierGaussian()
+            ctf=cxs.AstigmaticCTF(), envelope=im.FourierGaussian()
         )
         return {
             "image_config": image_config,
@@ -1401,7 +1401,7 @@ def test_append_relion_stack_dataset():
 
         pose = cxs.EulerAnglePose()
         transfer_theory = cxs.ContrastTransferTheory(
-            ctf=cxs.AstigmaticCTF(), envelope=op.FourierGaussian()
+            ctf=cxs.AstigmaticCTF(), envelope=im.FourierGaussian()
         )
         return {
             "image_config": image_config,

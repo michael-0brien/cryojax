@@ -11,9 +11,7 @@ from equinox import AbstractVar
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
 from ...jax_util import FloatLike, error_if_not_positive
-from ...ndimage import rfftn
-from ...ndimage.operators import Constant, FourierOperatorLike
-from ...ndimage.transforms import FilterLike, MaskLike
+from ...ndimage import Constant, FilterLike, FourierOperatorLike, MaskLike, rfftn
 from .._image_model import AbstractImageModel
 from .base_noise_model import AbstractEmpiricalNoiseModel, AbstractLikelihoodNoiseModel
 

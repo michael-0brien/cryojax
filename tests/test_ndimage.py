@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import jax.random as jr
 import numpy as np
 import pytest
-from cryojax.coordinates import make_frequency_grid, make_radial_frequency_grid
+from cryojax.ndimage import make_frequency_grid, make_radial_frequency_grid
 
 
 jax.config.update("jax_enable_x64", True)

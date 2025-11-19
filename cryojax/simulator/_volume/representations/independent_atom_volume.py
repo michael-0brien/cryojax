@@ -9,7 +9,7 @@ from jaxtyping import Array, Float, PyTree
 
 from ....constants import PengScatteringFactorParameters
 from ....jax_util import FloatLike, NDArrayLike
-from ....ndimage.operators import AbstractFourierOperator
+from ....ndimage import AbstractFourierOperator
 from ..._pose import AbstractPose
 from .base_representations import AbstractAtomVolume
 

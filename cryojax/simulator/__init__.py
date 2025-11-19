@@ -85,7 +85,7 @@ def __getattr__(name: str) -> _Any:
         _warnings.warn(
             "'AberratedAstigmaticCTF' is deprecated and will be removed in "
             "cryoJAX 0.6.0. Use 'AstigmaticCTF' instead.",
-            category=DeprecationWarning,
+            category=FutureWarning,
             stacklevel=2,
         )
         return AstigmaticCTF
@@ -93,7 +93,7 @@ def __getattr__(name: str) -> _Any:
         _warnings.warn(
             "Alias 'CTF' is deprecated and will be removed in "
             "cryoJAX 0.6.0. Use 'AstigmaticCTF' instead.",
-            category=DeprecationWarning,
+            category=FutureWarning,
             stacklevel=2,
         )
         return AstigmaticCTF
@@ -101,7 +101,7 @@ def __getattr__(name: str) -> _Any:
         _warnings.warn(
             "'NufftProjection' is deprecated and will be removed in "
             "cryoJAX 0.6.0. Use 'RealVoxelProjection' instead.",
-            category=DeprecationWarning,
+            category=FutureWarning,
             stacklevel=2,
         )
         return RealVoxelProjection
@@ -110,7 +110,7 @@ def __getattr__(name: str) -> _Any:
             "'PengScatteringFactorParameters' has been moved to `cryojax.constants` "
             "will be removed from `cryojax.simulator` in "
             "cryoJAX 0.6.0.",
-            category=DeprecationWarning,
+            category=FutureWarning,
             stacklevel=2,
         )
         from ..constants import PengScatteringFactorParameters
@@ -123,7 +123,7 @@ def __getattr__(name: str) -> _Any:
             "`GaussianMixtureVolume.from_tabulated_parameters`. "
             "This is a breaking change if you are "
             "directly using `PengAtomicVolume.__init__`.",
-            category=DeprecationWarning,
+            category=FutureWarning,
             stacklevel=2,
         )
         return GaussianMixtureVolume
@@ -132,7 +132,7 @@ def __getattr__(name: str) -> _Any:
             "'UncorrelatedGaussianNoiseModel' is deprecated and "
             "will be removed in cryoJAX 0.6.0. Instead, use "
             "'GaussianWhiteNoiseModel'.",
-            category=DeprecationWarning,
+            category=FutureWarning,
             stacklevel=2,
         )
         return GaussianWhiteNoiseModel
@@ -141,13 +141,13 @@ def __getattr__(name: str) -> _Any:
             "'CorrelatedGaussianNoiseModel' is deprecated and "
             "will be removed in cryoJAX 0.6.0. Instead, use "
             "'GaussianColoredNoiseModel'.",
-            category=DeprecationWarning,
+            category=FutureWarning,
             stacklevel=2,
         )
         return GaussianColoredNoiseModel
     # Deprecated in previous versions
     if name == "DiscreteStructuralEnsemble":
-        raise ValueError(
+        raise ImportError(
             "'DiscreteStructuralEnsemble' was deprecated in cryoJAX 0.5.0. "
             "To achieve similar functionality, see the examples section "
             "of the documentation: "
