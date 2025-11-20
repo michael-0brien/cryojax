@@ -9,16 +9,16 @@ import jax.numpy as jnp
 import jax.scipy as jsp
 from jaxtyping import Array, Complex, Float, PyTree
 
-from ....constants import (
+from ...constants import (
     PengScatteringFactorParameters,
     b_factor_to_variance,
     variance_to_b_factor,
 )
-from ....jax_util import FloatLike, NDArrayLike, error_if_not_positive
-from ....ndimage import fftn, make_1d_coordinate_grid, resize_with_crop_or_pad, rfftn
-from ..._image_config import AbstractImageConfig
-from ..._pose import AbstractPose
-from ..base_volume import (
+from ...jax_util import FloatLike, NDArrayLike, error_if_not_positive
+from ...ndimage import fftn, make_1d_coordinate_grid, resize_with_crop_or_pad, rfftn
+from .._image_config import AbstractImageConfig
+from .._pose import AbstractPose
+from .base_volume import (
     AbstractAtomVolume,
     AbstractVolumeIntegrator,
     AbstractVolumeRenderFn,

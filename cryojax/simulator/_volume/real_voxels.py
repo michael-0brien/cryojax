@@ -10,11 +10,11 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
-from ....jax_util import NDArrayLike
-from ....ndimage import convert_fftn_to_rfftn, crop_to_shape, irfftn, make_coordinate_grid
-from ..._image_config import AbstractImageConfig
-from ..._pose import AbstractPose
-from ..base_volume import AbstractVolumeIntegrator, AbstractVoxelVolume
+from ...jax_util import NDArrayLike
+from ...ndimage import convert_fftn_to_rfftn, crop_to_shape, irfftn, make_coordinate_grid
+from .._image_config import AbstractImageConfig
+from .._pose import AbstractPose
+from .base_volume import AbstractVolumeIntegrator, AbstractVoxelVolume
 
 
 try:

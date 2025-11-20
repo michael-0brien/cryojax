@@ -7,9 +7,9 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float, PyTree
 
-from ....constants import PengScatteringFactorParameters
-from ....jax_util import FloatLike, NDArrayLike, error_if_not_positive
-from ....ndimage import (
+from ...constants import PengScatteringFactorParameters
+from ...jax_util import FloatLike, NDArrayLike, error_if_not_positive
+from ...ndimage import (
     AbstractFourierOperator,
     FourierSinc,
     block_reduce_downsample,
@@ -20,9 +20,9 @@ from ....ndimage import (
     resize_with_crop_or_pad,
     rfftn,
 )
-from ..._image_config import AbstractImageConfig
-from ..._pose import AbstractPose
-from ..base_volume import (
+from .._image_config import AbstractImageConfig
+from .._pose import AbstractPose
+from .base_volume import (
     AbstractAtomVolume,
     AbstractVolumeIntegrator,
     AbstractVolumeRenderFn,

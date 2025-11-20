@@ -1,11 +1,3 @@
-from .atoms import (
-    FFTAtomProjection as FFTAtomProjection,
-    FFTAtomRenderFn as FFTAtomRenderFn,
-    GaussianMixtureProjection as GaussianMixtureProjection,
-    GaussianMixtureRenderFn as GaussianMixtureRenderFn,
-    GaussianMixtureVolume as GaussianMixtureVolume,
-    IndependentAtomVolume as IndependentAtomVolume,
-)
 from .base_volume import (
     AbstractAtomVolume as AbstractAtomVolume,
     AbstractVolumeIntegrator as AbstractVolumeIntegrator,
@@ -14,11 +6,23 @@ from .base_volume import (
     AbstractVolumeRepresentation as AbstractVolumeRepresentation,
     AbstractVoxelVolume as AbstractVoxelVolume,
 )
-from .voxels import (
+from .fourier_voxels import (
     EwaldSphereExtraction as EwaldSphereExtraction,
     FourierSliceExtraction as FourierSliceExtraction,
     FourierVoxelGridVolume as FourierVoxelGridVolume,
     FourierVoxelSplineVolume as FourierVoxelSplineVolume,
+)
+from .gaussian_volume import (
+    GaussianMixtureProjection as GaussianMixtureProjection,
+    GaussianMixtureRenderFn as GaussianMixtureRenderFn,
+    GaussianMixtureVolume as GaussianMixtureVolume,
+)
+from .independent_atom_volume import (
+    FFTAtomProjection as FFTAtomProjection,
+    FFTAtomRenderFn as FFTAtomRenderFn,
+    IndependentAtomVolume as IndependentAtomVolume,
+)
+from .real_voxels import (
     RealVoxelGridVolume as RealVoxelGridVolume,
     RealVoxelProjection as RealVoxelProjection,
 )

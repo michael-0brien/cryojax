@@ -9,8 +9,8 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
-from ....jax_util import NDArrayLike
-from ....ndimage import (
+from ...jax_util import NDArrayLike
+from ...ndimage import (
     AbstractFilter,
     InverseSincMask,
     compute_spline_coefficients,
@@ -24,9 +24,9 @@ from ....ndimage import (
     pad_to_shape,
     rfftn,
 )
-from ..._image_config import AbstractImageConfig
-from ..._pose import AbstractPose
-from ..base_volume import AbstractVolumeIntegrator, AbstractVoxelVolume
+from .._image_config import AbstractImageConfig
+from .._pose import AbstractPose
+from .base_volume import AbstractVolumeIntegrator, AbstractVoxelVolume
 
 
 class AbstractFourierVoxelVolume(AbstractVoxelVolume, strict=True):
