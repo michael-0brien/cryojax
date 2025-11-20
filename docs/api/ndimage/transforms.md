@@ -2,8 +2,8 @@
 
 ## Filters
 
-??? abstract "`cryojax.ndimage.transforms.AbstractFilter`"
-    ::: cryojax.ndimage.transforms.AbstractFilter
+??? abstract "`cryojax.ndimage.AbstractFilter`"
+    ::: cryojax.ndimage.AbstractFilter
         options:
             members:
                 - get
@@ -11,13 +11,13 @@
 
 ## Masks
 
-??? abstract "`cryojax.ndimage.transforms.AbstractMask`"
-    ::: cryojax.ndimage.transforms.AbstractMask
+??? abstract "`cryojax.ndimage.AbstractMask`"
+    ::: cryojax.ndimage.AbstractMask
         options:
             members:
                 - get
 
-::: cryojax.ndimage.transforms.InverseSincMask
+::: cryojax.ndimage.InverseSincMask
         options:
             members:
                 - __init__
