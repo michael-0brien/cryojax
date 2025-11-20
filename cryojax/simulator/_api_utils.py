@@ -17,18 +17,16 @@ from ._pose import AbstractPose
 from ._scattering_theory import WeakPhaseScatteringTheory
 from ._transfer_theory import ContrastTransferTheory
 from ._volume import (
+    AbstractVolumeIntegrator,
     AbstractVolumeParametrization,
+    FFTAtomProjection,
+    FourierSliceExtraction,
     FourierVoxelGridVolume,
     FourierVoxelSplineVolume,
+    GaussianMixtureProjection,
     GaussianMixtureVolume,
     IndependentAtomVolume,
     RealVoxelGridVolume,
-)
-from ._volume_integrator import (
-    AbstractVolumeIntegrator,
-    FFTAtomProjection,
-    FourierSliceExtraction,
-    GaussianMixtureProjection,
     RealVoxelProjection,
 )
 

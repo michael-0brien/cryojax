@@ -56,26 +56,22 @@ from ._transfer_theory import (
 )
 from ._volume import (
     AbstractAtomVolume as AbstractAtomVolume,
+    AbstractVolumeIntegrator as AbstractVolumeIntegrator,
     AbstractVolumeParametrization as AbstractVolumeParametrization,
+    AbstractVolumeRenderFn as AbstractVolumeRenderFn,
     AbstractVolumeRepresentation as AbstractVolumeRepresentation,
     AbstractVoxelVolume as AbstractVoxelVolume,
+    FFTAtomProjection as FFTAtomProjection,
+    FFTAtomRenderFn as FFTAtomRenderFn,
+    FourierSliceExtraction as FourierSliceExtraction,
     FourierVoxelGridVolume as FourierVoxelGridVolume,
     FourierVoxelSplineVolume as FourierVoxelSplineVolume,
+    GaussianMixtureProjection as GaussianMixtureProjection,
+    GaussianMixtureRenderFn as GaussianMixtureRenderFn,
     GaussianMixtureVolume as GaussianMixtureVolume,
     IndependentAtomVolume as IndependentAtomVolume,
     RealVoxelGridVolume as RealVoxelGridVolume,
-)
-from ._volume_integrator import (
-    AbstractVolumeIntegrator as AbstractVolumeIntegrator,
-    FFTAtomProjection as FFTAtomProjection,
-    FourierSliceExtraction as FourierSliceExtraction,
-    GaussianMixtureProjection as GaussianMixtureProjection,
     RealVoxelProjection as RealVoxelProjection,
-)
-from ._volume_rendering import (
-    AbstractVolumeRenderFn as AbstractVolumeRenderFn,
-    FFTAtomRenderFn as FFTAtomRenderFn,
-    GaussianMixtureRenderFn as GaussianMixtureRenderFn,
 )
 
 
