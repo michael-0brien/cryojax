@@ -1,4 +1,8 @@
-# Representing rotations
+# Rotations in cryo-EM
+
+`cryojax.rotations` implements an engine and utility functions for rotations in cryo-EM.
+
+## Representing rotations
 
 The engine for handling rotations in cryoJAX is the `cryojax.rotations.SO3` class. This is based on the implementation in the package [`jaxlie`](https://github.com/brentyi/jaxlie).
 
@@ -20,3 +24,6 @@ The engine for handling rotations in cryoJAX is the `cryojax.rotations.SO3` clas
                 - adjoint
                 - normalize
                 - sample_uniform
+
+
+## Utilities for converting between angular parametrizations

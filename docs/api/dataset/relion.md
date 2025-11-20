@@ -1,1 +1,0 @@
-# RELION compatibility
