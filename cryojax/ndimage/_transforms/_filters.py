@@ -10,8 +10,8 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float, Inexact
 
-from ...coordinates import make_frequency_grid
 from ...jax_util import FloatLike, NDArrayLike
+from .._coordinates import make_frequency_grid
 from .._edges import resize_with_crop_or_pad
 from .._fft import irfftn, rfftn
 from .._fourier_statistics import compute_binned_powerspectrum

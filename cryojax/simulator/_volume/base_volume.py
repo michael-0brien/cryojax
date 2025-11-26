@@ -1,13 +1,16 @@
 import abc
-from typing import TypeVar
+from typing import Generic, TypeVar
 from typing_extensions import Self, override
 
 import equinox as eqx
-from jaxtyping import PRNGKeyArray
+from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
+from ...jax_util import NDArrayLike
+from .._image_config import AbstractImageConfig
 from .._pose import AbstractPose
 
 
+VolRep = TypeVar("VolRep", bound="AbstractVolumeRepresentation")
 T = TypeVar("T")
 
 
@@ -97,3 +100,91 @@ class AbstractVolumeRepresentation(AbstractVolumeParametrization, strict=True):
             Not used in this implementation.
         """
         return self
+
+
+class AbstractAtomVolume(AbstractVolumeRepresentation, strict=True):
+    """Abstract interface for a volume represented as a point-cloud."""
+
+    @abc.abstractmethod
+    def translate_to_pose(self, pose: AbstractPose) -> Self:
+        raise NotImplementedError
+
+
+class AbstractVoxelVolume(AbstractVolumeRepresentation, strict=True):
+    """Abstract interface for a volume represented with voxels.
+
+    !!! info
+
+        If you are using a `volume` in a voxel representation
+        pass, the voxel size *must* be passed as the
+        `pixel_size` argument, e.g.
+
+        ```python
+        import cryojax.simulator as cxs
+        from cryojax.io import read_array_from_mrc
+
+        real_voxel_grid, voxel_size = read_array_from_mrc("example.mrc")
+        volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
+        ...
+        config = cxs.BasicImageConfig(shape, pixel_size=voxel_size, ...)
+        ```
+
+        If this is not done, the resulting
+        image will be incorrect and *not* rescaled to the specified
+        to the different pixel size.
+    """
+
+    @property
+    @abc.abstractmethod
+    def shape(self) -> tuple[int, ...]:
+        """The shape of the voxel array."""
+        raise NotImplementedError
+
+    @classmethod
+    @abc.abstractmethod
+    def from_real_voxel_grid(
+        cls, real_voxel_grid: Float[NDArrayLike, "dim dim dim"]
+    ) -> Self:
+        """Load an `AbstractVoxelStructure` from a 3D grid in
+        real-space.
+        """
+        raise NotImplementedError
+
+
+class AbstractVolumeIntegrator(eqx.Module, Generic[VolRep], strict=True):
+    """Base class for a method of integrating a volume onto
+    the exit plane.
+    """
+
+    is_projection_approximation: eqx.AbstractClassVar[bool]
+
+    @abc.abstractmethod
+    def integrate(
+        self,
+        volume_representation: VolRep,
+        image_config: AbstractImageConfig,
+        outputs_real_space: bool = False,
+    ) -> (
+        Complex[
+            Array,
+            "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}",
+        ]
+        | Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
+        | Float[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
+    ):
+        raise NotImplementedError
+
+
+class AbstractVolumeRenderFn(eqx.Module, Generic[VolRep], strict=True):
+    """Base class for rendering a volume onto voxels."""
+
+    @abc.abstractmethod
+    def __call__(
+        self,
+        volume_representation: VolRep,
+        *,
+        outputs_real_space: bool = True,
+        outputs_rfft: bool = False,
+        fftshifted: bool = False,
+    ) -> Array:
+        raise NotImplementedError

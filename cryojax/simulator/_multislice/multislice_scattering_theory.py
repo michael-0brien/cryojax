@@ -4,10 +4,10 @@ from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
 from ...jax_util import FloatLike, error_if_not_fractional
 from .._image_config import AbstractImageConfig
-from .._multislice_integrator import AbstractMultisliceIntegrator
+from .._multislice import AbstractMultisliceIntegrator
+from .._scattering_theory import AbstractWaveScatteringTheory
 from .._transfer_theory import WaveTransferTheory
 from .._volume import AbstractVolumeRepresentation
-from .base_scattering_theory import AbstractWaveScatteringTheory
 
 
 class MultisliceScatteringTheory(AbstractWaveScatteringTheory, strict=True):

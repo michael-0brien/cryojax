@@ -48,6 +48,7 @@ plugins:
         extra_public_objects:
             - xarray.core.dataset.Dataset
             - numpy.ndarray
+            - equinox.Module
     - mkdocstrings:
         handlers:
           python:
@@ -98,13 +99,9 @@ nav:
             - 'api/io/atom_loading.md'
         - cryojax.ndimage:
             - 'api/ndimage/functions.md'
-            - cryojax.ndimage.operators:
-                - 'api/ndimage/operators.md'
-            - cryojax.ndimage.transforms:
-                - 'api/ndimage/transforms.md'
-        - cryojax.coordinates:
-            - 'api/coordinates/making_coordinates.md'
-            - 'api/coordinates/transforming_coordinates.md'
+            - 'api/ndimage/coordinates.md'
+            - 'api/ndimage/operators.md'
+            - 'api/ndimage/transforms.md'
         - cryojax.rotations:
             - 'api/rotations/lie_groups.md'
             - 'api/rotations/conversions.md'

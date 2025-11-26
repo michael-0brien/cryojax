@@ -1,26 +1,221 @@
 """
-Using the fourier slice theorem for computing volume projections.
+Fourier voxel-based representations of a volume.
 """
 
-from typing import ClassVar
-from typing_extensions import override
+from typing import ClassVar, cast
+from typing_extensions import Self, override
 
+import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
+from ...jax_util import NDArrayLike
 from ...ndimage import (
+    AbstractFilter,
+    InverseSincMask,
+    compute_spline_coefficients,
     convert_fftn_to_rfftn,
     fftn,
     ifftn,
     irfftn,
+    make_frequency_slice,
     map_coordinates,
     map_coordinates_spline,
+    pad_to_shape,
     rfftn,
 )
-from ...ndimage.transforms import InverseSincMask
 from .._image_config import AbstractImageConfig
-from .._volume import FourierVoxelGridVolume, FourierVoxelSplineVolume
-from .base_integrator import AbstractVolumeIntegrator
+from .._pose import AbstractPose
+from .base_volume import AbstractVolumeIntegrator, AbstractVoxelVolume
+
+
+class AbstractFourierVoxelVolume(AbstractVoxelVolume, strict=True):
+    """Abstract interface for a voxel-based volume."""
+
+    frequency_slice_in_pixels: eqx.AbstractVar[Float[Array, "1 dim dim 3"]]
+
+    @override
+    def rotate_to_pose(self, pose: AbstractPose, inverse: bool = False) -> Self:
+        """Return a new volume with a rotated `frequency_slice_in_pixels`."""
+        return eqx.tree_at(
+            lambda d: d.frequency_slice_in_pixels,
+            self,
+            pose.rotate_coordinates(self.frequency_slice_in_pixels, inverse=inverse),
+        )
+
+
+class FourierVoxelGridVolume(AbstractFourierVoxelVolume, strict=True):
+    """A 3D voxel grid in fourier-space."""
+
+    fourier_voxel_grid: Complex[Array, "dim dim dim"]
+    frequency_slice_in_pixels: Float[Array, "1 dim dim 3"]
+
+    def __init__(
+        self,
+        fourier_voxel_grid: Complex[NDArrayLike, "dim dim dim"],
+        frequency_slice_in_pixels: Float[NDArrayLike, "1 dim dim 3"],
+    ):
+        """**Arguments:**
+
+        - `fourier_voxel_grid`:
+            The cubic voxel grid in fourier space.
+        - `frequency_slice_in_pixels`:
+            The frequency slice coordinate system.
+        """
+        self.fourier_voxel_grid = jnp.asarray(fourier_voxel_grid, dtype=complex)
+        self.frequency_slice_in_pixels = jnp.asarray(
+            frequency_slice_in_pixels, dtype=float
+        )
+
+    @property
+    def shape(self) -> tuple[int, int, int]:
+        """The shape of the `fourier_voxel_grid`."""
+        return cast(tuple[int, int, int], self.fourier_voxel_grid.shape)
+
+    @classmethod
+    def from_real_voxel_grid(
+        cls,
+        real_voxel_grid: Float[NDArrayLike, "dim dim dim"],
+        *,
+        pad_scale: float = 1.0,
+        pad_mode: str = "constant",
+        filter: AbstractFilter | None = None,
+    ) -> Self:
+        """Load from a real-valued 3D voxel grid.
+
+        **Arguments:**
+
+        - `real_voxel_grid`: A voxel grid in real space.
+        - `pad_scale`: Scale factor at which to pad `real_voxel_grid` before fourier
+                     transform. Must be a value greater than `1.0`.
+        - `pad_mode`: Padding method. See `jax.numpy.pad` for documentation.
+        - `filter`: A filter to apply to the result of the fourier transform of
+                  `real_voxel_grid`, i.e. `fftn(real_voxel_grid)`. Note that the zero
+                  frequency component is assumed to be in the corner.
+        """
+        # Cast to jax array
+        real_voxel_grid = jnp.asarray(real_voxel_grid, dtype=float)
+        # Pad template
+        if pad_scale < 1.0:
+            raise ValueError("`pad_scale` must be greater than 1.0")
+        # ... always pad to even size to avoid interpolation issues in
+        # fourier slice extraction.
+        padded_shape = cast(
+            tuple[int, int, int],
+            tuple([int(s * pad_scale) for s in real_voxel_grid.shape]),
+        )
+        padded_real_voxel_grid = pad_to_shape(
+            real_voxel_grid, padded_shape, mode=pad_mode
+        )
+        # Load grid and coordinates. For now, do not store the
+        # fourier grid only on the half space. Fourier slice extraction
+        # does not currently work if rfftn is used.
+        fourier_voxel_grid_with_zero_in_corner = (
+            fftn(padded_real_voxel_grid)
+            if filter is None
+            else filter(fftn(padded_real_voxel_grid))
+        )
+        # ... store the grid with the zero frequency component in the center
+        fourier_voxel_grid = jnp.fft.fftshift(fourier_voxel_grid_with_zero_in_corner)
+        # ... create in-plane frequency slice on the half space
+        frequency_slice = make_frequency_slice(
+            cast(tuple[int, int], padded_real_voxel_grid.shape[:-1]),
+            outputs_rfftfreqs=False,
+        )
+
+        return cls(fourier_voxel_grid, frequency_slice)
+
+
+class FourierVoxelSplineVolume(AbstractFourierVoxelVolume, strict=True):
+    """A 3D voxel grid in fourier-space, represented
+    by spline coefficients.
+    """
+
+    spline_coefficients: Complex[Array, "coeff_dim coeff_dim coeff_dim"]
+    frequency_slice_in_pixels: Float[Array, "1 dim dim 3"]
+
+    def __init__(
+        self,
+        spline_coefficients: Complex[NDArrayLike, "coeff_dim coeff_dim coeff_dim"],
+        frequency_slice_in_pixels: Float[NDArrayLike, "1 dim dim 3"],
+    ):
+        """**Arguments:**
+
+        - `spline_coefficients`:
+            The spline coefficents computed from the cubic voxel grid
+            in fourier space. See `cryojax.ndimage.compute_spline_coefficients`.
+        - `frequency_slice_in_pixels`:
+            Frequency slice coordinate system.
+            See `cryojax.coordinates.make_frequency_slice`.
+        """
+        self.spline_coefficients = jnp.asarray(spline_coefficients, dtype=complex)
+        self.frequency_slice_in_pixels = jnp.asarray(
+            frequency_slice_in_pixels, dtype=float
+        )
+
+    @property
+    def shape(self) -> tuple[int, int, int]:
+        """The shape of the original `fourier_voxel_grid` from which
+        `coefficients` were computed.
+        """
+        return cast(
+            tuple[int, int, int], tuple([s - 2 for s in self.spline_coefficients.shape])
+        )
+
+    @classmethod
+    def from_real_voxel_grid(
+        cls,
+        real_voxel_grid: Float[NDArrayLike, "dim dim dim"],
+        *,
+        pad_scale: float = 1.0,
+        pad_mode: str = "constant",
+        filter: AbstractFilter | None = None,
+    ) -> Self:
+        """Load from a real-valued 3D voxel grid.
+
+        **Arguments:**
+
+        - `real_voxel_grid`: A voxel grid in real space.
+        - `pad_scale`: Scale factor at which to pad `real_voxel_grid` before fourier
+                     transform. Must be a value greater than `1.0`.
+        - `pad_mode`: Padding method. See `jax.numpy.pad` for documentation.
+        - `filter`: A filter to apply to the result of the fourier transform of
+                  `real_voxel_grid`, i.e. `fftn(real_voxel_grid)`. Note that the zero
+                  frequency component is assumed to be in the corner.
+        """
+        # Cast to jax array
+        real_voxel_grid = jnp.asarray(real_voxel_grid, dtype=float)
+        # Pad template
+        if pad_scale < 1.0:
+            raise ValueError("`pad_scale` must be greater than 1.0")
+        # ... always pad to even size to avoid interpolation issues in
+        # fourier slice extraction.
+        padded_shape = cast(
+            tuple[int, int, int],
+            tuple([int(s * pad_scale) for s in real_voxel_grid.shape]),
+        )
+        padded_real_voxel_grid = pad_to_shape(
+            real_voxel_grid, padded_shape, mode=pad_mode
+        )
+        # Load grid and coordinates. For now, do not store the
+        # fourier grid only on the half space. Fourier slice extraction
+        # does not currently work if rfftn is used.
+        fourier_voxel_grid_with_zero_in_corner = (
+            fftn(padded_real_voxel_grid)
+            if filter is None
+            else filter(fftn(padded_real_voxel_grid))
+        )
+        # ... store the grid with the zero frequency component in the center
+        fourier_voxel_grid = jnp.fft.fftshift(fourier_voxel_grid_with_zero_in_corner)
+        # ... compute spline coefficients
+        spline_coefficients = compute_spline_coefficients(fourier_voxel_grid)
+        # ... create in-plane frequency slice on the half space
+        frequency_slice = make_frequency_slice(
+            cast(tuple[int, int], padded_real_voxel_grid.shape[:-1]),
+            outputs_rfftfreqs=False,
+        )
+
+        return cls(spline_coefficients, frequency_slice)
 
 
 class FourierSliceExtraction(

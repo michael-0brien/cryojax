@@ -8,7 +8,7 @@ import equinox as eqx
 import jax
 from jaxtyping import Array, Float, Inexact, PRNGKeyArray
 
-from ...ndimage.transforms import FilterLike, MaskLike
+from ...ndimage import FilterLike, MaskLike
 from .._detector import AbstractDetector
 from .._solvent_2d import AbstractRandomSolvent2D
 

@@ -14,10 +14,11 @@ from ..constants import (
     lorentz_factor_from_kilovolts,
     wavelength_from_kilovolts,
 )
-from ..coordinates import make_coordinate_grid, make_frequency_grid
 from ..jax_util import error_if_not_positive
 from ..ndimage import (
     crop_to_shape,
+    make_coordinate_grid,
+    make_frequency_grid,
     pad_to_shape,
     resize_with_crop_or_pad,
 )

@@ -1,13 +1,31 @@
+from abc import abstractmethod
+from typing import Generic, TypeVar
 from typing_extensions import override
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
 from ...ndimage import fftn, ifftn, map_coordinates
 from .._image_config import AbstractImageConfig
-from .._volume import RealVoxelGridVolume
-from .base_multislice_integrator import AbstractMultisliceIntegrator
+from .._volume import AbstractVolumeRepresentation, RealVoxelGridVolume
+
+
+VolRep = TypeVar("VolRep", bound="AbstractVolumeRepresentation")
+
+
+class AbstractMultisliceIntegrator(eqx.Module, Generic[VolRep], strict=True):
+    """Base class for a multislice integration scheme."""
+
+    @abstractmethod
+    def integrate(
+        self,
+        volume_representation: VolRep,
+        image_config: AbstractImageConfig,
+        amplitude_contrast_ratio: Float[Array, ""] | float,
+    ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]:
+        raise NotImplementedError
 
 
 class FFTMultisliceIntegrator(

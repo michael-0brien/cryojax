@@ -4,7 +4,7 @@ Applying a contrast transfer function (CTF) to an image in `cryojax` is layered 
 
 ```python
 import cryojax.simulator as cxs
-from cryojax.coordinates import make_frequency_grid
+from cryojax.ndimage import make_frequency_grid
 
 shape, pixel_size = (100, 100), 1.1
 frequency_grid_in_angstroms = make_frequency_grid(shape, pixel_size)

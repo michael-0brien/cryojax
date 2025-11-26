@@ -12,8 +12,7 @@ import jax.numpy as jnp
 from equinox import AbstractClassVar
 from jaxtyping import Array, Float, PRNGKeyArray
 
-from cryojax.jax_util._typing import NDArrayLike
-
+from ..jax_util import NDArrayLike
 from ._rotation import AbstractRotation
 
 

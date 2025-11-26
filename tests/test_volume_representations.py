@@ -8,11 +8,11 @@ from jaxtyping import Array, Float, install_import_hook
 
 
 with install_import_hook("cryojax", "typeguard.typechecked"):
+    import cryojax.ndimage as im
     import cryojax.simulator as cxs
     from cryojax.constants import PengScatteringFactorParameters
-    from cryojax.coordinates import make_coordinate_grid
     from cryojax.io import read_atoms_from_pdb
-    from cryojax.ndimage import fourier_crop_downsample, ifftn, irfftn, operators as op
+    from cryojax.ndimage import make_coordinate_grid
 
 try:
     import jax_finufft as jnufft
@@ -105,7 +105,7 @@ def test_fourier_vs_real_voxel_volume_agreement(sample_pdb_path):
     )
     # Since Voxelgrid is in Frequency space by default, we have to first
     # transform back into real space.
-    fvg_real = ifftn(jnp.fft.ifftshift(fourier_volume.fourier_voxel_grid)).real
+    fvg_real = im.ifftn(jnp.fft.ifftshift(fourier_volume.fourier_voxel_grid)).real
 
     vg = cxs.RealVoxelGridVolume.from_real_voxel_grid(volume_as_real_voxel_grid)
 
@@ -145,7 +145,7 @@ def test_downsampled_voxel_volume_agreement(sample_pdb_path):
     low_resolution_volume_grid = lowres_render_fn(atom_volume)
     highres_render_fn = cxs.GaussianMixtureRenderFn(shape, voxel_size)
     high_resolution_volume_grid = highres_render_fn(atom_volume)
-    downsampled_volume_grid = fourier_crop_downsample(
+    downsampled_volume_grid = im.fourier_crop_downsample(
         high_resolution_volume_grid, downsampling_factor
     )
 
@@ -170,7 +170,7 @@ def test_render_options(pdb_info):
         volumes.append(
             cxs.IndependentAtomVolume(
                 position_pytree=atom_positions,
-                scattering_factor_pytree=op.FourierGaussian(
+                scattering_factor_pytree=im.FourierGaussian(
                     amplitude=1.0, b_factor=width**2 * (8 * np.pi**2)
                 ),
             )
@@ -210,7 +210,7 @@ def test_fft_atom_render(pdb_info, width, voxel_size, shape):
         )
         atom_volume = cxs.IndependentAtomVolume(
             position_pytree=atom_positions,
-            scattering_factor_pytree=op.FourierGaussian(
+            scattering_factor_pytree=im.FourierGaussian(
                 amplitude=1.0, b_factor=width**2 * (8 * np.pi**2)
             ),
         )
@@ -319,7 +319,7 @@ class TestIntegrateGMMToPixels:
         integrator = cxs.GaussianMixtureProjection()
         # Compute projections
         projection = integrator.integrate(atomic_volume, image_config)
-        projection = irfftn(projection)
+        projection = im.irfftn(projection)
 
         # Find the maximum
         maximum_index = jnp.argmax(projection)
@@ -354,7 +354,7 @@ class TestIntegrateGMMToPixels:
         integrator = cxs.GaussianMixtureProjection()
         # Compute projections
         projection = integrator.integrate(atomic_volume, image_config)
-        projection = irfftn(projection)
+        projection = im.irfftn(projection)
 
         integral = jnp.sum(projection) * voxel_size**2
         assert jnp.isclose(integral, jnp.sum(ff_a))

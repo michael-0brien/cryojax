@@ -3,7 +3,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
 from ...jax_util import FloatLike, error_if_not_fractional
-from ...ndimage.operators import FourierOperatorLike
+from ...ndimage import FourierOperatorLike
 from .._image_config import AbstractImageConfig
 from .transfer_function import AbstractCTF
 
