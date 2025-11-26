@@ -1,4 +1,4 @@
-# Utilities for atom manipulation
+# Atom manipulation
 
 `cryojax.atom_util` is a submodule that contains functions for manipulating arrays of atoms and their properties.
 

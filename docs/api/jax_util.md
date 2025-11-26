@@ -1,4 +1,6 @@
-# Utilities for working with JAX/Equinox
+# Extra JAX/Equinox
+
+`cryojax.jax_util` supports downstream applications with helpers for common patterns using cryoJAX for cryo-EM data analysis.
 
 ## Equinox extensions
 
