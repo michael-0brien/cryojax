@@ -8,6 +8,13 @@
             members:
                 - integrate
 
+
+::: cryojax.simulator.AutoVolumeProjection
+        options:
+            members:
+                - __init__
+                - integrate
+
 ## Integration methods for voxel-based structures
 
 ::: cryojax.simulator.FourierSliceExtraction

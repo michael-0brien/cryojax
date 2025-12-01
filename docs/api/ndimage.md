@@ -28,6 +28,12 @@ This documentation is a collection of functions used to work with coordinate sys
 
 ## Image transforms (filters and masks)
 
+??? abstract "`cryojax.ndimage.AbstractImageTransform`"
+    ::: cryojax.ndimage.AbstractImageTransform
+        options:
+            members:
+                - __init__
+
 ### Filters
 
 ??? abstract "`cryojax.ndimage.AbstractFilter`"
