@@ -8,13 +8,13 @@ from typing_extensions import Self, override
 
 import equinox as eqx
 import jax.numpy as jnp
-from jaxtyping import Array, Complex, Float
+from jaxtyping import Array, Float
 
 from ...jax_util import NDArrayLike
 from ...ndimage import convert_fftn_to_rfftn, crop_to_shape, irfftn, make_coordinate_grid
 from .._image_config import AbstractImageConfig
 from .._pose import AbstractPose
-from .base_volume import AbstractVolumeIntegrator, AbstractVoxelVolume
+from .base_volume import AbstractVolumeIntegrator, AbstractVoxelVolume, ProjectionArray
 
 
 try:
@@ -142,28 +142,24 @@ class RealVoxelProjection(
         volume_representation: RealVoxelGridVolume,
         image_config: AbstractImageConfig,
         outputs_real_space: bool = False,
-    ) -> (
-        Complex[
-            Array,
-            "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}",
-        ]
-        | Float[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
-    ):
+    ) -> ProjectionArray:
         """Integrate the volume at the `AbstractImageConfig` settings
         of a voxel-based representation in real-space, using non-uniform FFTs.
 
         **Arguments:**
 
-        - `volume_representation`: The volume representation.
-        - `image_config`: The configuration of the resulting image.
+        - `volume_representation`:
+            The volume representation.
+        - `image_config`:
+            The image configuration.
         - `outputs_real_space`:
             If `True`, return the image in real space. Otherwise,
-            return in fourier.
+            return in Fourier.
 
         **Returns:**
 
-        The projection integral of the `volume_representation` in fourier space, at the
-        `image_config.padded_shape` and the `image_config.pixel_size`.
+        The volume projection in real or Fourier space, at the
+        `image_config.padded_shape`.
         """
         n_voxels = math.prod(volume_representation.shape)
         fourier_projection = _project_with_nufft(

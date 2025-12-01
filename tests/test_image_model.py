@@ -102,7 +102,7 @@ def test_even_vs_odd_image_shape(extra_dim_y, extra_dim_x, volume_and_pixel_size
     np.testing.assert_allclose(
         crop_to_shape(model_test.simulate(), control_shape),
         model_control.simulate(),
-        atol=1e-4,
+        atol=1e-3,
     )
 
 

@@ -14,6 +14,27 @@ VolRep = TypeVar("VolRep", bound="AbstractVolumeRepresentation")
 T = TypeVar("T")
 
 
+ProjectionOrEwaldSphereArray = (
+    Complex[
+        Array,
+        "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}",
+    ]
+    | Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
+    | Float[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
+)
+ProjectionArray = (
+    Complex[
+        Array,
+        "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}",
+    ]
+    | Float[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
+)
+EwaldSphereArray = (
+    Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
+    | Float[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
+)
+
+
 class AbstractVolumeParametrization(eqx.Module, strict=True):
     """Abstract interface for a parametrization of a volume. Specifically,
     the cryo-EM image formation process typically starts with a *scattering potential*.
@@ -164,14 +185,7 @@ class AbstractVolumeIntegrator(eqx.Module, Generic[VolRep], strict=True):
         volume_representation: VolRep,
         image_config: AbstractImageConfig,
         outputs_real_space: bool = False,
-    ) -> (
-        Complex[
-            Array,
-            "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}",
-        ]
-        | Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
-        | Float[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
-    ):
+    ) -> ProjectionOrEwaldSphereArray:
         raise NotImplementedError
 
 

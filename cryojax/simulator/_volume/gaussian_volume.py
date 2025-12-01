@@ -7,7 +7,7 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
-from jaxtyping import Array, Complex, Float, PyTree
+from jaxtyping import Array, Float, Inexact, PyTree
 
 from ...constants import (
     PengScatteringFactorParameters,
@@ -22,6 +22,7 @@ from .base_volume import (
     AbstractAtomVolume,
     AbstractVolumeIntegrator,
     AbstractVolumeRenderFn,
+    ProjectionArray,
 )
 
 
@@ -304,13 +305,7 @@ class GaussianMixtureProjection(
         volume_representation: GaussianMixtureVolume,
         image_config: AbstractImageConfig,
         outputs_real_space: bool = False,
-    ) -> (
-        Complex[
-            Array,
-            "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}",
-        ]
-        | Float[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
-    ):
+    ) -> ProjectionArray:
         """Compute a projection from gaussians.
 
         **Arguments:**
@@ -318,15 +313,15 @@ class GaussianMixtureProjection(
         - `volume_representation`:
             The volume representation.
         - `image_config`:
-            The configuration of the resulting image.
+            The image configuration.
         - `outputs_real_space`:
             If `True`, return the image in real space. Otherwise,
-            return in fourier.
+            return in Fourier.
 
         **Returns:**
 
-        The integrated volume in real or fourier space at the
-        `AbstractImageConfig.padded_shape`.
+        The volume projection in real or Fourier space at the
+        `AbstractImageConfig.padded_shape` and the `image_config.pixel_size`.
         """  # noqa: E501
         # Grab the image configuration
         shape = image_config.padded_shape if self.shape is None else self.shape
@@ -443,7 +438,7 @@ class GaussianMixtureRenderFn(AbstractVolumeRenderFn[GaussianMixtureVolume], str
         outputs_real_space: bool = True,
         outputs_rfft: bool = False,
         fftshifted: bool = False,
-    ) -> Float[Array, "{self.shape[0]} {self.shape[1]} {self.shape[2]}"]:
+    ) -> Inexact[Array, "{self.shape[0]} {self.shape[1]} {self.shape[2]}"]:
         """**Arguments:**
 
         - `volume_representation`:

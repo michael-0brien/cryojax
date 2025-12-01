@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, overload
 
 from jaxtyping import Bool
 
@@ -19,16 +19,93 @@ from ._transfer_theory import ContrastTransferTheory
 from ._volume import (
     AbstractVolumeIntegrator,
     AbstractVolumeParametrization,
-    FFTAtomProjection,
-    FourierSliceExtraction,
-    FourierVoxelGridVolume,
-    FourierVoxelSplineVolume,
-    GaussianMixtureProjection,
-    GaussianMixtureVolume,
-    IndependentAtomVolume,
-    RealVoxelGridVolume,
-    RealVoxelProjection,
+    AutoVolumeProjection,
 )
+
+
+@overload
+def make_image_model(
+    volume_parametrization: AbstractVolumeParametrization,
+    image_config: AbstractImageConfig,
+    pose: AbstractPose,
+    transfer_theory: None = None,
+    volume_integrator: AbstractVolumeIntegrator = AutoVolumeProjection(),
+    detector: AbstractDetector | None = None,
+    *,
+    quantity_mode: None = None,
+    applies_translation: bool = True,
+    normalizes_signal: bool = False,
+    signal_region: Bool[NDArrayLike, "_ _"] | None = None,
+    translate_mode: Literal["fft", "atom"] = "fft",
+) -> ProjectionImageModel: ...
+
+
+@overload
+def make_image_model(  # pyright: ignore[reportOverlappingOverload]
+    volume_parametrization: AbstractVolumeParametrization,
+    image_config: AbstractImageConfig,
+    pose: AbstractPose,
+    transfer_theory: ContrastTransferTheory,
+    volume_integrator: AbstractVolumeIntegrator = AutoVolumeProjection(),
+    detector: AbstractDetector | None = None,
+    *,
+    quantity_mode: None = None,
+    applies_translation: bool = True,
+    normalizes_signal: bool = False,
+    signal_region: Bool[NDArrayLike, "_ _"] | None = None,
+    translate_mode: Literal["fft", "atom"] = "fft",
+) -> LinearImageModel: ...
+
+
+@overload
+def make_image_model(
+    volume_parametrization: AbstractVolumeParametrization,
+    image_config: AbstractImageConfig,
+    pose: AbstractPose,
+    transfer_theory: ContrastTransferTheory,
+    volume_integrator: AbstractVolumeIntegrator = AutoVolumeProjection(),
+    detector: AbstractDetector | None = None,
+    *,
+    quantity_mode: Literal["contrast"] = "contrast",
+    applies_translation: bool = True,
+    normalizes_signal: bool = False,
+    signal_region: Bool[NDArrayLike, "_ _"] | None = None,
+    translate_mode: Literal["fft", "atom"] = "fft",
+) -> ContrastImageModel: ...
+
+
+@overload
+def make_image_model(
+    volume_parametrization: AbstractVolumeParametrization,
+    image_config: AbstractImageConfig,
+    pose: AbstractPose,
+    transfer_theory: ContrastTransferTheory,
+    volume_integrator: AbstractVolumeIntegrator = AutoVolumeProjection(),
+    detector: AbstractDetector | None = None,
+    *,
+    quantity_mode: Literal["intensity"] = "intensity",
+    applies_translation: bool = True,
+    normalizes_signal: bool = False,
+    signal_region: Bool[NDArrayLike, "_ _"] | None = None,
+    translate_mode: Literal["fft", "atom"] = "fft",
+) -> IntensityImageModel: ...
+
+
+@overload
+def make_image_model(
+    volume_parametrization: AbstractVolumeParametrization,
+    image_config: AbstractImageConfig,
+    pose: AbstractPose,
+    transfer_theory: ContrastTransferTheory,
+    volume_integrator: AbstractVolumeIntegrator = AutoVolumeProjection(),
+    detector: AbstractDetector | None = None,
+    *,
+    quantity_mode: Literal["counts"] = "counts",
+    applies_translation: bool = True,
+    normalizes_signal: bool = False,
+    signal_region: Bool[NDArrayLike, "_ _"] | None = None,
+    translate_mode: Literal["fft", "atom"] = "fft",
+) -> ElectronCountsImageModel: ...
 
 
 def make_image_model(
@@ -36,14 +113,13 @@ def make_image_model(
     image_config: AbstractImageConfig,
     pose: AbstractPose,
     transfer_theory: ContrastTransferTheory | None = None,
-    volume_integrator: AbstractVolumeIntegrator | None = None,
+    volume_integrator: AbstractVolumeIntegrator = AutoVolumeProjection(),
     detector: AbstractDetector | None = None,
     *,
+    quantity_mode: Literal["contrast", "intensity", "counts"] | None = None,
     applies_translation: bool = True,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-    simulates_quantity: bool = False,
-    quantity_mode: Literal["contrast", "intensity", "counts"] = "contrast",
     translate_mode: Literal["fft", "atom"] = "fft",
 ) -> AbstractImageModel:
     """Construct an `AbstractImageModel` for most common use-cases.
@@ -80,12 +156,9 @@ def make_image_model(
         A boolean array that is 1 where there is signal,
         and 0 otherwise used to normalize the image.
         Must have shape equal to `AbstractImageConfig.shape`.
-    - `simulates_quantity`:
-        If `True`, the image simulated is a physical quantity, which is
-        chosen with the `quantity_mode` argument. Otherwise, simulate an image without
-        scaling to absolute units.
     - `quantity_mode`:
-        The physical observable to simulate. Not used if `simulates_quantity = False`.
+        The physical observable to simulate. If `None`, simulate without scaling
+        to physical units using the `LinearImageModel`.
         Options are
         - 'contrast':
             Uses the `ContrastImageModel` to simulate contrast. This is
@@ -110,11 +183,6 @@ def make_image_model(
     image = image_model.simulate()
     ```
     """
-    # Select default integrator
-    if volume_integrator is None:
-        volume_integrator = _select_default_integrator(
-            volume_parametrization, simulates_quantity
-        )
     if transfer_theory is None:
         # Image model for projections
         image_model = ProjectionImageModel(
@@ -129,7 +197,7 @@ def make_image_model(
         )
     else:
         # Simulate physical observables
-        if simulates_quantity:
+        if quantity_mode is not None:
             scattering_theory = WeakPhaseScatteringTheory(
                 volume_integrator, transfer_theory
             )
@@ -199,23 +267,3 @@ def make_image_model(
             )
 
     return image_model
-
-
-def _select_default_integrator(
-    volume: AbstractVolumeParametrization, simulates_quantity: bool
-) -> AbstractVolumeIntegrator:
-    if isinstance(volume, (FourierVoxelGridVolume, FourierVoxelSplineVolume)):
-        integrator = FourierSliceExtraction(outputs_integral=simulates_quantity)
-    elif isinstance(volume, GaussianMixtureVolume):
-        integrator = GaussianMixtureProjection(sampling_mode="average")
-    elif isinstance(volume, RealVoxelGridVolume):
-        integrator = RealVoxelProjection()
-    elif isinstance(volume, IndependentAtomVolume):
-        integrator = FFTAtomProjection()
-    else:
-        raise ValueError(
-            "Could not select default integrator for volume of "
-            f"type {type(volume).__name__}. If using a custom potential "
-            "please directly pass an integrator."
-        )
-    return integrator

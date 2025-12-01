@@ -26,7 +26,12 @@ from ...ndimage import (
 )
 from .._image_config import AbstractImageConfig
 from .._pose import AbstractPose
-from .base_volume import AbstractVolumeIntegrator, AbstractVoxelVolume
+from .base_volume import (
+    AbstractVolumeIntegrator,
+    AbstractVoxelVolume,
+    EwaldSphereArray,
+    ProjectionArray,
+)
 
 
 class AbstractFourierVoxelVolume(AbstractVoxelVolume, strict=True):
@@ -275,13 +280,7 @@ class FourierSliceExtraction(
         volume_representation: FourierVoxelGridVolume | FourierVoxelSplineVolume,
         image_config: AbstractImageConfig,
         outputs_real_space: bool = False,
-    ) -> (
-        Complex[
-            Array,
-            "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}",
-        ]
-        | Float[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
-    ):
+    ) -> ProjectionArray:
         """Integrate the volume at the `AbstractImageConfig` settings
         of a voxel-based representation in fourier-space,
         using fourier slice extraction.
@@ -291,15 +290,15 @@ class FourierSliceExtraction(
         - `volume_representation`:
             The volume representation.
         - `image_config`:
-            The configuration of the resulting image.
+            The image configuration.
         - `outputs_real_space`:
             If `True`, return the image in real space. Otherwise,
-            return in fourier.
+            return in Fourier.
 
         **Returns:**
 
-        The extracted fourier voxels of the `volume_representation`,
-        at the `image_config.padded_shape` and the `image_config.pixel_size`.
+        The volume projection in real or Fourier space at the
+        `AbstractImageConfig.padded_shape` and the `image_config.pixel_size`.
         """
         frequency_slice = volume_representation.frequency_slice_in_pixels
         N = frequency_slice.shape[1]
@@ -474,23 +473,25 @@ class EwaldSphereExtraction(
         volume_representation: FourierVoxelGridVolume | FourierVoxelSplineVolume,
         image_config: AbstractImageConfig,
         outputs_real_space: bool = False,
-    ) -> (
-        Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
-        | Float[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
-    ):
+    ) -> EwaldSphereArray:
         """Integrate the volume at the `AbstractImageConfig` settings
         of a voxel-based representation in fourier-space, using fourier
         slice extraction.
 
         **Arguments:**
 
-        - `volume_representation`: The volume representation.
-        - `image_config`: The configuration of the resulting image.
+        - `volume_representation`:
+            The volume representation.
+        - `image_config`:
+            The image configuration.
+        - `outputs_real_space`:
+            If `True`, return the Ewald sphere surface in
+            real space. Otherwise, return in Fourier.
 
         **Returns:**
 
-        The extracted fourier voxels of the `volume_representation`, at the
-        `image_config.padded_shape` and the `image_config.pixel_size`.
+        The Ewald sphere surface in real or Fourier space at the
+        `AbstractImageConfig.padded_shape` and the `image_config.pixel_size`.
         """
         frequency_slice = volume_representation.frequency_slice_in_pixels
         N = frequency_slice.shape[1]
