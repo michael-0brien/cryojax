@@ -42,6 +42,10 @@ The [`jax-finufft`](https://github.com/dfm/jax-finufft) package is an optional d
 Simulate an image in cryoJAX by instantiating an `image_model`
 
 ```python
+import jax
+import jax.numpy as jnp
+import cryojax.simulator as cxs
+
 # Instantiate a cryoJAX `image_model`
 image_model = cxs.make_image_model(
     # ... load atoms as a mixture of gaussians from tabulated
@@ -69,6 +73,8 @@ image_model = cxs.make_image_model(
         amplitude_contrast_ratio=0.1,
     ),
 )
+# Simulate an image
+image = image_model.simulate(outputs_real_space=True)
 ```
 
 For more advanced image simulation examples and to understand the many features in this library, see the [documentation](https://michael-0brien.github.io/cryojax/).
