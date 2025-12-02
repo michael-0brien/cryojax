@@ -26,7 +26,6 @@ from ._pose import AbstractPose
 from ._scattering_theory import WeakPhaseScatteringTheory
 from ._transfer_theory import ContrastTransferTheory
 from ._volume import (
-    AbstractAtomVolume,
     AbstractVolumeIntegrator,
     AbstractVolumeParametrization,
     AutoVolumeProjection,
@@ -310,7 +309,7 @@ def load_tabulated_volume(
     b_factor_fn: Callable[[NDArrayLike, NDArrayLike], NDArrayLike] = identity_fn,
     selection_string: str = "all",
     pdb_options: dict[str, Any] = {},
-) -> tuple[AbstractAtomVolume, pd.DataFrame] | AbstractAtomVolume:
+) -> IndependentAtomVolume | GaussianMixtureVolume:
     """Load an atomistic representation of a volume from
     tabulated electron scattering factors.
 

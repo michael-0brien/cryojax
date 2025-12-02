@@ -61,18 +61,15 @@ def toy_gaussian_cloud():
 # Test `load_tabulated_volume`
 #
 def test_load_atom_volume(sample_pdb_path):
+    import mmdf
+
     atom_volume = cxs.load_tabulated_volume(sample_pdb_path, outputs_gmm=False)
     assert isinstance(atom_volume, cxs.IndependentAtomVolume)
     atom_volume = cxs.load_tabulated_volume(sample_pdb_path, outputs_gmm=True)
     assert isinstance(atom_volume, cxs.GaussianMixtureVolume)
-    atom_volume, _ = cxs.load_tabulated_volume(
-        sample_pdb_path, outputs_gmm=False, outputs_mmdf=True
-    )
+    atom_data = mmdf.read(sample_pdb_path)
+    atom_volume = cxs.load_tabulated_volume(atom_data, outputs_gmm=False)
     assert isinstance(atom_volume, cxs.IndependentAtomVolume)
-    atom_volume, _ = cxs.load_tabulated_volume(
-        sample_pdb_path, outputs_gmm=True, outputs_mmdf=True
-    )
-    assert isinstance(atom_volume, cxs.GaussianMixtureVolume)
 
 
 #
