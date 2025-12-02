@@ -3,7 +3,6 @@ import warnings
 import cryojax.ndimage as im
 import cryojax.simulator as cxs
 import equinox as eqx
-import jax
 import numpy as np
 import pytest
 from cryojax.atom_util import split_atoms_by_element
@@ -19,9 +18,6 @@ try:
 except ModuleNotFoundError as err:
     jnufft = None
     JAX_FINUFFT_IMPORT_ERROR = err
-
-
-jax.config.update("jax_enable_x64", True)
 
 
 @pytest.fixture

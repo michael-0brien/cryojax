@@ -30,9 +30,6 @@ from cryojax.rotations import SO3
 from jaxtyping import TypeCheckError
 
 
-jax.config.update("jax_enable_x64", True)
-
-
 def compare_pytrees(pytree1, pytree2):
     arrays1, others1 = eqx.partition(pytree1, eqx.is_array)
     arrays2, others2 = eqx.partition(pytree2, eqx.is_array)

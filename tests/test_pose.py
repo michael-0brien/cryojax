@@ -3,10 +3,6 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 from cryojax.rotations import SO3
-from jax import config
-
-
-config.update("jax_enable_x64", True)
 
 
 def test_default_pose_arguments():

@@ -3,7 +3,6 @@ import warnings
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from jax import config
 from jaxtyping import Array, Float, install_import_hook
 
 
@@ -21,8 +20,6 @@ try:
 except ModuleNotFoundError as err:
     jnufft = None
     JAX_FINUFFT_IMPORT_ERROR = err
-
-config.update("jax_enable_x64", True)
 
 
 @pytest.fixture

@@ -7,9 +7,6 @@ import pytest
 from cryojax.ndimage import make_frequency_grid, make_radial_frequency_grid
 
 
-jax.config.update("jax_enable_x64", True)
-
-
 #
 # Downsampling
 #
