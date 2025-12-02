@@ -2,10 +2,9 @@
 
 The `AbstractImageConfig` is an object at the core of simulating images in `cryojax`. It stores a configuration for the simulated image and the electron microscope, such as the shape of the desired image and the wavelength of the incident electron beam.
 
-::: cryojax.simulator.AbstractImageConfig
-        options:
+??? abstract "`cryojax.simulator.AbstractImageConfig`"
+    ::: cryojax.simulator.AbstractImageConfig
             members:
-                - __init__
                 - wavelength_in_angstroms
                 - wavenumber_in_inverse_angstroms
                 - lorentz_factor
@@ -31,3 +30,23 @@ The `AbstractImageConfig` is an object at the core of simulating images in `cryo
                 - crop_to_shape
                 - pad_to_padded_shape
                 - crop_or_pad_to_padded_shape
+
+
+---
+
+::: cryojax.simulator.BasicImageConfig
+        options:
+            members:
+                - __init__
+
+---
+
+::: cryojax.simulator.DoseImageConfig
+        options:
+            members:
+                - __init__
+
+::: cryojax.simulator.GridHelper
+        options:
+            members:
+                - __init__

@@ -89,6 +89,7 @@ nav:
                 - 'api/simulator/integrator.md'
                 - 'api/simulator/transfer_theory.md'
                 - 'api/simulator/scattering_theory.md'
+                - 'api/simulator/detector.md'
             - Putting it all together:
                 - 'api/simulator/config.md'
                 - 'api/simulator/image_model.md'

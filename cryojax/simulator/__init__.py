@@ -61,6 +61,7 @@ from ._volume import (
     AbstractVolumeRenderFn as AbstractVolumeRenderFn,
     AbstractVolumeRepresentation as AbstractVolumeRepresentation,
     AbstractVoxelVolume as AbstractVoxelVolume,
+    AutoVolumeProjection as AutoVolumeProjection,
     FFTAtomProjection as FFTAtomProjection,
     FFTAtomRenderFn as FFTAtomRenderFn,
     FourierSliceExtraction as FourierSliceExtraction,

@@ -5,7 +5,7 @@ from typing_extensions import Self, override
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, Complex, Float, PyTree
+from jaxtyping import Array, Float, Inexact, PyTree
 
 from ...constants import PengScatteringFactorParameters
 from ...jax_util import FloatLike, NDArrayLike, error_if_not_positive
@@ -26,6 +26,7 @@ from .base_volume import (
     AbstractAtomVolume,
     AbstractVolumeIntegrator,
     AbstractVolumeRenderFn,
+    ProjectionArray,
 )
 
 
@@ -218,6 +219,13 @@ class FFTAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True
             See [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft)
             for documentation.
         """
+        if sampling_mode not in ["average", "point"]:
+            raise ValueError(
+                "`sampling_mode` in `FFTAtomRenderFn` "
+                "must be either 'average' for averaging within a "
+                "pixel or 'point' for point sampling. Got "
+                f"`sampling_mode = {sampling_mode}`."
+            )
         self.shape = shape
         self.voxel_size = error_if_not_positive(jnp.asarray(voxel_size, dtype=float))
         self.frequency_grid = frequency_grid
@@ -233,7 +241,7 @@ class FFTAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True
         outputs_real_space: bool = True,
         outputs_rfft: bool = False,
         fftshifted: bool = False,
-    ) -> Float[Array, "{self.shape[0]} {self.shape[1]} {self.shape[2]}"]:
+    ) -> Inexact[Array, "{self.shape[0]} {self.shape[1]} {self.shape[2]}"]:
         """**Arguments:**
 
         - `volume_representation`:
@@ -383,13 +391,7 @@ class FFTAtomProjection(
         volume_representation: IndependentAtomVolume,
         image_config: AbstractImageConfig,
         outputs_real_space: bool = False,
-    ) -> (
-        Complex[
-            Array,
-            "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}",
-        ]
-        | Float[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
-    ):
+    ) -> ProjectionArray:
         """Compute a projection from scattering factors per atom type
         from the `IndependentAtomVolume`.
 
@@ -405,8 +407,8 @@ class FFTAtomProjection(
 
         **Returns:**
 
-        The integrated volume in real or fourier space at the
-        `AbstractImageConfig.padded_shape`.
+        The volume projection in real or Fourier space at the
+        `AbstractImageConfig.padded_shape` and the `image_config.pixel_size`.
         """  # noqa: E501
         u = self.upsample_factor
         pixel_size = image_config.pixel_size
