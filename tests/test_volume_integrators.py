@@ -33,7 +33,7 @@ def pdb_info(sample_pdb_path):
 def test_gmm_integrator_shape(sample_pdb_path, shape):
     atom_volume = cxs.load_tabulated_volume(
         sample_pdb_path,
-        loads_gmm=True,
+        outputs_gmm=True,
         include_b_factors=True,
         selection_string="not element H",
     )

@@ -1,7 +1,6 @@
 import cryojax.simulator as cxs
 import numpy as np
 import pytest
-from cryojax.simulator import load_tabulated_volume
 
 
 @pytest.mark.parametrize(
@@ -38,9 +37,9 @@ def test_scattering_theories_no_pose(
         astigmatism_angle,
     ) = ctf_params
 
-    atom_potential = load_tabulated_volume(
+    atom_potential = cxs.load_tabulated_volume(
         sample_pdb_path,
-        loads_gmm=True,
+        outputs_gmm=True,
         selection_string="not element H",
     )
     instrument_config = cxs.BasicImageConfig(
@@ -150,8 +149,8 @@ def test_scattering_theories_pose(
         astigmatism_angle,
     ) = ctf_params
 
-    atom_potential = load_tabulated_volume(
-        sample_pdb_path, loads_gmm=True, selection_string="name CA "
+    atom_potential = cxs.load_tabulated_volume(
+        sample_pdb_path, outputs_gmm=True, selection_string="name CA "
     )
     instrument_config = cxs.BasicImageConfig(
         shape=shape,

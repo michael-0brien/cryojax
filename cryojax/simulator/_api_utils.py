@@ -4,11 +4,13 @@ from typing import Any, Literal, overload
 
 import equinox.internal as eqxi
 import jax.numpy as jnp
-from jaxtyping import Bool, ScalarLike
+import mmdf
+import pandas as pd
+from jaxtyping import Bool
 
 from ..atom_util import split_atoms_by_element
 from ..constants import PengScatteringFactorParameters
-from ..io import read_atoms_from_pdb
+from ..io import mmdf_to_atoms
 from ..jax_util import NDArrayLike
 from ._detector import AbstractDetector
 from ._image_config import AbstractImageConfig, DoseImageConfig
@@ -33,7 +35,7 @@ from ._volume import (
 )
 
 
-identity_fn = eqxi.doc_repr(lambda x: x, "identity_fn")
+identity_fn = eqxi.doc_repr(lambda x, _: x, "identity_fn")
 
 
 @overload
@@ -277,10 +279,25 @@ def make_image_model(
 def load_tabulated_volume(  # pyright: ignore[reportOverlappingOverload]
     path_to_pdb: str | pathlib.Path,
     *,
-    loads_gmm: Literal[True] = True,
-    table: Literal["peng"] = "peng",
+    outputs_gmm: Literal[False] = False,
+    tabulation: Literal["peng"] = "peng",
+    outputs_mmdf: Literal[False] = False,
     include_b_factors: bool = True,
-    b_factor_fn: Callable[[ScalarLike], ScalarLike] = identity_fn,
+    b_factor_fn: Callable[[NDArrayLike, NDArrayLike], NDArrayLike] = identity_fn,
+    selection_string: str = "all",
+    pdb_options: dict[str, Any] = {},
+) -> IndependentAtomVolume: ...
+
+
+@overload
+def load_tabulated_volume(
+    path_to_pdb: str | pathlib.Path,
+    *,
+    outputs_gmm: Literal[True] = True,
+    tabulation: Literal["peng"] = "peng",
+    outputs_mmdf: Literal[False] = False,
+    include_b_factors: bool = True,
+    b_factor_fn: Callable[[NDArrayLike, NDArrayLike], NDArrayLike] = identity_fn,
     selection_string: str = "all",
     pdb_options: dict[str, Any] = {},
 ) -> GaussianMixtureVolume: ...
@@ -290,44 +307,88 @@ def load_tabulated_volume(  # pyright: ignore[reportOverlappingOverload]
 def load_tabulated_volume(
     path_to_pdb: str | pathlib.Path,
     *,
-    loads_gmm: Literal[False] = False,
-    table: Literal["peng"] = "peng",
+    outputs_gmm: Literal[False] = False,
+    tabulation: Literal["peng"] = "peng",
+    outputs_mmdf: Literal[True] = True,
     include_b_factors: bool = True,
-    b_factor_fn: Callable[[ScalarLike], ScalarLike] = identity_fn,
+    b_factor_fn: Callable[[NDArrayLike, NDArrayLike], NDArrayLike] = identity_fn,
     selection_string: str = "all",
     pdb_options: dict[str, Any] = {},
-) -> IndependentAtomVolume: ...
+) -> tuple[IndependentAtomVolume, pd.DataFrame]: ...
+
+
+@overload
+def load_tabulated_volume(
+    path_to_pdb: str | pathlib.Path,
+    *,
+    outputs_gmm: Literal[True] = True,
+    tabulation: Literal["peng"] = "peng",
+    outputs_mmdf: Literal[True] = True,
+    include_b_factors: bool = True,
+    b_factor_fn: Callable[[NDArrayLike, NDArrayLike], NDArrayLike] = identity_fn,
+    selection_string: str = "all",
+    pdb_options: dict[str, Any] = {},
+) -> tuple[GaussianMixtureVolume, pd.DataFrame]: ...
 
 
 def load_tabulated_volume(
     path_to_pdb: str | pathlib.Path,
     *,
-    loads_gmm: bool = True,
-    table: Literal["peng"] = "peng",
-    include_b_factors: bool = True,
-    b_factor_fn: Callable[[ScalarLike], ScalarLike] = identity_fn,
+    outputs_gmm: bool = False,
+    tabulation: Literal["peng"] = "peng",
+    outputs_mmdf: bool = False,
+    include_b_factors: bool = False,
+    b_factor_fn: Callable[[NDArrayLike, NDArrayLike], NDArrayLike] = identity_fn,
     selection_string: str = "all",
     pdb_options: dict[str, Any] = {},
-) -> AbstractAtomVolume:
+) -> tuple[AbstractAtomVolume, pd.DataFrame] | AbstractAtomVolume:
     """Load an atomistic representation of a volume from
     tabulated electron scattering factors.
+
+    !!! warning
+        This function cannot be used with JIT compilation.
+        Rather, its output should be passed to JIT-compiled
+        functions. For example:
+
+        ```python
+        import cryojax.simulator as cxs
+        import equinox as eqx
+
+        path_to_pdb = ...
+        volume = cxs.load_tabulated_volume(path_to_pdb)
+
+        @eqx.filter_jit
+        def simulate_fn(volume, ...):
+            image_model = cxs.make_image_model(volume, ...)
+            return image_model.simulate()
+
+        image = simulate_fn(volume, ...)
+        ```
 
     **Arguments:**
 
     - `path_to_pdb`:
-        The path to the PDB/PDBx file
-    - `loads_gmm`:
-        If `True`, load a [`cryojax.simulator.GaussianMixtureVolume`][] with
+        The path to the PDB/PDBx file.
+    - `outputs_gmm`:
+        If `True`, load a [`cryojax.simulator.GaussianMixtureVolume`][] using
         [`cryojax.constants.PengScatteringFactorParameters`][].
-    - `table`:
-        Specifies which electron scattering factor table to use.
-        For now, only `table = 'peng'` is supported.
+    - `tabulation`:
+        Specifies which electron scattering factor tabulation to use.
+        For now, only `tabulation = 'peng'` is supported. Not used if
+        `outputs_gmm = True`.
+    - `outputs_mmdf`:
+        If `True`, return the `pandas.DataFrame` read from
+        [`mmdf`](https://github.com/teamtomo/mmdf).
     - `include_b_factors`:
         If `True`, include PDB B-factors in the volume.
     - `b_factor_fn`:
         A function that modulates PDB B-factors before passing to the
-        volume. Has signature `modulated_b_factor = b_factor_fn(pdb_b_factor)`.
+        volume. Has signature
+        `modulated_b_factor = b_factor_fn(pdb_b_factor, atomic_number)`.
+        If `outputs_gmm = False`, `pdb_b_factor` is the mean B-factor
+        for a given atom type.
     - `selection_string`:
+        A string for [`mdtraj` atom selection](https://mdtraj.org/1.9.4/examples/atom-selection.html#atom-selection).
         See [`cryojax.io.read_atoms_from_pdb`][] for documentation.
     - `pdb_options`:
         Additional keyword options passed to [`cryojax.io.read_atoms_from_pdb`][],
@@ -335,21 +396,28 @@ def load_tabulated_volume(
 
     **Returns:**
 
-    If `loads_gmm = True`, returns a [`cryojax.simulator.GaussianMixtureVolume`][].
+    If `outputs_gmm = True`, returns a [`cryojax.simulator.GaussianMixtureVolume`][].
     Otherwise, returns a [`cryojax.simulator.IndependentAtomVolume`][].
-    """
-    atom_positions, atomic_numbers, atom_properties = read_atoms_from_pdb(
-        path_to_pdb,
+
+    If `outputs_mmdf` is `True`, return a tuple where the first element is the
+    volume and the second element is the `pandas.DataFrame` returned from
+    [`mmdf`](https://github.com/teamtomo/mmdf).
+    """  # noqa: E501
+    atom_data = mmdf.read(pathlib.Path(path_to_pdb))
+    atom_positions, atomic_numbers, atom_properties = mmdf_to_atoms(
+        atom_data,
         loads_properties=True,
         selection_string=selection_string,
         **pdb_options,
     )
-    if loads_gmm:
+    if outputs_gmm:
         # TODO: this is inefficient if this function is called multiple times,
         # as the electron scattering factor parameter table is read on each call
         peng_parameters = PengScatteringFactorParameters(atomic_numbers)
         b_factors = (
-            jnp.asarray(b_factor_fn(atom_properties["b_factors"]), dtype=float)
+            jnp.asarray(
+                b_factor_fn(atom_properties["b_factors"], atomic_numbers), dtype=float
+            )
             if include_b_factors
             else None
         )
@@ -361,18 +429,21 @@ def load_tabulated_volume(
             atomic_numbers, (atom_positions, atom_properties["b_factors"])
         )
         b_factor_by_id = tuple(
-            jnp.asarray(b_factor_fn(jnp.mean(b))) for b in b_factor_by_id
+            jnp.asarray(b_factor_fn(jnp.mean(b), atom_ids)) for b in b_factor_by_id
         )
-        if table == "peng":
+        if tabulation == "peng":
             scattering_parameters = PengScatteringFactorParameters(atom_ids)
         else:
             raise ValueError(
-                "Only `table = 'peng'` is supported in "
+                "Only `tabulation = 'peng'` is supported in "
                 "`load_tabulated_volume`. "
-                "Additional tables are not yet implemented."
+                "Additional tabulations are not yet implemented."
             )
         atom_volume = IndependentAtomVolume.from_tabulated_parameters(
             positions_by_id, scattering_parameters, b_factor_by_element=b_factor_by_id
         )
 
-    return atom_volume
+    if outputs_mmdf:
+        return atom_volume, atom_data
+    else:
+        return atom_volume
