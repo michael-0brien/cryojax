@@ -1,8 +1,7 @@
 import cryojax.simulator as cxs
 import numpy as np
 import pytest
-from cryojax.constants import PengScatteringFactorParameters
-from cryojax.io import read_atoms_from_pdb
+from cryojax.simulator import load_tabulated_volume
 
 
 @pytest.mark.parametrize(
@@ -39,18 +38,11 @@ def test_scattering_theories_no_pose(
         astigmatism_angle,
     ) = ctf_params
 
-    atom_positions, atom_types, atom_properties = read_atoms_from_pdb(
+    atom_potential = load_tabulated_volume(
         sample_pdb_path,
-        center=True,
+        loads_gmm=True,
         selection_string="not element H",
-        loads_properties=True,
     )
-    atom_potential = cxs.GaussianMixtureVolume.from_tabulated_parameters(
-        atom_positions,
-        parameters=PengScatteringFactorParameters(atom_types),
-        extra_b_factors=atom_properties["b_factors"],
-    )
-
     instrument_config = cxs.BasicImageConfig(
         shape=shape,
         pixel_size=pixel_size,
@@ -158,17 +150,8 @@ def test_scattering_theories_pose(
         astigmatism_angle,
     ) = ctf_params
 
-    atom_positions, atom_types, atom_properties = read_atoms_from_pdb(
-        sample_pdb_path,
-        center=True,
-        selection_string="name CA ",
-        loads_properties=True,
-    )
-
-    atom_potential = cxs.GaussianMixtureVolume.from_tabulated_parameters(
-        atom_positions,
-        parameters=PengScatteringFactorParameters(atom_types),
-        extra_b_factors=atom_properties["b_factors"],
+    atom_potential = load_tabulated_volume(
+        sample_pdb_path, loads_gmm=True, selection_string="name CA "
     )
     instrument_config = cxs.BasicImageConfig(
         shape=shape,

@@ -1,7 +1,14 @@
-from typing import Literal, overload
+import pathlib
+from collections.abc import Callable
+from typing import Any, Literal, overload
 
-from jaxtyping import Bool
+import equinox.internal as eqxi
+import jax.numpy as jnp
+from jaxtyping import Bool, ScalarLike
 
+from ..atom_util import split_atoms_by_element
+from ..constants import PengScatteringFactorParameters
+from ..io import read_atoms_from_pdb
 from ..jax_util import NDArrayLike
 from ._detector import AbstractDetector
 from ._image_config import AbstractImageConfig, DoseImageConfig
@@ -17,10 +24,16 @@ from ._pose import AbstractPose
 from ._scattering_theory import WeakPhaseScatteringTheory
 from ._transfer_theory import ContrastTransferTheory
 from ._volume import (
+    AbstractAtomVolume,
     AbstractVolumeIntegrator,
     AbstractVolumeParametrization,
     AutoVolumeProjection,
+    GaussianMixtureVolume,
+    IndependentAtomVolume,
 )
+
+
+identity_fn = eqxi.doc_repr(lambda x: x, "identity_fn")
 
 
 @overload
@@ -183,6 +196,12 @@ def make_image_model(
     image = image_model.simulate()
     ```
     """
+    options = dict(
+        applies_translation=applies_translation,
+        normalizes_signal=normalizes_signal,
+        signal_region=signal_region,
+        translate_mode=translate_mode,
+    )
     if transfer_theory is None:
         # Image model for projections
         image_model = ProjectionImageModel(
@@ -190,14 +209,21 @@ def make_image_model(
             pose,
             image_config,
             volume_integrator,
-            applies_translation=applies_translation,
-            normalizes_signal=normalizes_signal,
-            signal_region=signal_region,
-            translate_mode=translate_mode,
+            **options,  # pyright: ignore[reportArgumentType]
         )
     else:
         # Simulate physical observables
-        if quantity_mode is not None:
+        if quantity_mode is None:
+            # Linear image model
+            image_model = LinearImageModel(
+                volume_parametrization,
+                pose,
+                image_config,
+                volume_integrator,
+                transfer_theory,
+                **options,  # pyright: ignore[reportArgumentType]
+            )
+        else:
             scattering_theory = WeakPhaseScatteringTheory(
                 volume_integrator, transfer_theory
             )
@@ -219,10 +245,7 @@ def make_image_model(
                     image_config,
                     scattering_theory,
                     detector,
-                    applies_translation=applies_translation,
-                    normalizes_signal=normalizes_signal,
-                    signal_region=signal_region,
-                    translate_mode=translate_mode,
+                    **options,  # pyright: ignore[reportArgumentType]
                 )
             elif quantity_mode == "contrast":
                 image_model = ContrastImageModel(
@@ -230,10 +253,7 @@ def make_image_model(
                     pose,
                     image_config,
                     scattering_theory,
-                    applies_translation=applies_translation,
-                    normalizes_signal=normalizes_signal,
-                    signal_region=signal_region,
-                    translate_mode=translate_mode,
+                    **options,  # pyright: ignore[reportArgumentType]
                 )
             elif quantity_mode == "intensity":
                 image_model = IntensityImageModel(
@@ -241,10 +261,7 @@ def make_image_model(
                     pose,
                     image_config,
                     scattering_theory,
-                    applies_translation=applies_translation,
-                    normalizes_signal=normalizes_signal,
-                    signal_region=signal_region,
-                    translate_mode=translate_mode,
+                    **options,  # pyright: ignore[reportArgumentType]
                 )
             else:
                 raise ValueError(
@@ -252,18 +269,110 @@ def make_image_model(
                     "modes for simulating "
                     "physical quantities are 'contrast', 'intensity', and 'counts'."
                 )
-        else:
-            # Linear image model
-            image_model = LinearImageModel(
-                volume_parametrization,
-                pose,
-                image_config,
-                volume_integrator,
-                transfer_theory,
-                applies_translation=applies_translation,
-                normalizes_signal=normalizes_signal,
-                signal_region=signal_region,
-                translate_mode=translate_mode,
-            )
 
     return image_model
+
+
+@overload
+def load_tabulated_volume(  # pyright: ignore[reportOverlappingOverload]
+    path_to_pdb: str | pathlib.Path,
+    *,
+    loads_gmm: Literal[True] = True,
+    table: Literal["peng"] = "peng",
+    include_b_factors: bool = True,
+    b_factor_fn: Callable[[ScalarLike], ScalarLike] = identity_fn,
+    selection_string: str = "all",
+    pdb_options: dict[str, Any] = {},
+) -> GaussianMixtureVolume: ...
+
+
+@overload
+def load_tabulated_volume(
+    path_to_pdb: str | pathlib.Path,
+    *,
+    loads_gmm: Literal[False] = False,
+    table: Literal["peng"] = "peng",
+    include_b_factors: bool = True,
+    b_factor_fn: Callable[[ScalarLike], ScalarLike] = identity_fn,
+    selection_string: str = "all",
+    pdb_options: dict[str, Any] = {},
+) -> IndependentAtomVolume: ...
+
+
+def load_tabulated_volume(
+    path_to_pdb: str | pathlib.Path,
+    *,
+    loads_gmm: bool = True,
+    table: Literal["peng"] = "peng",
+    include_b_factors: bool = True,
+    b_factor_fn: Callable[[ScalarLike], ScalarLike] = identity_fn,
+    selection_string: str = "all",
+    pdb_options: dict[str, Any] = {},
+) -> AbstractAtomVolume:
+    """Load an atomistic representation of a volume from
+    tabulated electron scattering factors.
+
+    **Arguments:**
+
+    - `path_to_pdb`:
+        The path to the PDB/PDBx file
+    - `loads_gmm`:
+        If `True`, load a [`cryojax.simulator.GaussianMixtureVolume`][] with
+        [`cryojax.constants.PengScatteringFactorParameters`][].
+    - `table`:
+        Specifies which electron scattering factor table to use.
+        For now, only `table = 'peng'` is supported.
+    - `include_b_factors`:
+        If `True`, include PDB B-factors in the volume.
+    - `b_factor_fn`:
+        A function that modulates PDB B-factors before passing to the
+        volume. Has signature `modulated_b_factor = b_factor_fn(pdb_b_factor)`.
+    - `selection_string`:
+        See [`cryojax.io.read_atoms_from_pdb`][] for documentation.
+    - `pdb_options`:
+        Additional keyword options passed to [`cryojax.io.read_atoms_from_pdb`][],
+        not including `selection_string`.
+
+    **Returns:**
+
+    If `loads_gmm = True`, returns a [`cryojax.simulator.GaussianMixtureVolume`][].
+    Otherwise, returns a [`cryojax.simulator.IndependentAtomVolume`][].
+    """
+    atom_positions, atomic_numbers, atom_properties = read_atoms_from_pdb(
+        path_to_pdb,
+        loads_properties=True,
+        selection_string=selection_string,
+        **pdb_options,
+    )
+    if loads_gmm:
+        # TODO: this is inefficient if this function is called multiple times,
+        # as the electron scattering factor parameter table is read on each call
+        peng_parameters = PengScatteringFactorParameters(atomic_numbers)
+        b_factors = (
+            jnp.asarray(b_factor_fn(atom_properties["b_factors"]), dtype=float)
+            if include_b_factors
+            else None
+        )
+        atom_volume = GaussianMixtureVolume.from_tabulated_parameters(
+            atom_positions, peng_parameters, extra_b_factors=b_factors
+        )
+    else:
+        (positions_by_id, b_factor_by_id), atom_ids = split_atoms_by_element(
+            atomic_numbers, (atom_positions, atom_properties["b_factors"])
+        )
+        b_factor_by_id = tuple(
+            jnp.asarray(b_factor_fn(jnp.mean(b))) for b in b_factor_by_id
+        )
+        if table == "peng":
+            scattering_parameters = PengScatteringFactorParameters(atom_ids)
+        else:
+            raise ValueError(
+                "Only `table = 'peng'` is supported in "
+                "`load_tabulated_volume`. "
+                "Additional tables are not yet implemented."
+            )
+        atom_volume = IndependentAtomVolume.from_tabulated_parameters(
+            positions_by_id, scattering_parameters, b_factor_by_element=b_factor_by_id
+        )
+
+    return atom_volume

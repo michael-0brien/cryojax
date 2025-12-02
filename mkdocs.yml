@@ -49,6 +49,7 @@ plugins:
             - xarray.core.dataset.Dataset
             - numpy.ndarray
             - equinox.Module
+            - mdtraj.core.topology.Topology
     - mkdocstrings:
         handlers:
           python:

@@ -31,16 +31,11 @@ def pdb_info(sample_pdb_path):
 
 @pytest.mark.parametrize("shape", ((64, 64), (63, 63), (63, 64), (64, 63)))
 def test_gmm_integrator_shape(sample_pdb_path, shape):
-    atom_positions, atom_types, atom_properties = read_atoms_from_pdb(
+    atom_volume = cxs.load_tabulated_volume(
         sample_pdb_path,
-        center=True,
+        loads_gmm=True,
+        include_b_factors=True,
         selection_string="not element H",
-        loads_properties=True,
-    )
-    atom_volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(
-        atom_positions,
-        parameters=PengScatteringFactorParameters(atom_types),
-        extra_b_factors=atom_properties["b_factors"],
     )
     pixel_size = 0.5
 

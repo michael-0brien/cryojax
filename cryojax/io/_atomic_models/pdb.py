@@ -5,6 +5,7 @@ adapted from `mdtraj`.
 
 import os
 import pathlib
+import typing
 import warnings
 from copy import copy
 from typing import Literal, TypedDict, overload
@@ -22,10 +23,14 @@ from mdtraj.core.topology import Topology
 from ...atom_util import center_atom_positions
 
 
-class AtomProperties(TypedDict):
-    masses: Float[np.ndarray, "... n_atoms"]
-    b_factors: Float[np.ndarray, "... n_atoms"]
-    charges: Float[np.ndarray, "... n_atoms"]
+if hasattr(typing, "GENERATING_DOCUMENTATION"):
+    AtomProperties = dict  # pyright: ignore[reportAssignmentType]
+else:
+
+    class AtomProperties(TypedDict):
+        masses: Float[np.ndarray, "... n_atoms"]
+        b_factors: Float[np.ndarray, "... n_atoms"]
+        charges: Float[np.ndarray, "... n_atoms"]
 
 
 @overload
