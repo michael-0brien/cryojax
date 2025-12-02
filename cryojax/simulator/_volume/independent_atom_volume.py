@@ -326,7 +326,7 @@ class FFTAtomProjection(
     eps: float
     opts: Any
 
-    is_projection_approximation: ClassVar[bool] = True
+    outputs_ewald_sphere: ClassVar[bool] = False
 
     def __init__(
         self,

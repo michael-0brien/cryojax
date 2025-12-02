@@ -177,7 +177,7 @@ class AbstractVolumeIntegrator(eqx.Module, Generic[VolRep], strict=True):
     the exit plane.
     """
 
-    is_projection_approximation: eqx.AbstractClassVar[bool]
+    outputs_ewald_sphere: eqx.AbstractClassVar[bool]
 
     @abc.abstractmethod
     def integrate(
