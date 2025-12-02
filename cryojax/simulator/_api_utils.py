@@ -277,11 +277,10 @@ def make_image_model(
 
 @overload
 def load_tabulated_volume(  # pyright: ignore[reportOverlappingOverload]
-    path_to_pdb: str | pathlib.Path,
+    path_or_mmdf: str | pathlib.Path | pd.DataFrame,
     *,
     outputs_gmm: Literal[False] = False,
     tabulation: Literal["peng"] = "peng",
-    outputs_mmdf: Literal[False] = False,
     include_b_factors: bool = True,
     b_factor_fn: Callable[[NDArrayLike, NDArrayLike], NDArrayLike] = identity_fn,
     selection_string: str = "all",
@@ -291,11 +290,10 @@ def load_tabulated_volume(  # pyright: ignore[reportOverlappingOverload]
 
 @overload
 def load_tabulated_volume(
-    path_to_pdb: str | pathlib.Path,
+    path_or_mmdf: str | pathlib.Path | pd.DataFrame,
     *,
     outputs_gmm: Literal[True] = True,
     tabulation: Literal["peng"] = "peng",
-    outputs_mmdf: Literal[False] = False,
     include_b_factors: bool = True,
     b_factor_fn: Callable[[NDArrayLike, NDArrayLike], NDArrayLike] = identity_fn,
     selection_string: str = "all",
@@ -303,40 +301,11 @@ def load_tabulated_volume(
 ) -> GaussianMixtureVolume: ...
 
 
-@overload
 def load_tabulated_volume(
-    path_to_pdb: str | pathlib.Path,
-    *,
-    outputs_gmm: Literal[False] = False,
-    tabulation: Literal["peng"] = "peng",
-    outputs_mmdf: Literal[True] = True,
-    include_b_factors: bool = True,
-    b_factor_fn: Callable[[NDArrayLike, NDArrayLike], NDArrayLike] = identity_fn,
-    selection_string: str = "all",
-    pdb_options: dict[str, Any] = {},
-) -> tuple[IndependentAtomVolume, pd.DataFrame]: ...
-
-
-@overload
-def load_tabulated_volume(
-    path_to_pdb: str | pathlib.Path,
-    *,
-    outputs_gmm: Literal[True] = True,
-    tabulation: Literal["peng"] = "peng",
-    outputs_mmdf: Literal[True] = True,
-    include_b_factors: bool = True,
-    b_factor_fn: Callable[[NDArrayLike, NDArrayLike], NDArrayLike] = identity_fn,
-    selection_string: str = "all",
-    pdb_options: dict[str, Any] = {},
-) -> tuple[GaussianMixtureVolume, pd.DataFrame]: ...
-
-
-def load_tabulated_volume(
-    path_to_pdb: str | pathlib.Path,
+    path_or_mmdf: str | pathlib.Path | pd.DataFrame,
     *,
     outputs_gmm: bool = False,
     tabulation: Literal["peng"] = "peng",
-    outputs_mmdf: bool = False,
     include_b_factors: bool = False,
     b_factor_fn: Callable[[NDArrayLike, NDArrayLike], NDArrayLike] = identity_fn,
     selection_string: str = "all",
@@ -367,8 +336,9 @@ def load_tabulated_volume(
 
     **Arguments:**
 
-    - `path_to_pdb`:
-        The path to the PDB/PDBx file.
+    - `path_or_mmdf`:
+        The path to the PDB/PDBx file or a `pandas.DataFrame` loaded
+        from [`mmdf.read`](https://github.com/teamtomo/mmdf).
     - `outputs_gmm`:
         If `True`, load a [`cryojax.simulator.GaussianMixtureVolume`][] using
         [`cryojax.constants.PengScatteringFactorParameters`][].
@@ -376,9 +346,6 @@ def load_tabulated_volume(
         Specifies which electron scattering factor tabulation to use.
         For now, only `tabulation = 'peng'` is supported. Not used if
         `outputs_gmm = True`.
-    - `outputs_mmdf`:
-        If `True`, return the `pandas.DataFrame` read from
-        [`mmdf`](https://github.com/teamtomo/mmdf).
     - `include_b_factors`:
         If `True`, include PDB B-factors in the volume.
     - `b_factor_fn`:
@@ -398,12 +365,19 @@ def load_tabulated_volume(
 
     If `outputs_gmm = True`, returns a [`cryojax.simulator.GaussianMixtureVolume`][].
     Otherwise, returns a [`cryojax.simulator.IndependentAtomVolume`][].
-
-    If `outputs_mmdf` is `True`, return a tuple where the first element is the
-    volume and the second element is the `pandas.DataFrame` returned from
-    [`mmdf`](https://github.com/teamtomo/mmdf).
     """  # noqa: E501
-    atom_data = mmdf.read(pathlib.Path(path_to_pdb))
+    if isinstance(path_or_mmdf, (str, pathlib.Path)):
+        atom_data = mmdf.read(pathlib.Path(path_or_mmdf))
+    elif isinstance(path_or_mmdf, pd.DataFrame):
+        atom_data = path_or_mmdf
+    else:
+        raise ValueError(
+            "Argument `path_or_mmdf` to "
+            "`load_tabulated_volume` was an unrecognized "
+            "input type. Accepts a path to a PDB/PDBx file, "
+            "or a pandas.DataFrame loaded from `mmdf.read`. "
+            f"Instead, got type {path_or_mmdf.__class__.__name__}."
+        )
     atom_positions, atomic_numbers, atom_properties = mmdf_to_atoms(
         atom_data,
         loads_properties=True,
@@ -443,7 +417,4 @@ def load_tabulated_volume(
             positions_by_id, scattering_parameters, b_factor_by_element=b_factor_by_id
         )
 
-    if outputs_mmdf:
-        return atom_volume, atom_data
-    else:
-        return atom_volume
+    return atom_volume
