@@ -48,28 +48,15 @@ import cryojax.simulator as cxs
 
 # Instantiate a cryoJAX `image_model`
 image_model = cxs.make_image_model(
-    # ... load atoms as a mixture of gaussians from tabulated
-    # electron scattering factors
+    # ... load atoms as gaussians mixture from tabulated electron scattering factors
     volume_parametrization=cxs.load_tabulated_volume("example.pdb", outputs_gmm=True),
     # ... configure the image
-    image_config=cxs.BasicImageConfig(
-        shape=(320, 320), pixel_size=1.0, voltage_in_kilovolts=300.0
-    ),
+    image_config=cxs.BasicImageConfig(shape=(320, 320), pixel_size=1., voltage_in_kilovolts=300),
     # ... the pose
-    pose=cxs.EulerAnglePose(
-        offset_x_in_angstroms=5.0,
-        offset_y_in_angstroms=-3.0,
-        phi_angle=20.0,
-        theta_angle=80.0,
-        psi_angle=-10.0,
-    ),
+    pose=cxs.EulerAnglePose(phi_angle=20., theta_angle=80., psi_angle=-10.),
     # ... the CTF
     transfer_theory=cxs.ContrastTransferTheory(
-        ctf=cxs.AstigmaticCTF(
-            defocus_in_angstroms=9800.0,
-            astigmatism_in_angstroms=200.0,
-            astigmatism_angle=10.0,
-        ),
+        ctf=cxs.AstigmaticCTF(defocus_in_angstroms=9800., astigmatism_in_angstroms=200., astigmatism_angle=10.),
         amplitude_contrast_ratio=0.1,
     ),
 )
