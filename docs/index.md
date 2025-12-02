@@ -31,7 +31,7 @@ The [`jax-finufft`](https://github.com/dfm/jax-finufft) package is an optional d
 
 ## Simulating an image
 
-Simulate an image in cryoJAX by instantiating an `image_model`
+Image simulation in cryoJAX revolves around the `image_model` class. The following is a basic example for instantiating an `image_model` and simulating an image:
 
 ```python
 import jax
