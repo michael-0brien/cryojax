@@ -23,7 +23,7 @@ from .real_voxels import RealVoxelGridVolume, RealVoxelProjection
 class AutoVolumeProjection(AbstractVolumeIntegrator[VolRep]):
     options: dict[str, Any] = eqx.field(default_factory=dict)
 
-    is_projection_approximation: ClassVar[bool] = True
+    outputs_ewald_sphere: ClassVar[bool] = False
 
     def _select_projection_method(
         self, volume: AbstractVolumeRepresentation
