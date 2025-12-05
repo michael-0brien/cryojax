@@ -27,8 +27,8 @@ Modeling the electron scattering amplitudes of individual atoms is an important 
 !!! warning
 
     Only electron scattering factors for elements found in PDB files (e.g. proteins, DNA/RNA,
-    small molecules) are supported when instantiating [`PengScatteringFactorParameters`][] or
-    [`LobatoScatteringFactorParameters`][]. These are the following `atomic_numbers`:
+    small molecules) are supported when instantiating [`cryojax.constants.PengScatteringFactorParameters`][] or
+    [`cryojax.constants.LobatoScatteringFactorParameters`][]. These are the following `atomic_numbers`:
 
         - 1: Hydrogen
         - 6: Carbon
