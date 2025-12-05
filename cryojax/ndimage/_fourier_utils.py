@@ -4,9 +4,9 @@ from jaxtyping import Array, Complex
 
 
 def convert_fftn_to_rfftn(
-    fftn_array: Complex[Array, "y_dim x_dim"],
+    fftn_array: Complex[Array, "y_dim x_dim"] | Complex[Array, "z_dim y_dim x_dim"],
     mode: Literal["zero", "one", "real"] | None = "zero",
-) -> Complex[Array, "y_dim x_dim//2+1"]:
+) -> Complex[Array, "y_dim x_dim//2+1"] | Complex[Array, "z_dim y_dim x_dim//2+1"]:
     """Converts the output of a call to `jax.numpy.fft.fftn` to
     an `jax.numpy.fft.rfftn`.
 

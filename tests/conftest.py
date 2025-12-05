@@ -32,3 +32,8 @@ def sample_cif_path():
 @pytest.fixture
 def sample_waterbox_pdb():
     return os.path.join(os.path.dirname(__file__), "data", "relaxed_small_box_tip3p.pdb")
+
+
+@pytest.fixture
+def peng_parameters_path():
+    return os.path.join(os.path.dirname(__file__), "data", "peng1996_element_params.npy")
