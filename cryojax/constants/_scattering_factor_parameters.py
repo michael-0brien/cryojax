@@ -43,21 +43,6 @@ class PengScatteringFactorParameters(eqx.Module, strict=True):
         self.b = parameters[:, 1, :]
 
 
-def check_atomic_numbers_supported(atomic_numbers: Int[np.ndarray, " _"]):
-    """Throw an error if `atomic_numbers` contains values not
-    supported by
-    [`cryojax.constants.extract_scattering_factor_parameters`][].
-    """
-    unique_atomic_numbers = np.unique(atomic_numbers).tolist()
-    if not set(unique_atomic_numbers).issubset(set(_SUPPORTED_ATOMIC_NUMBERS)):
-        raise ValueError(
-            "Found unsupported atomic numbers when running "
-            "function `cryojax.constants.check_atomic_numbers_supported`. "
-            f"Supported atomic numbers are `{_SUPPORTED_ATOMIC_NUMBERS}`, "
-            f"but found values {unique_atomic_numbers}."
-        )
-
-
 def extract_scattering_factor_parameters(
     atomic_numbers: Int[np.ndarray, " n_atoms"],
     tabulation: Literal["peng"] = "peng",
@@ -116,6 +101,21 @@ def extract_scattering_factor_parameters(
         raise ValueError(
             "Only `tabulation = 'peng'` is supported. "
             f"Instead, got `tabulation = {tabulation}`."
+        )
+
+
+def check_atomic_numbers_supported(atomic_numbers: Int[np.ndarray, " _"]):
+    """Throw an error if `atomic_numbers` contains values not
+    supported by
+    [`cryojax.constants.extract_scattering_factor_parameters`][].
+    """
+    unique_atomic_numbers = np.unique(atomic_numbers).tolist()
+    if not set(unique_atomic_numbers).issubset(set(_SUPPORTED_ATOMIC_NUMBERS)):
+        raise ValueError(
+            "Found unsupported atomic numbers when running "
+            "function `cryojax.constants.check_atomic_numbers_supported`. "
+            f"Supported atomic numbers are `{_SUPPORTED_ATOMIC_NUMBERS}`, "
+            f"but found values {unique_atomic_numbers}."
         )
 
 
