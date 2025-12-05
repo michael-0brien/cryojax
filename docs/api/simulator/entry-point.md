@@ -5,3 +5,7 @@
 ---
 
 ::: cryojax.simulator.load_tabulated_volume
+
+---
+
+::: cryojax.simulator.make_linear_operator

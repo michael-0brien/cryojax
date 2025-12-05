@@ -497,7 +497,8 @@ def make_linear_operator(
     """  # noqa: E501
     # Extract arguments for the volume corresponding to
     # `where_volume`
-    volume, other_args = make_filter_spec(args, where_volume)
+    filter_spec = make_filter_spec(args, where_volume)
+    volume, other_args = eqx.partition(args, filter_spec)
     volume, static_args = eqx.partition(volume, eqx.is_array)
     other_args = eqx.combine(other_args, static_args)
     # Instantiate the `lineax.FunctionLinearOperator`
