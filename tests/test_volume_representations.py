@@ -14,6 +14,7 @@ with install_import_hook("cryojax", "typeguard.typechecked"):
     import cryojax.ndimage as im
     import cryojax.simulator as cxs
     from cryojax.constants import (
+        LobatoScatteringFactorParameters,
         PengScatteringFactorParameters,
         check_atomic_numbers_supported,
     )
@@ -128,6 +129,20 @@ def test_scattering_factor_parameters_correct(
 
     np.testing.assert_equal(a1, a2)
     np.testing.assert_equal(b1, b2)
+
+
+def test_compare_hydrogen_scattering_factor():
+    shape, pixel_size = (32, 32), 1.0
+    frequencies = im.make_frequency_grid(shape, pixel_size)
+    hydrogen_id = np.asarray([1], dtype=int)
+    p, l = (
+        PengScatteringFactorParameters(hydrogen_id),
+        LobatoScatteringFactorParameters(hydrogen_id),
+    )
+    p_fac = cxs.PengScatteringFactor(p.a[0], p.b[0])
+    l_fac = cxs.LobatoScatteringFactor(l.a[0], l.b[0])
+    p_arr, l_arr = p_fac(frequencies), l_fac(frequencies)
+    np.testing.assert_allclose(p_arr, l_arr, atol=1e-3)
 
 
 @pytest.mark.parametrize("tabulation", ("peng", "lobato"))
