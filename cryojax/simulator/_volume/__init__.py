@@ -22,6 +22,8 @@ from .independent_atom_volume import (
     FFTAtomProjection as FFTAtomProjection,
     FFTAtomRenderFn as FFTAtomRenderFn,
     IndependentAtomVolume as IndependentAtomVolume,
+    LobatoScatteringFactor as LobatoScatteringFactor,
+    PengScatteringFactor as PengScatteringFactor,
 )
 from .real_voxels import (
     RealVoxelGridVolume as RealVoxelGridVolume,

@@ -7,7 +7,7 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float, PyTree
 
-from ...constants import PengScatteringFactorParameters
+from ...constants import LobatoScatteringFactorParameters, PengScatteringFactorParameters
 from ...jax_util import FloatLike, NDArrayLike, error_if_not_positive
 from ...ndimage import (
     AbstractFourierOperator,
@@ -44,14 +44,14 @@ T = TypeVar("T")
 
 
 class PengScatteringFactor(AbstractFourierOperator, strict=True):
-    a: Float[Array, "5"]
-    b: Float[Array, "5"]
+    a: Float[Array, " n"]
+    b: Float[Array, " n"]
     b_factor: Float[Array, ""] | None
 
     def __init__(
         self,
-        a: Float[NDArrayLike, "5"],
-        b: Float[NDArrayLike, "5"],
+        a: Float[NDArrayLike, " n"],
+        b: Float[NDArrayLike, " n"],
         b_factor: FloatLike | None = None,
     ):
         self.a = jnp.asarray(a, dtype=float)
@@ -68,6 +68,37 @@ class PengScatteringFactor(AbstractFourierOperator, strict=True):
         b_factor = 0.0 if self.b_factor is None else self.b_factor
         gaussian_fn = lambda _a, _b: _a * jnp.exp(-0.25 * (_b + b_factor) * q_squared)
         return jnp.sum(jax.vmap(gaussian_fn)(self.a, self.b), axis=0)
+
+
+class LobatoScatteringFactor(AbstractFourierOperator, strict=True):
+    a: Float[Array, " n"]
+    b: Float[Array, " n"]
+    b_factor: Float[Array, ""] | None
+
+    def __init__(
+        self,
+        a: Float[NDArrayLike, " n"],
+        b: Float[NDArrayLike, " n"],
+        b_factor: FloatLike | None = None,
+    ):
+        self.a = jnp.asarray(a, dtype=float)
+        self.b = jnp.asarray(b, dtype=float)
+        self.b_factor = None if b_factor is None else jnp.asarray(b_factor, dtype=float)
+
+    def __call__(
+        self,
+        frequency_grid: (
+            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
+        ),
+    ):
+        q_squared = jnp.sum(frequency_grid**2, axis=-1)
+        hydrogenic_fn = (
+            lambda _a, _b: _a * (2 + _b * q_squared) / (1 + _b * q_squared) ** 2
+        )
+        scattering_factor = jnp.sum(jax.vmap(hydrogenic_fn)(self.a, self.b), axis=0)
+        if self.b_factor is not None:
+            scattering_factor *= jnp.exp(-0.25 * self.b_factor * q_squared)
+        return scattering_factor
 
 
 class IndependentAtomVolume(AbstractAtomVolume, strict=True):
@@ -124,10 +155,24 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
     def from_tabulated_parameters(
         cls,
         positions_by_element: tuple[Float[NDArrayLike, "_ 3"], ...],
-        parameters: PengScatteringFactorParameters,
+        parameters: PengScatteringFactorParameters | LobatoScatteringFactorParameters,
         *,
         b_factor_by_element: FloatLike | tuple[FloatLike, ...] | None = None,
     ) -> Self:
+        def make_scattering_factor(a, b, b_factor):
+            if isinstance(parameters, PengScatteringFactorParameters):
+                return PengScatteringFactor(a, b, b_factor)
+            elif isinstance(parameters, LobatoScatteringFactorParameters):
+                return LobatoScatteringFactor(a, b, b_factor)
+            else:
+                raise ValueError(
+                    "Unrecognized argument `parameters` when "
+                    "calling `IndependentAtomVolume.from_tabulated_parameters`. "
+                    "Should be either `cryojax.constants.PengScatteringFactorParameters` "
+                    "or `cryojax.constants.LobatoScatteringFactorParameters`, but got "
+                    f"type {parameters.__class__.__name__}."
+                )
+
         n_elements = len(positions_by_element)
         a, b = parameters.a, parameters.b
         if a.shape[0] != n_elements or b.shape[0] != n_elements:
@@ -154,14 +199,14 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
                     b_factor_by_element for _ in range(n_elements)
                 )
             scattering_factors_by_element = tuple(
-                PengScatteringFactor(a_i, b_i, b_factor)
+                make_scattering_factor(a_i, b_i, b_factor)
                 for a_i, b_i, b_factor in zip(
                     parameters.a, parameters.b, b_factor_by_element
                 )
             )
         else:
             scattering_factors_by_element = tuple(
-                PengScatteringFactor(a_i, b_i)
+                make_scattering_factor(a_i, b_i, b_factor=None)
                 for a_i, b_i in zip(parameters.a, parameters.b)
             )
         return cls(positions_by_element, scattering_factors_by_element)
