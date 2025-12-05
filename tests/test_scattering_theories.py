@@ -40,7 +40,7 @@ def test_scattering_theories_no_pose(
 
     atom_potential = cxs.load_tabulated_volume(
         sample_pdb_path,
-        outputs_gmm=True,
+        output_type=cxs.GaussianMixtureVolume,
         selection_string="not element H",
     )
     instrument_config = cxs.BasicImageConfig(
@@ -117,7 +117,9 @@ def test_scattering_theories_pose(
     ) = ctf_params
 
     atom_potential = cxs.load_tabulated_volume(
-        sample_pdb_path, outputs_gmm=True, selection_string="name CA "
+        sample_pdb_path,
+        output_type=cxs.GaussianMixtureVolume,
+        selection_string="name CA ",
     )
     instrument_config = cxs.BasicImageConfig(
         shape=shape,

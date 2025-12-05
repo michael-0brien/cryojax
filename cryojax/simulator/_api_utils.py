@@ -278,7 +278,7 @@ def make_image_model(
 def load_tabulated_volume(  # pyright: ignore[reportOverlappingOverload]
     path_or_mmdf: str | pathlib.Path | pd.DataFrame,
     *,
-    outputs_gmm: Literal[False] = False,
+    output_type: type[IndependentAtomVolume] = IndependentAtomVolume,
     tabulation: Literal["peng"] = "peng",
     include_b_factors: bool = True,
     b_factor_fn: Callable[[NDArrayLike, NDArrayLike], NDArrayLike] = identity_fn,
@@ -291,7 +291,7 @@ def load_tabulated_volume(  # pyright: ignore[reportOverlappingOverload]
 def load_tabulated_volume(
     path_or_mmdf: str | pathlib.Path | pd.DataFrame,
     *,
-    outputs_gmm: Literal[True] = True,
+    output_type: type[GaussianMixtureVolume] = GaussianMixtureVolume,
     tabulation: Literal["peng"] = "peng",
     include_b_factors: bool = True,
     b_factor_fn: Callable[[NDArrayLike, NDArrayLike], NDArrayLike] = identity_fn,
@@ -303,7 +303,9 @@ def load_tabulated_volume(
 def load_tabulated_volume(
     path_or_mmdf: str | pathlib.Path | pd.DataFrame,
     *,
-    outputs_gmm: bool = False,
+    output_type: type[
+        IndependentAtomVolume | GaussianMixtureVolume
+    ] = IndependentAtomVolume,
     tabulation: Literal["peng"] = "peng",
     include_b_factors: bool = False,
     b_factor_fn: Callable[[NDArrayLike, NDArrayLike], NDArrayLike] = identity_fn,
@@ -338,21 +340,20 @@ def load_tabulated_volume(
     - `path_or_mmdf`:
         The path to the PDB/PDBx file or a `pandas.DataFrame` loaded
         from [`mmdf.read`](https://github.com/teamtomo/mmdf).
-    - `outputs_gmm`:
-        If `True`, load a [`cryojax.simulator.GaussianMixtureVolume`][] using
-        [`cryojax.constants.PengScatteringFactorParameters`][].
+    - `output_type`:
+        Either [`cryojax.simulator.GaussianMixtureVolume`][] or
+        [`cryojax.simulator.IndependentAtomVolume`][].
     - `tabulation`:
         Specifies which electron scattering factor tabulation to use.
-        For now, only `tabulation = 'peng'` is supported. Not used if
-        `outputs_gmm = True`.
+        For now, only `tabulation = 'peng'` is supported.
     - `include_b_factors`:
         If `True`, include PDB B-factors in the volume.
     - `b_factor_fn`:
         A function that modulates PDB B-factors before passing to the
         volume. Has signature
         `modulated_b_factor = b_factor_fn(pdb_b_factor, atomic_number)`.
-        If `outputs_gmm = False`, `pdb_b_factor` is the mean B-factor
-        for a given atom type.
+        If `output_type = IndependentAtomVolume`, `pdb_b_factor` is
+        the mean B-factor for a given atom type.
     - `selection_string`:
         A string for [`mdtraj` atom selection](https://mdtraj.org/1.9.4/examples/atom-selection.html#atom-selection).
         See [`cryojax.io.read_atoms_from_pdb`][] for documentation.
@@ -362,8 +363,9 @@ def load_tabulated_volume(
 
     **Returns:**
 
-    If `outputs_gmm = True`, returns a [`cryojax.simulator.GaussianMixtureVolume`][].
-    Otherwise, returns a [`cryojax.simulator.IndependentAtomVolume`][].
+    Returns a [`cryojax.simulator.GaussianMixtureVolume`][] or
+    a [`cryojax.simulator.IndependentAtomVolume`][] depending on
+    `output_type`.
     """  # noqa: E501
     if isinstance(path_or_mmdf, (str, pathlib.Path)):
         atom_data = mmdf.read(pathlib.Path(path_or_mmdf))
@@ -383,7 +385,7 @@ def load_tabulated_volume(
         selection_string=selection_string,
         **pdb_options,
     )
-    if outputs_gmm:
+    if output_type is GaussianMixtureVolume:
         # TODO: this is inefficient if this function is called multiple times,
         # as the electron scattering factor parameter table is read on each call
         peng_parameters = PengScatteringFactorParameters(atomic_numbers)
@@ -397,7 +399,7 @@ def load_tabulated_volume(
         atom_volume = GaussianMixtureVolume.from_tabulated_parameters(
             atom_positions, peng_parameters, extra_b_factors=b_factors
         )
-    else:
+    elif output_type is IndependentAtomVolume:
         (positions_by_id, b_factor_by_id), atom_ids = split_atoms_by_element(
             atomic_numbers, (atom_positions, atom_properties["b_factors"])
         )
@@ -414,6 +416,11 @@ def load_tabulated_volume(
             )
         atom_volume = IndependentAtomVolume.from_tabulated_parameters(
             positions_by_id, scattering_parameters, b_factor_by_element=b_factor_by_id
+        )
+    else:
+        raise ValueError(
+            "Only `output_type` equal to `GaussianMixtureVolume` "
+            "or `IndependentAtomVolume` are supported."
         )
 
     return atom_volume
