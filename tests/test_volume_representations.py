@@ -4,9 +4,6 @@ from typing import Literal
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from cryojax.constants._scattering_factor_parameters import (
-    LobatoScatteringFactorParameters,
-)
 from jaxtyping import Array, Float, install_import_hook
 
 
