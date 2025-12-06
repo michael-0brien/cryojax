@@ -463,15 +463,15 @@ def make_linear_operator(
         # Instantiate a linear operator
         volume_representation = cxs.FourierVoxelGridVolume.from_real_voxel_grid(...)
         image_model = cxs.make_image_model(volume_representation, ...)
-        linear_operator, volume = cxs.make_linear_operator(
+        operator, volume = cxs.make_linear_operator(
             simulate_fn=lambda x: x.simulate(),
             args=image_model,
             where_volume=lambda x: x.volume_parametrization.fourier_voxel_grid,
         )
         # Simulate an image
-        image = linear_operator.mv(volume)
+        image = operator.mv(volume)
         # Access arguments other than those at `volume`
-        args = linear_operator.fn.args
+        args = operator.fn.args
     ```
 
     !!! warning
