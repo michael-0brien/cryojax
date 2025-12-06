@@ -517,9 +517,9 @@ def make_linear_operator(
 
 
 class _SimulateFn(eqx.Module):
-    fn: Callable[[PyTree], Array]
+    simulate_fn: Callable[[PyTree], Array]
     args: PyTree
 
     def __call__(self, volume_args: PyTree) -> Array:
         pytree = eqx.combine(volume_args, self.args)
-        return self.fn(pytree)
+        return self.simulate_fn(pytree)
