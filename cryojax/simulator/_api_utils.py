@@ -455,7 +455,7 @@ def make_linear_operator(
     In particular, instantiates a [`lineax.FunctionLinearOperator`](https://docs.kidger.site/lineax/api/operators/#lineax.FunctionLinearOperator)
     to simulate an image.
 
-    !!! info "Example"
+    !!! example
 
         ```python
         import cryojax.simulator as cxs
