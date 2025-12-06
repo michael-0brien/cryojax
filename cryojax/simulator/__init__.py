@@ -6,7 +6,7 @@ from ._api_utils import (
     load_tabulated_volume as load_tabulated_volume,
     make_image_model as make_image_model,
     make_linear_operator as make_linear_operator,
-    render_voxels as render_voxels,
+    render_voxel_volume as render_voxel_volume,
 )
 from ._detector import (
     AbstractDetector as AbstractDetector,

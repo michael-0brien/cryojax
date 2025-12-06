@@ -452,7 +452,7 @@ def load_tabulated_volume(
 
 
 @overload
-def render_voxels(  # pyright: ignore[reportOverlappingOverload]
+def render_voxel_volume(  # pyright: ignore[reportOverlappingOverload]
     atom_volume: AbstractAtomVolume,
     render_fn: AbstractVolumeRenderFn,
     *,
@@ -461,7 +461,7 @@ def render_voxels(  # pyright: ignore[reportOverlappingOverload]
 
 
 @overload
-def render_voxels(
+def render_voxel_volume(
     atom_volume: AbstractAtomVolume,
     render_fn: AbstractVolumeRenderFn,
     *,
@@ -470,7 +470,7 @@ def render_voxels(
 
 
 @overload
-def render_voxels(
+def render_voxel_volume(
     atom_volume: AbstractAtomVolume,
     render_fn: AbstractVolumeRenderFn,
     *,
@@ -478,7 +478,7 @@ def render_voxels(
 ) -> RealVoxelGridVolume: ...
 
 
-def render_voxels(
+def render_voxel_volume(
     atom_volume: AbstractAtomVolume,
     render_fn: AbstractVolumeRenderFn,
     *,
@@ -494,7 +494,7 @@ def render_voxels(
         import cryojax.simulator as cxs
 
         # Simulate an image from a voxel grid
-        voxel_volume = cxs.render_voxels(
+        voxel_volume = cxs.render_voxel_volume(
             atom_volume=cxs.load_tabulated_volume("example.pdb"),
             render_fn=cxs.AutoVolumeRenderFn(shape=(100, 100, 100), voxel_size=1.0),
         )
@@ -530,7 +530,7 @@ def render_voxels(
     """
     if len(set(render_fn.shape)) != 1:
         raise ValueError(
-            "Function `render_voxels` only supports "
+            "Function `render_voxel_volume` only supports "
             "volume rendering for cubic volumes, i.e. "
             "`render_fn.shape = (N, N, N)`. Got "
             f"`render_fn.shape = {render_fn.shape}`."

@@ -177,7 +177,9 @@ def test_render_voxels(sample_pdb_path):
         cxs.FourierVoxelSplineVolume,
         cxs.RealVoxelGridVolume,
     ]:
-        assert type(cxs.render_voxels(atom_volume, render_fn, output_type=cls)) == cls
+        assert (
+            type(cxs.render_voxel_volume(atom_volume, render_fn, output_type=cls)) == cls
+        )
 
 
 def test_voxel_volume_loaders():
@@ -209,10 +211,10 @@ def test_fourier_vs_real_agreement(sample_pdb_path):
         n_voxels_per_side,
         voxel_size,
     )
-    fourier_volume = cxs.render_voxels(
+    fourier_volume = cxs.render_voxel_volume(
         atom_volume, render_fn, output_type=cxs.FourierVoxelGridVolume
     )
-    real_volume = cxs.render_voxels(
+    real_volume = cxs.render_voxel_volume(
         atom_volume, render_fn, output_type=cxs.RealVoxelGridVolume
     )
     real_voxel_grid = im.ifftn(jnp.fft.ifftshift(fourier_volume.fourier_voxel_grid)).real
