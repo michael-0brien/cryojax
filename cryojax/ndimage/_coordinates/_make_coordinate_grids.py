@@ -139,7 +139,7 @@ def make_radial_frequency_grid(
 def make_frequency_slice(
     shape: tuple[int, int],
     grid_spacing: float | Float[np.ndarray, ""] | Float[Array, ""] = 1.0,
-    outputs_rfftfreqs: bool = True,
+    outputs_rfftfreqs: bool = False,
 ) -> Float[Array, "1 {shape[0]} {shape[1]} 3"]:
     """Create a fourier-space cartesian coordinate system on a grid, where
     zero-frequency component is in the *center* of the grid.

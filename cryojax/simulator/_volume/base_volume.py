@@ -171,7 +171,7 @@ class AbstractVoxelVolume(AbstractVolumeRepresentation, strict=True):
     def from_real_voxel_grid(
         cls, real_voxel_grid: Float[NDArrayLike, "dim dim dim"]
     ) -> Self:
-        """Load an `AbstractVoxelStructure` from a 3D grid in
+        """Load an `AbstractVoxelVolume` from a 3D grid in
         real-space.
         """
         raise NotImplementedError
@@ -196,6 +196,9 @@ class AbstractVolumeIntegrator(eqx.Module, Generic[VolRep], strict=True):
 
 class AbstractVolumeRenderFn(eqx.Module, Generic[VolRep], strict=True):
     """Base class for rendering a volume onto voxels."""
+
+    shape: eqx.AbstractVar[tuple[int, int, int]]
+    voxel_size: eqx.AbstractVar[Float[Array, ""]]
 
     @abc.abstractmethod
     def __call__(

@@ -164,8 +164,22 @@ def test_invalid_atomic_numbers(tabulation):
 
 
 #
-# Test different representations
+# Test volume rendering
 #
+def test_render_voxels(sample_pdb_path):
+    atom_volume = cxs.load_tabulated_volume(
+        sample_pdb_path,
+        output_type=cxs.GaussianMixtureVolume,
+    )
+    render_fn = cxs.AutoVolumeRenderFn((16, 16, 16), voxel_size=4.0)
+    for cls in [
+        cxs.FourierVoxelGridVolume,
+        cxs.FourierVoxelSplineVolume,
+        cxs.RealVoxelGridVolume,
+    ]:
+        assert type(cxs.render_voxels(atom_volume, render_fn, output_type=cls)) == cls
+
+
 def test_voxel_volume_loaders():
     real_voxel_grid = jnp.zeros((10, 10, 10), dtype=float)
     fourier_volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
@@ -178,10 +192,7 @@ def test_voxel_volume_loaders():
     assert isinstance(real_volume.coordinate_grid_in_pixels, Float[Array, "_ _ _ 3"])  # type: ignore
 
 
-#
-# Test rendering
-#
-def test_fourier_vs_real_voxel_volume_agreement(sample_pdb_path):
+def test_fourier_vs_real_agreement(sample_pdb_path):
     """
     Integration test ensuring that the VoxelGrid classes
     produce comparable electron densities when loaded from PDB.
@@ -189,30 +200,24 @@ def test_fourier_vs_real_voxel_volume_agreement(sample_pdb_path):
     n_voxels_per_side = (128, 128, 128)
     voxel_size = 0.5
 
-    # Load the PDB file
-    atom_positions, atom_types = read_atoms_from_pdb(
+    atom_volume = cxs.load_tabulated_volume(
         sample_pdb_path,
-        center=True,
+        output_type=cxs.GaussianMixtureVolume,
         selection_string="not element H",
     )
-    # Load atomistic volume
-    atom_volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(
-        atom_positions,
-        parameters=PengScatteringFactorParameters(atom_types),
+    render_fn = cxs.AutoVolumeRenderFn(
+        n_voxels_per_side,
+        voxel_size,
     )
-    # Build the grid
-    volume_render_fn = cxs.GaussianMixtureRenderFn(n_voxels_per_side, voxel_size)
-    volume_as_real_voxel_grid = volume_render_fn(atom_volume)
-    fourier_volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(
-        volume_as_real_voxel_grid
+    fourier_volume = cxs.render_voxels(
+        atom_volume, render_fn, output_type=cxs.FourierVoxelGridVolume
     )
-    # Since Voxelgrid is in Frequency space by default, we have to first
-    # transform back into real space.
-    fvg_real = im.ifftn(jnp.fft.ifftshift(fourier_volume.fourier_voxel_grid)).real
+    real_volume = cxs.render_voxels(
+        atom_volume, render_fn, output_type=cxs.RealVoxelGridVolume
+    )
+    real_voxel_grid = im.ifftn(jnp.fft.ifftshift(fourier_volume.fourier_voxel_grid)).real
 
-    vg = cxs.RealVoxelGridVolume.from_real_voxel_grid(volume_as_real_voxel_grid)
-
-    np.testing.assert_allclose(fvg_real, vg.real_voxel_grid, atol=1e-12)
+    np.testing.assert_allclose(real_voxel_grid, real_volume.real_voxel_grid, atol=1e-12)
 
 
 def test_downsampled_voxel_volume_agreement(sample_pdb_path):
@@ -334,8 +339,6 @@ def test_fft_atom_render(pdb_info, width, voxel_size, shape):
 #
 # TODO: organize
 #
-
-
 @pytest.mark.parametrize("shape", ((128, 127, 126),))
 def test_compute_rectangular_voxel_grid(sample_pdb_path, shape):
     voxel_size = 0.5

@@ -2,25 +2,42 @@ from typing import Any, ClassVar
 from typing_extensions import override
 
 import equinox as eqx
+import jax.numpy as jnp
+from jaxtyping import Array, Float
 
+from ...jax_util import FloatLike
 from .._image_config import AbstractImageConfig
 from .base_volume import (
     AbstractVolumeIntegrator,
+    AbstractVolumeRenderFn,
     AbstractVolumeRepresentation,
     ProjectionArray,
     VolRep,
+    VoxelArray,
 )
 from .fourier_voxels import (
     FourierSliceExtraction,
     FourierVoxelGridVolume,
     FourierVoxelSplineVolume,
 )
-from .gaussian_volume import GaussianMixtureProjection, GaussianMixtureVolume
-from .independent_atom_volume import FFTAtomProjection, IndependentAtomVolume
+from .gaussian_volume import (
+    GaussianMixtureProjection,
+    GaussianMixtureRenderFn,
+    GaussianMixtureVolume,
+)
+from .independent_atom_volume import (
+    FFTAtomProjection,
+    FFTAtomRenderFn,
+    IndependentAtomVolume,
+)
 from .real_voxels import RealVoxelGridVolume, RealVoxelProjection
 
 
-class AutoVolumeProjection(AbstractVolumeIntegrator[VolRep]):
+class AutoVolumeProjection(AbstractVolumeIntegrator[VolRep], strict=True):
+    """Volume projection auto selection from cryoJAX
+    `AbstractVolumeIntegrator` implementations.
+    """
+
     options: dict[str, Any] = eqx.field(default_factory=dict)
 
     is_projection_approximation: ClassVar[bool] = True
@@ -77,5 +94,69 @@ class AutoVolumeProjection(AbstractVolumeIntegrator[VolRep]):
 
 AutoVolumeProjection.__init__.__doc__ = """**Arguments:**
 
-- `options`: Keyword arguments passed to `AbstractVolumeIntegrator.__init__`.
+- `options`:
+    Keyword arguments passed to the resolved `AbstractVolumeIntegrator`,
+    e.g. `GaussianMixtureProjection(**options)`.
 """
+
+
+class AutoVolumeRenderFn(AbstractVolumeRenderFn[VolRep], strict=True):
+    """Volume rendering auto selection from cryoJAX
+    `AbstractVolumeRenderFn` implementations.
+    """
+
+    shape: tuple[int, int, int]
+    voxel_size: Float[Array, ""]
+
+    options: dict[str, Any]
+
+    def __init__(
+        self,
+        shape: tuple[int, int, int],
+        voxel_size: FloatLike,
+        options: dict[str, Any] = {},
+    ):
+        """**Arguments:**
+
+        - `shape`:
+            The shape of the voxel grid for rendering.
+        - `voxel_size`:
+            The voxel size for rendering.
+        - `options`:
+            Keyword arguments passed to the resolved `AbstractVolumeRenderFn`,
+            e.g. `GaussianMixtureRenderFn(shape, voxel_size, **options)`.
+        """
+        self.shape = shape
+        self.voxel_size = jnp.asarray(voxel_size, dtype=float)
+        self.options = options
+
+    def _select_render_method(
+        self, volume: AbstractVolumeRepresentation
+    ) -> AbstractVolumeRenderFn:
+        if isinstance(volume, IndependentAtomVolume):
+            return FFTAtomRenderFn(self.shape, self.voxel_size, **self.options)
+        elif isinstance(volume, GaussianMixtureVolume):
+            return GaussianMixtureRenderFn(self.shape, self.voxel_size, **self.options)
+        else:
+            raise ValueError(
+                "Could not use `AutoVolumeRenderFn` for volume of "
+                f"type {type(volume).__name__}. If using a custom volume, "
+                "please directly pass its rendering function."
+            )
+
+    @override
+    def __call__(
+        self,
+        volume_representation: VolRep,
+        *,
+        outputs_real_space: bool = True,
+        outputs_rfft: bool = False,
+        fftshifted: bool = False,
+    ) -> VoxelArray:
+        render_fn = self._select_render_method(volume_representation)
+        return render_fn(
+            volume_representation,
+            outputs_real_space=outputs_real_space,
+            outputs_rfft=outputs_rfft,
+            fftshifted=fftshifted,
+        )

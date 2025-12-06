@@ -15,6 +15,11 @@ from ..atom_util import split_atoms_by_element
 from ..constants import LobatoScatteringFactorParameters, PengScatteringFactorParameters
 from ..io import mmdf_to_atoms
 from ..jax_util import NDArrayLike, make_filter_spec
+from ..ndimage import (
+    compute_spline_coefficients,
+    make_coordinate_grid,
+    make_frequency_slice,
+)
 from ._detector import AbstractDetector
 from ._image_config import AbstractImageConfig, DoseImageConfig
 from ._image_model import (
@@ -29,11 +34,16 @@ from ._pose import AbstractPose
 from ._scattering_theory import WeakPhaseScatteringTheory
 from ._transfer_theory import ContrastTransferTheory
 from ._volume import (
+    AbstractAtomVolume,
     AbstractVolumeIntegrator,
     AbstractVolumeParametrization,
+    AbstractVolumeRenderFn,
     AutoVolumeProjection,
+    FourierVoxelGridVolume,
+    FourierVoxelSplineVolume,
     GaussianMixtureVolume,
     IndependentAtomVolume,
+    RealVoxelGridVolume,
 )
 
 
@@ -439,6 +449,114 @@ def load_tabulated_volume(
         )
 
     return atom_volume
+
+
+@overload
+def render_voxels(  # pyright: ignore[reportOverlappingOverload]
+    atom_volume: AbstractAtomVolume,
+    render_fn: AbstractVolumeRenderFn,
+    *,
+    output_type: type[FourierVoxelGridVolume] = FourierVoxelGridVolume,
+) -> FourierVoxelGridVolume: ...
+
+
+@overload
+def render_voxels(
+    atom_volume: AbstractAtomVolume,
+    render_fn: AbstractVolumeRenderFn,
+    *,
+    output_type: type[FourierVoxelSplineVolume] = FourierVoxelSplineVolume,
+) -> FourierVoxelSplineVolume: ...
+
+
+@overload
+def render_voxels(
+    atom_volume: AbstractAtomVolume,
+    render_fn: AbstractVolumeRenderFn,
+    *,
+    output_type: type[RealVoxelGridVolume] = RealVoxelGridVolume,
+) -> RealVoxelGridVolume: ...
+
+
+def render_voxels(
+    atom_volume: AbstractAtomVolume,
+    render_fn: AbstractVolumeRenderFn,
+    *,
+    output_type: type[
+        FourierVoxelGridVolume | FourierVoxelSplineVolume | RealVoxelGridVolume
+    ] = FourierVoxelGridVolume,
+) -> FourierVoxelGridVolume | FourierVoxelSplineVolume | RealVoxelGridVolume:
+    """Render a voxel volume representation from an atomistic one.
+
+    !!! example
+
+        ```python
+        import cryojax.simulator as cxs
+
+        # Simulate an image from a voxel grid
+        voxel_volume = cxs.render_voxels(
+            atom_volume=cxs.load_tabulated_volume("example.pdb"),
+            render_fn=cxs.AutoVolumeRenderFn(shape=(100, 100, 100), voxel_size=1.0),
+        )
+        image_model = cxs.make_image_model(voxel_volume, ...)
+        image = image_model.simulate()
+        ```
+
+    **Arguments:**
+
+    - `atom_volume`:
+        An atomistic volume representation, such as a
+        [`cryojax.simulator.GaussianMixtureVolume`][] or a
+        [`cryojax.simulator.IndependentAtomVolume`][].
+    - `render_fn`:
+        A [`cryojax.simulator.AbstractVolumeRenderFn`][] that
+        accepts `atom_volume` as input. Choose
+        [`cryojax.simulator.AutoVolumeRenderFn`][] to
+        auto-select a method from existing cryoJAX
+        implementations.
+    - `output_type`:
+        The [`cryojax.simulator.AbstractVoxelVolume`][]
+        implementation to output.
+        Either [`cryojax.simulator.FourierVoxelGridVolume`][] /
+        [`cryojax.simulator.FourierVoxelSplineVolume`][] for
+        fourier-space representations, or
+        [`cryojax.simulator.RealVoxelGridVolume`][] for real-space.
+
+
+    **Returns:**
+
+    A [`cryojax.simulator.AbstractVoxelVolume`][] with type
+    equal to `output_type`.
+    """
+    if len(set(render_fn.shape)) != 1:
+        raise ValueError(
+            "Function `render_voxels` only supports "
+            "volume rendering for cubic volumes, i.e. "
+            "`render_fn.shape = (N, N, N)`. Got "
+            f"`render_fn.shape = {render_fn.shape}`."
+        )
+    if output_type == FourierVoxelGridVolume or output_type == FourierVoxelSplineVolume:
+        dim = render_fn.shape[0]
+        frequency_slice = make_frequency_slice((dim, dim), outputs_rfftfreqs=False)
+        fourier_voxel_grid = render_fn(
+            atom_volume, outputs_real_space=False, outputs_rfft=False, fftshifted=True
+        )
+        if output_type == FourierVoxelGridVolume:
+            return FourierVoxelGridVolume(fourier_voxel_grid, frequency_slice)
+        else:
+            spline_coefficients = compute_spline_coefficients(fourier_voxel_grid)
+            return FourierVoxelSplineVolume(spline_coefficients, frequency_slice)
+    elif output_type == RealVoxelGridVolume:
+        coordinate_grid = make_coordinate_grid(render_fn.shape)
+        real_voxel_grid = render_fn(atom_volume, outputs_real_space=True)
+        return RealVoxelGridVolume(real_voxel_grid, coordinate_grid)
+    else:
+        raise ValueError(
+            "Only `output_type` equal to `FourierVoxelGridVolume`, "
+            "`FourierVoxelSplineVolume`, or `RealVoxelGridVolume` "
+            "are supported."
+            f"Got `output_type = {output_type}`."
+        )
 
 
 def make_linear_operator(
