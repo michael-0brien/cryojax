@@ -1,5 +1,5 @@
 import pathlib
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from typing import Any, Literal, TypeVar, overload
 
 import equinox as eqx
@@ -445,12 +445,14 @@ def make_linear_operator(
     simulate_fn: Callable[[Args], Array],
     args: Args,
     where_volume: Callable[[Args], Any],
+    *,
+    tags: object | Iterable[object] = (),
 ) -> tuple[lx.FunctionLinearOperator, Args]:
     """Convert from a cryoJAX abstraction for image simulation to a
     [`lineax`](https://docs.kidger.site/lineax/)'s matrix-vector multiplication
     abstraction.
 
-    Instantiates a [`lineax.FunctionLinearOperator`](https://docs.kidger.site/lineax/api/operators/#lineax.FunctionLinearOperator)
+    In particular, instantiates a [`lineax.FunctionLinearOperator`](https://docs.kidger.site/lineax/api/operators/#lineax.FunctionLinearOperator)
     to simulate an image.
 
     !!! info "Example"
@@ -488,6 +490,8 @@ def make_linear_operator(
     - `where_volume`:
         A pointer to where the arguments for the volume are in
         `args`.
+    - `tags`:
+        See `lineax.FunctionLinearOperator` for documentation.
 
     **Returns:**
 
@@ -507,7 +511,7 @@ def make_linear_operator(
         lambda x: jax.ShapeDtypeStruct(x.shape, x.dtype), volume
     )
     linear_operator = lx.FunctionLinearOperator(
-        fn=simulate_wrapper, input_structure=input_structure
+        fn=simulate_wrapper, input_structure=input_structure, tags=tags
     )
     return linear_operator, volume
 
