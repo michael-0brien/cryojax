@@ -58,7 +58,6 @@ class AbstractGaussianNoiseModel(
             stochastic elements to the `AbstractImageModel`
             will not be used.
 
-
         **Arguments:**
 
         - `outputs_real_space`:
@@ -183,15 +182,14 @@ class GaussianWhiteNoiseModel(AbstractGaussianNoiseModel, strict=True):
         - `filter`:
             A filter to apply to the final image.
         """
-        image_model = self.image_model
-        n_pixels = image_model.get_image_config().padded_n_pixels
-        freqs = image_model.get_image_config().padded_frequency_grid_in_angstroms
+        n_pixels = self.image_model.image_config.padded_n_pixels
+        frequency_grid = self.image_model.image_config.padded_frequency_grid_in_angstroms
         # Compute the zero mean variance and scale up to be independent of the number of
         # pixels
         std = jnp.sqrt(n_pixels * self.variance)
-        noise = image_model.postprocess(
+        noise = self.image_model.postprocess(
             std
-            * jr.normal(rng_key, shape=freqs.shape[0:-1])
+            * jr.normal(rng_key, shape=frequency_grid.shape[0:-1])
             .at[0, 0]
             .set(0.0)
             .astype(complex),
@@ -205,10 +203,7 @@ class GaussianWhiteNoiseModel(AbstractGaussianNoiseModel, strict=True):
     @override
     def log_likelihood(
         self,
-        observed: Float[
-            Array,
-            "{self.image_model.image_config.y_dim} {self.image_model.image_config.x_dim}",
-        ],
+        observed: RealImageArray,
         *,
         mask: MaskLike | None = None,
         filter: FilterLike | None = None,
@@ -312,15 +307,14 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
         - `filter`:
             A filter to apply to the final image.
         """
-        image_model = self.image_model
-        n_pixels = image_model.get_image_config().padded_n_pixels
-        freqs = image_model.get_image_config().padded_frequency_grid_in_angstroms
+        n_pixels = self.image_model.image_config.padded_n_pixels
+        frequency_grid = self.image_model.image_config.padded_frequency_grid_in_angstroms
         # Compute the zero mean variance and scale up to be independent of the number of
         # pixels
-        std = jnp.sqrt(n_pixels * self.variance_fn(freqs))
-        noise = image_model.postprocess(
+        std = jnp.sqrt(n_pixels * self.variance_fn(frequency_grid))
+        noise = self.image_model.postprocess(
             std
-            * jr.normal(rng_key, shape=freqs.shape[0:-1])
+            * jr.normal(rng_key, shape=frequency_grid.shape[0:-1])
             .at[0, 0]
             .set(0.0)
             .astype(complex),
@@ -334,11 +328,7 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
     @override
     def log_likelihood(
         self,
-        observed: Complex[
-            Array,
-            "{self.image_model.image_config.y_dim} "
-            "{self.image_model.image_config.x_dim//2+1}",
-        ],
+        observed: FourierImageArray,
         *,
         mask: MaskLike | None = None,
         filter: FilterLike | None = None,
@@ -362,11 +352,10 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
         - `filter`:
             A filter to apply to the final image.
         """
-        config = self.image_model.get_image_config()
-        n_pixels = config.n_pixels
-        freqs = config.frequency_grid_in_angstroms
+        n_pixels = self.image_config.n_pixels
+        frequency_grid = self.image_config.frequency_grid_in_angstroms
         # Compute the variance and scale up to be independent of the number of pixels
-        variance = n_pixels * self.variance_fn(freqs)
+        variance = n_pixels * self.variance_fn(frequency_grid)
         # Create simulated data
         simulated = self.compute_signal(
             outputs_real_space=False,

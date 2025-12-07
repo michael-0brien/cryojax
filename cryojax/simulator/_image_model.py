@@ -49,22 +49,14 @@ class AbstractImageModel(eqx.Module, strict=True):
     Call an `AbstractImageModel`'s `simulate` routine.
     """
 
+    image_config: eqx.AbstractVar[AbstractImageConfig]
+    pose: eqx.AbstractVar[AbstractPose]
+    signal_region: eqx.AbstractVar[Bool[Array, "_ _"] | None]
+
     normalizes_signal: eqx.AbstractVar[bool]
 
     @abstractmethod
-    def get_pose(self) -> AbstractPose:
-        raise NotImplementedError
-
-    @abstractmethod
-    def get_image_config(self) -> AbstractImageConfig:
-        raise NotImplementedError
-
-    @abstractmethod
-    def get_signal_region(self) -> Bool[Array, "_ _"] | None:
-        raise NotImplementedError
-
-    @abstractmethod
-    def compute_fourier_image(self, rng_key: PRNGKeyArray | None = None) -> Array:
+    def raw_simulate(self, rng_key: PRNGKeyArray | None = None) -> Array:
         """Render an image without postprocessing."""
         raise NotImplementedError
 
@@ -85,11 +77,10 @@ class AbstractImageModel(eqx.Module, strict=True):
             The random number generator key. If not passed, render an image
             with no stochasticity.
         - `removes_padding`:
-            If `True`, return an image cropped to `BasicImageConfig.shape`.
-            Otherwise, return an image at the `BasicImageConfig.padded_shape`.
-            If `removes_padding = False`, the `AbstractImageModel.filter`
-            and `AbstractImageModel.mask` are not applied, overriding
-            the booleans `applies_mask` and `applies_filter`.
+            If `True`, return an image cropped to `image_config.shape`.
+            Otherwise, return an image at the `image_config.padded_shape`.
+            If `removes_padding = False`, the `filter`
+            and `mask` are not applied.
         - `outputs_real_space`:
             If `True`, return the image in real space.
         - `mask`:
@@ -97,7 +88,7 @@ class AbstractImageModel(eqx.Module, strict=True):
         - `filter`:
             Optionally apply a filter to the image.
         """
-        fourier_image = self.compute_fourier_image(rng_key)
+        fourier_image = self.raw_simulate(rng_key)
 
         return self._maybe_postprocess(
             fourier_image,
@@ -118,7 +109,7 @@ class AbstractImageModel(eqx.Module, strict=True):
         """Return an image postprocessed with filters, cropping, masking,
         and normalization in either real or fourier space.
         """
-        image_config = self.get_image_config()
+        image_config = self.image_config
         if (
             mask is None
             and image_config.padded_shape == image_config.shape
@@ -161,22 +152,20 @@ class AbstractImageModel(eqx.Module, strict=True):
             return image if outputs_real_space else rfftn(image)
 
     def _phase_shift_translate(self, fourier_image: Array) -> Array:
-        pose, image_config = self.get_pose(), self.get_image_config()
-        phase_shifts = pose.compute_translation_operator(
-            image_config.padded_frequency_grid_in_angstroms
+        phase_shifts = self.pose.compute_translation_operator(
+            self.image_config.padded_frequency_grid_in_angstroms
         )
-        fourier_image = pose.translate_image(
+        fourier_image = self.pose.translate_image(
             fourier_image,
             phase_shifts,
-            image_config.padded_shape,
+            self.image_config.padded_shape,
         )
 
         return fourier_image
 
     def _atom_translate(self, volrep: AbstractVolumeRepresentation) -> AbstractAtomVolume:
-        pose = self.get_pose()
         if isinstance(volrep, AbstractAtomVolume):
-            return volrep.translate_to_pose(pose)
+            return volrep.translate_to_pose(self.pose)
         else:
             raise ValueError(
                 "Tried to apply translation in `translate_mode = 'atom'`, but "
@@ -185,10 +174,9 @@ class AbstractImageModel(eqx.Module, strict=True):
             )
 
     def _normalize_image(self, image: Array) -> Array:
-        signal_region = self.get_signal_region()
         mean, std = (
-            jnp.mean(image, where=signal_region),
-            jnp.std(image, where=signal_region),
+            jnp.mean(image, where=self.signal_region),
+            jnp.std(image, where=self.signal_region),
         )
         image = (image - mean) / std
 
@@ -203,14 +191,13 @@ class AbstractImageModel(eqx.Module, strict=True):
         mask: MaskLike | None = None,
         filter: FilterLike | None = None,
     ) -> Array:
-        image_config = self.get_image_config()
         if removes_padding:
             return self.postprocess(
                 image, outputs_real_space=outputs_real_space, mask=mask, filter=filter
             )
         else:
             return (
-                irfftn(image, s=image_config.padded_shape)
+                irfftn(image, s=self.image_config.padded_shape)
                 if outputs_real_space
                 else image
             )
@@ -285,27 +272,15 @@ class LinearImageModel(AbstractImageModel, strict=True):
             self.signal_region = jnp.asarray(signal_region, dtype=bool)
 
     @override
-    def get_pose(self) -> AbstractPose:
-        return self.pose
-
-    @override
-    def get_image_config(self) -> AbstractImageConfig:
-        return self.image_config
-
-    @override
-    def get_signal_region(self) -> Bool[Array, "_ _"] | None:
-        return self.signal_region
-
-    @override
-    def compute_fourier_image(
+    def raw_simulate(
         self, rng_key: PRNGKeyArray | None = None
     ) -> PaddedFourierImageArray:
         # Get the representation of the volume
         if rng_key is None:
-            volume_representation = self.volume_parametrization.get_representation()
+            volume_representation = self.volume_parametrization.to_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            volume_representation = self.volume_parametrization.get_representation(
+            volume_representation = self.volume_parametrization.to_representation(
                 rng_key=this_key
             )
         # Rotate it to the lab frame
@@ -396,27 +371,15 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
             self.signal_region = jnp.asarray(signal_region, dtype=bool)
 
     @override
-    def get_pose(self) -> AbstractPose:
-        return self.pose
-
-    @override
-    def get_image_config(self) -> AbstractImageConfig:
-        return self.image_config
-
-    @override
-    def get_signal_region(self) -> Bool[Array, "_ _"] | None:
-        return self.signal_region
-
-    @override
-    def compute_fourier_image(
+    def raw_simulate(
         self, rng_key: PRNGKeyArray | None = None
     ) -> ImageArray | PaddedImageArray:
         # Get the representation of the volume
         if rng_key is None:
-            volume_representation = self.volume_parametrization.get_representation()
+            volume_representation = self.volume_parametrization.to_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            volume_representation = self.volume_parametrization.get_representation(
+            volume_representation = self.volume_parametrization.to_representation(
                 rng_key=this_key
             )
         # Rotate it to the lab frame
@@ -509,28 +472,16 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
             self.signal_region = jnp.asarray(signal_region, dtype=bool)
 
     @override
-    def get_pose(self) -> AbstractPose:
-        return self.pose
-
-    @override
-    def get_image_config(self) -> AbstractImageConfig:
-        return self.image_config
-
-    @override
-    def get_signal_region(self) -> Bool[Array, "_ _"] | None:
-        return self.signal_region
-
-    @override
-    def compute_fourier_image(
+    def raw_simulate(
         self, rng_key: PRNGKeyArray | None = None
     ) -> PaddedFourierImageArray:
         # Get the volume representation. Its data should be a scattering potential
         # to simulate in physical units
         if rng_key is None:
-            volume_representation = self.volume_parametrization.get_representation()
+            volume_representation = self.volume_parametrization.to_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            volume_representation = self.volume_parametrization.get_representation(
+            volume_representation = self.volume_parametrization.to_representation(
                 rng_key=this_key
             )
         # Rotate it to the lab frame
@@ -618,28 +569,16 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
             self.signal_region = jnp.asarray(signal_region, dtype=bool)
 
     @override
-    def get_pose(self) -> AbstractPose:
-        return self.pose
-
-    @override
-    def get_image_config(self) -> AbstractImageConfig:
-        return self.image_config
-
-    @override
-    def get_signal_region(self) -> Bool[Array, "_ _"] | None:
-        return self.signal_region
-
-    @override
-    def compute_fourier_image(
+    def raw_simulate(
         self, rng_key: PRNGKeyArray | None = None
     ) -> PaddedFourierImageArray:
         # Get the volume representation. Its data should be a scattering potential
         # to simulate in physical units
         if rng_key is None:
-            volume_representation = self.volume_parametrization.get_representation()
+            volume_representation = self.volume_parametrization.to_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            volume_representation = self.volume_parametrization.get_representation(
+            volume_representation = self.volume_parametrization.to_representation(
                 rng_key=this_key
             )
         # Rotate it to the lab frame
@@ -729,25 +668,13 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
             self.signal_region = jnp.asarray(signal_region, dtype=bool)
 
     @override
-    def get_pose(self) -> AbstractPose:
-        return self.pose
-
-    @override
-    def get_image_config(self) -> DoseImageConfig:
-        return self.image_config
-
-    @override
-    def get_signal_region(self) -> Bool[Array, "_ _"] | None:
-        return self.signal_region
-
-    @override
-    def compute_fourier_image(
+    def raw_simulate(
         self, rng_key: PRNGKeyArray | None = None
     ) -> PaddedFourierImageArray:
         if rng_key is None:
             # Get the volume representation. Its data should be a scattering potential
             # to simulate in physical units
-            volume_representation = self.volume_parametrization.get_representation()
+            volume_representation = self.volume_parametrization.to_representation()
             # Rotate it to the lab frame
             volume_representation = volume_representation.rotate_to_pose(self.pose)
             # Translate if using atom translations
@@ -773,9 +700,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
             keys = jr.split(rng_key, 3)
             # Get the volume representation. Its data should be a scattering potential
             # to simulate in physical units
-            volume_representation = self.volume_parametrization.get_representation(
-                keys[0]
-            )
+            volume_representation = self.volume_parametrization.to_representation(keys[0])
             # Rotate it to the lab frame
             volume_representation = volume_representation.rotate_to_pose(self.pose)
             # Translate if using atom translations
