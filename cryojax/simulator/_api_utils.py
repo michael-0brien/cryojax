@@ -6,6 +6,7 @@ import equinox.internal as eqxi
 import jax.numpy as jnp
 import mmdf
 import pandas as pd
+import equinox as eqx
 from jaxtyping import Bool
 
 from ..atom_util import split_atoms_by_element
@@ -31,10 +32,22 @@ from ._volume import (
     AutoVolumeProjection,
     GaussianMixtureVolume,
     IndependentAtomVolume,
+    FourierVoxelGridVolume,
+    FourierVoxelSplineVolume,
 )
 
 
 identity_fn = eqxi.doc_repr(lambda x, _: x, "identity_fn")
+
+
+def _use_inverse_pose(volume_parametrization: AbstractVolumeParametrization) -> bool:
+    jaxpr_fn = eqx.filter_make_jaxpr(lambda vol: vol.to_representation())
+    _, out_dynamic, out_static = jaxpr_fn(volume_parametrization)
+    out_struct = eqx.combine(out_dynamic, out_static)
+    expects_frame_rotation = isinstance(
+        out_struct, (FourierVoxelGridVolume, FourierVoxelSplineVolume)
+    )
+    return expects_frame_rotation
 
 
 @overload
@@ -179,6 +192,22 @@ def make_image_model(
         translation on atom positions before projection.
         If `'none'`, does not apply a translation.
 
+    !!! warning
+        The `pose` given to `make_image_model` always represents a
+        rotation of the *object*, not of the frame. Some volume
+        projection methods (e.g. `FourierVoxelExtraction`) instead image
+        a rotation of the frame, so if `volume_parametrization` outputs
+        such a representation, the pose is transposed under the hood.
+
+        Rotations will still differ by a transpose if:
+
+        - The `volume_parametrization` outputs a custom volume that
+        implements a frame rotation
+        - The user instantiates an `AbstractImageModel` directly, rather
+        than through `make_image_model`.
+
+        In these cases, it is necessary to manually invert the pose.
+
     **Returns:**
 
     An `AbstractImageModel`. Simulate an image with syntax
@@ -188,6 +217,10 @@ def make_image_model(
     image = image_model.simulate()
     ```
     """
+    # Invert pose if volume expects frame rotation
+    if _use_inverse_pose(volume_parametrization):
+        pose = pose.to_inverse_rotation()
+    # Gather options
     options = dict(
         normalizes_signal=normalizes_signal,
         signal_region=signal_region,
