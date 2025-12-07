@@ -26,13 +26,16 @@ This documentation is a collection of functions used to work with coordinate sys
 ::: cryojax.ndimage.cartesian_to_polar
 
 
-## Image transforms (filters and masks)
+## Image transforms (e.g. filters and masks)
 
 ??? abstract "`cryojax.ndimage.AbstractImageTransform`"
     ::: cryojax.ndimage.AbstractImageTransform
         options:
             members:
                 - __init__
+                - is_real_space
+                - __call__
+
 
 ### Filters
 

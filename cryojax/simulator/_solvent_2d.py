@@ -16,7 +16,6 @@ from ..ndimage import (
     AbstractFourierOperator,
     FourierGaussian,
     FourierGaussianWithRadialOffset,
-    FourierOperatorLike,
     ifftn,
     irfftn,
     rescale_image,
@@ -43,13 +42,13 @@ class SolventMixturePower(AbstractFourierOperator, strict=True):
     `envelope_fn` and `peak_fn`.
     """
 
-    envelope_fn: FourierOperatorLike
-    peak_fn: FourierOperatorLike
+    envelope_fn: AbstractFourierOperator
+    peak_fn: AbstractFourierOperator
 
     def __init__(
         self,
-        envelope_fn: FourierOperatorLike | None = None,
-        peak_fn: FourierOperatorLike | None = None,
+        envelope_fn: AbstractFourierOperator | None = None,
+        peak_fn: AbstractFourierOperator | None = None,
     ):
         if envelope_fn is None:
             self.envelope_fn = FourierGaussian(
@@ -163,7 +162,7 @@ class GRFSolvent2D(AbstractRandomSolvent2D, strict=True):
     thickness_in_angstroms: Float[Array, ""]
     molecules_per_angstrom_cubed: float
     total_potential_per_molecule: float
-    power_fn: FourierOperatorLike
+    power_fn: AbstractFourierOperator
     samples_power: bool
 
     def __init__(
@@ -171,7 +170,7 @@ class GRFSolvent2D(AbstractRandomSolvent2D, strict=True):
         thickness_in_angstroms: Float[Array, ""] | float,
         molecules_per_angstrom_cubed: float = 0.0325,
         total_potential_per_molecule: float = 38.214333,
-        power_fn: FourierOperatorLike | None = None,
+        power_fn: AbstractFourierOperator | None = None,
         samples_power: bool = False,
     ):
         """**Arguments:**

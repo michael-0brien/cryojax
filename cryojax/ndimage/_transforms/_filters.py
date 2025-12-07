@@ -4,6 +4,7 @@ Filters to apply to images in Fourier space
 
 import abc
 import math
+from typing import ClassVar
 from typing_extensions import override
 
 import jax
@@ -21,6 +22,8 @@ from ._base_transform import AbstractImageTransform
 
 class AbstractFilter(AbstractImageTransform, strict=True):
     """Base class for computing and applying an image filter."""
+
+    is_real_space: ClassVar[bool] = False
 
     @abc.abstractmethod
     def get(self) -> Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]:

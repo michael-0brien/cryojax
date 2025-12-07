@@ -11,7 +11,13 @@ from equinox import AbstractVar
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
 from ...jax_util import FloatLike, error_if_not_positive
-from ...ndimage import Constant, FilterLike, FourierOperatorLike, MaskLike, rfftn
+from ...ndimage import (
+    AbstractFourierOperator,
+    FilterLike,
+    FourierConstant,
+    MaskLike,
+    rfftn,
+)
 from .._image_model import AbstractImageModel
 from .base_noise_model import AbstractEmpiricalNoiseModel, AbstractLikelihoodNoiseModel
 
@@ -257,14 +263,14 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
     """
 
     image_model: AbstractImageModel
-    variance_fn: FourierOperatorLike
+    variance_fn: AbstractFourierOperator
     signal_scale_factor: Float[Array, ""]
     signal_offset: Float[Array, ""]
 
     def __init__(
         self,
         image_model: AbstractImageModel,
-        variance_fn: FourierOperatorLike | None = None,
+        variance_fn: AbstractFourierOperator | None = None,
         signal_scale_factor: FloatLike = 1.0,
         signal_offset: FloatLike = 0.0,
     ):
@@ -274,14 +280,14 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
             The image formation model.
         - `variance_fn`:
             The variance of each fourier mode. By default,
-            `cryojax.ndimage.operators.Constant(1.0)`.
+            `cryojax.ndimage.FourierConstant(1.0)`.
         - `signal_scale_factor`:
             A scale factor for the underlying signal simulated from `image_model`.
         - `signal_offset`:
             An offset for the underlying signal simulated from `image_model`.
         """  # noqa: E501
         self.image_model = image_model
-        self.variance_fn = variance_fn or Constant(1.0)
+        self.variance_fn = variance_fn or FourierConstant(1.0)
         self.signal_scale_factor = error_if_not_positive(
             jnp.asarray(signal_scale_factor, dtype=float)
         )

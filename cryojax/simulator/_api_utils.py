@@ -13,6 +13,7 @@ from ..atom_util import split_atoms_by_element
 from ..constants import PengScatteringFactorParameters
 from ..io import mmdf_to_atoms
 from ..jax_util import NDArrayLike
+from ..ndimage import AbstractImageTransform
 from ._detector import AbstractDetector
 from ._image_config import AbstractImageConfig, DoseImageConfig
 from ._image_model import (
@@ -59,10 +60,11 @@ def make_image_model(
     volume_integrator: AbstractVolumeIntegrator = AutoVolumeProjection(),
     detector: AbstractDetector | None = None,
     *,
-    quantity_mode: None = None,
+    transform: AbstractImageTransform | None = None,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
     translate_mode: Literal["fft", "atom", "none"] = "fft",
+    quantity_mode: None = None,
 ) -> ProjectionImageModel: ...
 
 
@@ -75,10 +77,11 @@ def make_image_model(  # pyright: ignore[reportOverlappingOverload]
     volume_integrator: AbstractVolumeIntegrator = AutoVolumeProjection(),
     detector: AbstractDetector | None = None,
     *,
-    quantity_mode: None = None,
+    transform: AbstractImageTransform | None = None,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
     translate_mode: Literal["fft", "atom", "none"] = "fft",
+    quantity_mode: None = None,
 ) -> LinearImageModel: ...
 
 
@@ -91,10 +94,11 @@ def make_image_model(
     volume_integrator: AbstractVolumeIntegrator = AutoVolumeProjection(),
     detector: AbstractDetector | None = None,
     *,
-    quantity_mode: Literal["contrast"] = "contrast",
+    transform: AbstractImageTransform | None = None,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
     translate_mode: Literal["fft", "atom", "none"] = "fft",
+    quantity_mode: Literal["contrast"] = "contrast",
 ) -> ContrastImageModel: ...
 
 
@@ -107,10 +111,11 @@ def make_image_model(
     volume_integrator: AbstractVolumeIntegrator = AutoVolumeProjection(),
     detector: AbstractDetector | None = None,
     *,
-    quantity_mode: Literal["intensity"] = "intensity",
+    transform: AbstractImageTransform | None = None,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
     translate_mode: Literal["fft", "atom", "none"] = "fft",
+    quantity_mode: Literal["intensity"] = "intensity",
 ) -> IntensityImageModel: ...
 
 
@@ -123,10 +128,11 @@ def make_image_model(
     volume_integrator: AbstractVolumeIntegrator = AutoVolumeProjection(),
     detector: AbstractDetector | None = None,
     *,
-    quantity_mode: Literal["counts"] = "counts",
+    transform: AbstractImageTransform | None = None,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
     translate_mode: Literal["fft", "atom", "none"] = "fft",
+    quantity_mode: Literal["counts"] = "counts",
 ) -> ElectronCountsImageModel: ...
 
 
@@ -138,10 +144,11 @@ def make_image_model(
     volume_integrator: AbstractVolumeIntegrator = AutoVolumeProjection(),
     detector: AbstractDetector | None = None,
     *,
-    quantity_mode: Literal["contrast", "intensity", "counts"] | None = None,
+    transform: AbstractImageTransform | None = None,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
     translate_mode: Literal["fft", "atom", "none"] = "fft",
+    quantity_mode: Literal["contrast", "intensity", "counts"] | None = None,
 ) -> AbstractImageModel:
     """Construct an `AbstractImageModel` for most common use-cases.
 
@@ -168,12 +175,23 @@ def make_image_model(
     - `detector`:
         If `quantity_mode = 'counts'` is chosen, then an `AbstractDetector` class must be
         chosen to simulate electron counts.
+    - `transform`:
+        A [`cryojax.ndimage.AbstractImageTransform`][] applied to the
+        image after simulation. If this is a real-space transform it
+        is applied before masking and after normalization, and
+        if it is a fourier-space transform it is applied
+        before filtering and before normalization.
     - `normalizes_signal`:
         If `True`, normalizes_signal the image before returning.
     - `signal_region`:
         A boolean array that is 1 where there is signal,
         and 0 otherwise used to normalize the image.
         Must have shape equal to `AbstractImageConfig.shape`.
+    - `translate_mode`:
+        If `'fft'`, apply in-plane translation via phase
+        shifts in the Fourier domain. If `'atoms'` apply
+        translation on atom positions before projection.
+        If `'none'`, does not apply a translation.
     - `quantity_mode`:
         The physical observable to simulate. If `None`, simulate without scaling
         to physical units using the `LinearImageModel`.
@@ -186,11 +204,6 @@ def make_image_model(
         - 'counts':
             Uses the `ElectronCountsImageModel` to simulate electron counts.
             If this is passed, a `detector` must also be passed.
-    - `translate_mode`:
-        If `'fft'`, apply in-plane translation via phase
-        shifts in the Fourier domain. If `'atoms'` apply
-        translation on atom positions before projection.
-        If `'none'`, does not apply a translation.
 
     !!! warning
         The `pose` given to `make_image_model` always represents a
@@ -225,6 +238,7 @@ def make_image_model(
         normalizes_signal=normalizes_signal,
         signal_region=signal_region,
         translate_mode=translate_mode,
+        transform=transform,
     )
     if transfer_theory is None:
         # Image model for projections

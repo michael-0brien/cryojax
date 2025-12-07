@@ -1,24 +1,15 @@
-from ._base_operator import (
-    AbstractImageOperator as AbstractImageOperator,
-    Constant as Constant,
-    CustomOperator as CustomOperator,
-    DiffImageOperator as DiffImageOperator,
-    Empirical as Empirical,
-    ProductImageOperator as ProductImageOperator,
-    SumImageOperator as SumImageOperator,
-)
 from ._fourier_operator import (
     AbstractFourierOperator as AbstractFourierOperator,
+    CustomFourierOperator as CustomFourierOperator,
+    FourierConstant as FourierConstant,
     FourierExp2D as FourierExp2D,
     FourierGaussian as FourierGaussian,
     FourierGaussianWithRadialOffset as FourierGaussianWithRadialOffset,
-    FourierOperatorLike as FourierOperatorLike,
     FourierSinc as FourierSinc,
-    Lorenzian as Lorenzian,
     ZeroMode as ZeroMode,
 )
 from ._real_operator import (
     AbstractRealOperator as AbstractRealOperator,
-    Gaussian2D as Gaussian2D,
-    RealOperatorLike as RealOperatorLike,
+    RealConstant as RealConstant,
+    RealGaussian as RealGaussian,
 )

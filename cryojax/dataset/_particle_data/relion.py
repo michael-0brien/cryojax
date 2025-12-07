@@ -19,7 +19,7 @@ from jaxtyping import Array, Float, Int
 
 from ...io import read_starfile, write_image_stack_to_mrc, write_starfile
 from ...jax_util import NDArrayLike
-from ...ndimage import Constant, FourierGaussian
+from ...ndimage import FourierConstant, FourierGaussian
 from ...simulator import (
     AstigmaticCTF,
     BasicImageConfig,
@@ -1164,7 +1164,7 @@ def _make_envelope_function(amp, b_factor):
         return None
 
     elif b_factor is None and amp is not None:
-        return eqx.tree_at(lambda x: x.value, Constant(1.0), amp)
+        return eqx.tree_at(lambda x: x.value, FourierConstant(1.0), amp)
     else:
         if amp is None:
             amp = np.asarray(1.0) if b_factor.ndim == 0 else np.ones_like(b_factor)
@@ -1526,7 +1526,7 @@ def _parameters_to_particle_data(
         if isinstance(transfer_theory.envelope, FourierGaussian):
             particles_dict["rlnCtfBfactor"] = transfer_theory.envelope.b_factor
             particles_dict["rlnCtfScalefactor"] = transfer_theory.envelope.amplitude
-        elif isinstance(transfer_theory.envelope, Constant):
+        elif isinstance(transfer_theory.envelope, FourierConstant):
             particles_dict["rlnCtfScalefactor"] = transfer_theory.envelope.value
         elif transfer_theory.envelope is None:
             pass
@@ -1534,8 +1534,8 @@ def _parameters_to_particle_data(
             raise ValueError(
                 "When adding particle to STAR file, "
                 "`transfer_theory.envelope` must be "
-                "type `cryojax.image.operators.FourierGaussian` "
-                "or `cryojax.image.operators.Constant`, or `None`. Got "
+                "type `cryojax.ndimage.FourierGaussian` "
+                "or `cryojax.ndimage.FourierConstant`, or `None`. Got "
                 f"{type(transfer_theory.envelope).__name__}."
             )
         particles_dict["rlnPhaseShift"] = transfer_theory.phase_shift
