@@ -1,5 +1,6 @@
 from typing import Literal, overload
 
+import equinox as eqx
 from jaxtyping import Bool
 
 from ..jax_util import NDArrayLike
@@ -20,7 +21,19 @@ from ._volume import (
     AbstractVolumeIntegrator,
     AbstractVolumeParametrization,
     AutoVolumeProjection,
+    FourierVoxelGridVolume,
+    FourierVoxelSplineVolume,
 )
+
+
+def _do_pose_transpose(volume_parametrization: AbstractVolumeParametrization) -> bool:
+    jaxpr_fn = eqx.filter_make_jaxpr(lambda vol: vol.get_representation())
+    _, out_dynamic, out_static = jaxpr_fn(volume_parametrization)
+    out_struct = eqx.combine(out_dynamic, out_static)
+    expects_frame_rotation = isinstance(
+        out_struct, (FourierVoxelGridVolume, FourierVoxelSplineVolume)
+    )
+    return expects_frame_rotation
 
 
 @overload
@@ -165,6 +178,22 @@ def make_image_model(
         translation on atom positions before projection.
         If `'none'`, does not apply a translation.
 
+    !!! warning
+        The `pose` given to `make_image_model` always represents a
+        rotation of the *object*, not of the frame. Some volume
+        projection methods (e.g. `FourierVoxelExtraction`) instead image
+        a rotation of the frame, so if `volume_parametrization` outputs
+        such a representation, the pose is transposed under the hood.
+
+        Rotations will still differ by a transpose if:
+
+        - The `volume_parametrization` outputs a custom volume that
+        implements a frame rotation
+        - The user instantiates an `AbstractImageModel` directly, rather
+        than through `make_image_model`.
+
+        In these cases, it is necessary to manually invert the pose.
+
     **Returns:**
 
     An `AbstractImageModel`. Simulate an image with syntax
@@ -174,6 +203,8 @@ def make_image_model(
     image = image_model.simulate()
     ```
     """
+    if _do_pose_transpose(volume_parametrization):
+        pose = pose.to_inverse_rotation()
     if transfer_theory is None:
         # Image model for projections
         image_model = ProjectionImageModel(
