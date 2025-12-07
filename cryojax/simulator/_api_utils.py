@@ -26,8 +26,8 @@ from ._volume import (
 )
 
 
-def _do_pose_transpose(volume_parametrization: AbstractVolumeParametrization) -> bool:
-    jaxpr_fn = eqx.filter_make_jaxpr(lambda vol: vol.get_representation())
+def _use_inverse_pose(volume_parametrization: AbstractVolumeParametrization) -> bool:
+    jaxpr_fn = eqx.filter_make_jaxpr(lambda vol: vol.to_representation())
     _, out_dynamic, out_static = jaxpr_fn(volume_parametrization)
     out_struct = eqx.combine(out_dynamic, out_static)
     expects_frame_rotation = isinstance(
@@ -203,7 +203,7 @@ def make_image_model(
     image = image_model.simulate()
     ```
     """
-    if _do_pose_transpose(volume_parametrization):
+    if _use_inverse_pose(volume_parametrization):
         pose = pose.to_inverse_rotation()
     if transfer_theory is None:
         # Image model for projections
