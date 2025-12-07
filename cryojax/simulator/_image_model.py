@@ -49,22 +49,19 @@ class AbstractImageModel(eqx.Module, strict=True):
     Call an `AbstractImageModel`'s `simulate` routine.
     """
 
+    image_config: eqx.AbstractVar[AbstractImageConfig]
+    pose: eqx.AbstractVar[AbstractPose]
+    signal_region: eqx.AbstractVar[Bool[Array, "_ _"] | None]
+
     normalizes_signal: eqx.AbstractVar[bool]
 
     @abstractmethod
-    def get_pose(self) -> AbstractPose:
-        raise NotImplementedError
-
-    @abstractmethod
-    def get_image_config(self) -> AbstractImageConfig:
-        raise NotImplementedError
-
-    @abstractmethod
-    def get_signal_region(self) -> Bool[Array, "_ _"] | None:
-        raise NotImplementedError
-
-    @abstractmethod
-    def compute_fourier_image(self, rng_key: PRNGKeyArray | None = None) -> Array:
+    def raw_simulate(
+        self,
+        rng_key: PRNGKeyArray | None = None,
+        *,
+        outputs_real_space: bool = True,
+    ) -> Array:
         """Render an image without postprocessing."""
         raise NotImplementedError
 
@@ -85,11 +82,10 @@ class AbstractImageModel(eqx.Module, strict=True):
             The random number generator key. If not passed, render an image
             with no stochasticity.
         - `removes_padding`:
-            If `True`, return an image cropped to `BasicImageConfig.shape`.
-            Otherwise, return an image at the `BasicImageConfig.padded_shape`.
-            If `removes_padding = False`, the `AbstractImageModel.filter`
-            and `AbstractImageModel.mask` are not applied, overriding
-            the booleans `applies_mask` and `applies_filter`.
+            If `True`, return an image cropped to `image_config.shape`.
+            Otherwise, return an image at the `image_config.padded_shape`.
+            If `removes_padding = False`, the `filter`
+            and `mask` are not applied.
         - `outputs_real_space`:
             If `True`, return the image in real space.
         - `mask`:
@@ -97,7 +93,7 @@ class AbstractImageModel(eqx.Module, strict=True):
         - `filter`:
             Optionally apply a filter to the image.
         """
-        fourier_image = self.compute_fourier_image(rng_key)
+        fourier_image = self.raw_simulate(rng_key, outputs_real_space=False)
 
         return self._maybe_postprocess(
             fourier_image,
@@ -118,7 +114,7 @@ class AbstractImageModel(eqx.Module, strict=True):
         """Return an image postprocessed with filters, cropping, masking,
         and normalization in either real or fourier space.
         """
-        image_config = self.get_image_config()
+        image_config = self.image_config
         if (
             mask is None
             and image_config.padded_shape == image_config.shape
@@ -161,22 +157,20 @@ class AbstractImageModel(eqx.Module, strict=True):
             return image if outputs_real_space else rfftn(image)
 
     def _phase_shift_translate(self, fourier_image: Array) -> Array:
-        pose, image_config = self.get_pose(), self.get_image_config()
-        phase_shifts = pose.compute_translation_operator(
-            image_config.padded_frequency_grid_in_angstroms
+        phase_shifts = self.pose.compute_translation_operator(
+            self.image_config.padded_frequency_grid_in_angstroms
         )
-        fourier_image = pose.translate_image(
+        fourier_image = self.pose.translate_image(
             fourier_image,
             phase_shifts,
-            image_config.padded_shape,
+            self.image_config.padded_shape,
         )
 
         return fourier_image
 
     def _atom_translate(self, volrep: AbstractVolumeRepresentation) -> AbstractAtomVolume:
-        pose = self.get_pose()
         if isinstance(volrep, AbstractAtomVolume):
-            return volrep.translate_to_pose(pose)
+            return volrep.translate_to_pose(self.pose)
         else:
             raise ValueError(
                 "Tried to apply translation in `translate_mode = 'atom'`, but "
@@ -185,10 +179,9 @@ class AbstractImageModel(eqx.Module, strict=True):
             )
 
     def _normalize_image(self, image: Array) -> Array:
-        signal_region = self.get_signal_region()
         mean, std = (
-            jnp.mean(image, where=signal_region),
-            jnp.std(image, where=signal_region),
+            jnp.mean(image, where=self.signal_region),
+            jnp.std(image, where=self.signal_region),
         )
         image = (image - mean) / std
 
@@ -203,14 +196,13 @@ class AbstractImageModel(eqx.Module, strict=True):
         mask: MaskLike | None = None,
         filter: FilterLike | None = None,
     ) -> Array:
-        image_config = self.get_image_config()
         if removes_padding:
             return self.postprocess(
                 image, outputs_real_space=outputs_real_space, mask=mask, filter=filter
             )
         else:
             return (
-                irfftn(image, s=image_config.padded_shape)
+                irfftn(image, s=self.image_config.padded_shape)
                 if outputs_real_space
                 else image
             )
@@ -225,10 +217,9 @@ class LinearImageModel(AbstractImageModel, strict=True):
     transfer_theory: ContrastTransferTheory
     image_config: AbstractImageConfig
 
-    applies_translation: bool
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
-    translate_mode: Literal["fft", "atom"]
+    translate_mode: Literal["fft", "atom", "none"]
 
     def __init__(
         self,
@@ -238,10 +229,9 @@ class LinearImageModel(AbstractImageModel, strict=True):
         volume_integrator: AbstractVolumeIntegrator,
         transfer_theory: ContrastTransferTheory,
         *,
-        applies_translation: bool = True,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-        translate_mode: Literal["fft", "atom"] = "fft",
+        translate_mode: Literal["fft", "atom", "none"] = "fft",
     ):
         """**Arguments:**
 
@@ -254,9 +244,6 @@ class LinearImageModel(AbstractImageModel, strict=True):
             and the wavelength.
         - `volume_integrator`: The method for integrating the scattering potential.
         - `transfer_theory`: The contrast transfer theory.
-        - `applies_translation`:
-            If `True`, apply the in-plane translation in the `AbstractPose`
-            via phase shifts in fourier space.
         - `normalizes_signal`:
             If `True`, normalizes_signal the image before returning.
         - `signal_region`:
@@ -267,7 +254,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
             If `'fft'`, apply in-plane translation via phase
             shifts in the Fourier domain. If `'atoms'`,
             apply translation on atom positions before projection.
-            Does nothing if `applies_translation = False`.
+            If `'none'`, does not apply a translation.
         """
         # Simulator components
         self.volume_parametrization = volume_parametrization
@@ -276,7 +263,6 @@ class LinearImageModel(AbstractImageModel, strict=True):
         self.volume_integrator = volume_integrator
         self.transfer_theory = transfer_theory
         # Options
-        self.applies_translation = applies_translation
         self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
         if signal_region is None:
@@ -285,33 +271,24 @@ class LinearImageModel(AbstractImageModel, strict=True):
             self.signal_region = jnp.asarray(signal_region, dtype=bool)
 
     @override
-    def get_pose(self) -> AbstractPose:
-        return self.pose
-
-    @override
-    def get_image_config(self) -> AbstractImageConfig:
-        return self.image_config
-
-    @override
-    def get_signal_region(self) -> Bool[Array, "_ _"] | None:
-        return self.signal_region
-
-    @override
-    def compute_fourier_image(
-        self, rng_key: PRNGKeyArray | None = None
+    def raw_simulate(
+        self,
+        rng_key: PRNGKeyArray | None = None,
+        *,
+        outputs_real_space: bool = True,
     ) -> PaddedFourierImageArray:
         # Get the representation of the volume
         if rng_key is None:
-            volume_representation = self.volume_parametrization.get_representation()
+            volume_representation = self.volume_parametrization.to_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            volume_representation = self.volume_parametrization.get_representation(
+            volume_representation = self.volume_parametrization.to_representation(
                 rng_key=this_key
             )
         # Rotate it to the lab frame
         volume_representation = volume_representation.rotate_to_pose(self.pose)
         # Translate if using atom translations
-        if self.applies_translation and self.translate_mode == "atom":
+        if self.translate_mode == "atom":
             volume_representation = self._atom_translate(volume_representation)
         # Compute the projection image
         fourier_image = self.volume_integrator.integrate(
@@ -321,14 +298,18 @@ class LinearImageModel(AbstractImageModel, strict=True):
         fourier_image = self.transfer_theory.propagate_object(  # noqa: E501
             fourier_image,
             self.image_config,
-            is_projection_approximation=self.volume_integrator.is_projection_approximation,
+            input_is_ewald_sphere=self.volume_integrator.outputs_ewald_sphere,
             defocus_offset=self.pose.offset_z_in_angstroms,
         )
         # Now for the in-plane translation if using phase shifts
-        if self.applies_translation and self.translate_mode == "fft":
+        if self.translate_mode == "fft":
             fourier_image = self._phase_shift_translate(fourier_image)
 
-        return fourier_image
+        return (
+            irfftn(fourier_image, s=self.image_config.padded_shape)
+            if outputs_real_space
+            else fourier_image
+        )
 
 
 class ProjectionImageModel(AbstractImageModel, strict=True):
@@ -339,10 +320,9 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
     volume_integrator: AbstractVolumeIntegrator
     image_config: AbstractImageConfig
 
-    applies_translation: bool
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
-    translate_mode: Literal["fft", "atom"]
+    translate_mode: Literal["fft", "atom", "none"]
 
     def __init__(
         self,
@@ -351,10 +331,9 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
         image_config: AbstractImageConfig,
         volume_integrator: AbstractVolumeIntegrator,
         *,
-        applies_translation: bool = True,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-        translate_mode: Literal["fft", "atom"] = "fft",
+        translate_mode: Literal["fft", "atom", "none"] = "fft",
     ):
         """**Arguments:**
 
@@ -366,11 +345,6 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
             The configuration of the instrument, such as for the pixel size
             and the wavelength.
         - `volume_integrator`: The method for integrating the scattering potential.
-        - `applies_translation`:
-            If `True`, apply the in-plane translation in the `AbstractPose`
-            via phase shifts in fourier space.
-        - `normalizes_signal`:
-            If `True`, normalizes_signal the image before returning.
         - `signal_region`:
             A boolean array that is 1 where there is signal,
             and 0 otherwise used to normalize the image.
@@ -379,7 +353,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
             If `'fft'`, apply in-plane translation via phase
             shifts in the Fourier domain. If `'atoms'`,
             apply translation on atom positions before projection.
-            Does nothing if `applies_translation = False`.
+            If `'none'`, does not apply a translation.
         """
         # Simulator components
         self.volume_parametrization = volume_parametrization
@@ -387,7 +361,6 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
         self.image_config = image_config
         self.volume_integrator = volume_integrator
         # Options
-        self.applies_translation = applies_translation
         self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
         if signal_region is None:
@@ -396,43 +369,38 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
             self.signal_region = jnp.asarray(signal_region, dtype=bool)
 
     @override
-    def get_pose(self) -> AbstractPose:
-        return self.pose
-
-    @override
-    def get_image_config(self) -> AbstractImageConfig:
-        return self.image_config
-
-    @override
-    def get_signal_region(self) -> Bool[Array, "_ _"] | None:
-        return self.signal_region
-
-    @override
-    def compute_fourier_image(
-        self, rng_key: PRNGKeyArray | None = None
+    def raw_simulate(
+        self,
+        rng_key: PRNGKeyArray | None = None,
+        *,
+        outputs_real_space: bool = True,
     ) -> ImageArray | PaddedImageArray:
         # Get the representation of the volume
         if rng_key is None:
-            volume_representation = self.volume_parametrization.get_representation()
+            volume_representation = self.volume_parametrization.to_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            volume_representation = self.volume_parametrization.get_representation(
+            volume_representation = self.volume_parametrization.to_representation(
                 rng_key=this_key
             )
         # Rotate it to the lab frame
         volume_representation = volume_representation.rotate_to_pose(self.pose)
         # Translate if using atom translations
-        if self.applies_translation and self.translate_mode == "atom":
+        if self.translate_mode == "atom":
             volume_representation = self._atom_translate(volume_representation)
         # Compute the projection image
         fourier_image = self.volume_integrator.integrate(
             volume_representation, self.image_config, outputs_real_space=False
         )
         # Now for the in-plane translation
-        if self.applies_translation and self.translate_mode == "fft":
+        if self.translate_mode == "fft":
             fourier_image = self._phase_shift_translate(fourier_image)
 
-        return fourier_image
+        return (
+            irfftn(fourier_image, s=self.image_config.padded_shape)
+            if outputs_real_space
+            else fourier_image
+        )
 
 
 class AbstractPhysicalImageModel(AbstractImageModel, strict=True):
@@ -453,10 +421,9 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
     image_config: AbstractImageConfig
     scattering_theory: AbstractScatteringTheory
 
-    applies_translation: bool
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
-    translate_mode: Literal["fft", "atom"]
+    translate_mode: Literal["fft", "atom", "none"]
 
     def __init__(
         self,
@@ -465,10 +432,9 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
         image_config: AbstractImageConfig,
         scattering_theory: AbstractScatteringTheory,
         *,
-        applies_translation: bool = True,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-        translate_mode: Literal["fft", "atom"] = "fft",
+        translate_mode: Literal["fft", "atom", "none"] = "fft",
     ):
         """**Arguments:**
 
@@ -481,9 +447,6 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
             and the wavelength.
         - `scattering_theory`:
             The scattering theory.
-        - `applies_translation`:
-            If `True`, apply the in-plane translation in the `AbstractPose`
-            via phase shifts in fourier space.
         - `normalizes_signal`:
             If `True`, normalize the image before returning.
         - `signal_region`:
@@ -494,13 +457,12 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
             If `'fft'`, apply in-plane translation via phase
             shifts in the Fourier domain. If `'atoms'`,
             apply translation on atom positions before projection.
-            Does nothing if `applies_translation = False`.
+            If `'none'`, does not apply a translation.
         """
         self.volume_parametrization = volume_parametrization
         self.pose = pose
         self.image_config = image_config
         self.scattering_theory = scattering_theory
-        self.applies_translation = applies_translation
         self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
         if signal_region is None:
@@ -509,34 +471,25 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
             self.signal_region = jnp.asarray(signal_region, dtype=bool)
 
     @override
-    def get_pose(self) -> AbstractPose:
-        return self.pose
-
-    @override
-    def get_image_config(self) -> AbstractImageConfig:
-        return self.image_config
-
-    @override
-    def get_signal_region(self) -> Bool[Array, "_ _"] | None:
-        return self.signal_region
-
-    @override
-    def compute_fourier_image(
-        self, rng_key: PRNGKeyArray | None = None
+    def raw_simulate(
+        self,
+        rng_key: PRNGKeyArray | None = None,
+        *,
+        outputs_real_space: bool = True,
     ) -> PaddedFourierImageArray:
         # Get the volume representation. Its data should be a scattering potential
         # to simulate in physical units
         if rng_key is None:
-            volume_representation = self.volume_parametrization.get_representation()
+            volume_representation = self.volume_parametrization.to_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            volume_representation = self.volume_parametrization.get_representation(
+            volume_representation = self.volume_parametrization.to_representation(
                 rng_key=this_key
             )
         # Rotate it to the lab frame
         volume_representation = volume_representation.rotate_to_pose(self.pose)
         # Translate if using atom translations
-        if self.applies_translation and self.translate_mode == "atom":
+        if self.translate_mode == "atom":
             volume_representation = self._atom_translate(volume_representation)
         # Compute the contrast
         contrast_spectrum = self.scattering_theory.compute_contrast_spectrum(
@@ -546,10 +499,14 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
             defocus_offset=self.pose.offset_z_in_angstroms,
         )
         # Apply the translation
-        if self.applies_translation and self.translate_mode == "fft":
+        if self.translate_mode == "fft":
             contrast_spectrum = self._phase_shift_translate(contrast_spectrum)
 
-        return contrast_spectrum
+        return (
+            irfftn(contrast_spectrum, s=self.image_config.padded_shape)
+            if outputs_real_space
+            else contrast_spectrum
+        )
 
 
 class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
@@ -562,10 +519,9 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
     image_config: AbstractImageConfig
     scattering_theory: AbstractScatteringTheory
 
-    applies_translation: bool
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
-    translate_mode: Literal["fft", "atom"]
+    translate_mode: Literal["fft", "atom", "none"]
 
     def __init__(
         self,
@@ -574,10 +530,9 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
         image_config: AbstractImageConfig,
         scattering_theory: AbstractScatteringTheory,
         *,
-        applies_translation: bool = True,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-        translate_mode: Literal["fft", "atom"] = "fft",
+        translate_mode: Literal["fft", "atom", "none"] = "fft",
     ):
         """**Arguments:**
 
@@ -590,9 +545,6 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
             and the wavelength.
         - `scattering_theory`:
             The scattering theory.
-        - `applies_translation`:
-            If `True`, apply the in-plane translation in the `AbstractPose`
-            via phase shifts in fourier space.
         - `normalizes_signal`:
             If `True`, normalize the image before returning.
         - `signal_region`:
@@ -603,13 +555,12 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
             If `'fft'`, apply in-plane translation via phase
             shifts in the Fourier domain. If `'atoms'`,
             apply translation on atom positions before projection.
-            Does nothing if `applies_translation = False`.
+            If `'none'`, does not apply a translation.
         """
         self.volume_parametrization = volume_parametrization
         self.pose = pose
         self.image_config = image_config
         self.scattering_theory = scattering_theory
-        self.applies_translation = applies_translation
         self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
         if signal_region is None:
@@ -618,34 +569,25 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
             self.signal_region = jnp.asarray(signal_region, dtype=bool)
 
     @override
-    def get_pose(self) -> AbstractPose:
-        return self.pose
-
-    @override
-    def get_image_config(self) -> AbstractImageConfig:
-        return self.image_config
-
-    @override
-    def get_signal_region(self) -> Bool[Array, "_ _"] | None:
-        return self.signal_region
-
-    @override
-    def compute_fourier_image(
-        self, rng_key: PRNGKeyArray | None = None
+    def raw_simulate(
+        self,
+        rng_key: PRNGKeyArray | None = None,
+        *,
+        outputs_real_space: bool = True,
     ) -> PaddedFourierImageArray:
         # Get the volume representation. Its data should be a scattering potential
         # to simulate in physical units
         if rng_key is None:
-            volume_representation = self.volume_parametrization.get_representation()
+            volume_representation = self.volume_parametrization.to_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            volume_representation = self.volume_parametrization.get_representation(
+            volume_representation = self.volume_parametrization.to_representation(
                 rng_key=this_key
             )
         # Rotate it to the lab frame
         volume_representation = volume_representation.rotate_to_pose(self.pose)
         # Translate if using atom translations
-        if self.applies_translation and self.translate_mode == "atom":
+        if self.translate_mode == "atom":
             volume_representation = self._atom_translate(volume_representation)
         # Compute the intensity spectrum
         intensity_spectrum = self.scattering_theory.compute_intensity_spectrum(
@@ -654,10 +596,14 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
             rng_key,
             defocus_offset=self.pose.offset_z_in_angstroms,
         )
-        if self.applies_translation and self.translate_mode == "fft":
+        if self.translate_mode == "fft":
             intensity_spectrum = self._phase_shift_translate(intensity_spectrum)
 
-        return intensity_spectrum
+        return (
+            irfftn(intensity_spectrum, s=self.image_config.padded_shape)
+            if outputs_real_space
+            else intensity_spectrum
+        )
 
 
 class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
@@ -671,10 +617,9 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
     scattering_theory: AbstractScatteringTheory
     detector: AbstractDetector
 
-    applies_translation: bool
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
-    translate_mode: Literal["fft", "atom"]
+    translate_mode: Literal["fft", "atom", "none"]
 
     def __init__(
         self,
@@ -684,10 +629,9 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
         scattering_theory: AbstractScatteringTheory,
         detector: AbstractDetector,
         *,
-        applies_translation: bool = True,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-        translate_mode: Literal["fft", "atom"] = "fft",
+        translate_mode: Literal["fft", "atom", "none"] = "fft",
     ):
         """**Arguments:**
 
@@ -700,9 +644,6 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
             and the wavelength.
         - `scattering_theory`:
             The scattering theory.
-        - `applies_translation`:
-            If `True`, apply the in-plane translation in the `AbstractPose`
-            via phase shifts in fourier space.
         - `normalizes_signal`:
             If `True`, normalize the image before returning.
         - `signal_region`:
@@ -713,14 +654,13 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
             If `'fft'`, apply in-plane translation via phase
             shifts in the Fourier domain. If `'atoms'`,
             apply translation on atom positions before projection.
-            Does nothing if `applies_translation = False`.
+            If `'none'`, does not apply a translation.
         """
         self.volume_parametrization = volume_parametrization
         self.pose = pose
         self.image_config = image_config
         self.scattering_theory = scattering_theory
         self.detector = detector
-        self.applies_translation = applies_translation
         self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
         if signal_region is None:
@@ -729,29 +669,20 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
             self.signal_region = jnp.asarray(signal_region, dtype=bool)
 
     @override
-    def get_pose(self) -> AbstractPose:
-        return self.pose
-
-    @override
-    def get_image_config(self) -> DoseImageConfig:
-        return self.image_config
-
-    @override
-    def get_signal_region(self) -> Bool[Array, "_ _"] | None:
-        return self.signal_region
-
-    @override
-    def compute_fourier_image(
-        self, rng_key: PRNGKeyArray | None = None
+    def raw_simulate(
+        self,
+        rng_key: PRNGKeyArray | None = None,
+        *,
+        outputs_real_space: bool = True,
     ) -> PaddedFourierImageArray:
         if rng_key is None:
             # Get the volume representation. Its data should be a scattering potential
             # to simulate in physical units
-            volume_representation = self.volume_parametrization.get_representation()
+            volume_representation = self.volume_parametrization.to_representation()
             # Rotate it to the lab frame
             volume_representation = volume_representation.rotate_to_pose(self.pose)
             # Translate if using atom translations
-            if self.applies_translation and self.translate_mode == "atom":
+            if self.translate_mode == "atom":
                 volume_representation = self._atom_translate(volume_representation)
             # Compute the intensity
             fourier_intensity = self.scattering_theory.compute_intensity_spectrum(
@@ -759,7 +690,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
                 self.image_config,
                 defocus_offset=self.pose.offset_z_in_angstroms,
             )
-            if self.applies_translation and self.translate_mode == "fft":
+            if self.translate_mode == "fft":
                 fourier_intensity = self._phase_shift_translate(fourier_intensity)
             # ... now measure the expected electron events at the detector
             fourier_expected_electron_events = (
@@ -768,18 +699,20 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
                 )
             )
 
-            return fourier_expected_electron_events
+            return (
+                irfftn(fourier_expected_electron_events, s=self.image_config.padded_shape)
+                if outputs_real_space
+                else fourier_expected_electron_events
+            )
         else:
             keys = jr.split(rng_key, 3)
             # Get the volume representation. Its data should be a scattering potential
             # to simulate in physical units
-            volume_representation = self.volume_parametrization.get_representation(
-                keys[0]
-            )
+            volume_representation = self.volume_parametrization.to_representation(keys[0])
             # Rotate it to the lab frame
             volume_representation = volume_representation.rotate_to_pose(self.pose)
             # Translate if using atom translations
-            if self.applies_translation and self.translate_mode == "atom":
+            if self.translate_mode == "atom":
                 volume_representation = self._atom_translate(volume_representation)
             # Compute the squared wavefunction
             fourier_intensity = self.scattering_theory.compute_intensity_spectrum(
@@ -788,7 +721,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
                 keys[1],
                 defocus_offset=self.pose.offset_z_in_angstroms,
             )
-            if self.applies_translation and self.translate_mode == "fft":
+            if self.translate_mode == "fft":
                 fourier_intensity = self._phase_shift_translate(fourier_intensity)
             # ... now measure the detector readout
             fourier_detector_readout = self.detector.compute_detector_readout(
@@ -797,4 +730,8 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
                 self.image_config,
             )
 
-            return fourier_detector_readout
+            return (
+                irfftn(fourier_detector_readout, s=self.image_config.padded_shape)
+                if outputs_real_space
+                else fourier_detector_readout
+            )

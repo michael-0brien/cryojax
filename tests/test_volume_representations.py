@@ -189,8 +189,8 @@ def test_render_options(pdb_info):
     if jnufft is not None:
         volumes.append(
             cxs.IndependentAtomVolume(
-                position_pytree=atom_positions,
-                scattering_factor_pytree=im.FourierGaussian(
+                positions=atom_positions,
+                scattering_factors=im.FourierGaussian(
                     amplitude=1.0, b_factor=width**2 * (8 * np.pi**2)
                 ),
             )
@@ -229,8 +229,8 @@ def test_fft_atom_render(pdb_info, width, voxel_size, shape):
             variances=width**2,
         )
         atom_volume = cxs.IndependentAtomVolume(
-            position_pytree=atom_positions,
-            scattering_factor_pytree=im.FourierGaussian(
+            positions=atom_positions,
+            scattering_factors=im.FourierGaussian(
                 amplitude=1.0, b_factor=width**2 * (8 * np.pi**2)
             ),
         )

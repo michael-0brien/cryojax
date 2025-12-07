@@ -147,7 +147,7 @@ class WeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
                     rng_key,
                     fourier_in_plane_potential,
                     image_config,
-                    input_is_rfft=self.volume_integrator.is_projection_approximation,
+                    input_is_rfft=not self.volume_integrator.outputs_ewald_sphere,
                 )
 
         object_spectrum = image_config.interaction_constant * fourier_in_plane_potential
@@ -168,7 +168,7 @@ class WeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
         contrast_spectrum = self.transfer_theory.propagate_object(  # noqa: E501
             object_spectrum,
             image_config,
-            is_projection_approximation=self.volume_integrator.is_projection_approximation,
+            input_is_ewald_sphere=self.volume_integrator.outputs_ewald_sphere,
             defocus_offset=defocus_offset,
         )
 
@@ -258,7 +258,7 @@ class StrongPhaseScatteringTheory(AbstractWaveScatteringTheory, strict=True):
         )
         # The integrated potential may not be from an rfft; this depends on
         # if it is a projection approx
-        is_projection_approx = self.volume_integrator.is_projection_approximation
+        is_projection_approx = not self.volume_integrator.outputs_ewald_sphere
         if rng_key is not None:
             # Get the potential of the specimen plus the ice
             if self.solvent is not None:

@@ -70,38 +70,43 @@ class PengScatteringFactor(AbstractFourierOperator, strict=True):
 
 
 class IndependentAtomVolume(AbstractAtomVolume, strict=True):
-    position_pytree: PyTree[Float[Array, "_ 3"]]
-    scattering_factor_pytree: PyTree[AbstractFourierOperator]
+    positions: PyTree[Float[Array, "_ 3"]]
+    scattering_factors: PyTree[AbstractFourierOperator]
 
     def __init__(
         self,
-        position_pytree: PyTree[Float[NDArrayLike, "_ 3"], "T"],
-        scattering_factor_pytree: PyTree[AbstractFourierOperator, "T"],
+        positions: PyTree[Float[NDArrayLike, "_ 3"], "T"],
+        scattering_factors: PyTree[AbstractFourierOperator, "T"],
     ):
-        self.position_pytree = jax.tree.map(
-            lambda x: jnp.asarray(x, dtype=float), position_pytree
-        )
-        self.scattering_factor_pytree = scattering_factor_pytree
+        """**Arguments:**
 
-    def __check_init__(self):
-        if jax.tree.structure(self.position_pytree) != jax.tree.structure(
-            self.scattering_factor_pytree,
+        - `positions`:
+            A pytree of atom positions.
+        - `scattering_factors`:
+            A pytree of scattering factors with the same tree structure
+            as `positions`, where each leaf is a
+            [`cryojax.ndimage.AbstractFourierOperator`][].
+        """
+        if jax.tree.structure(positions) != jax.tree.structure(
+            scattering_factors,
             is_leaf=lambda x: isinstance(x, AbstractFourierOperator),
         ):
             raise ValueError(
                 "When instantiating an `IndependentAtomVolume`, found "
-                "that the pytree structures of `positions_pytree` and "
-                "`scattering_factor_pytree` were not equal."
+                "that the pytree structures of `positions` and "
+                "`scattering_factors` were not equal."
             )
+        self.positions = jax.tree.map(lambda x: jnp.asarray(x, dtype=float), positions)
+        self.scattering_factors = scattering_factors
 
     @override
     def rotate_to_pose(self, pose: AbstractPose, inverse: bool = False) -> Self:
         """Return a new potential with rotated `positions`."""
         rotate_fn = lambda pos: pose.rotate_coordinates(pos, inverse=inverse)
         return eqx.tree_at(
-            lambda x: x.position_pytree,
+            lambda x: x.positions,
             self,
-            jax.tree.map(rotate_fn, self.position_pytree),
+            jax.tree.map(rotate_fn, self.positions),
         )
 
     @override
@@ -114,9 +119,9 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
             )
         translate_fn = lambda pos: pos + offset_in_angstroms
         return eqx.tree_at(
-            lambda x: x.position_pytree,
+            lambda x: x.positions,
             self,
-            jax.tree.map(translate_fn, self.position_pytree),
+            jax.tree.map(translate_fn, self.positions),
         )
 
     @classmethod
@@ -280,8 +285,8 @@ class FFTAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True
             lambda x, y: x + y,
             jax.tree.map(
                 proj_kernel,
-                volume_representation.position_pytree,
-                volume_representation.scattering_factor_pytree,
+                volume_representation.positions,
+                volume_representation.scattering_factors,
                 is_leaf=lambda x: isinstance(x, AbstractFourierOperator),
             ),
         )
@@ -321,7 +326,7 @@ class FFTAtomProjection(
     eps: float
     opts: Any
 
-    is_projection_approximation: ClassVar[bool] = True
+    outputs_ewald_sphere: ClassVar[bool] = False
 
     def __init__(
         self,
@@ -438,8 +443,8 @@ class FFTAtomProjection(
             lambda x, y: x + y,
             jax.tree.map(
                 proj_kernel,
-                volume_representation.position_pytree,
-                volume_representation.scattering_factor_pytree,
+                volume_representation.positions,
+                volume_representation.scattering_factors,
                 is_leaf=lambda x: isinstance(x, AbstractFourierOperator),
             ),
         )

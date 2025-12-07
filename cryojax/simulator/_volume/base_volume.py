@@ -82,7 +82,7 @@ class AbstractVolumeParametrization(eqx.Module, strict=True):
     """  # noqa: E501
 
     @abc.abstractmethod
-    def get_representation(
+    def to_representation(
         self, rng_key: PRNGKeyArray | None = None
     ) -> "AbstractVolumeRepresentation":
         """Core interface for computing the representation of
@@ -111,7 +111,7 @@ class AbstractVolumeRepresentation(AbstractVolumeParametrization, strict=True):
         raise NotImplementedError
 
     @override
-    def get_representation(self, rng_key: PRNGKeyArray | None = None) -> Self:
+    def to_representation(self, rng_key: PRNGKeyArray | None = None) -> Self:
         """Since this class is itself an
         `AbstractVolumeRepresentation`, this function maps to the identity.
 
@@ -120,6 +120,7 @@ class AbstractVolumeRepresentation(AbstractVolumeParametrization, strict=True):
         - `rng_key`:
             Not used in this implementation.
         """
+        del rng_key
         return self
 
 
@@ -177,7 +178,7 @@ class AbstractVolumeIntegrator(eqx.Module, Generic[VolRep], strict=True):
     the exit plane.
     """
 
-    is_projection_approximation: eqx.AbstractClassVar[bool]
+    outputs_ewald_sphere: eqx.AbstractClassVar[bool]
 
     @abc.abstractmethod
     def integrate(

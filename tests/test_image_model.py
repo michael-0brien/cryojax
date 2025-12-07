@@ -131,7 +131,6 @@ def test_translate_mode(pdb_info, offset_xy, pixel_size, shape, pad_scale):
         pose,
         image_config,
         integrator,
-        applies_translation=True,
         translate_mode="fft",
     )
     atom_proj_model = cxs.ProjectionImageModel(
@@ -139,7 +138,6 @@ def test_translate_mode(pdb_info, offset_xy, pixel_size, shape, pad_scale):
         pose,
         image_config,
         integrator,
-        applies_translation=True,
         translate_mode="atom",
     )
     atom_translate_proj = compute_image(atom_proj_model)
@@ -154,7 +152,6 @@ def test_translate_mode(pdb_info, offset_xy, pixel_size, shape, pad_scale):
         image_config,
         integrator,
         transfer_theory,
-        applies_translation=True,
         translate_mode="fft",
     )
     atom_im_model = cxs.LinearImageModel(
@@ -163,7 +160,6 @@ def test_translate_mode(pdb_info, offset_xy, pixel_size, shape, pad_scale):
         image_config,
         integrator,
         transfer_theory,
-        applies_translation=True,
         translate_mode="atom",
     )
     atom_translate_im = compute_image(atom_im_model)

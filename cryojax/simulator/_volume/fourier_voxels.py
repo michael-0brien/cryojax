@@ -240,7 +240,7 @@ class FourierSliceExtraction(
     out_of_bounds_mode: str
     fill_value: complex
 
-    is_projection_approximation: ClassVar[bool] = True
+    outputs_ewald_sphere: ClassVar[bool] = False
 
     def __init__(
         self,
@@ -433,7 +433,7 @@ class EwaldSphereExtraction(
     out_of_bounds_mode: str
     fill_value: complex
 
-    is_projection_approximation: ClassVar[bool] = False
+    outputs_ewald_sphere: ClassVar[bool] = True
 
     def __init__(
         self,
