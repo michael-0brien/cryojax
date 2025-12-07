@@ -35,7 +35,7 @@ def make_image_model(
     quantity_mode: None = None,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-    translate_mode: Literal["fft", "atom"] = "fft",
+    translate_mode: Literal["fft", "atom", "none"] = "fft",
 ) -> ProjectionImageModel: ...
 
 
@@ -51,7 +51,7 @@ def make_image_model(  # pyright: ignore[reportOverlappingOverload]
     quantity_mode: None = None,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-    translate_mode: Literal["fft", "atom"] = "fft",
+    translate_mode: Literal["fft", "atom", "none"] = "fft",
 ) -> LinearImageModel: ...
 
 
@@ -67,7 +67,7 @@ def make_image_model(
     quantity_mode: Literal["contrast"] = "contrast",
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-    translate_mode: Literal["fft", "atom"] = "fft",
+    translate_mode: Literal["fft", "atom", "none"] = "fft",
 ) -> ContrastImageModel: ...
 
 
@@ -83,7 +83,7 @@ def make_image_model(
     quantity_mode: Literal["intensity"] = "intensity",
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-    translate_mode: Literal["fft", "atom"] = "fft",
+    translate_mode: Literal["fft", "atom", "none"] = "fft",
 ) -> IntensityImageModel: ...
 
 
@@ -99,7 +99,7 @@ def make_image_model(
     quantity_mode: Literal["counts"] = "counts",
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-    translate_mode: Literal["fft", "atom"] = "fft",
+    translate_mode: Literal["fft", "atom", "none"] = "fft",
 ) -> ElectronCountsImageModel: ...
 
 
@@ -114,7 +114,7 @@ def make_image_model(
     quantity_mode: Literal["contrast", "intensity", "counts"] | None = None,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-    translate_mode: Literal["fft", "atom"] = "fft",
+    translate_mode: Literal["fft", "atom", "none"] = "fft",
 ) -> AbstractImageModel:
     """Construct an `AbstractImageModel` for most common use-cases.
 
