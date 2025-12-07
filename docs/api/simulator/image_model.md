@@ -4,16 +4,17 @@
     ::: cryojax.simulator.AbstractImageModel
         options:
             members:
-                - compute_fourier_image
-                - get_pose
-                - get_signal_region
-                - get_image_config
+                - raw_simulate
+                - image_config
+                - pose
+                - signal_region
 
 ::: cryojax.simulator.LinearImageModel
         options:
             members:
                 - __init__
                 - simulate
+                - raw_simulate
                 - postprocess
 
 ---
@@ -23,6 +24,7 @@
             members:
                 - __init__
                 - simulate
+                - raw_simulate
                 - postprocess
 
 
@@ -33,6 +35,7 @@
             members:
                 - __init__
                 - simulate
+                - raw_simulate
                 - postprocess
 
 ---
@@ -42,6 +45,7 @@
             members:
                 - __init__
                 - simulate
+                - raw_simulate
                 - postprocess
 
 ---
@@ -51,4 +55,5 @@
             members:
                 - __init__
                 - simulate
+                - raw_simulate
                 - postprocess

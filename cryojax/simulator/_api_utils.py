@@ -33,10 +33,9 @@ def make_image_model(
     detector: AbstractDetector | None = None,
     *,
     quantity_mode: None = None,
-    applies_translation: bool = True,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-    translate_mode: Literal["fft", "atom"] = "fft",
+    translate_mode: Literal["fft", "atom", "none"] = "fft",
 ) -> ProjectionImageModel: ...
 
 
@@ -50,10 +49,9 @@ def make_image_model(  # pyright: ignore[reportOverlappingOverload]
     detector: AbstractDetector | None = None,
     *,
     quantity_mode: None = None,
-    applies_translation: bool = True,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-    translate_mode: Literal["fft", "atom"] = "fft",
+    translate_mode: Literal["fft", "atom", "none"] = "fft",
 ) -> LinearImageModel: ...
 
 
@@ -67,10 +65,9 @@ def make_image_model(
     detector: AbstractDetector | None = None,
     *,
     quantity_mode: Literal["contrast"] = "contrast",
-    applies_translation: bool = True,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-    translate_mode: Literal["fft", "atom"] = "fft",
+    translate_mode: Literal["fft", "atom", "none"] = "fft",
 ) -> ContrastImageModel: ...
 
 
@@ -84,10 +81,9 @@ def make_image_model(
     detector: AbstractDetector | None = None,
     *,
     quantity_mode: Literal["intensity"] = "intensity",
-    applies_translation: bool = True,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-    translate_mode: Literal["fft", "atom"] = "fft",
+    translate_mode: Literal["fft", "atom", "none"] = "fft",
 ) -> IntensityImageModel: ...
 
 
@@ -101,10 +97,9 @@ def make_image_model(
     detector: AbstractDetector | None = None,
     *,
     quantity_mode: Literal["counts"] = "counts",
-    applies_translation: bool = True,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-    translate_mode: Literal["fft", "atom"] = "fft",
+    translate_mode: Literal["fft", "atom", "none"] = "fft",
 ) -> ElectronCountsImageModel: ...
 
 
@@ -117,10 +112,9 @@ def make_image_model(
     detector: AbstractDetector | None = None,
     *,
     quantity_mode: Literal["contrast", "intensity", "counts"] | None = None,
-    applies_translation: bool = True,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-    translate_mode: Literal["fft", "atom"] = "fft",
+    translate_mode: Literal["fft", "atom", "none"] = "fft",
 ) -> AbstractImageModel:
     """Construct an `AbstractImageModel` for most common use-cases.
 
@@ -147,9 +141,6 @@ def make_image_model(
     - `detector`:
         If `quantity_mode = 'counts'` is chosen, then an `AbstractDetector` class must be
         chosen to simulate electron counts.
-    - `applies_translation`:
-        If `True`, apply the in-plane translation in the `AbstractPose`
-        via phase shifts in fourier space.
     - `normalizes_signal`:
         If `True`, normalizes_signal the image before returning.
     - `signal_region`:
@@ -170,9 +161,9 @@ def make_image_model(
             If this is passed, a `detector` must also be passed.
     - `translate_mode`:
         If `'fft'`, apply in-plane translation via phase
-        shifts in the Fourier domain. If `'atoms'` apply translation
-        on atom positions before projection. Does nothing if
-        `applies_translation = False`.
+        shifts in the Fourier domain. If `'atoms'` apply
+        translation on atom positions before projection.
+        If `'none'`, does not apply a translation.
 
     **Returns:**
 
@@ -190,7 +181,6 @@ def make_image_model(
             pose,
             image_config,
             volume_integrator,
-            applies_translation=applies_translation,
             normalizes_signal=normalizes_signal,
             signal_region=signal_region,
             translate_mode=translate_mode,
@@ -219,7 +209,6 @@ def make_image_model(
                     image_config,
                     scattering_theory,
                     detector,
-                    applies_translation=applies_translation,
                     normalizes_signal=normalizes_signal,
                     signal_region=signal_region,
                     translate_mode=translate_mode,
@@ -230,7 +219,6 @@ def make_image_model(
                     pose,
                     image_config,
                     scattering_theory,
-                    applies_translation=applies_translation,
                     normalizes_signal=normalizes_signal,
                     signal_region=signal_region,
                     translate_mode=translate_mode,
@@ -241,7 +229,6 @@ def make_image_model(
                     pose,
                     image_config,
                     scattering_theory,
-                    applies_translation=applies_translation,
                     normalizes_signal=normalizes_signal,
                     signal_region=signal_region,
                     translate_mode=translate_mode,
@@ -260,7 +247,6 @@ def make_image_model(
                 image_config,
                 volume_integrator,
                 transfer_theory,
-                applies_translation=applies_translation,
                 normalizes_signal=normalizes_signal,
                 signal_region=signal_region,
                 translate_mode=translate_mode,
