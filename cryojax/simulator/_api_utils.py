@@ -2,11 +2,11 @@ import pathlib
 from collections.abc import Callable
 from typing import Any, Literal, overload
 
+import equinox as eqx
 import equinox.internal as eqxi
 import jax.numpy as jnp
 import mmdf
 import pandas as pd
-import equinox as eqx
 from jaxtyping import Bool
 
 from ..atom_util import split_atoms_by_element
@@ -30,10 +30,10 @@ from ._volume import (
     AbstractVolumeIntegrator,
     AbstractVolumeParametrization,
     AutoVolumeProjection,
-    GaussianMixtureVolume,
-    IndependentAtomVolume,
     FourierVoxelGridVolume,
     FourierVoxelSplineVolume,
+    GaussianMixtureVolume,
+    IndependentAtomVolume,
 )
 
 
