@@ -16,7 +16,7 @@ from .._coordinates import make_frequency_grid
 from .._edges import resize_with_crop_or_pad
 from .._fft import irfftn, rfftn
 from .._fourier_statistics import compute_binned_powerspectrum
-from .._radial_average import interpolate_radial_average_on_grid
+from .._radial_average import radial_average_to_grid
 from ._base_transform import AbstractImageTransform
 
 
@@ -258,7 +258,7 @@ def _compute_whitening_filter(
         radially_averaged_powerspectrum_stack, axis=0
     )
     # Put onto a grid
-    radially_averaged_powerspectrum_on_grid = interpolate_radial_average_on_grid(
+    radially_averaged_powerspectrum_on_grid = radial_average_to_grid(
         radially_averaged_powerspectrum,
         frequency_bins,
         radial_frequency_grid,

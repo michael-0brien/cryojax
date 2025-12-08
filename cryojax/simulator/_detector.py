@@ -12,7 +12,7 @@ import numpy as np
 from equinox import AbstractVar, Module
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
-from ..jax_util import error_if_not_fractional
+from ..jax_util import FloatLike, error_if_not_fractional
 from ..ndimage import irfftn, rfftn
 from ._image_config import DoseImageConfig
 
@@ -23,56 +23,8 @@ class AbstractDQE(eqx.Module, strict=True):
     fraction_detected_electrons: AbstractVar[Float[Array, ""]]
 
     @abstractmethod
-    def __call__(
-        self,
-        frequency_grid_in_angstroms_or_pixels: Float[Array, "y_dim x_dim 2"],
-        *,
-        pixel_size: Float[Array, ""] | None = None,
-    ) -> Float[Array, "y_dim x_dim"]:
-        """**Arguments:**
-
-        - `frequency_grid_in_angstroms_or_pixels`: A frequency grid
-                                                   given in angstroms
-                                                   or pixels. If given
-                                                   in angstroms, `pixel_size`
-                                                   must be passed
-        - `pixel_size`: The pixel size of `frequency_grid_in_angstroms_or_pixels`.
-        """
+    def __call__(self, image_config: DoseImageConfig) -> Float[Array, "_ _"]:
         raise NotImplementedError
-
-
-class CountingDQE(AbstractDQE, strict=True):
-    r"""A perfect DQE for a detector at a discrete pixel size.
-
-    See Ruskin et. al. "Quantitative characterization of electron detectors for
-    transmission electron microscopy." (2013) for details.
-    """
-
-    fraction_detected_electrons: Float[Array, ""]
-
-    def __init__(self, fraction_detected_electrons: float | Float[Array, ""] = 1.0):
-        self.fraction_detected_electrons = error_if_not_fractional(
-            jnp.asarray(fraction_detected_electrons, dtype=float)
-        )
-
-    @override
-    def __call__(
-        self,
-        frequency_grid_in_angstroms_or_pixels: Float[Array, "y_dim x_dim 2"],
-        *,
-        pixel_size: Float[Array, ""] | None = None,
-    ) -> Float[Array, "y_dim x_dim"]:
-        if pixel_size is None:
-            frequency_grid_in_nyquist_units = frequency_grid_in_angstroms_or_pixels / 0.5
-        else:
-            frequency_grid_in_nyquist_units = (
-                frequency_grid_in_angstroms_or_pixels * pixel_size
-            ) / 0.5
-        return (
-            self.fraction_detected_electrons**2
-            * jnp.sinc(frequency_grid_in_nyquist_units[..., 0] / 2) ** 2
-            * jnp.sinc(frequency_grid_in_nyquist_units[..., 1] / 2) ** 2
-        )
 
 
 class NullDQE(AbstractDQE, strict=True):
@@ -80,20 +32,22 @@ class NullDQE(AbstractDQE, strict=True):
 
     fraction_detected_electrons: Float[Array, ""]
 
-    def __init__(self, fraction_detected_electrons: float | Float[Array, ""] = 1.0):
+    def __init__(self, fraction_detected_electrons: FloatLike = 1.0):
         self.fraction_detected_electrons = error_if_not_fractional(
             jnp.asarray(fraction_detected_electrons, dtype=float)
         )
 
     @override
     def __call__(
-        self,
-        frequency_grid_in_angstroms_or_pixels: Float[Array, "y_dim x_dim 2"],
-        *,
-        pixel_size: Float[Array, ""] | None = None,
-    ) -> Float[Array, "y_dim x_dim"]:
+        self, image_config: DoseImageConfig
+    ) -> Float[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
+        """**Arguments:**
+
+        - `shape`: The image shape.
+        - `pixel_size`: The pixel size.
+        """
         return jnp.full(
-            frequency_grid_in_angstroms_or_pixels.shape[0:2],
+            (image_config.padded_y_dim, image_config.padded_x_dim // 2 + 1),
             self.fraction_detected_electrons,
         )
 
@@ -103,7 +57,7 @@ class AbstractDetector(Module, strict=True):
 
     dqe: AbstractDQE
 
-    def __init__(self, dqe: AbstractDQE):
+    def __init__(self, dqe: AbstractDQE = NullDQE()):
         self.dqe = dqe
 
     @abstractmethod
@@ -117,15 +71,15 @@ class AbstractDetector(Module, strict=True):
         self,
         fourier_squared_wavefunction_at_detector_plane: Complex[
             Array,
-            "{config.padded_y_dim} {config.padded_x_dim//2+1}",
+            "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}",
         ],
-        config: DoseImageConfig,
-    ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim//2+1}"]:
+        image_config: DoseImageConfig,
+    ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         """Compute the expected electron events from the detector."""
         fourier_expected_electron_events = (
             self._compute_expected_events_or_detector_readout(
                 fourier_squared_wavefunction_at_detector_plane,
-                config,
+                image_config,
                 key=None,
             )
         )
@@ -137,14 +91,14 @@ class AbstractDetector(Module, strict=True):
         key: PRNGKeyArray,
         fourier_squared_wavefunction_at_detector_plane: Complex[
             Array,
-            "{config.padded_y_dim} {config.padded_x_dim//2+1}",
+            "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}",
         ],
-        config: DoseImageConfig,
-    ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim//2+1}"]:
+        image_config: DoseImageConfig,
+    ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         """Measure the readout from the detector."""
         fourier_detector_readout = self._compute_expected_events_or_detector_readout(
             fourier_squared_wavefunction_at_detector_plane,
-            config,
+            image_config,
             key,
         )
 
@@ -154,25 +108,26 @@ class AbstractDetector(Module, strict=True):
         self,
         fourier_squared_wavefunction_at_detector_plane: Complex[
             Array,
-            "{config.padded_y_dim} {config.padded_x_dim//2+1}",
+            "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}",
         ],
-        config: DoseImageConfig,
+        image_config: DoseImageConfig,
         key: PRNGKeyArray | None = None,
-    ) -> Complex[Array, "{config.padded_y_dim} {config.padded_x_dim//2+1}"]:
+    ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         """Pass the image through the detector model."""
-        N_pix = np.prod(config.padded_shape)
-        frequency_grid = config.padded_frequency_grid_in_pixels
+        n_pixels = np.prod(image_config.padded_shape)
         # Compute the time-integrated electron flux in pixels
-        electrons_per_pixel = config.electrons_per_angstrom_squared * config.pixel_size**2
+        electrons_per_pixel = (
+            image_config.electrons_per_angstrom_squared * image_config.pixel_size**2
+        )
         # ... now the total number of electrons over the entire image
-        electrons_per_image = N_pix * electrons_per_pixel
+        electrons_per_image = n_pixels * electrons_per_pixel
         # Normalize the squared wavefunction to a set of probabilities
         fourier_squared_wavefunction_at_detector_plane /= (
             fourier_squared_wavefunction_at_detector_plane[0, 0]
         )
         # Compute the noiseless signal by applying the DQE to the squared wavefunction
         fourier_signal = fourier_squared_wavefunction_at_detector_plane * jnp.sqrt(
-            self.dqe(frequency_grid)
+            self.dqe(image_config)
         )
         # Apply the integrated dose rate
         fourier_expected_electron_events = electrons_per_image * fourier_signal
@@ -183,7 +138,7 @@ class AbstractDetector(Module, strict=True):
             # ... otherwise, go to real space, sample, go back to fourier,
             # and return.
             expected_electron_events = irfftn(
-                fourier_expected_electron_events, s=config.padded_shape
+                fourier_expected_electron_events, s=image_config.padded_shape
             )
             return rfftn(
                 self.sample_readout_from_expected_events(key, expected_electron_events)
