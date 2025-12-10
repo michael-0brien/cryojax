@@ -36,7 +36,27 @@ from .real_voxels import RealVoxelGridVolume, RealVoxelProjection
 class AutoVolumeProjection(AbstractVolumeIntegrator[VolRep], strict=True):
     """Volume projection auto selection from cryoJAX
     `AbstractVolumeIntegrator` implementations.
-    """
+
+    !!! info
+        Based on the [`cryojax.simulator.AbstractVolumeRepresentation`][] passed
+        at runtime, this class chooses a default projection method.
+        In particular,
+
+        | Volume representation | Projection method | Atom or voxel? |
+        | :-------------------- | :------------------ | :------------------ |
+        | [`cryojax.simulator.GaussianMixtureVolume`][] | [`cryojax.simulator.GaussianMixtureProjection`][] | atom |
+        | [`cryojax.simulator.IndependentAtomVolume`][] | [`cryojax.simulator.FFTAtomProjection`][] | atom |
+        | [`cryojax.simulator.FourierVoxelGridVolume`][] or [`cryojax.simulator.FourierVoxelSplineVolume`][] | [`cryojax.simulator.FourierSliceExtraction`][] | voxel |
+        | [`cryojax.simulator.RealVoxelGridVolume`][] | [`cryojax.simulator.RealVoxelProjection`][] | voxel |
+
+        To use advanced options for a given projection method,
+        see each respective class.
+
+    !!! warning
+        If using [`cryojax.simulator.FFTAtomRenderFn`][] or [`cryojax.simulator.RealVoxelProjection`][], [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft)
+        must be installed. See the cryoJAX [installation instructions](https://github.com/michael-0brien/cryojax?tab=readme-ov-file#installation)
+        for installing `jax-finufft`.
+    """  # noqa: E501
 
     options: dict[str, Any] = eqx.field(default_factory=dict)
 
@@ -95,7 +115,7 @@ class AutoVolumeProjection(AbstractVolumeIntegrator[VolRep], strict=True):
 AutoVolumeProjection.__init__.__doc__ = """**Arguments:**
 
 - `options`:
-    Keyword arguments passed to the resolved `AbstractVolumeIntegrator`,
+    Keyword arguments passed to the resolved projection method`,
     e.g. `GaussianMixtureProjection(**options)`.
 """
 
@@ -103,7 +123,25 @@ AutoVolumeProjection.__init__.__doc__ = """**Arguments:**
 class AutoVolumeRenderFn(AbstractVolumeRenderFn[VolRep], strict=True):
     """Volume rendering auto selection from cryoJAX
     `AbstractVolumeRenderFn` implementations.
-    """
+
+    !!! info
+        Based on the [`cryojax.simulator.AbstractVolumeRepresentation`][] passed
+        at runtime, this class chooses a default rendering function.
+        In particular,
+
+        | Volume representation | Rendering function  |
+        | :-------------------- | :-----------------  |
+        | [`cryojax.simulator.GaussianMixtureVolume`][] | [`cryojax.simulator.GaussianMixtureRenderFn`][] |
+        | [`cryojax.simulator.IndependentAtomVolume`][] | [`cryojax.simulator.FFTAtomRenderFn`][] |
+
+        To use advanced options for a given rendering function,
+        see each respective class.
+
+    !!! warning
+        If using [`cryojax.simulator.FFTAtomRenderFn`][], [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft)
+        must be installed. See the cryoJAX [installation instructions](https://github.com/michael-0brien/cryojax?tab=readme-ov-file#installation)
+        for installing `jax-finufft`.
+    """  # noqa: E501
 
     shape: tuple[int, int, int]
     voxel_size: Float[Array, ""]
@@ -123,7 +161,7 @@ class AutoVolumeRenderFn(AbstractVolumeRenderFn[VolRep], strict=True):
         - `voxel_size`:
             The voxel size for rendering.
         - `options`:
-            Keyword arguments passed to the resolved `AbstractVolumeRenderFn`,
+            Keyword arguments passed to the resolved rendering function,
             e.g. `GaussianMixtureRenderFn(shape, voxel_size, **options)`.
         """
         self.shape = shape
