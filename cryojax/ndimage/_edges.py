@@ -71,7 +71,10 @@ def crop_to_shape(
             xc, yc = center
             h, w = shape
             x0, y0 = (max(xc - w // 2, 0), max(yc - h // 2, 0))
-            xn, yn = (min(xc + w // 2 + w % 2, w), min(yc + h // 2 + h % 2, h))
+            xn, yn = (
+                min(xc + w // 2 + w % 2, image.shape[1]),
+                min(yc + h // 2 + h % 2, image.shape[0]),
+            )
             cropped = image[y0:yn, x0:xn]
         else:
             assert len(center) == 3
@@ -80,9 +83,9 @@ def crop_to_shape(
             d, h, w = shape
             x0, y0, z0 = (max(xc - w // 2, 0), max(yc - h // 2, 0), max(zc - d // 2, 0))
             xn, yn, zn = (
-                min(xc + w // 2 + w % 2, w),
-                min(yc + h // 2 + h % 2, h),
-                min(zc + d // 2 + d % 2, d),
+                min(xc + w // 2 + w % 2, volume.shape[2]),
+                min(yc + h // 2 + h % 2, volume.shape[1]),
+                min(zc + d // 2 + d % 2, volume.shape[0]),
             )
             cropped = volume[z0:zn, y0:yn, x0:xn]
     if cropped.shape != shape:
