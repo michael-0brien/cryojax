@@ -25,7 +25,6 @@ dependencies = [
     "mrcfile",
     "starfile",
     "pandas",
-    "xarray",
     "typing_extensions>=4.5.0",
     "tqdm",
     "mmdf",
@@ -50,7 +49,7 @@ docs = [
 tests = [
     "pytest",
     "pytest-cov",
-    "pycistem; sys_platform == 'linux' and python_version < '3.12'",
+    "pycistem==0.4.1; sys_platform == 'linux' and python_version < '3.12'",
     "typeguard==2.13.3"
 ]
 extras = [

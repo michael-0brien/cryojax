@@ -3,32 +3,15 @@ Routines for loading atomic structures.
 Large amounts of the code are adapted from the ioSPI package
 """
 
-import importlib.resources as pkg_resources
-import os
-
 import equinox as eqx
-import jax.numpy as jnp
 import numpy as np
-import xarray as xr
 from jaxtyping import Float, Int
 
 
 class PengScatteringFactorParameters(eqx.Module, strict=True):
-    """A convenience wrapper for instantiating the
-    scattering factor parameters from Peng et al. (1996).
-
-    To access scattering factors $a_i$ and $b_i$ given in
-    the citation,
-
-    ```python
-    from cryojax.io import read_atoms_from_pdb
-    from cryojax.constants import PengScatteringFactorParameters
-
-    # Load positions of atoms and one-hot encoded atom names
-    atom_positions, atom_types = read_atoms_from_pdb(...)
-    parameters = PengScatteringFactorParameters(atom_types)
-    print(parameters.a, parameters.b)  # a_i and b_i
-    ```
+    """Loads electron scattering factor
+    parameters from "Robust Parameterization of Elastic and Absorptive
+    Electron Atomic Scattering Factors" by Peng et al. (1996).
     """
 
     a: Float[np.ndarray, " n_atoms 5"]
@@ -38,71 +21,412 @@ class PengScatteringFactorParameters(eqx.Module, strict=True):
         """**Arguments:**
 
         - `atomic_numbers`:
-            The atom types as an integer array.
+            An array of atomic numbers.
         """
-        scattering_factor_parameter_table = read_peng_scattering_factor_parameter_table()
-        parameter_dict = extract_scattering_factor_parameters(
-            atomic_numbers, scattering_factor_parameter_table
-        )
-        self.a = parameter_dict["a"]
-        self.b = parameter_dict["b"]
+        parameters = _PENG_PARAMETER_TABLE[atomic_numbers]
+        self.a = parameters[:, 0, :]
+        self.b = parameters[:, 1, :]
 
 
-def read_peng_scattering_factor_parameter_table() -> xr.Dataset:
-    r"""Function to load the atomic scattering factor parameter
-    table from "Robust Parameterization of Elastic and Absorptive
-    Electron Atomic Scattering Factors" by Peng et al. (1996).
-
-    **Returns:**
-
-    The parameter table for parameters $\{a_i\}_{i = 1}^5$ and $\{b_i\}_{i = 1}^5$
-    for each atom, described in the above reference. This is stored as an
-    `xarray.Dataset`.
+class LobatoScatteringFactorParameters(eqx.Module, strict=True):
+    """Loads electron scattering factor
+    parameters from "An accurate parameterization for scattering factors,
+    electron densities and electrostatic potentials for neutral atoms
+    that obey all physical constraints" by Lobato et al. (2014).
     """
-    with pkg_resources.as_file(
-        pkg_resources.files("cryojax").joinpath("constants")
-    ) as path:
-        scattering_factor_parameters = jnp.load(
-            os.path.join(path, "peng1996_element_params.npy")
+
+    a: Float[np.ndarray, " n_atoms 5"]
+    b: Float[np.ndarray, " n_atoms 5"]
+
+    def __init__(self, atomic_numbers: Int[np.ndarray, " n_atoms"]):
+        """**Arguments:**
+
+        - `atomic_numbers`:
+            An array of atomic numbers.
+        """
+        parameters = _LOBATO_PARAMETER_TABLE[atomic_numbers]
+        self.a = parameters[:, 0, :]
+        self.b = parameters[:, 1, :]
+
+
+def check_atomic_numbers_supported(atomic_numbers: Int[np.ndarray, " _"]):
+    """Throw an error if `atomic_numbers` contains values not
+    supported by cryoJAX electron scattering factor tabulations.
+    """
+    unique_atomic_numbers = np.unique(atomic_numbers).tolist()
+    if not set(unique_atomic_numbers).issubset(set(_SUPPORTED_ATOMIC_NUMBERS)):
+        raise ValueError(
+            "Found unsupported atomic numbers when running "
+            "function `cryojax.constants.check_atomic_numbers_supported`. "
+            f"Supported atomic numbers are `{_SUPPORTED_ATOMIC_NUMBERS}`, "
+            f"but found values {unique_atomic_numbers}."
         )
-    dims = ("n_elements", "n_gaussians")
-    scattering_factor_parameter_table = xr.Dataset(
-        data_vars=dict(
-            a=xr.DataArray(scattering_factor_parameters[0], dims=dims),
-            b=xr.DataArray(scattering_factor_parameters[1], dims=dims),
-        ),
-        attrs=dict(description="Scattering factor parameters from Peng et al. (1996)"),
-    )
-
-    return scattering_factor_parameter_table
 
 
-def extract_scattering_factor_parameters(
-    atom_types: Int[np.ndarray, " n_atoms"],
-    scattering_factor_parameter_table: xr.Dataset | None = None,
-) -> dict[str, Float[np.ndarray, " n_atoms n_scattering_factors"]]:
-    """Gets the parameters for the scattering factor for each atom in
-    `atom_types`.
+_SUPPORTED_ATOMIC_NUMBERS = [
+    1,
+    6,
+    7,
+    8,
+    9,
+    11,
+    12,
+    15,
+    16,
+    17,
+    19,
+    20,
+    25,
+    26,
+    27,
+    29,
+    30,
+]
 
-    **Arguments:**
+_PENG_PARAMETER_TABLE = np.full((31, 2, 5), np.nan)
+_LOBATO_PARAMETER_TABLE = np.full((31, 2, 5), np.nan)
 
-    - `atom_identitites`:
-        Array containing the index of the one-hot encoded atom names.
-        By default, Hydrogen is "1", Carbon is "6", Nitrogen is "7", etc.
-    - `scattering_factor_parameter_table`:
-        The table of scattering factors as an `xarray.Dataset`. By default, this
-        is the tabulation from "Robust Parameterization of Elastic and
-        Absorptive Electron Atomic Scattering Factors" by Peng et al. (1996),
-        given by [`read_peng_element_scattering_factor_parameter_table`](https://michael-0brien.github.io/cryojax/api/constants/scattering_factor_parameters/#cryojax.constants.read_peng_element_scattering_factor_parameter_table).
+# Peng parameters
+_PENG_PARAMETER_TABLE[1] = [
+    [0.0349, 0.1201, 0.197, 0.0573, 0.1195],
+    [0.5347, 3.5867, 12.3471, 18.9525, 38.6269],
+]
+_PENG_PARAMETER_TABLE[6] = [
+    [0.0893, 0.2563, 0.757, 1.0487, 0.3575],
+    [0.2465, 1.71, 6.4094, 18.6113, 50.2523],
+]
+_PENG_PARAMETER_TABLE[7] = [
+    [0.1022, 0.3219, 0.7982, 0.8197, 0.1715],
+    [0.2451, 1.7481, 6.1925, 17.3894, 48.1431],
+]
+_PENG_PARAMETER_TABLE[8] = [
+    [0.0974, 0.2921, 0.691, 0.699, 0.2039],
+    [0.2067, 1.3815, 4.6943, 12.7105, 32.4726],
+]
+_PENG_PARAMETER_TABLE[9] = [
+    [0.1083, 0.3175, 0.6487, 0.5846, 0.1421],
+    [0.2057, 1.3439, 4.2788, 11.3932, 28.7881],
+]
+_PENG_PARAMETER_TABLE[11] = [
+    [0.2142, 0.6853, 0.7692, 1.6589, 1.4482],
+    [0.3334, 2.3446, 10.083, 48.3037, 138.27],
+]
+_PENG_PARAMETER_TABLE[12] = [
+    [0.2314, 0.6866, 0.9677, 2.1882, 1.1339],
+    [0.3278, 2.272, 10.9241, 39.2898, 101.9748],
+]
+_PENG_PARAMETER_TABLE[15] = [
+    [0.2548, 0.6106, 1.4541, 2.3204, 0.8477],
+    [0.2908, 1.874, 8.5176, 24.3434, 63.2996],
+]
+_PENG_PARAMETER_TABLE[16] = [
+    [0.2497, 0.5628, 1.3899, 2.1865, 0.7715],
+    [0.2681, 1.6711, 7.0267, 19.5377, 50.3888],
+]
+_PENG_PARAMETER_TABLE[17] = [
+    [0.2443, 0.5397, 1.3919, 2.0197, 0.6621],
+    [0.2468, 1.5242, 6.1537, 16.6687, 42.3086],
+]
+_PENG_PARAMETER_TABLE[19] = [
+    [0.4115, 1.4031, 2.2784, 2.6742, 2.2162],
+    [0.3703, 3.3874, 13.1029, 68.9592, 194.4329],
+]
+_PENG_PARAMETER_TABLE[20] = [
+    [0.4054, 1.388, 2.1602, 3.7532, 2.2063],
+    [0.3499, 3.0991, 11.9608, 53.9353, 142.3892],
+]
+_PENG_PARAMETER_TABLE[25] = [
+    [0.3796, 1.2094, 1.7815, 2.542, 1.5937],
+    [0.2699, 2.0455, 7.4726, 31.0604, 91.5622],
+]
+_PENG_PARAMETER_TABLE[26] = [
+    [0.3946, 1.2725, 1.7031, 2.314, 1.4795],
+    [0.2717, 2.0443, 7.6007, 29.9714, 86.2265],
+]
+_PENG_PARAMETER_TABLE[27] = [
+    [0.4118, 1.3161, 1.6493, 2.193, 1.283],
+    [0.2742, 2.0372, 7.7205, 29.968, 84.9383],
+]
+_PENG_PARAMETER_TABLE[29] = [
+    [0.4314, 1.3208, 1.5236, 1.4671, 0.8562],
+    [0.2694, 1.9223, 7.3474, 28.9892, 90.6246],
+]
+_PENG_PARAMETER_TABLE[30] = [
+    [0.4288, 1.2646, 1.4472, 1.8294, 1.0934],
+    [0.2593, 1.7998, 6.75, 25.586, 73.5284],
+]
 
-    **Returns:**
 
-    The particular scattering factor parameters stored in
-    `scattering_factor_parameter_table` for `atom_types`.
-    """  # noqa: E501
-    if scattering_factor_parameter_table is None:
-        scattering_factor_parameter_table = read_peng_scattering_factor_parameter_table()
-    return {
-        str(k): np.asarray(v.data[np.asarray(atom_types), ...])
-        for k, v in scattering_factor_parameter_table.items()
-    }
+# Lobato parameters
+_LOBATO_PARAMETER_TABLE[1] = [
+    [
+        0.0064738484883529,
+        -0.490192576780229,
+        0.573284160390876,
+        -0.37940330148399,
+        0.554426474774079,
+    ],
+    [
+        2.78519885379148,
+        2.77620428330644,
+        2.77538591050625,
+        2.76759302867258,
+        2.76511897642927,
+    ],
+]
+_LOBATO_PARAMETER_TABLE[6] = [
+    [
+        124.466088621343,
+        -220.352857078963,
+        195.235352280479,
+        -98.10793612697991,
+        0.0142023041213623,
+    ],
+    [
+        2.42120849256005,
+        2.30537943752425,
+        2.04851932106564,
+        1.93352552917547,
+        0.0768976818478339,
+    ],
+]
+_LOBATO_PARAMETER_TABLE[7] = [
+    [
+        58.1327150702556,
+        -147.542409087812,
+        130.143065649639,
+        -39.6195674084154,
+        0.010595776333148,
+    ],
+    [
+        1.70044856413471,
+        1.5590385260174,
+        1.41576827473146,
+        1.27841818205455,
+        0.0565587798474805,
+    ],
+]
+_LOBATO_PARAMETER_TABLE[8] = [
+    [
+        29.9474045242362,
+        -77.61012662552781,
+        99.8817764623144,
+        -51.2127005505673,
+        0.0081961895444603,
+    ],
+    [
+        1.3028398788001,
+        1.15794105258309,
+        1.00988549338025,
+        0.943327971433266,
+        0.0433197611321825,
+    ],
+]
+_LOBATO_PARAMETER_TABLE[9] = [
+    [
+        0.948984894503524,
+        -30.1333923043554,
+        52.7965078127338,
+        -22.7062703795272,
+        0.0065699766453144,
+    ],
+    [
+        1.45882933198645,
+        0.68877999318768,
+        0.654239869346695,
+        0.614836130811994,
+        0.0342837419495011,
+    ],
+]
+_LOBATO_PARAMETER_TABLE[11] = [
+    [
+        23.6700603946792,
+        -21.8531786159742,
+        0.592499448108946,
+        -0.0244652290310244,
+        0.0048395022170653,
+    ],
+    [
+        8.45148773514603,
+        8.040966004742979,
+        0.624996000526315,
+        0.132450394947296,
+        0.0233994362049878,
+    ],
+]
+_LOBATO_PARAMETER_TABLE[12] = [
+    [
+        4.85501047687149,
+        -2.66220906476843,
+        0.478001236085108,
+        -0.0702307064692064,
+        0.0039890582810401,
+    ],
+    [
+        5.94639273842456,
+        4.171303125206969,
+        0.398269808150374,
+        0.161886185837474,
+        0.0195345056363103,
+    ],
+]
+_LOBATO_PARAMETER_TABLE[15] = [
+    [
+        2.79151840023151,
+        -4.36506837823822,
+        4.43558455516699,
+        -0.0809635773399473,
+        0.0026790001796644,
+    ],
+    [
+        3.90065961865466,
+        0.32982596837715,
+        0.306089956505888,
+        0.108083232545972,
+        0.0125894495331186,
+    ],
+]
+_LOBATO_PARAMETER_TABLE[16] = [
+    [
+        2.67971415610199,
+        -0.474252822230755,
+        0.514835948989687,
+        -0.0958360024990722,
+        0.0024887196381893,
+    ],
+    [
+        3.06889121199971,
+        0.378216702185809,
+        0.188721811902548,
+        0.0923370590031494,
+        0.0111920877241144,
+    ],
+]
+_LOBATO_PARAMETER_TABLE[17] = [
+    [
+        2.5662483998002,
+        -0.338876350828591,
+        1.14584558755515,
+        -0.923109316547079,
+        0.0022916800204104,
+    ],
+    [
+        2.41594920365612,
+        0.421414239310216,
+        0.10959240497583,
+        0.0990955458226753,
+        0.0099966594892752,
+    ],
+]
+_LOBATO_PARAMETER_TABLE[19] = [
+    [
+        5.81107878601454,
+        -50.2537096539422,
+        48.8609412059842,
+        0.0740628592048382,
+        0.0007278027386262,
+    ],
+    [
+        12.6691483399036,
+        3.95641039698166,
+        3.68385059577154,
+        0.107458517569562,
+        0.006655767893915,
+    ],
+]
+_LOBATO_PARAMETER_TABLE[20] = [
+    [
+        21.1781161524159,
+        -339.043824317468,
+        322.756958523296,
+        0.0650077673896996,
+        0.0006558743665785,
+    ],
+    [
+        6.39608619431736,
+        3.7402471389174896,
+        3.6488844992260496,
+        0.0945090634514673,
+        0.0059852061988375,
+    ],
+]
+_LOBATO_PARAMETER_TABLE[25] = [
+    [
+        4.37417550633122,
+        -160.925510918779,
+        160.273308060322,
+        0.0312303861049162,
+        0.0003469660210209,
+    ],
+    [
+        5.51031705504928,
+        1.68798216402433,
+        1.66614047777702,
+        0.0483370390321277,
+        0.0036474696005306,
+    ],
+]
+_LOBATO_PARAMETER_TABLE[26] = [
+    [
+        3.7981009083685904,
+        -91.6893549381687,
+        91.4454252155429,
+        0.0272754344027604,
+        0.0003033798543837,
+    ],
+    [
+        5.31712645899433,
+        1.49713094884748,
+        1.4680924180441,
+        0.0427247850128954,
+        0.0033279185523187,
+    ],
+]
+_LOBATO_PARAMETER_TABLE[27] = [
+    [
+        3.33037874467544,
+        -77.00175964729671,
+        77.0725221790516,
+        0.0239904669040569,
+        0.0002682566655239,
+    ],
+    [
+        5.18135964579543,
+        1.32915122265139,
+        1.30284928963228,
+        0.0380645486826371,
+        0.0030501000799157,
+    ],
+]
+_LOBATO_PARAMETER_TABLE[29] = [
+    [
+        1.75207145212145,
+        -43.0410523492124,
+        44.07059155435729,
+        0.0186876154088144,
+        0.0002017273247916,
+    ],
+    [
+        6.18750497986187,
+        1.00266263628976,
+        0.98538431135303,
+        0.0302984703916117,
+        0.0025585559874887,
+    ],
+]
+_LOBATO_PARAMETER_TABLE[30] = [
+    [
+        2.46637110499459,
+        -61.467854133253695,
+        62.0176945237481,
+        0.0164160173931416,
+        0.0001724871175953,
+    ],
+    [
+        4.91028078493815,
+        0.967898520322992,
+        0.951283834775355,
+        0.0269600967667566,
+        0.0023410961104625,
+    ],
+]

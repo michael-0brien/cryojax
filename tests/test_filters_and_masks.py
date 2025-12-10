@@ -1,17 +1,17 @@
+import cryojax.ndimage as im
 import jax
 import jax.numpy as jnp
 import pytest
-from cryojax.coordinates import make_coordinate_grid, make_frequency_grid
-from cryojax.ndimage import transforms as tf
+from cryojax.ndimage import make_coordinate_grid, make_frequency_grid
 
 
 def test_mask_2d_running():
     classes = [
-        tf.InverseSincMask,
-        tf.SquareCosineMask,
-        tf.CircularCosineMask,
-        tf.Cylindrical2DCosineMask,
-        tf.Rectangular2DCosineMask,
+        im.InverseSincMask,
+        im.SquareCosineMask,
+        im.CircularCosineMask,
+        im.Cylindrical2DCosineMask,
+        im.Rectangular2DCosineMask,
     ]
     kwargs = [
         dict(),
@@ -29,7 +29,7 @@ def test_mask_2d_running():
 
 
 def test_mask_3d_running():
-    classes = [tf.InverseSincMask, tf.SphericalCosineMask, tf.Rectangular3DCosineMask]
+    classes = [im.InverseSincMask, im.SphericalCosineMask, im.Rectangular3DCosineMask]
     kwargs = [
         dict(),
         dict(radius=5, rolloff_width=2),
@@ -44,7 +44,7 @@ def test_mask_3d_running():
 
 
 def test_filter_running():
-    classes = [tf.LowpassFilter, tf.HighpassFilter]
+    classes = [im.LowpassFilter, im.HighpassFilter]
     kwargs = [dict(), dict()]
     frequency_grid_2d, fourier_image_2d = (
         make_frequency_grid((10, 10)),
@@ -64,7 +64,7 @@ def test_filter_running():
 
 
 def test_custom_filter_and_mask_initialization():
-    classes = [tf.CustomFilter, tf.CustomMask]
+    classes = [im.CustomFilter, im.CustomMask]
     array = jnp.zeros((10, 10))
     for cls in classes:
         _ = cls(array)
@@ -84,7 +84,7 @@ def test_custom_filter_and_mask_initialization():
 def test_whitening_filter(image_shape, filter_shape, mode, square):
     rng_key = jax.random.key(1234)
     image = jax.random.normal(rng_key, image_shape)
-    f = tf.WhiteningFilter(
+    f = im.WhiteningFilter(
         image, shape=filter_shape, interpolation_mode=mode, outputs_squared=square
     )
     _ = f.get()

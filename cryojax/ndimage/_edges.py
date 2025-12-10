@@ -2,7 +2,6 @@
 Routines for dealing with image cropping and padding.
 """
 
-import warnings
 from typing import Any
 
 import jax
@@ -17,91 +16,82 @@ def crop_to_shape(
         Inexact[NDArrayLike, "y_dim x_dim"] | Inexact[NDArrayLike, "z_dim y_dim x_dim"]
     ),
     shape: tuple[int, int] | tuple[int, int, int],
+    center: (
+        tuple[int, int]
+        | tuple[int, int, int]
+        | tuple[Int[NDArrayLike, ""], Int[NDArrayLike, ""]]
+        | tuple[Int[NDArrayLike, ""], Int[NDArrayLike, ""], Int[NDArrayLike, ""]]
+        | None
+    ) = None,
 ) -> (
     Inexact[Array, " {shape[0]} {shape[1]}"]
     | Inexact[Array, " {shape[0]} {shape[1]} {shape[2]}"]
 ):
     """Crop an image or volume to a new shape around its
     center.
+
+    !!! info
+
+        The behavior of this function is slightly different
+        depending on the type of `center`. If `center` is
+        a tuple of `jax.Array`s, wraps `jax.lax.dynamic_slice`.
+        If `center` is a tuple of `int` or `numpy.ndarrays`,
+        crops with array indexing and throws an error if
+        the resulting shape isn't equal to the requested shape.
     """
-    if image_or_volume.ndim not in [2, 3]:
+    ndim = image_or_volume.ndim
+    if ndim not in [2, 3]:
         raise ValueError(
-            "crop_to_shape can only crop images and volumes. Got array shape of "
-            f"{image_or_volume.shape}."
+            "`cryojax.ndimage.crop_to_shape` can only crop images "
+            f" and volumes, but got array shape of {image_or_volume.shape}."
         )
     if len(shape) != len(image_or_volume.shape):
         raise ValueError(
-            "Mismatch between ndim of desired crop shape and "
-            f"array shape. Got a crop shape of {shape} and "
-            f"an array shape of {image_or_volume.shape}."
+            "Mismatch between number of dimensions of desired "
+            "crop shape and image or volume shape. "
+            f"Desired crop shape was {shape} and "
+            f"image or volume shape was {image_or_volume.shape}."
         )
-    if len(shape) == 2:
-        image = image_or_volume
-        Ny, Nx = image.shape
-        xc, yc = Nx // 2, Ny // 2
-        h, w = shape
-        cropped = image[
-            yc - h // 2 : yc + h // 2 + h % 2,
-            xc - w // 2 : xc + w // 2 + w % 2,
-        ]
-    elif len(shape) == 3:
-        volume = image_or_volume
-        Nz, Ny, Nx = volume.shape
-        xc, yc, zc = Nx // 2, Ny // 2, Nz // 2
-        d, h, w = shape
-        cropped = volume[
-            zc - d // 2 : zc + d // 2 + d % 2,
-            yc - h // 2 : yc + h // 2 + h % 2,
-            xc - w // 2 : xc + w // 2 + w % 2,
-        ]
+    if center is None:
+        center = tuple(n // 2 for n in image_or_volume.shape[::-1])  # type: ignore
+        assert center is not None
+    if any(isinstance(x, Array) for x in center):
+        start_indices = tuple(
+            jnp.asarray(x - s // 2) for x, s in zip(center[::-1], shape)
+        )
+        cropped = jax.lax.dynamic_slice(
+            image_or_volume,
+            start_indices,
+            shape,
+        )
     else:
-        raise ValueError(
-            "crop_to_shape can only crop images and volumes. Got desired crop shape of "
-            f"of {shape}."
-        )
-    return jnp.asarray(cropped)
-
-
-def crop_to_shape_with_center(
-    image: Inexact[NDArrayLike, "y_dim x_dim"],
-    shape: tuple[int, int],
-    center: tuple[int, int] | tuple[Int[NDArrayLike, ""], Int[NDArrayLike, ""]],
-    do_safe_crop: bool = True,
-) -> Inexact[Array, "{shape[0]} {shape[1]}"]:
-    """Crop an image to a new shape, given a center."""
-    if image.ndim != 2:
-        raise ValueError(
-            "crop_to_shape_with_center can only crop images. Got array shape of "
-            f"{image.shape}."
-        )
-    if len(shape) == 2:
-        xc, yc = center
-        h, w = shape
-        if do_safe_crop:
-            if not isinstance(xc, int) or not isinstance(yc, int):
-                raise ValueError(
-                    "If `do_safe_crop = True`, then `center` must be passed as "
-                    "a tuple of python integers. Found instead a tuple with "
-                    f"type {type(xc).__name__}."
-                )
-            x0, y0 = max(xc - w // 2, 0), max(yc - h // 2, 0)
+        if len(shape) == 2:
+            assert len(center) == 2
+            image = image_or_volume
+            xc, yc = center
+            h, w = shape
+            x0, y0 = (max(xc - w // 2, 0), max(yc - h // 2, 0))
             xn, yn = (
-                min(xc + w // 2 + w % 2, image.shape[1] - 1),
-                min(yc + h // 2 + h % 2, image.shape[0] - 1),
+                min(xc + w // 2 + w % 2, image.shape[1]),
+                min(yc + h // 2 + h % 2, image.shape[0]),
             )
             cropped = image[y0:yn, x0:xn]
         else:
-            x0, y0 = jnp.asarray(xc - w // 2), jnp.asarray(yc - h // 2)
-            cropped = jax.lax.dynamic_slice(image, (y0, x0), shape)
-    else:
-        raise ValueError(
-            "`crop_to_shape_with_center` can only crop images. Got desired crop shape of "
-            f"{shape}."
-        )
+            assert len(center) == 3
+            volume = image_or_volume
+            xc, yc, zc = center
+            d, h, w = shape
+            x0, y0, z0 = (max(xc - w // 2, 0), max(yc - h // 2, 0), max(zc - d // 2, 0))
+            xn, yn, zn = (
+                min(xc + w // 2 + w % 2, volume.shape[2]),
+                min(yc + h // 2 + h % 2, volume.shape[1]),
+                min(zc + d // 2 + d % 2, volume.shape[0]),
+            )
+            cropped = volume[z0:zn, y0:yn, x0:xn]
     if cropped.shape != shape:
-        warnings.warn(
-            "The cropped shape is not equal to the desired shape in "
-            "crop_to_shape_with_center. Usually, this happens because the crop was "
+        raise ValueError(
+            "The cropped shape was not equal to the desired shape in "
+            "`cryojax.ndimage.crop_to_shape`. This can happen if the crop is "
             "near the image edges."
         )
     return jnp.asarray(cropped)

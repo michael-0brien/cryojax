@@ -1,1 +1,1 @@
-# Distributions: noisy images and likelihoods
+# Noise and likelihoods

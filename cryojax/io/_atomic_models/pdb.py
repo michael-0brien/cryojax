@@ -5,6 +5,7 @@ adapted from `mdtraj`.
 
 import os
 import pathlib
+import typing
 import warnings
 from copy import copy
 from typing import Literal, TypedDict, overload
@@ -22,10 +23,14 @@ from mdtraj.core.topology import Topology
 from ...atom_util import center_atom_positions
 
 
-class AtomProperties(TypedDict):
-    masses: Float[np.ndarray, "... n_atoms"]
-    b_factors: Float[np.ndarray, "... n_atoms"]
-    charges: Float[np.ndarray, "... n_atoms"]
+if hasattr(typing, "GENERATING_DOCUMENTATION"):
+    AtomProperties = dict  # pyright: ignore[reportAssignmentType]
+else:
+
+    class AtomProperties(TypedDict):
+        masses: Float[np.ndarray, "... n_atoms"]
+        b_factors: Float[np.ndarray, "... n_atoms"]
+        charges: Float[np.ndarray, "... n_atoms"]
 
 
 @overload
@@ -175,7 +180,7 @@ def mmdf_to_atoms(
     *,
     loads_properties: Literal[False],
     loads_b_factors: bool = False,
-    center: bool = False,
+    center: bool = True,
     selection_string: str = "all",
     model_index: int | None = None,
     stack_models: bool = False,
@@ -190,7 +195,7 @@ def mmdf_to_atoms(  # type: ignore
     *,
     loads_properties: Literal[True],
     loads_b_factors: bool = False,
-    center: bool = False,
+    center: bool = True,
     selection_string: str = "all",
     model_index: int | None = None,
     stack_models: bool = False,
@@ -209,7 +214,7 @@ def mmdf_to_atoms(
     *,
     loads_properties: bool = False,
     loads_b_factors: bool = False,
-    center: bool = False,
+    center: bool = True,
     selection_string: str = "all",
     model_index: int | None = None,
     stack_models: bool = False,
@@ -223,7 +228,7 @@ def mmdf_to_atoms(
     *,
     loads_properties: bool = False,
     loads_b_factors: bool = False,
-    center: bool = False,
+    center: bool = True,
     selection_string: str = "all",
     model_index: int | None = None,
     stack_models: bool = False,
@@ -287,7 +292,7 @@ def mmdf_to_atoms(
             warnings.warn(
                 "`loads_b_factor` option is deprecated and will be removed in "
                 "cryoJAX 0.6.0. Use `loads_properties` instead.",
-                category=DeprecationWarning,
+                category=FutureWarning,
                 stacklevel=2,
             )
             return atom_positions, atomic_numbers, atom_properties["b_factors"]

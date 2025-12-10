@@ -3,7 +3,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
 from ...jax_util import FloatLike, error_if_not_fractional
-from ...ndimage.operators import FourierOperatorLike
+from ...ndimage import AbstractFourierOperator
 from .._image_config import AbstractImageConfig
 from .transfer_function import AbstractCTF
 
@@ -26,14 +26,14 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
     """
 
     ctf: AbstractCTF
-    envelope: FourierOperatorLike | None
+    envelope: AbstractFourierOperator | None
     amplitude_contrast_ratio: Float[Array, ""]
     phase_shift: Float[Array, ""]
 
     def __init__(
         self,
         ctf: AbstractCTF,
-        envelope: FourierOperatorLike | None = None,
+        envelope: AbstractFourierOperator | None = None,
         amplitude_contrast_ratio: FloatLike = 0.1,
         phase_shift: FloatLike = 0.0,
     ):
@@ -65,7 +65,7 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
         image_config: AbstractImageConfig,
         *,
         defocus_offset: FloatLike | None = None,
-        is_projection_approximation: bool = True,
+        input_is_ewald_sphere: bool = False,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         """Apply the CTF directly to the phase shifts in the exit plane.
 
@@ -76,10 +76,10 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
             below it.
         - `image_config`:
             The configuration of the resulting image.
-        - `is_projection_approximation`:
-            If `True`, the `object_spectrum_in_exit_plane` is a projection
+        - `input_is_ewald_sphere`:
+            If `False`, the `object_spectrum_in_exit_plane` is a projection
             approximation and is therefore the fourier transform of a real-valued
-            array. If `False`, `object_spectrum_in_exit_plane` is extracted from
+            array. If `True`, `object_spectrum_in_exit_plane` is extracted from
             the ewald sphere and is therefore the fourier transform of a complex-valued
             array.
         - `defocus_offset`:
@@ -87,7 +87,7 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
             runtime.
         """
         frequency_grid = image_config.padded_frequency_grid_in_angstroms
-        if is_projection_approximation:
+        if not input_is_ewald_sphere:
             # Compute the CTF, including additional phase shifts
             ctf_array = self.ctf(
                 frequency_grid,

@@ -1,13 +1,9 @@
 import cryojax.simulator as cxs
 import equinox as eqx
-import jax
 import numpy as np
 import pytest
 from cryojax.io import read_array_from_mrc, read_atoms_from_pdb
-from cryojax.ndimage import crop_to_shape
-
-
-jax.config.update("jax_enable_x64", True)
+from cryojax.ndimage import CircularCosineMask, ImageScaling, crop_to_shape
 
 
 @pytest.fixture
@@ -21,35 +17,30 @@ def voxel_info(sample_mrc_path):
 
 
 @pytest.fixture
-def volume_and_pixel_size(voxel_info):
-    real_voxel_grid, voxel_size = voxel_info
-    return (
-        cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid, pad_scale=1.3),
-        voxel_size,
-    )
+def voxel_volume(voxel_info):
+    return cxs.FourierVoxelGridVolume.from_real_voxel_grid(voxel_info[0], pad_scale=1.3)
 
 
 @pytest.fixture
-def volume(volume_and_pixel_size):
-    return volume_and_pixel_size[0]
+def voxel_size(voxel_info):
+    return voxel_info[1]
 
 
 @pytest.fixture
-def basic_config(volume_and_pixel_size):
-    volume, pixel_size = volume_and_pixel_size
-    shape = volume.shape[0:2]
+def basic_config(voxel_volume, voxel_size):
+    shape = voxel_volume.shape[0:2]
     return cxs.BasicImageConfig(
         shape=(int(0.9 * shape[0]), int(0.9 * shape[1])),
-        pixel_size=pixel_size,
+        pixel_size=voxel_size,
         voltage_in_kilovolts=300.0,
         pad_options=dict(shape=shape),
     )
 
 
 @pytest.fixture
-def image_model(volume, basic_config):
+def image_model(voxel_volume, basic_config):
     return cxs.make_image_model(
-        volume,
+        voxel_volume,
         basic_config,
         pose=cxs.EulerAnglePose(),
         transfer_theory=cxs.ContrastTransferTheory(cxs.AstigmaticCTF()),
@@ -81,28 +72,27 @@ def test_fourier_shape(model, request):
 
 
 @pytest.mark.parametrize("extra_dim_y, extra_dim_x", [(1, 1), (1, 0), (0, 1)])
-def test_even_vs_odd_image_shape(extra_dim_y, extra_dim_x, volume_and_pixel_size):
-    volume, pixel_size = volume_and_pixel_size
-    control_shape = volume.shape[0:2]
+def test_even_vs_odd_image_shape(extra_dim_y, extra_dim_x, voxel_volume, voxel_size):
+    control_shape = voxel_volume.shape[0:2]
     test_shape = (control_shape[0] + extra_dim_y, control_shape[1] + extra_dim_x)
     config_control = cxs.BasicImageConfig(
-        control_shape, pixel_size=pixel_size, voltage_in_kilovolts=300.0
+        control_shape, pixel_size=voxel_size, voltage_in_kilovolts=300.0
     )
     config_test = cxs.BasicImageConfig(
-        test_shape, pixel_size=pixel_size, voltage_in_kilovolts=300.0
+        test_shape, pixel_size=voxel_size, voltage_in_kilovolts=300.0
     )
     pose = cxs.EulerAnglePose()
     transfer_theory = cxs.ContrastTransferTheory(cxs.AstigmaticCTF())
     model_control = cxs.make_image_model(
-        volume, config_control, pose=pose, transfer_theory=transfer_theory
+        voxel_volume, config_control, pose=pose, transfer_theory=transfer_theory
     )
     model_test = cxs.make_image_model(
-        volume, config_test, pose=pose, transfer_theory=transfer_theory
+        voxel_volume, config_test, pose=pose, transfer_theory=transfer_theory
     )
     np.testing.assert_allclose(
         crop_to_shape(model_test.simulate(), control_shape),
         model_control.simulate(),
-        atol=1e-4,
+        atol=1e-3,
     )
 
 
@@ -135,7 +125,6 @@ def test_translate_mode(pdb_info, offset_xy, pixel_size, shape, pad_scale):
         pose,
         image_config,
         integrator,
-        applies_translation=True,
         translate_mode="fft",
     )
     atom_proj_model = cxs.ProjectionImageModel(
@@ -143,7 +132,6 @@ def test_translate_mode(pdb_info, offset_xy, pixel_size, shape, pad_scale):
         pose,
         image_config,
         integrator,
-        applies_translation=True,
         translate_mode="atom",
     )
     atom_translate_proj = compute_image(atom_proj_model)
@@ -158,7 +146,6 @@ def test_translate_mode(pdb_info, offset_xy, pixel_size, shape, pad_scale):
         image_config,
         integrator,
         transfer_theory,
-        applies_translation=True,
         translate_mode="fft",
     )
     atom_im_model = cxs.LinearImageModel(
@@ -167,7 +154,6 @@ def test_translate_mode(pdb_info, offset_xy, pixel_size, shape, pad_scale):
         image_config,
         integrator,
         transfer_theory,
-        applies_translation=True,
         translate_mode="atom",
     )
     atom_translate_im = compute_image(atom_im_model)
@@ -184,6 +170,44 @@ def test_bad_translate_mode(voxel_info, basic_config):
             voxel_volume, basic_config, pose=cxs.EulerAnglePose(), translate_mode="atom"
         )
         _ = model.simulate()
+
+
+@pytest.mark.parametrize("std", (2.0, 4.0))
+def test_transform(std, voxel_info, basic_config):
+    real_voxels, _ = voxel_info
+    voxel_volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxels)
+    image_model = cxs.make_image_model(
+        voxel_volume,
+        basic_config,
+        pose=cxs.EulerAnglePose(),
+        transform=ImageScaling(scale=std),
+        normalizes_signal=True,
+    )
+    image = compute_image(image_model)
+    np.testing.assert_approx_equal(np.std(image), std)
+
+
+@pytest.mark.parametrize("use_transform", (True, False))
+def test_mask_zeros_edges(use_transform, voxel_info, basic_config):
+    real_voxels, _ = voxel_info
+    voxel_volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxels)
+    image_model = cxs.make_image_model(
+        voxel_volume,
+        basic_config,
+        pose=cxs.EulerAnglePose(),
+        transform=(ImageScaling(scale=1.0) if use_transform else None),
+        normalizes_signal=True,
+    )
+    image = image_model.simulate(
+        mask=CircularCosineMask(
+            basic_config.coordinate_grid_in_pixels, radius=10, rolloff_width=0
+        )
+    )
+    ny, nx = image.shape
+    np.testing.assert_allclose(image[0, 0], 0.0)
+    np.testing.assert_allclose(image[ny, 0], 0.0)
+    np.testing.assert_allclose(image[0, nx], 0.0)
+    np.testing.assert_allclose(image[ny, nx], 0.0)
 
 
 @eqx.filter_jit

@@ -46,8 +46,11 @@ plugins:
     - ipynb
     - hippogriffe:
         extra_public_objects:
-            - xarray.core.dataset.Dataset
             - numpy.ndarray
+            - equinox.Module
+            - mdtraj.Topology
+            - pandas.DataFrame
+            # - lineax.FunctionLinearOperator
     - mkdocstrings:
         handlers:
           python:
@@ -67,6 +70,7 @@ plugins:
 
 nav:
     - 'index.md'
+    - 'overview.md'
     - Examples:
         - Getting started:
             - Simulate an image: 'examples/simulate-image.ipynb'
@@ -78,8 +82,8 @@ nav:
             - Write a STAR file of simulated data: 'examples/simulate-relion-dataset.ipynb'
             - Structural refinement using gradient descent: 'examples/structure-refinement.ipynb'
     - API:
-        - cryojax.simulator:
-            - 'api/simulator/api.md'
+        - The simulator:
+            - 'api/simulator/entry-point.md'
             - Representing volumes:
                 - 'api/simulator/pose.md'
                 - 'api/simulator/volume.md'
@@ -87,32 +91,16 @@ nav:
                 - 'api/simulator/integrator.md'
                 - 'api/simulator/transfer_theory.md'
                 - 'api/simulator/scattering_theory.md'
+                - 'api/simulator/detector.md'
             - Putting it all together:
                 - 'api/simulator/config.md'
                 - 'api/simulator/image_model.md'
                 - 'api/simulator/noise_model.md'
-        - cryojax.dataset:
-            - 'api/dataset/relion.md'
-        - cryojax.io:
-            - 'api/io/mrc.md'
-            - 'api/io/atom_loading.md'
-        - cryojax.ndimage:
-            - 'api/ndimage/functions.md'
-            - cryojax.ndimage.operators:
-                - 'api/ndimage/operators.md'
-            - cryojax.ndimage.transforms:
-                - 'api/ndimage/transforms.md'
-        - cryojax.coordinates:
-            - 'api/coordinates/making_coordinates.md'
-            - 'api/coordinates/transforming_coordinates.md'
-        - cryojax.rotations:
-            - 'api/rotations/lie_groups.md'
-            - 'api/rotations/conversions.md'
-        - cryojax.constants:
-            - 'api/constants/units.md'
-            - 'api/constants/scattering_factor_parameters.md'
-            - 'api/constants/conventions.md'
-        - cryojax.atom_util:
+        - Support utilities:
+            - 'api/io.md'
+            - 'api/ndimage.md'
             - 'api/atom_util.md'
-        - cryojax.jax_util:
-            - 'api/jax_util.md'
+            - 'api/constants.md'
+            - 'api/rotations.md'
+        - 'api/dataset.md'
+        - 'api/jax_util.md'

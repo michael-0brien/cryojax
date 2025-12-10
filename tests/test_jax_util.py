@@ -7,11 +7,8 @@ from jaxtyping import Array, install_import_hook
 
 
 with install_import_hook("cryojax", "typeguard.typechecked"):
-    import cryojax.jax_util as cju
-    from cryojax.coordinates import make_coordinate_grid
-
-
-jax.config.update("jax_enable_x64", True)
+    import cryojax.jax_util as jxu
+    from cryojax.ndimage import make_coordinate_grid
 
 
 #
@@ -29,9 +26,9 @@ def test_resolve_transform():
     pytree_with_transform = eqx.tree_at(
         lambda fn: fn.a,
         pytree,
-        replace_fn=lambda a: cju.CustomTransform(jnp.exp, jnp.log(a)),
+        replace_fn=lambda a: jxu.CustomTransform(jnp.exp, jnp.log(a)),
     )
-    assert eqx.tree_equal(pytree, cju.resolve_transforms(pytree_with_transform))
+    assert eqx.tree_equal(pytree, jxu.resolve_transforms(pytree_with_transform))
 
 
 def test_nested_resolve_transform():
@@ -39,33 +36,33 @@ def test_nested_resolve_transform():
     pytree_with_transform = eqx.tree_at(
         lambda fn: fn.a,
         pytree,
-        replace_fn=lambda a: cju.CustomTransform(lambda b: 2 * b, a / 2),
+        replace_fn=lambda a: jxu.CustomTransform(lambda b: 2 * b, a / 2),
     )
     pytree_with_nested_transform = eqx.tree_at(
         lambda fn: fn.a.args[0],
         pytree_with_transform,
-        replace_fn=lambda a_scaled: cju.CustomTransform(jnp.exp, jnp.log(a_scaled)),
+        replace_fn=lambda a_scaled: jxu.CustomTransform(jnp.exp, jnp.log(a_scaled)),
     )
     assert eqx.tree_equal(
         pytree,
-        cju.resolve_transforms(pytree_with_transform),
-        cju.resolve_transforms(pytree_with_nested_transform),
+        jxu.resolve_transforms(pytree_with_transform),
+        jxu.resolve_transforms(pytree_with_nested_transform),
     )
 
 
 def test_stop_gradient():
     @jax.value_and_grad
     def objective_fn(pytree):
-        exp, x = cju.resolve_transforms(pytree)
+        exp, x = jxu.resolve_transforms(pytree)
         return exp(x)
 
     x = jnp.asarray(np.random.random())
     exp = Exp(a=1.0)
     exp_with_stop_gradient = eqx.tree_at(
-        lambda fn: fn.a, exp, replace_fn=cju.StopGradientTransform
+        lambda fn: fn.a, exp, replace_fn=jxu.StopGradientTransform
     )
     _, grads = objective_fn((exp_with_stop_gradient, x))
-    grads = cju.resolve_transforms(grads)
+    grads = jxu.resolve_transforms(grads)
     assert grads[0].a == 0.0
 
 
@@ -94,13 +91,13 @@ def test_pytree_grid_manipulation():
     is_leaf = lambda x: isinstance(x, ExampleModule)
     tree_grid = [ExampleModule(a_1, a_2, a_3), b, None, (c, (None,))]
     # Get grid point
-    shape = cju.tree_grid_shape(tree_grid, is_leaf=is_leaf)
-    tree_grid_point = cju.tree_grid_take(
-        tree_grid, cju.tree_grid_unravel_index(0, tree_grid, is_leaf=is_leaf)
+    shape = jxu.tree_grid_shape(tree_grid, is_leaf=is_leaf)
+    tree_grid_point = jxu.tree_grid_take(
+        tree_grid, jxu.tree_grid_unravel_index(0, tree_grid, is_leaf=is_leaf)
     )
-    tree_grid_points = cju.tree_grid_take(
+    tree_grid_points = jxu.tree_grid_take(
         tree_grid,
-        cju.tree_grid_unravel_index(jnp.asarray([0, 10]), tree_grid, is_leaf=is_leaf),
+        jxu.tree_grid_unravel_index(jnp.asarray([0, 10]), tree_grid, is_leaf=is_leaf),
     )
     # Define ground truth
     true_shape = (a_1.size, b.size, c.size)
@@ -158,8 +155,8 @@ def test_run_grid_search(batch_size, dim, offset, variance):
     )
     grid = (x, y)
     # Run the grid search
-    method = cju.MinimumSearchMethod(batch_size=batch_size)
-    solution = cju.run_grid_search(cost_fn, method, grid, (variance, offset))
+    method = jxu.MinimumSearchMethod(batch_size=batch_size)
+    solution = jxu.run_grid_search(cost_fn, method, grid, (variance, offset))
     np.testing.assert_allclose(solution.state.current_minimum_eval, true_min_eval)
     np.testing.assert_allclose(solution.value, true_min_pos)
 
@@ -183,4 +180,4 @@ def test_bscan_remainder(batch_size, dim):
         return x + 1
 
     xs = jnp.zeros(dim)
-    np.testing.assert_allclose(cju.filter_bmap(f, xs, batch_size=batch_size), f(xs))
+    np.testing.assert_allclose(jxu.filter_bmap(f, xs, batch_size=batch_size), f(xs))

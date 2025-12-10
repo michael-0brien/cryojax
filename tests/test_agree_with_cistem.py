@@ -1,17 +1,17 @@
 import warnings
 
 import cryojax.simulator as cxs
-import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from cryojax.coordinates import cartesian_to_polar, make_frequency_grid
 from cryojax.io import read_array_from_mrc
-from cryojax.ndimage import compute_binned_powerspectrum, irfftn
+from cryojax.ndimage import (
+    cartesian_to_polar,
+    compute_binned_powerspectrum,
+    irfftn,
+    make_frequency_grid,
+)
 from cryojax.simulator import AstigmaticCTF, EulerAnglePose
-
-
-jax.config.update("jax_enable_x64", True)
 
 
 try:

@@ -1,14 +1,13 @@
 import warnings
 
+import cryojax.ndimage as im
 import cryojax.simulator as cxs
 import equinox as eqx
-import jax
 import numpy as np
 import pytest
 from cryojax.atom_util import split_atoms_by_element
 from cryojax.constants import PengScatteringFactorParameters
 from cryojax.io import read_atoms_from_pdb
-from cryojax.ndimage import crop_to_shape, irfftn, operators as op
 from jaxtyping import Array
 
 
@@ -21,9 +20,6 @@ except ModuleNotFoundError as err:
     JAX_FINUFFT_IMPORT_ERROR = err
 
 
-jax.config.update("jax_enable_x64", True)
-
-
 @pytest.fixture
 def pdb_info(sample_pdb_path):
     return read_atoms_from_pdb(sample_pdb_path, center=True, loads_properties=True)
@@ -31,16 +27,11 @@ def pdb_info(sample_pdb_path):
 
 @pytest.mark.parametrize("shape", ((64, 64), (63, 63), (63, 64), (64, 63)))
 def test_gmm_integrator_shape(sample_pdb_path, shape):
-    atom_positions, atom_types, atom_properties = read_atoms_from_pdb(
+    atom_volume = cxs.load_tabulated_volume(
         sample_pdb_path,
-        center=True,
+        output_type=cxs.GaussianMixtureVolume,
+        include_b_factors=True,
         selection_string="not element H",
-        loads_properties=True,
-    )
-    atom_volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(
-        atom_positions,
-        parameters=PengScatteringFactorParameters(atom_types),
-        extra_b_factors=atom_properties["b_factors"],
     )
     pixel_size = 0.5
 
@@ -62,8 +53,8 @@ def test_gmm_integrator_shape(sample_pdb_path, shape):
 def test_fft_atom_bad_instantiation():
     with pytest.raises(ValueError):
         _ = cxs.IndependentAtomVolume(
-            position_pytree=np.zeros((10, 3)),
-            scattering_factor_pytree=(op.FourierGaussian(),),
+            positions=np.zeros((10, 3)),
+            scattering_factors=(im.FourierGaussian(),),
         )
     with pytest.raises(ValueError):
         _ = cxs.FFTAtomProjection(upsample_factor=2)
@@ -92,8 +83,8 @@ def test_fft_atom_projection_exact(pdb_info, pixel_size, shape):
         )
         atom_volume, fft_integrator = (
             cxs.IndependentAtomVolume(
-                position_pytree=atom_positions,
-                scattering_factor_pytree=op.FourierGaussian(
+                positions=atom_positions,
+                scattering_factors=im.FourierGaussian(
                     amplitude=amplitude, b_factor=b_factor
                 ),
             ),
@@ -125,8 +116,8 @@ def test_fft_atom_projection_antialias(pdb_info, width, pixel_size, shape):
             variances=width**2,
         )
         atom_volume = cxs.IndependentAtomVolume(
-            position_pytree=atom_positions,
-            scattering_factor_pytree=op.FourierGaussian(
+            positions=atom_positions,
+            scattering_factors=im.FourierGaussian(
                 amplitude=1.0, b_factor=width**2 * (8 * np.pi**2)
             ),
         )
@@ -370,8 +361,8 @@ def compute_projection(
     fourier_projection = integrator.integrate(
         volume, image_config, outputs_real_space=False
     )
-    return crop_to_shape(
-        irfftn(
+    return im.crop_to_shape(
+        im.irfftn(
             fourier_projection,
             s=image_config.padded_shape,
         ),
@@ -393,8 +384,8 @@ def compute_projection_at_pose(
     translation_operator = pose.compute_translation_operator(
         image_config.padded_frequency_grid_in_angstroms
     )
-    return crop_to_shape(
-        irfftn(
+    return im.crop_to_shape(
+        im.irfftn(
             pose.translate_image(
                 fourier_projection,
                 translation_operator,

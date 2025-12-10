@@ -1,8 +1,8 @@
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
-from ...coordinates import cartesian_to_polar
 from ...jax_util import FloatLike
+from ...ndimage import cartesian_to_polar
 
 
 # Not currently public API

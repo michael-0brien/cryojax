@@ -126,7 +126,7 @@ def fourier_crop_downsample(
             int(image.shape[0] / downsample_factor),
             int(image.shape[1] / downsample_factor),
         )
-        downsampled_array = fourier_crop_downsample_to_shape(
+        downsampled_array = fourier_crop_to_shape(
             image,
             new_shape,
             preserve_mean=preserve_mean,
@@ -139,7 +139,7 @@ def fourier_crop_downsample(
             int(volume.shape[1] / downsample_factor),
             int(volume.shape[2] / downsample_factor),
         )
-        downsampled_array = fourier_crop_downsample_to_shape(
+        downsampled_array = fourier_crop_to_shape(
             volume,
             new_shape,
             preserve_mean=preserve_mean,
@@ -155,9 +155,9 @@ def fourier_crop_downsample(
     return downsampled_array
 
 
-def fourier_crop_downsample_to_shape(
+def fourier_crop_to_shape(
     image_or_volume: Inexact[NDArrayLike, "_ _"] | Inexact[NDArrayLike, "_ _ _"],
-    downsampled_shape: tuple[int, int] | tuple[int, int, int],
+    shape: tuple[int, int] | tuple[int, int, int],
     outputs_real_space: bool = True,
     preserve_mean: bool = False,
 ) -> Inexact[Array, "_ _"] | Inexact[Array, "_ _ _"]:
@@ -172,7 +172,7 @@ def fourier_crop_downsample_to_shape(
     **Arguments:**
 
     - `image_or_volume`: The image or volume array to downsample.
-    - `downsampled_shape`:
+    - `shape`:
         The new shape after fourier cropping.
     - `outputs_real_space`:
         If `False`, the `image_or_volume` is returned in fourier space
@@ -185,17 +185,17 @@ def fourier_crop_downsample_to_shape(
     **Returns:**
 
     The downsampled `image_or_volume`, at the new real-space shape
-    `downsampled_shape`.
+    `shape`.
     """
     if jnp.iscomplexobj(image_or_volume):
         signal = _fft_ds_complex_signal_to_shape(
-            image_or_volume, downsampled_shape, outputs_real_space=outputs_real_space
+            image_or_volume, shape, outputs_real_space=outputs_real_space
         )
     else:
         signal = _fft_ds_real_signal_to_shape(
-            image_or_volume, downsampled_shape, outputs_real_space=outputs_real_space
+            image_or_volume, shape, outputs_real_space=outputs_real_space
         )
-    n_pixels, n_pixels_ds = math.prod(image_or_volume.shape), math.prod(downsampled_shape)
+    n_pixels, n_pixels_ds = math.prod(image_or_volume.shape), math.prod(shape)
     return (n_pixels_ds / n_pixels) * signal if preserve_mean else signal
 
 

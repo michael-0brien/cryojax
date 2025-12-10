@@ -41,7 +41,7 @@ def compute_binned_radial_average(
     return binned_radial_average
 
 
-def interpolate_radial_average_on_grid(
+def radial_average_to_grid(
     binned_radial_average: Inexact[Array, " n_bins"],
     bins: Float[Array, " n_bins"],
     radial_coordinate_grid: (

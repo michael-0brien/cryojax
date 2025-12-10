@@ -1,4 +1,4 @@
-# Volume integration methods
+# Volume projection and integration onto the plane
 
 `cryojax` provides different methods for integrating [volumes](./volume.md#volume-representations) onto a plane to generate an image.
 
@@ -6,6 +6,13 @@
     ::: cryojax.simulator.AbstractVolumeIntegrator
         options:
             members:
+                - integrate
+
+
+::: cryojax.simulator.AutoVolumeProjection
+        options:
+            members:
+                - __init__
                 - integrate
 
 ## Integration methods for voxel-based structures

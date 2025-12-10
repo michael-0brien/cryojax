@@ -11,9 +11,13 @@ from equinox import AbstractVar
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
 from ...jax_util import FloatLike, error_if_not_positive
-from ...ndimage import rfftn
-from ...ndimage.operators import Constant, FourierOperatorLike
-from ...ndimage.transforms import FilterLike, MaskLike
+from ...ndimage import (
+    AbstractFourierOperator,
+    FilterLike,
+    FourierConstant,
+    MaskLike,
+    rfftn,
+)
 from .._image_model import AbstractImageModel
 from .base_noise_model import AbstractEmpiricalNoiseModel, AbstractLikelihoodNoiseModel
 
@@ -59,7 +63,6 @@ class AbstractGaussianNoiseModel(
             `AbstractImageModel.simulate`, therefore any
             stochastic elements to the `AbstractImageModel`
             will not be used.
-
 
         **Arguments:**
 
@@ -185,15 +188,14 @@ class GaussianWhiteNoiseModel(AbstractGaussianNoiseModel, strict=True):
         - `filter`:
             A filter to apply to the final image.
         """
-        image_model = self.image_model
-        n_pixels = image_model.get_image_config().padded_n_pixels
-        freqs = image_model.get_image_config().padded_frequency_grid_in_angstroms
+        n_pixels = self.image_model.image_config.padded_n_pixels
+        frequency_grid = self.image_model.image_config.padded_frequency_grid_in_angstroms
         # Compute the zero mean variance and scale up to be independent of the number of
         # pixels
         std = jnp.sqrt(n_pixels * self.variance)
-        noise = image_model.postprocess(
+        noise = self.image_model.postprocess(
             std
-            * jr.normal(rng_key, shape=freqs.shape[0:-1])
+            * jr.normal(rng_key, shape=frequency_grid.shape[0:-1])
             .at[0, 0]
             .set(0.0)
             .astype(complex),
@@ -207,10 +209,7 @@ class GaussianWhiteNoiseModel(AbstractGaussianNoiseModel, strict=True):
     @override
     def log_likelihood(
         self,
-        observed: Float[
-            Array,
-            "{self.image_model.image_config.y_dim} {self.image_model.image_config.x_dim}",
-        ],
+        observed: RealImageArray,
         *,
         mask: MaskLike | None = None,
         filter: FilterLike | None = None,
@@ -264,14 +263,14 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
     """
 
     image_model: AbstractImageModel
-    variance_fn: FourierOperatorLike
+    variance_fn: AbstractFourierOperator
     signal_scale_factor: Float[Array, ""]
     signal_offset: Float[Array, ""]
 
     def __init__(
         self,
         image_model: AbstractImageModel,
-        variance_fn: FourierOperatorLike | None = None,
+        variance_fn: AbstractFourierOperator | None = None,
         signal_scale_factor: FloatLike = 1.0,
         signal_offset: FloatLike = 0.0,
     ):
@@ -281,14 +280,14 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
             The image formation model.
         - `variance_fn`:
             The variance of each fourier mode. By default,
-            `cryojax.ndimage.operators.Constant(1.0)`.
+            `cryojax.ndimage.FourierConstant(1.0)`.
         - `signal_scale_factor`:
             A scale factor for the underlying signal simulated from `image_model`.
         - `signal_offset`:
             An offset for the underlying signal simulated from `image_model`.
         """  # noqa: E501
         self.image_model = image_model
-        self.variance_fn = variance_fn or Constant(1.0)
+        self.variance_fn = variance_fn or FourierConstant(1.0)
         self.signal_scale_factor = error_if_not_positive(
             jnp.asarray(signal_scale_factor, dtype=float)
         )
@@ -314,15 +313,14 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
         - `filter`:
             A filter to apply to the final image.
         """
-        image_model = self.image_model
-        n_pixels = image_model.get_image_config().padded_n_pixels
-        freqs = image_model.get_image_config().padded_frequency_grid_in_angstroms
+        n_pixels = self.image_model.image_config.padded_n_pixels
+        frequency_grid = self.image_model.image_config.padded_frequency_grid_in_angstroms
         # Compute the zero mean variance and scale up to be independent of the number of
         # pixels
-        std = jnp.sqrt(n_pixels * self.variance_fn(freqs))
-        noise = image_model.postprocess(
+        std = jnp.sqrt(n_pixels * self.variance_fn(frequency_grid))
+        noise = self.image_model.postprocess(
             std
-            * jr.normal(rng_key, shape=freqs.shape[0:-1])
+            * jr.normal(rng_key, shape=frequency_grid.shape[0:-1])
             .at[0, 0]
             .set(0.0)
             .astype(complex),
@@ -336,11 +334,7 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
     @override
     def log_likelihood(
         self,
-        observed: Complex[
-            Array,
-            "{self.image_model.image_config.y_dim} "
-            "{self.image_model.image_config.x_dim//2+1}",
-        ],
+        observed: FourierImageArray,
         *,
         mask: MaskLike | None = None,
         filter: FilterLike | None = None,
@@ -364,11 +358,10 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
         - `filter`:
             A filter to apply to the final image.
         """
-        config = self.image_model.get_image_config()
-        n_pixels = config.n_pixels
-        freqs = config.frequency_grid_in_angstroms
+        n_pixels = self.image_config.n_pixels
+        frequency_grid = self.image_config.frequency_grid_in_angstroms
         # Compute the variance and scale up to be independent of the number of pixels
-        variance = n_pixels * self.variance_fn(freqs)
+        variance = n_pixels * self.variance_fn(frequency_grid)
         # Create simulated data
         simulated = self.compute_signal(
             outputs_real_space=False,
