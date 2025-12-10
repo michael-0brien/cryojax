@@ -1350,7 +1350,7 @@
 <span class="p">)</span>
 <span class="n">plot_image_stack</span><span class="p">(</span><span class="n">dataset_images</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">9</span><span class="p">])</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/ab3b309a393546fda8b606e7fd948e64.png" /></p>
+<p><img alt="img" src="../_data/771bf05fd61f4fdc934cad53bb3548ee.png" /></p>
 <p>Next, define the loss function. We will naively do a gradient descent on the positions of the C-alpha atoms to see if we can capture the large-scale difference of the conformational change.</p>
 <div class="highlight"><pre><span></span><code><span class="nd">@eqx</span><span class="o">.</span><span class="n">filter_value_and_grad</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">compute_loss</span><span class="p">(</span><span class="n">atom_positions</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
@@ -1473,7 +1473,7 @@ step=99, loss=-111047.25
 </code></pre></div>
 <div class="highlight"><pre><span></span><code>[Text(0.5, 0, &#39;step number&#39;), Text(0, 0.5, &#39;cross-correlation loss&#39;)]
 </code></pre></div>
-<p><img alt="img" src="../_data/f6889352cdc149febaa0ac352e2107e1.png" /></p>
+<p><img alt="img" src="../_data/c344e1e9005940b9a02df8d32205d244.png" /></p>
 <p>Now let's check the results! Let's first look at FSC curves between the ground truth and structure before and after refinement.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">cryojax.coordinates</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_radial_frequency_grid</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">cryojax.ndimage</span><span class="w"> </span><span class="kn">import</span> <span class="n">compute_fourier_shell_correlation</span><span class="p">,</span> <span class="n">rfftn</span>
@@ -1519,7 +1519,7 @@ step=99, loss=-111047.25
 <div class="highlight"><pre><span></span><code>/var/folders/37/7n3d9k7903zc8cy1_374smt00000gn/T/ipykernel_87098/740336328.py:1: FutureWarning: Submodule `cryojax.coordinates` is deprecated and has been moved to the `cryojax.ndimage` namespace. `cryojax.coordinates` will be removed in cryoJAX 0.6.0.
   from cryojax.coordinates import make_radial_frequency_grid
 </code></pre></div>
-<p><img alt="img" src="../_data/a40b133456a94bffa6e790e2686b3338.png" /></p>
+<p><img alt="img" src="../_data/4c584c0b43374044b1162a163bdf1327.png" /></p>
 <p>The above FSC curves quantifies the increase in correlation after gradient descent refinement. Indeed, visually the refinement is able to (roughly) recover the ground truth conformation!</p>
 <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_cross_sections</span><span class="p">(</span>
     <span class="n">pos1</span><span class="p">,</span> <span class="n">pos2</span><span class="p">,</span> <span class="n">axes</span><span class="p">,</span> <span class="n">label1</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">label2</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">color1</span><span class="o">=</span><span class="s2">&quot;b&quot;</span><span class="p">,</span> <span class="n">color2</span><span class="o">=</span><span class="s2">&quot;orange&quot;</span>
@@ -1558,7 +1558,7 @@ step=99, loss=-111047.25
 <span class="n">fig</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s2">&quot;Central cross sections of GMM positions&quot;</span><span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/46d8210089be433dadd60d4eacac1c60.png" /></p>
+<p><img alt="img" src="../_data/fe7e5b16db0b4c82a6c1d442fb59cfdb.png" /></p>
 <p>Interactive plots of the 3D point clouds can be generated locally using <code>plotly</code> with the following code block:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">plotly.graph_objects</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">go</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">plotly.subplots</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_subplots</span>

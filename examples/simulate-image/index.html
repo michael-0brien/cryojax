@@ -1219,7 +1219,7 @@
 <div class="highlight"><pre><span></span><code><span class="c1"># Import the cryoJAX simulator</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">cryojax.simulator</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">cxs</span>
 </code></pre></div>
-<p>This tutorial starts by instantiating the representation of the volume. This is the protein electrostatic potential as a voxel grid in fourier space and also the pose parameterized by euler angles.</p>
+<p>This tutorial starts by instantiating the representation of the volume. This is a fourier voxel representation of the protein electrostatic potential. See the tutorial on <a href="To see how the electrostatic potential array is computed, see the documentation [here](https://michael-0brien.github.io/cryojax/examples/compute-potential/)">rendering volumes</a> from atomic models for more information.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">cryojax.io</span><span class="w"> </span><span class="kn">import</span> <span class="n">read_array_from_mrc</span>
 
 
@@ -1228,7 +1228,9 @@
 <span class="c1"># ... read into a FourierVoxelGridPotential</span>
 <span class="n">real_voxel_grid</span><span class="p">,</span> <span class="n">voxel_size</span> <span class="o">=</span> <span class="n">read_array_from_mrc</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">loads_grid_spacing</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="n">volume</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">FourierVoxelGridVolume</span><span class="o">.</span><span class="n">from_real_voxel_grid</span><span class="p">(</span><span class="n">real_voxel_grid</span><span class="p">,</span> <span class="n">pad_scale</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
-<span class="c1"># Now, instantiate the pose. Angles are given in degrees</span>
+</code></pre></div>
+<p>Next, instantiate the image formation parameters. This includes parameters for the pose, CTF, and image configuration.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Now, instantiate the pose. Angles are given in degrees</span>
 <span class="n">pose</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">EulerAnglePose</span><span class="p">(</span>
     <span class="n">offset_x_in_angstroms</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span>
     <span class="n">offset_y_in_angstroms</span><span class="o">=-</span><span class="mf">3.0</span><span class="p">,</span>
@@ -1236,17 +1238,14 @@
     <span class="n">theta_angle</span><span class="o">=</span><span class="mf">80.0</span><span class="p">,</span>
     <span class="n">psi_angle</span><span class="o">=-</span><span class="mf">5.0</span><span class="p">,</span>
 <span class="p">)</span>
-</code></pre></div>
-<p>To see how the electrostatic potential array is computed, see the documentation <a href="https://michael-0brien.github.io/cryojax/examples/compute-potential/">here</a>.</p>
-<p>Next, instantiate the image formation parameters. This includes parameters for the instrument optics and the configuration for the image.</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># First, the contrast transfer theory</span>
+<span class="c1"># Then the contrast transfer theory</span>
 <span class="n">ctf</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">AstigmaticCTF</span><span class="p">(</span>
     <span class="n">defocus_in_angstroms</span><span class="o">=</span><span class="mf">10000.0</span><span class="p">,</span>
     <span class="n">astigmatism_in_angstroms</span><span class="o">=-</span><span class="mf">100.0</span><span class="p">,</span>
     <span class="n">astigmatism_angle</span><span class="o">=</span><span class="mf">10.0</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="n">transfer_theory</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">ContrastTransferTheory</span><span class="p">(</span><span class="n">ctf</span><span class="p">,</span> <span class="n">amplitude_contrast_ratio</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
-<span class="c1"># Then the configuration. Add padding with respect to the final image shape.</span>
+<span class="c1"># Then the configuration. Add padding to avoid periodic artifacts due to CTF rings</span>
 <span class="n">pad_options</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="n">volume</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">2</span><span class="p">])</span>
 <span class="n">image_config</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">BasicImageConfig</span><span class="p">(</span>
     <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">80</span><span class="p">,</span> <span class="mi">80</span><span class="p">),</span>
@@ -1255,7 +1254,14 @@
     <span class="n">pad_options</span><span class="o">=</span><span class="n">pad_options</span><span class="p">,</span>
 <span class="p">)</span>
 </code></pre></div>
-<p>Finally, instantiate the image model.</p>
+<p>Finally, instantiate the image model using <a class="autorefs autorefs-internal" href="../../api/simulator/entry-point/#cryojax.simulator.make_image_model"><code>cryojax.simulator.make_image_model</code></a>.</p>
+<div class="admonition info">
+<p class="admonition-title">What is an <code>image_model</code>?</p>
+<p>These are subclasses of the abstract base class <code>AbstractImageModel</code>. CryoJAX uses <code>equinox.Module</code>s for python classes, which implement PyTorch-like syntax while maintaining smooth integration with JAX functional programming. To learn more, see <a href="https://docs.kidger.site/equinox/all-of-equinox/#1-models-as-pytrees">here</a>.</p>
+<p>The <code>make_image_model</code> function is just a convenience wrapper to construct an <code>AbstractImageModel</code>, the core cryoJAX class for image simulation. The important things to know about it are 1) It contains necessary parameters for
+simulating an image, such as the pose, the volume, and the CTF and 2) Images are simulated with
+<code>image_model.simulate()</code>.</p>
+</div>
 <div class="highlight"><pre><span></span><code><span class="c1"># Make the image model as well as a simulation function. By default, cryoJAX will simulate</span>
 <span class="c1"># the contrast in physical units. Rather, normalize the image.</span>
 <span class="n">image_model</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">make_image_model</span><span class="p">(</span>
@@ -1265,16 +1271,7 @@
     <span class="n">transfer_theory</span><span class="p">,</span>
     <span class="n">normalizes_signal</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>
-</code></pre></div>
-<div class="admonition info">
-<p class="admonition-title">What is an <code>image_model</code>?</p>
-<p>These are subclasses of the abstract base class <code>AbstractImageModel</code>. CryoJAX uses <code>equinox</code> to python classes, which implements PyTorch-like syntax while maintaining smooth integration with JAX functional programming. To learn more, see <a href="https://docs.kidger.site/equinox/all-of-equinox/#1-models-as-pytrees">here</a>.</p>
-<p>The <code>make_image_model</code> function is just a convenience wrapper to construct an <code>AbstractImageModel</code>, the core cryoJAX class for image simulation. The important things to know about it are 1) It contains necessary parameters for
-simulating an image, such as the pose, the volume, and the CTF and 2) Images are simulated with
-<code>image_model.simulate()</code>.</p>
-<p>Let's print the image model to see its full structure.</p>
-</div>
-<div class="highlight"><pre><span></span><code><span class="nb">print</span><span class="p">(</span><span class="n">image_model</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">image_model</span><span class="p">)</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code>LinearImageModel(
   volume_parametrization=FourierVoxelGridVolume(
@@ -1334,7 +1331,7 @@ simulating an image, such as the pose, the volume, and the CTF and 2) Images are
 <span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/40aa1080d8684fbf824d09acd3bb6c91.png" /></p>
+<p><img alt="img" src="../_data/43ae55f6b705417c99daa28a58357b86.png" /></p>
 <p>Alternatively, the user can simulate an image with noise from a particular statistical distribution. In this example, we use the <code>GaussianWhiteNoiseModel</code>.</p>
 <p>Here, we will directly control image SNR by transforming the final image output using a <code>cryojax.ndimage.ImageScaling</code>.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">cryojax.ndimage</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">im</span>
@@ -1379,9 +1376,7 @@ simulating an image, such as the pose, the volume, and the CTF and 2) Images are
 <span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/2133ce0f791c4536a6209e3198186a3e.png" /></p>
-<div class="highlight"><pre><span></span><code>
-</code></pre></div>
+<p><img alt="img" src="../_data/687f12ac3b39474891af68db3ce5f50c.png" /></p>
 
 
 
