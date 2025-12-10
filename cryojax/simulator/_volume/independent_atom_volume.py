@@ -218,7 +218,7 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
 
 
 class FFTAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True):
-    """Render a voxel grid using non-uniform FFTs and convoluton."""
+    """Render a voxel grid using non-uniform FFTs and convolution."""
 
     shape: tuple[int, int, int]
     voxel_size: Float[Array, ""]

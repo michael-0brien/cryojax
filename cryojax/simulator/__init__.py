@@ -5,6 +5,7 @@ from typing import Any as _Any
 from ._api_utils import (
     load_tabulated_volume as load_tabulated_volume,
     make_image_model as make_image_model,
+    render_voxel_volume as render_voxel_volume,
 )
 from ._detector import (
     AbstractDetector as AbstractDetector,
@@ -65,6 +66,7 @@ from ._volume import (
     AbstractVolumeRepresentation as AbstractVolumeRepresentation,
     AbstractVoxelVolume as AbstractVoxelVolume,
     AutoVolumeProjection as AutoVolumeProjection,
+    AutoVolumeRenderFn as AutoVolumeRenderFn,
     FFTAtomProjection as FFTAtomProjection,
     FFTAtomRenderFn as FFTAtomRenderFn,
     FourierSliceExtraction as FourierSliceExtraction,

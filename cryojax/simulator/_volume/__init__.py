@@ -1,4 +1,7 @@
-from .auto_select import AutoVolumeProjection as AutoVolumeProjection
+from .auto_select import (
+    AutoVolumeProjection as AutoVolumeProjection,
+    AutoVolumeRenderFn as AutoVolumeRenderFn,
+)
 from .base_volume import (
     AbstractAtomVolume as AbstractAtomVolume,
     AbstractVolumeIntegrator as AbstractVolumeIntegrator,

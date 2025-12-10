@@ -51,12 +51,17 @@ There are many different volume representations of biological structures for cry
 
 #### Fourier-space
 
+???+ abstract "`cryojax.simulator.AbstractVoxelVolume`"
+    ::: cryojax.simulator.AbstractVoxelVolume
+        options:
+            members:
+                - from_real_voxel_grid
+                - shape
+
 !!! info "Fourier-space conventions"
-    - The `fourier_voxel_grid` and `frequency_slice` arguments to
+    The `fourier_voxel_grid` and `frequency_slice` arguments to
     `FourierVoxelGridVolume.__init__` should be loaded with the zero frequency
-    component in the center of the box. This is returned by the
-    - The parameters in an `AbstractPose` represent a rotation in real-space. This means that when calling `FourierVoxelGridVolume.rotate_to_pose`,
-    frequencies are rotated by the inverse rotation as stored in the pose.
+    component in the center of the box.
 
 ::: cryojax.simulator.FourierVoxelGridVolume
         options:
@@ -99,7 +104,19 @@ There are many different volume representations of biological structures for cry
     ::: cryojax.simulator.AbstractVolumeRenderFn
         options:
             members:
+                - shape
+                - voxel_size
                 - __call__
+
+---
+
+::: cryojax.simulator.AutoVolumeRenderFn
+        options:
+            members:
+                - __init__
+                - __call__
+
+---
 
 ::: cryojax.simulator.GaussianMixtureRenderFn
         options:

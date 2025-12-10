@@ -5,3 +5,7 @@
 ---
 
 ::: cryojax.simulator.load_tabulated_volume
+
+---
+
+::: cryojax.simulator.render_voxel_volume
