@@ -11,9 +11,6 @@ with install_import_hook("cryojax", "typeguard.typechecked"):
     from cryojax.ndimage import make_coordinate_grid
 
 
-jax.config.update("jax_enable_x64", True)
-
-
 #
 # Test PyTree transforms
 #

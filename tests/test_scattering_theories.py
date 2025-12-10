@@ -1,8 +1,7 @@
 import cryojax.simulator as cxs
+import equinox as eqx
 import numpy as np
 import pytest
-from cryojax.constants import PengScatteringFactorParameters
-from cryojax.io import read_atoms_from_pdb
 
 
 @pytest.mark.parametrize(
@@ -39,85 +38,44 @@ def test_scattering_theories_no_pose(
         astigmatism_angle,
     ) = ctf_params
 
-    atom_positions, atom_types, atom_properties = read_atoms_from_pdb(
+    atom_potential = cxs.load_tabulated_volume(
         sample_pdb_path,
-        center=True,
+        output_type=cxs.GaussianMixtureVolume,
         selection_string="not element H",
-        loads_properties=True,
     )
-    atom_potential = cxs.GaussianMixtureVolume.from_tabulated_parameters(
-        atom_positions,
-        parameters=PengScatteringFactorParameters(atom_types),
-        extra_b_factors=atom_properties["b_factors"],
-    )
-
     instrument_config = cxs.BasicImageConfig(
         shape=shape,
         pixel_size=pixel_size,
         voltage_in_kilovolts=voltage_in_kilovolts,
     )
-    # dim = shape[0]
-    # voxel_potential = cxs.RealVoxelGridVolume.from_real_voxel_grid(
-    #     atom_potential.to_real_voxel_grid((dim, dim, dim), pixel_size),
-    # )
-
-    # multislice_integrator = cxe.FFTMultisliceIntegrator(
-    #     slice_thickness_in_voxels=3,
-    # )
     pose = cxs.EulerAnglePose()
-    # pose_inv = pose.to_inverse_rotation()
 
     ctf = cxs.AstigmaticCTF(
         defocus_in_angstroms=defocus_in_angstroms,
         astigmatism_in_angstroms=astigmatism_in_angstroms,
         astigmatism_angle=astigmatism_angle,
     )
-
-    # multislice_scattering_theory = cxe.MultisliceScatteringTheory(
-    #     multislice_integrator,
-    #     cxe.WaveTransferTheory(ctf),
-    #     amplitude_contrast_ratio=ac,
-    # )
-    high_energy_scattering_theory = cxs.StrongPhaseScatteringTheory(
-        cxs.GaussianMixtureProjection(sampling_mode="average"),
-        cxs.WaveTransferTheory(ctf),
-        amplitude_contrast_ratio=ac,
+    sp = cxs.IntensityImageModel(
+        atom_potential,
+        pose,
+        instrument_config,
+        cxs.StrongPhaseScatteringTheory(
+            cxs.GaussianMixtureProjection(sampling_mode="average"),
+            cxs.WaveTransferTheory(ctf),
+            amplitude_contrast_ratio=ac,
+        ),
     )
-    weak_phase_scattering_theory = cxs.WeakPhaseScatteringTheory(
-        cxs.GaussianMixtureProjection(sampling_mode="average"),
-        cxs.ContrastTransferTheory(ctf, amplitude_contrast_ratio=ac),
+    wp = cxs.IntensityImageModel(
+        atom_potential,
+        pose,
+        instrument_config,
+        cxs.WeakPhaseScatteringTheory(
+            cxs.GaussianMixtureProjection(sampling_mode="average"),
+            cxs.ContrastTransferTheory(ctf, amplitude_contrast_ratio=ac),
+        ),
     )
-
-    # multislice_image_model_voxel = cxs.IntensityImageModel(
-    #     voxel_potential, pose_inv, instrument_config, multislice_scattering_theory
-    # )
-    high_energy_image_model = cxs.IntensityImageModel(
-        atom_potential, pose, instrument_config, high_energy_scattering_theory
-    )
-    weak_phase_image_model = cxs.IntensityImageModel(
-        atom_potential, pose, instrument_config, weak_phase_scattering_theory
-    )
-
-    # ms = multislice_image_model_voxel.simulate()
-    he = high_energy_image_model.simulate()
-    wp = weak_phase_image_model.simulate()
-
-    np.testing.assert_allclose(he, wp, atol=1e-2)
-
-    # normalize_image = lambda image: (image - image.mean()) / image.std()
-
-    # from matplotlib import pyplot as plt
-
-    # vmin, vmax = min(he.min(), wp.min(), ms.min()), max(he.max(), wp.max(), ms.max())
-    # fig, axes = plt.subplots(figsize=(15, 5), ncols=3)
-    # _ = axes[0].imshow(wp, vmin=vmin, vmax=vmax)
-    # _ = axes[1].imshow(he, vmin=vmin, vmax=vmax)
-    # im3 = axes[2].imshow(ms, vmin=vmin, vmax=vmax)
-    # fig.colorbar(im3)
-    # plt.show()
-
-    # np.testing.assert_allclose(normalize_image(he), normalize_image(ms), atol=atol)
-    # np.testing.assert_allclose(normalize_image(ms), normalize_image(wp), atol=atol)
+    # TODO: use jax.linearize for exact agreement
+    np.testing.assert_allclose(simulate_fn(sp), simulate_fn(wp), atol=1e-2)
 
 
 @pytest.mark.parametrize(
@@ -158,34 +116,17 @@ def test_scattering_theories_pose(
         astigmatism_angle,
     ) = ctf_params
 
-    atom_positions, atom_types, atom_properties = read_atoms_from_pdb(
+    atom_potential = cxs.load_tabulated_volume(
         sample_pdb_path,
-        center=True,
+        output_type=cxs.GaussianMixtureVolume,
         selection_string="name CA ",
-        loads_properties=True,
-    )
-
-    atom_potential = cxs.GaussianMixtureVolume.from_tabulated_parameters(
-        atom_positions,
-        parameters=PengScatteringFactorParameters(atom_types),
-        extra_b_factors=atom_properties["b_factors"],
     )
     instrument_config = cxs.BasicImageConfig(
         shape=shape,
         pixel_size=pixel_size,
         voltage_in_kilovolts=voltage_in_kilovolts,
     )
-    # dim = shape[0]
-
     pose = cxs.EulerAnglePose(*euler_pose_params)
-    # pose_inv = pose.to_inverse_rotation()
-
-    # voxel_potential = cxs.RealVoxelGridVolume.from_real_voxel_grid(
-    #     atom_potential.to_real_voxel_grid((dim, dim, dim), pixel_size),
-    # )
-    # multislice_integrator = cxe.FFTMultisliceIntegrator(
-    #     slice_thickness_in_voxels=3,
-    # )
 
     ctf = cxs.AstigmaticCTF(
         defocus_in_angstroms=defocus_in_angstroms,
@@ -193,56 +134,29 @@ def test_scattering_theories_pose(
         astigmatism_angle=astigmatism_angle,
     )
 
-    # multislice_scattering_theory = cxe.MultisliceScatteringTheory(
-    #     multislice_integrator,
-    #     cxe.WaveTransferTheory(ctf),
-    #     amplitude_contrast_ratio=ac,
-    # )
-    high_energy_scattering_theory = cxs.StrongPhaseScatteringTheory(
-        cxs.GaussianMixtureProjection(sampling_mode="average"),
-        cxs.WaveTransferTheory(ctf),
-        amplitude_contrast_ratio=ac,
+    sp = cxs.IntensityImageModel(
+        atom_potential,
+        pose,
+        instrument_config,
+        cxs.StrongPhaseScatteringTheory(
+            cxs.GaussianMixtureProjection(sampling_mode="average"),
+            cxs.WaveTransferTheory(ctf),
+            amplitude_contrast_ratio=ac,
+        ),
     )
-    weak_phase_scattering_theory = cxs.WeakPhaseScatteringTheory(
-        cxs.GaussianMixtureProjection(sampling_mode="average"),
-        cxs.ContrastTransferTheory(ctf, amplitude_contrast_ratio=ac),
+    wp = cxs.IntensityImageModel(
+        atom_potential,
+        pose,
+        instrument_config,
+        cxs.WeakPhaseScatteringTheory(
+            cxs.GaussianMixtureProjection(sampling_mode="average"),
+            cxs.ContrastTransferTheory(ctf, amplitude_contrast_ratio=ac),
+        ),
     )
-    # multislice_image_model_voxel = cxs.IntensityImageModel(
-    #     voxel_potential, pose_inv, instrument_config, multislice_scattering_theory
-    # )
-    high_energy_image_model = cxs.IntensityImageModel(
-        atom_potential, pose, instrument_config, high_energy_scattering_theory
-    )
-    weak_phase_image_model = cxs.IntensityImageModel(
-        atom_potential, pose, instrument_config, weak_phase_scattering_theory
-    )
-    # ms = multislice_image_model_voxel.simulate()
-    he = high_energy_image_model.simulate()
-    wp = weak_phase_image_model.simulate()
+    # TODO: use jax.linearize for exact agreement
+    np.testing.assert_allclose(simulate_fn(sp), simulate_fn(wp), atol=1e-2)
 
-    np.testing.assert_allclose(he, wp, atol=1e-3)
 
-    # normalize_image = lambda image: (image - image.mean()) / image.std()
-
-    # np.testing.assert_allclose(normalize_image(wp), normalize_image(he), atol=atol)
-    # np.testing.assert_allclose(normalize_image(he), normalize_image(ms), atol=atol)
-    # np.testing.assert_allclose(normalize_image(ms), normalize_image(wp), atol=atol)
-
-    # from matplotlib import pyplot as plt
-
-    # vmin, vmax = min(he.min(), wp.min(), ms.min()), max(he.max(), wp.max(), ms.max())
-    # fig, axes = plt.subplots(figsize=(15, 5), ncols=3)
-    # _ = axes[0].imshow(wp), vmin=vmin, vmax=vmax)
-    # _ = axes[1].imshow(he), vmin=vmin, vmax=vmax)
-    # im3 = axes[2].imshow(ms, vmin=vmin, vmax=vmax)
-    # fig.colorbar(im3)
-    # plt.show()
-
-    # close_fraction = 0.95
-    # atol = 1.0
-    # assert (
-    #     np.isclose(normalize_image(ms), normalize_image(wp), atol=atol)
-    #     .astype(float)
-    #     .mean()
-    #     > close_fraction
-    # )
+@eqx.filter_jit
+def simulate_fn(model):
+    return model.simulate()

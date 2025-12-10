@@ -2,7 +2,10 @@
 import warnings as _warnings
 from typing import Any as _Any
 
-from ._api_utils import make_image_model as make_image_model
+from ._api_utils import (
+    load_tabulated_volume as load_tabulated_volume,
+    make_image_model as make_image_model,
+)
 from ._detector import (
     AbstractDetector as AbstractDetector,
     AbstractDQE as AbstractDQE,

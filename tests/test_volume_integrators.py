@@ -3,7 +3,6 @@ import warnings
 import cryojax.ndimage as im
 import cryojax.simulator as cxs
 import equinox as eqx
-import jax
 import numpy as np
 import pytest
 from cryojax.atom_util import split_atoms_by_element
@@ -21,9 +20,6 @@ except ModuleNotFoundError as err:
     JAX_FINUFFT_IMPORT_ERROR = err
 
 
-jax.config.update("jax_enable_x64", True)
-
-
 @pytest.fixture
 def pdb_info(sample_pdb_path):
     return read_atoms_from_pdb(sample_pdb_path, center=True, loads_properties=True)
@@ -31,16 +27,11 @@ def pdb_info(sample_pdb_path):
 
 @pytest.mark.parametrize("shape", ((64, 64), (63, 63), (63, 64), (64, 63)))
 def test_gmm_integrator_shape(sample_pdb_path, shape):
-    atom_positions, atom_types, atom_properties = read_atoms_from_pdb(
+    atom_volume = cxs.load_tabulated_volume(
         sample_pdb_path,
-        center=True,
+        output_type=cxs.GaussianMixtureVolume,
+        include_b_factors=True,
         selection_string="not element H",
-        loads_properties=True,
-    )
-    atom_volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(
-        atom_positions,
-        parameters=PengScatteringFactorParameters(atom_types),
-        extra_b_factors=atom_properties["b_factors"],
     )
     pixel_size = 0.5
 

@@ -3,7 +3,6 @@ import warnings
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from jax import config
 from jaxtyping import Array, Float, install_import_hook
 
 
@@ -21,8 +20,6 @@ try:
 except ModuleNotFoundError as err:
     jnufft = None
     JAX_FINUFFT_IMPORT_ERROR = err
-
-config.update("jax_enable_x64", True)
 
 
 @pytest.fixture
@@ -58,6 +55,29 @@ def toy_gaussian_cloud():
     n_voxels_per_side = (128, 128, 128)
     voxel_size = 0.05
     return (atom_positions, ff_a, ff_b, n_voxels_per_side, voxel_size)
+
+
+#
+# Test `load_tabulated_volume`
+#
+def test_load_atom_volume(sample_pdb_path: str):
+    import pathlib
+
+    import mmdf
+
+    atom_volume = cxs.load_tabulated_volume(
+        sample_pdb_path, output_type=cxs.IndependentAtomVolume
+    )
+    assert isinstance(atom_volume, cxs.IndependentAtomVolume)
+    atom_volume = cxs.load_tabulated_volume(
+        sample_pdb_path, output_type=cxs.GaussianMixtureVolume
+    )
+    assert isinstance(atom_volume, cxs.GaussianMixtureVolume)
+    atom_data = mmdf.read(pathlib.Path(sample_pdb_path))
+    atom_volume = cxs.load_tabulated_volume(
+        atom_data, output_type=cxs.IndependentAtomVolume
+    )
+    assert isinstance(atom_volume, cxs.IndependentAtomVolume)
 
 
 #

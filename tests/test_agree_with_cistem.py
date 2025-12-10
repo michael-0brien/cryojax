@@ -1,7 +1,6 @@
 import warnings
 
 import cryojax.simulator as cxs
-import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -13,9 +12,6 @@ from cryojax.ndimage import (
     make_frequency_grid,
 )
 from cryojax.simulator import AstigmaticCTF, EulerAnglePose
-
-
-jax.config.update("jax_enable_x64", True)
 
 
 try:

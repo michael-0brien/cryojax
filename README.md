@@ -37,38 +37,31 @@ python -m pip install .
 
 The [`jax-finufft`](https://github.com/dfm/jax-finufft) package is an optional dependency used for non-uniform fast fourier transforms. This is used in select methods for computing image projections from atoms and voxels. If you would like to use these methods, we recommend first following the `jax_finufft` installation instructions and then installing `cryojax`.
 
-## Simulating an image
+## Quick example
 
-The following is a basic workflow to simulate an image.
+Image simulation in cryoJAX revolves around the `image_model` class. The following is a basic example for instantiating an `image_model` and simulating an image:
 
 ```python
 import jax
 import jax.numpy as jnp
 import cryojax.simulator as cxs
-from cryojax.io import read_array_from_mrc
 
-# Instantiate the voxel grid representation of a volume. See the documentation
-# for how to generate voxel grids from a PDB
-filename = "example_volume.mrc"
-real_voxel_grid, voxel_size = read_array_from_mrc(filename, loads_grid_spacing=True)
-volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
-# The pose. Angles are given in degrees.
-pose = cxs.EulerAnglePose(
-    offset_x_in_angstroms=5.0,
-    offset_y_in_angstroms=-3.0,
-    phi_angle=20.0,
-    theta_angle=80.0,
-    psi_angle=-10.0,
+# Instantiate a cryoJAX `image_model`
+image_model = cxs.make_image_model(
+    # ... load atoms as gaussians mixture from tabulated electron scattering factors
+    volume_parametrization=cxs.load_tabulated_volume(
+        "example.pdb", output_type=cxs.GaussianMixtureVolume
+    ),
+    # ... configure the image
+    image_config=cxs.BasicImageConfig(shape=(320, 320), pixel_size=1., voltage_in_kilovolts=300),
+    # ... the pose
+    pose=cxs.EulerAnglePose(phi_angle=20., theta_angle=80., psi_angle=-10.),
+    # ... the CTF
+    transfer_theory=cxs.ContrastTransferTheory(
+        ctf=cxs.AstigmaticCTF(defocus_in_angstroms=9800., astigmatism_in_angstroms=200., astigmatism_angle=10.),
+        amplitude_contrast_ratio=0.1,
+    ),
 )
-# The model for the CTF
-ctf = cxs.AstigmaticCTF(
-    defocus_in_angstroms=9800.0, astigmatism_in_angstroms=200.0, astigmatism_angle=10.0
-)
-transfer_theory = cxs.ContrastTransferTheory(ctf, amplitude_contrast_ratio=0.1)
-# The image configuration
-image_config = cxs.BasicImageConfig(shape=(320, 320), pixel_size=voxel_size, voltage_in_kilovolts=300.0)
-# Instantiate a cryoJAX `image_model` using the `make_image_model` function
-image_model = cxs.make_image_model(volume, image_config, pose, transfer_theory)
 # Simulate an image
 image = image_model.simulate(outputs_real_space=True)
 ```

@@ -4,5 +4,6 @@
 
 ## Loading atomic structures
 
+::: cryojax.io.read_atoms_from_pdb
 
 ## Reading and writing MRC files

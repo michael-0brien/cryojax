@@ -46,9 +46,11 @@ plugins:
     - ipynb
     - hippogriffe:
         extra_public_objects:
-            - xarray.core.dataset.Dataset
+            - xarray.Dataset
             - numpy.ndarray
             - equinox.Module
+            - mdtraj.Topology
+            - pandas.DataFrame
     - mkdocstrings:
         handlers:
           python:

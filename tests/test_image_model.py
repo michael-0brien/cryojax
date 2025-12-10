@@ -1,13 +1,9 @@
 import cryojax.simulator as cxs
 import equinox as eqx
-import jax
 import numpy as np
 import pytest
 from cryojax.io import read_array_from_mrc, read_atoms_from_pdb
 from cryojax.ndimage import crop_to_shape
-
-
-jax.config.update("jax_enable_x64", True)
 
 
 @pytest.fixture
