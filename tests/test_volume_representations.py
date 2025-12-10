@@ -1,4 +1,5 @@
 import warnings
+from typing import Literal
 
 import jax.numpy as jnp
 import numpy as np
@@ -9,7 +10,11 @@ from jaxtyping import Array, Float, install_import_hook
 with install_import_hook("cryojax", "typeguard.typechecked"):
     import cryojax.ndimage as im
     import cryojax.simulator as cxs
-    from cryojax.constants import PengScatteringFactorParameters
+    from cryojax.constants import (
+        LobatoScatteringFactorParameters,
+        PengScatteringFactorParameters,
+        check_atomic_numbers_supported,
+    )
     from cryojax.io import read_atoms_from_pdb
     from cryojax.ndimage import make_coordinate_grid
 
@@ -58,31 +63,122 @@ def toy_gaussian_cloud():
 
 
 #
-# Test `load_tabulated_volume`
+# Test volume tabulations
 #
-def test_load_atom_volume(sample_pdb_path: str):
+@pytest.mark.parametrize("tabulation", ("peng", "lobato"))
+def test_load_atom_volume(tabulation, sample_pdb_path: str):
     import pathlib
 
     import mmdf
 
     atom_volume = cxs.load_tabulated_volume(
-        sample_pdb_path, output_type=cxs.IndependentAtomVolume
+        sample_pdb_path,
+        output_type=cxs.IndependentAtomVolume,
+        tabulation=tabulation,
     )
     assert isinstance(atom_volume, cxs.IndependentAtomVolume)
-    atom_volume = cxs.load_tabulated_volume(
-        sample_pdb_path, output_type=cxs.GaussianMixtureVolume
-    )
-    assert isinstance(atom_volume, cxs.GaussianMixtureVolume)
+    if tabulation == "peng":
+        atom_volume = cxs.load_tabulated_volume(
+            sample_pdb_path,
+            output_type=cxs.GaussianMixtureVolume,
+            tabulation=tabulation,
+        )
+        assert isinstance(atom_volume, cxs.GaussianMixtureVolume)
+    else:
+        with pytest.raises(ValueError):
+            atom_volume = cxs.load_tabulated_volume(
+                sample_pdb_path,
+                output_type=cxs.GaussianMixtureVolume,
+                tabulation=tabulation,
+            )
     atom_data = mmdf.read(pathlib.Path(sample_pdb_path))
     atom_volume = cxs.load_tabulated_volume(
-        atom_data, output_type=cxs.IndependentAtomVolume
+        atom_data,
+        output_type=cxs.IndependentAtomVolume,
+        tabulation=tabulation,
     )
     assert isinstance(atom_volume, cxs.IndependentAtomVolume)
 
 
+def test_scattering_factor_parameters_correct(
+    peng_parameters_path, lobato_parameters_path
+):
+    from cryojax.constants._scattering_factor_parameters import _SUPPORTED_ATOMIC_NUMBERS
+
+    atomic_numbers = np.asarray(_SUPPORTED_ATOMIC_NUMBERS)
+
+    # Test Peng
+    params = PengScatteringFactorParameters(atomic_numbers)
+    a1, b1 = (params.a, params.b)
+
+    peng_table = np.load(peng_parameters_path)
+    a2, b2 = peng_table[:, atomic_numbers, :]
+
+    np.testing.assert_equal(a1, a2)
+    np.testing.assert_equal(b1, b2)
+
+    # Test lobato
+    params = LobatoScatteringFactorParameters(atomic_numbers)
+    a1, b1 = (params.a, params.b)
+
+    lobato_table = np.load(lobato_parameters_path)
+    a2, b2 = lobato_table[:, atomic_numbers, :]
+
+    np.testing.assert_equal(a1, a2)
+    np.testing.assert_equal(b1, b2)
+
+
+def test_compare_hydrogen_scattering_factor():
+    shape, pixel_size = (32, 32), 1.0
+    frequencies = im.make_frequency_grid(shape, pixel_size)
+    hydrogen_id = np.asarray([1], dtype=int)
+    p, l = (
+        PengScatteringFactorParameters(hydrogen_id),
+        LobatoScatteringFactorParameters(hydrogen_id),
+    )
+    p_fac = cxs.PengScatteringFactor(p.a[0], p.b[0])
+    l_fac = cxs.LobatoScatteringFactor(l.a[0], l.b[0])
+    p_arr, l_arr = p_fac(frequencies), l_fac(frequencies)
+    np.testing.assert_allclose(p_arr, l_arr, atol=1e-3)
+
+
+@pytest.mark.parametrize("tabulation", ("peng", "lobato"))
+def test_invalid_atomic_numbers(tabulation):
+    # Make sure has nan when expected
+    bad_nan = np.asarray([2, 6])
+    params_nan = _make_scattering_parameters(bad_nan, tabulation)
+    assert np.any(np.isnan(params_nan.a))
+    assert np.any(np.isnan(params_nan.b))
+    # Make sure throws out of bounds error when expected
+    bad_oob = np.asarray([1, 31])
+    with pytest.raises(IndexError):
+        _make_scattering_parameters(bad_oob, tabulation)
+    # Make sure error checks work
+    with pytest.raises(ValueError):
+        check_atomic_numbers_supported(bad_nan)
+    with pytest.raises(ValueError):
+        check_atomic_numbers_supported(bad_oob)
+
+
 #
-# Test different representations
+# Test volume rendering
 #
+def test_render_voxels(sample_pdb_path):
+    atom_volume = cxs.load_tabulated_volume(
+        sample_pdb_path,
+        output_type=cxs.GaussianMixtureVolume,
+    )
+    render_fn = cxs.AutoVolumeRenderFn((16, 16, 16), voxel_size=4.0)
+    for cls in [
+        cxs.FourierVoxelGridVolume,
+        cxs.FourierVoxelSplineVolume,
+        cxs.RealVoxelGridVolume,
+    ]:
+        assert (
+            type(cxs.render_voxel_volume(atom_volume, render_fn, output_type=cls)) == cls
+        )
+
+
 def test_voxel_volume_loaders():
     real_voxel_grid = jnp.zeros((10, 10, 10), dtype=float)
     fourier_volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
@@ -95,10 +191,7 @@ def test_voxel_volume_loaders():
     assert isinstance(real_volume.coordinate_grid_in_pixels, Float[Array, "_ _ _ 3"])  # type: ignore
 
 
-#
-# Test rendering
-#
-def test_fourier_vs_real_voxel_volume_agreement(sample_pdb_path):
+def test_fourier_vs_real_agreement(sample_pdb_path):
     """
     Integration test ensuring that the VoxelGrid classes
     produce comparable electron densities when loaded from PDB.
@@ -106,30 +199,24 @@ def test_fourier_vs_real_voxel_volume_agreement(sample_pdb_path):
     n_voxels_per_side = (128, 128, 128)
     voxel_size = 0.5
 
-    # Load the PDB file
-    atom_positions, atom_types = read_atoms_from_pdb(
+    atom_volume = cxs.load_tabulated_volume(
         sample_pdb_path,
-        center=True,
+        output_type=cxs.GaussianMixtureVolume,
         selection_string="not element H",
     )
-    # Load atomistic volume
-    atom_volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(
-        atom_positions,
-        parameters=PengScatteringFactorParameters(atom_types),
+    render_fn = cxs.AutoVolumeRenderFn(
+        n_voxels_per_side,
+        voxel_size,
     )
-    # Build the grid
-    volume_render_fn = cxs.GaussianMixtureRenderFn(n_voxels_per_side, voxel_size)
-    volume_as_real_voxel_grid = volume_render_fn(atom_volume)
-    fourier_volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(
-        volume_as_real_voxel_grid
+    fourier_volume = cxs.render_voxel_volume(
+        atom_volume, render_fn, output_type=cxs.FourierVoxelGridVolume
     )
-    # Since Voxelgrid is in Frequency space by default, we have to first
-    # transform back into real space.
-    fvg_real = im.ifftn(jnp.fft.ifftshift(fourier_volume.fourier_voxel_grid)).real
+    real_volume = cxs.render_voxel_volume(
+        atom_volume, render_fn, output_type=cxs.RealVoxelGridVolume
+    )
+    real_voxel_grid = im.ifftn(jnp.fft.ifftshift(fourier_volume.fourier_voxel_grid)).real
 
-    vg = cxs.RealVoxelGridVolume.from_real_voxel_grid(volume_as_real_voxel_grid)
-
-    np.testing.assert_allclose(fvg_real, vg.real_voxel_grid, atol=1e-12)
+    np.testing.assert_allclose(real_voxel_grid, real_volume.real_voxel_grid, atol=1e-12)
 
 
 def test_downsampled_voxel_volume_agreement(sample_pdb_path):
@@ -251,8 +338,6 @@ def test_fft_atom_render(pdb_info, width, voxel_size, shape):
 #
 # TODO: organize
 #
-
-
 @pytest.mark.parametrize("shape", ((128, 127, 126),))
 def test_compute_rectangular_voxel_grid(sample_pdb_path, shape):
     voxel_size = 0.5
@@ -483,4 +568,14 @@ def test_gmm_shape():
         == gmm2.variances.shape
         == gmm2.amplitudes.shape
         == (n_atoms, n_gaussians)
+    )
+
+
+def _make_scattering_parameters(
+    atomic_numbers: np.ndarray, tabulation: Literal["peng", "lobato"]
+):
+    return (
+        PengScatteringFactorParameters(atomic_numbers)
+        if tabulation == "peng"
+        else LobatoScatteringFactorParameters(atomic_numbers)
     )

@@ -3,7 +3,7 @@ from typing import Generic, TypeVar
 from typing_extensions import Self, override
 
 import equinox as eqx
-from jaxtyping import Array, Complex, Float, PRNGKeyArray
+from jaxtyping import Array, Complex, Float, Inexact, PRNGKeyArray
 
 from ...jax_util import NDArrayLike
 from .._image_config import AbstractImageConfig
@@ -32,6 +32,11 @@ ProjectionArray = (
 EwaldSphereArray = (
     Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
     | Float[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
+)
+
+VoxelArray = (
+    Inexact[Array, "{self.shape[0]} {self.shape[1]} {self.shape[2]}"]
+    | Complex[Array, "{self.shape[0]} {self.shape[1]} {self.shape[2]}//2+1"]
 )
 
 
@@ -167,7 +172,7 @@ class AbstractVoxelVolume(AbstractVolumeRepresentation, strict=True):
     def from_real_voxel_grid(
         cls, real_voxel_grid: Float[NDArrayLike, "dim dim dim"]
     ) -> Self:
-        """Load an `AbstractVoxelStructure` from a 3D grid in
+        """Load an `AbstractVoxelVolume` from a 3D grid in
         real-space.
         """
         raise NotImplementedError
@@ -192,6 +197,9 @@ class AbstractVolumeIntegrator(eqx.Module, Generic[VolRep], strict=True):
 
 class AbstractVolumeRenderFn(eqx.Module, Generic[VolRep], strict=True):
     """Base class for rendering a volume onto voxels."""
+
+    shape: eqx.AbstractVar[tuple[int, int, int]]
+    voxel_size: eqx.AbstractVar[Float[Array, ""]]
 
     @abc.abstractmethod
     def __call__(

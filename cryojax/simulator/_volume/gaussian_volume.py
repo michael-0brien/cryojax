@@ -7,7 +7,7 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
-from jaxtyping import Array, Float, Inexact, PyTree
+from jaxtyping import Array, Float, PyTree
 
 from ...constants import (
     PengScatteringFactorParameters,
@@ -23,6 +23,7 @@ from .base_volume import (
     AbstractVolumeIntegrator,
     AbstractVolumeRenderFn,
     ProjectionArray,
+    VoxelArray,
 )
 
 
@@ -438,7 +439,7 @@ class GaussianMixtureRenderFn(AbstractVolumeRenderFn[GaussianMixtureVolume], str
         outputs_real_space: bool = True,
         outputs_rfft: bool = False,
         fftshifted: bool = False,
-    ) -> Inexact[Array, "{self.shape[0]} {self.shape[1]} {self.shape[2]}"]:
+    ) -> VoxelArray:
         """**Arguments:**
 
         - `volume_representation`:

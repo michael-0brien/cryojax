@@ -1,4 +1,7 @@
-from .auto_select import AutoVolumeProjection as AutoVolumeProjection
+from .auto_select import (
+    AutoVolumeProjection as AutoVolumeProjection,
+    AutoVolumeRenderFn as AutoVolumeRenderFn,
+)
 from .base_volume import (
     AbstractAtomVolume as AbstractAtomVolume,
     AbstractVolumeIntegrator as AbstractVolumeIntegrator,
@@ -22,6 +25,8 @@ from .independent_atom_volume import (
     FFTAtomProjection as FFTAtomProjection,
     FFTAtomRenderFn as FFTAtomRenderFn,
     IndependentAtomVolume as IndependentAtomVolume,
+    LobatoScatteringFactor as LobatoScatteringFactor,
+    PengScatteringFactor as PengScatteringFactor,
 )
 from .real_voxels import (
     RealVoxelGridVolume as RealVoxelGridVolume,

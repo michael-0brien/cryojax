@@ -1,3 +1,4 @@
+from ..simulator._api_utils import make_linear_operator as make_linear_operator
 from ..simulator._multislice import (
     AbstractMultisliceIntegrator as AbstractMultisliceIntegrator,
     FFTMultisliceIntegrator as FFTMultisliceIntegrator,

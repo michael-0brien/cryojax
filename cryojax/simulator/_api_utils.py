@@ -1,19 +1,26 @@
 import pathlib
-from collections.abc import Callable
-from typing import Any, Literal, overload
+from collections.abc import Callable, Iterable
+from typing import Any, Literal, TypeVar, overload
 
 import equinox as eqx
 import equinox.internal as eqxi
+import jax
 import jax.numpy as jnp
+import lineax as lx
 import mmdf
 import pandas as pd
-from jaxtyping import Bool
+from jaxtyping import Array, Bool, PyTree
 
 from ..atom_util import split_atoms_by_element
-from ..constants import PengScatteringFactorParameters
+from ..constants import LobatoScatteringFactorParameters, PengScatteringFactorParameters
 from ..io import mmdf_to_atoms
-from ..jax_util import NDArrayLike
-from ..ndimage import AbstractImageTransform
+from ..jax_util import NDArrayLike, make_filter_spec
+from ..ndimage import (
+    AbstractImageTransform,
+    compute_spline_coefficients,
+    make_coordinate_grid,
+    make_frequency_slice,
+)
 from ._detector import AbstractDetector
 from ._image_config import AbstractImageConfig, DoseImageConfig
 from ._image_model import (
@@ -22,21 +29,26 @@ from ._image_model import (
     ElectronCountsImageModel,
     IntensityImageModel,
     LinearImageModel,
-    ProjectionImageModel as ProjectionImageModel,
+    ProjectionImageModel,
 )
 from ._pose import AbstractPose
 from ._scattering_theory import WeakPhaseScatteringTheory
 from ._transfer_theory import ContrastTransferTheory
 from ._volume import (
+    AbstractAtomVolume,
     AbstractVolumeIntegrator,
     AbstractVolumeParametrization,
+    AbstractVolumeRenderFn,
     AutoVolumeProjection,
     FourierVoxelGridVolume,
     FourierVoxelSplineVolume,
     GaussianMixtureVolume,
     IndependentAtomVolume,
+    RealVoxelGridVolume,
 )
 
+
+Args = TypeVar("Args")
 
 identity_fn = eqxi.doc_repr(lambda x, _: x, "identity_fn")
 
@@ -316,7 +328,7 @@ def load_tabulated_volume(  # pyright: ignore[reportOverlappingOverload]
     path_or_mmdf: str | pathlib.Path | pd.DataFrame,
     *,
     output_type: type[IndependentAtomVolume] = IndependentAtomVolume,
-    tabulation: Literal["peng"] = "peng",
+    tabulation: Literal["peng", "lobato"] = "peng",
     include_b_factors: bool = True,
     b_factor_fn: Callable[[NDArrayLike, NDArrayLike], NDArrayLike] = identity_fn,
     selection_string: str = "all",
@@ -343,7 +355,7 @@ def load_tabulated_volume(
     output_type: type[
         IndependentAtomVolume | GaussianMixtureVolume
     ] = IndependentAtomVolume,
-    tabulation: Literal["peng"] = "peng",
+    tabulation: Literal["peng", "lobato"] = "peng",
     include_b_factors: bool = False,
     b_factor_fn: Callable[[NDArrayLike, NDArrayLike], NDArrayLike] = identity_fn,
     selection_string: str = "all",
@@ -382,7 +394,10 @@ def load_tabulated_volume(
         [`cryojax.simulator.IndependentAtomVolume`][].
     - `tabulation`:
         Specifies which electron scattering factor tabulation to use.
-        For now, only `tabulation = 'peng'` is supported.
+        Supported values are `tabulation = 'peng'` or `tabulation = 'lobato'`.
+        See [`cryojax.constants.PengScatteringFactorParameters`][] and
+        [`cryojax.constants.LobatoScatteringFactorParameters`][]
+        for more information.
     - `include_b_factors`:
         If `True`, include PDB B-factors in the volume.
     - `b_factor_fn`:
@@ -423,8 +438,14 @@ def load_tabulated_volume(
         **pdb_options,
     )
     if output_type is GaussianMixtureVolume:
-        # TODO: this is inefficient if this function is called multiple times,
-        # as the electron scattering factor parameter table is read on each call
+        if tabulation != "peng":
+            raise ValueError(
+                "Passed `output_type = GaussianMixtureVolume` to "
+                "`load_tabulated_volume`, but found that "
+                f"`tabulation = {tabulation}`, which "
+                "is not a mixture of gaussians. Use "
+                "`tabulation = 'peng'` instead."
+            )
         peng_parameters = PengScatteringFactorParameters(atomic_numbers)
         b_factors = (
             jnp.asarray(
@@ -444,15 +465,16 @@ def load_tabulated_volume(
             jnp.asarray(b_factor_fn(jnp.mean(b), atom_ids)) for b in b_factor_by_id
         )
         if tabulation == "peng":
-            scattering_parameters = PengScatteringFactorParameters(atom_ids)
+            parameters = PengScatteringFactorParameters(atom_ids)
+        elif tabulation == "lobato":
+            parameters = LobatoScatteringFactorParameters(atom_ids)
         else:
             raise ValueError(
-                "Only `tabulation = 'peng'` is supported in "
-                "`load_tabulated_volume`. "
-                "Additional tabulations are not yet implemented."
+                "Only `tabulation` equal to 'peng' or 'lobato' are supported in "
+                f"`load_tabulated_volume`. Instead, got `tabulation = {tabulation}`."
             )
         atom_volume = IndependentAtomVolume.from_tabulated_parameters(
-            positions_by_id, scattering_parameters, b_factor_by_element=b_factor_by_id
+            positions_by_id, parameters, b_factor_by_element=b_factor_by_id
         )
     else:
         raise ValueError(
@@ -461,3 +483,192 @@ def load_tabulated_volume(
         )
 
     return atom_volume
+
+
+@overload
+def render_voxel_volume(  # pyright: ignore[reportOverlappingOverload]
+    atom_volume: AbstractAtomVolume,
+    render_fn: AbstractVolumeRenderFn,
+    *,
+    output_type: type[FourierVoxelGridVolume] = FourierVoxelGridVolume,
+) -> FourierVoxelGridVolume: ...
+
+
+@overload
+def render_voxel_volume(
+    atom_volume: AbstractAtomVolume,
+    render_fn: AbstractVolumeRenderFn,
+    *,
+    output_type: type[FourierVoxelSplineVolume] = FourierVoxelSplineVolume,
+) -> FourierVoxelSplineVolume: ...
+
+
+@overload
+def render_voxel_volume(
+    atom_volume: AbstractAtomVolume,
+    render_fn: AbstractVolumeRenderFn,
+    *,
+    output_type: type[RealVoxelGridVolume] = RealVoxelGridVolume,
+) -> RealVoxelGridVolume: ...
+
+
+def render_voxel_volume(
+    atom_volume: AbstractAtomVolume,
+    render_fn: AbstractVolumeRenderFn,
+    *,
+    output_type: type[
+        FourierVoxelGridVolume | FourierVoxelSplineVolume | RealVoxelGridVolume
+    ] = FourierVoxelGridVolume,
+) -> FourierVoxelGridVolume | FourierVoxelSplineVolume | RealVoxelGridVolume:
+    """Render a voxel volume representation from an atomistic one.
+
+    !!! example
+
+        ```python
+        import cryojax.simulator as cxs
+
+        # Simulate an image from a voxel grid
+        voxel_volume = cxs.render_voxel_volume(
+            atom_volume=cxs.load_tabulated_volume("example.pdb"),
+            render_fn=cxs.AutoVolumeRenderFn(shape=(100, 100, 100), voxel_size=1.0),
+        )
+        image_model = cxs.make_image_model(voxel_volume, ...)
+        image = image_model.simulate()
+        ```
+
+    **Arguments:**
+
+    - `atom_volume`:
+        An atomistic volume representation, such as a
+        [`cryojax.simulator.GaussianMixtureVolume`][] or a
+        [`cryojax.simulator.IndependentAtomVolume`][].
+    - `render_fn`:
+        A [`cryojax.simulator.AbstractVolumeRenderFn`][] that
+        accepts `atom_volume` as input. Choose
+        [`cryojax.simulator.AutoVolumeRenderFn`][] to
+        auto-select a method from existing cryoJAX
+        implementations.
+    - `output_type`:
+        The [`cryojax.simulator.AbstractVoxelVolume`][]
+        implementation to output.
+        Either [`cryojax.simulator.FourierVoxelGridVolume`][] /
+        [`cryojax.simulator.FourierVoxelSplineVolume`][] for
+        fourier-space representations, or
+        [`cryojax.simulator.RealVoxelGridVolume`][] for real-space.
+
+
+    **Returns:**
+
+    A [`cryojax.simulator.AbstractVoxelVolume`][] with type
+    equal to `output_type`.
+    """
+    if len(set(render_fn.shape)) != 1:
+        raise ValueError(
+            "Function `render_voxel_volume` only supports "
+            "volume rendering for cubic volumes, i.e. "
+            "`render_fn.shape = (N, N, N)`. Got "
+            f"`render_fn.shape = {render_fn.shape}`."
+        )
+    if output_type == FourierVoxelGridVolume or output_type == FourierVoxelSplineVolume:
+        dim = render_fn.shape[0]
+        frequency_slice = make_frequency_slice((dim, dim), outputs_rfftfreqs=False)
+        fourier_voxel_grid = render_fn(
+            atom_volume, outputs_real_space=False, outputs_rfft=False, fftshifted=True
+        )
+        if output_type == FourierVoxelGridVolume:
+            return FourierVoxelGridVolume(fourier_voxel_grid, frequency_slice)
+        else:
+            spline_coefficients = compute_spline_coefficients(fourier_voxel_grid)
+            return FourierVoxelSplineVolume(spline_coefficients, frequency_slice)
+    elif output_type == RealVoxelGridVolume:
+        coordinate_grid = make_coordinate_grid(render_fn.shape)
+        real_voxel_grid = render_fn(atom_volume, outputs_real_space=True)
+        return RealVoxelGridVolume(real_voxel_grid, coordinate_grid)
+    else:
+        raise ValueError(
+            "Only `output_type` equal to `FourierVoxelGridVolume`, "
+            "`FourierVoxelSplineVolume`, or `RealVoxelGridVolume` "
+            "are supported."
+            f"Got `output_type = {output_type}`."
+        )
+
+
+def make_linear_operator(
+    simulate_fn: Callable[[Args], Array],
+    args: Args,
+    where_vector: Callable[[Args], Any],
+    *,
+    tags: object | Iterable[object] = (),
+) -> tuple[lx.FunctionLinearOperator, Args]:
+    """Convert from a cryoJAX abstraction for image simulation to a
+    [`lineax`](https://docs.kidger.site/lineax/)'s matrix-vector multiplication
+    abstraction.
+
+    In particular, instantiates a [`lineax.FunctionLinearOperator`](https://docs.kidger.site/lineax/api/operators/#lineax.FunctionLinearOperator)
+    to simulate an image.
+
+    !!! example
+
+        ```python
+        import cryojax.simulator as cxs
+
+        # Instantiate a linear operator
+        volume_representation = cxs.FourierVoxelGridVolume.from_real_voxel_grid(...)
+        image_model = cxs.make_image_model(volume_representation, ...)
+        operator, vector = cxs.make_linear_operator(
+            simulate_fn=lambda x: x.simulate(),
+            args=image_model,
+            where_vector=lambda x: x.volume_parametrization.fourier_voxel_grid,
+        )
+        # Simulate an image
+        image = operator.mv(vector)
+    ```
+
+    !!! warning
+
+        This function promises that `simulate_fn` can be expressed as a
+        linear operator with respect to the input arguments at `where_vector`.
+        CryoJAX does not explicitly check if this is the case, so JAX will
+        throw errors downstream.
+
+    **Arguments:**
+
+    - `simulate_fn`:
+        A function with signature `image = simulate_fn(args)`
+    - `args`:
+        Input arguments to `simulate_fn`
+    - `where_vector`:
+        A pointer to where the arguments for the volume
+        input space are in `args`.
+    - `tags`:
+        See `lineax.FunctionLinearOperator` for documentation.
+
+    **Returns:**
+
+    A tuple with first element `lineax.FunctionLinearOperator` and second element
+    a pytree with the same structure as `pytree`, partitioned to only include the
+    arguments at `where_vector`.
+    """  # noqa: E501
+    # Extract arguments for the volume at `where_vector`
+    filter_spec = make_filter_spec(args, where_vector)
+    volume_args, other_args = eqx.partition(args, filter_spec)
+    vector, static_args = eqx.partition(volume_args, eqx.is_array)
+    other_args = eqx.combine(other_args, static_args)
+    # Instantiate the `lineax.FunctionLinearOperator`
+    simulate_wrapper = _SimulateFn(simulate_fn, other_args)
+    input_structure = jax.tree.map(
+        lambda x: jax.ShapeDtypeStruct(x.shape, x.dtype), vector
+    )
+    linear_operator = lx.FunctionLinearOperator(
+        fn=simulate_wrapper, input_structure=input_structure, tags=tags
+    )
+    return linear_operator, vector
+
+
+class _SimulateFn(eqx.Module):
+    simulate_fn: Callable[[PyTree], Array]
+    args: PyTree
+
+    def __call__(self, volume_args: PyTree) -> Array:
+        args = eqx.combine(volume_args, self.args)
+        return self.simulate_fn(args)
