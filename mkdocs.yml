@@ -46,12 +46,11 @@ plugins:
     - ipynb
     - hippogriffe:
         extra_public_objects:
-            - xarray.Dataset
             - numpy.ndarray
             - equinox.Module
             - mdtraj.Topology
             - pandas.DataFrame
-            - lineax.FunctionLinearOperator
+            # - lineax.FunctionLinearOperator
     - mkdocstrings:
         handlers:
           python:

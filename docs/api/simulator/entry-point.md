@@ -8,8 +8,4 @@
 
 ---
 
-::: cryojax.simulator.render_voxels
-
----
-
-::: cryojax.simulator.make_linear_operator
+::: cryojax.simulator.render_voxel_volume

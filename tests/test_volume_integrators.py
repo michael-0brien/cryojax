@@ -53,8 +53,8 @@ def test_gmm_integrator_shape(sample_pdb_path, shape):
 def test_fft_atom_bad_instantiation():
     with pytest.raises(ValueError):
         _ = cxs.IndependentAtomVolume(
-            position_pytree=np.zeros((10, 3)),
-            scattering_factor_pytree=(im.FourierGaussian(),),
+            positions=np.zeros((10, 3)),
+            scattering_factors=(im.FourierGaussian(),),
         )
     with pytest.raises(ValueError):
         _ = cxs.FFTAtomProjection(upsample_factor=2)
@@ -83,8 +83,8 @@ def test_fft_atom_projection_exact(pdb_info, pixel_size, shape):
         )
         atom_volume, fft_integrator = (
             cxs.IndependentAtomVolume(
-                position_pytree=atom_positions,
-                scattering_factor_pytree=im.FourierGaussian(
+                positions=atom_positions,
+                scattering_factors=im.FourierGaussian(
                     amplitude=amplitude, b_factor=b_factor
                 ),
             ),
@@ -116,8 +116,8 @@ def test_fft_atom_projection_antialias(pdb_info, width, pixel_size, shape):
             variances=width**2,
         )
         atom_volume = cxs.IndependentAtomVolume(
-            position_pytree=atom_positions,
-            scattering_factor_pytree=im.FourierGaussian(
+            positions=atom_positions,
+            scattering_factors=im.FourierGaussian(
                 amplitude=1.0, b_factor=width**2 * (8 * np.pi**2)
             ),
         )

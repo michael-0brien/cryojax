@@ -112,7 +112,7 @@ class RealVoxelProjection(
     eps: float
     opts: Any
 
-    is_projection_approximation: ClassVar[bool] = True
+    outputs_ewald_sphere: ClassVar[bool] = False
 
     def __init__(self, *, eps: float = 1e-6, opts: Any = None):
         """**Arguments:**

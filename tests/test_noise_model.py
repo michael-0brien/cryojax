@@ -1,4 +1,5 @@
 import cryojax.simulator as cxs
+import jax.random as jr
 import numpy as np
 import pytest
 from cryojax.io import read_array_from_mrc
@@ -100,6 +101,25 @@ def test_simulate_equals_compute_signal(cls, model, request):
     model = request.getfixturevalue(model)
     noise_model = cls(model)
     np.testing.assert_allclose(model.simulate(), noise_model.compute_signal())
+
+
+@pytest.mark.parametrize("variance, dim", ((1.0, 150), (2.0, 150), (4.0, 150)))
+def test_variance_correct(variance, dim):
+    rng_seed = 123
+    voxel_volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(
+        np.zeros((dim, dim, dim))
+    )
+    image_config = cxs.BasicImageConfig(
+        (dim, dim), pixel_size=1.0, voltage_in_kilovolts=300.0
+    )
+    image_model = cxs.make_image_model(
+        voxel_volume, image_config, pose=cxs.EulerAnglePose()
+    )
+    rng_key = jr.key(rng_seed)
+    noise_model = cxs.GaussianWhiteNoiseModel(image_model, variance=variance)
+    np.testing.assert_allclose(
+        noise_model.compute_noise(rng_key).std(), np.sqrt(variance), rtol=1e-2
+    )
 
 
 def test_detector_incompatible(detector_image_model):

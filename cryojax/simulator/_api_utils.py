@@ -52,6 +52,16 @@ Args = TypeVar("Args")
 identity_fn = eqxi.doc_repr(lambda x, _: x, "identity_fn")
 
 
+def _use_inverse_pose(volume_parametrization: AbstractVolumeParametrization) -> bool:
+    jaxpr_fn = eqx.filter_make_jaxpr(lambda vol: vol.to_representation())
+    _, out_dynamic, out_static = jaxpr_fn(volume_parametrization)
+    out_struct = eqx.combine(out_dynamic, out_static)
+    expects_frame_rotation = isinstance(
+        out_struct, (FourierVoxelGridVolume, FourierVoxelSplineVolume)
+    )
+    return expects_frame_rotation
+
+
 @overload
 def make_image_model(
     volume_parametrization: AbstractVolumeParametrization,
@@ -62,10 +72,9 @@ def make_image_model(
     detector: AbstractDetector | None = None,
     *,
     quantity_mode: None = None,
-    applies_translation: bool = True,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-    translate_mode: Literal["fft", "atom"] = "fft",
+    translate_mode: Literal["fft", "atom", "none"] = "fft",
 ) -> ProjectionImageModel: ...
 
 
@@ -79,10 +88,9 @@ def make_image_model(  # pyright: ignore[reportOverlappingOverload]
     detector: AbstractDetector | None = None,
     *,
     quantity_mode: None = None,
-    applies_translation: bool = True,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-    translate_mode: Literal["fft", "atom"] = "fft",
+    translate_mode: Literal["fft", "atom", "none"] = "fft",
 ) -> LinearImageModel: ...
 
 
@@ -96,10 +104,9 @@ def make_image_model(
     detector: AbstractDetector | None = None,
     *,
     quantity_mode: Literal["contrast"] = "contrast",
-    applies_translation: bool = True,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-    translate_mode: Literal["fft", "atom"] = "fft",
+    translate_mode: Literal["fft", "atom", "none"] = "fft",
 ) -> ContrastImageModel: ...
 
 
@@ -113,10 +120,9 @@ def make_image_model(
     detector: AbstractDetector | None = None,
     *,
     quantity_mode: Literal["intensity"] = "intensity",
-    applies_translation: bool = True,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-    translate_mode: Literal["fft", "atom"] = "fft",
+    translate_mode: Literal["fft", "atom", "none"] = "fft",
 ) -> IntensityImageModel: ...
 
 
@@ -130,10 +136,9 @@ def make_image_model(
     detector: AbstractDetector | None = None,
     *,
     quantity_mode: Literal["counts"] = "counts",
-    applies_translation: bool = True,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-    translate_mode: Literal["fft", "atom"] = "fft",
+    translate_mode: Literal["fft", "atom", "none"] = "fft",
 ) -> ElectronCountsImageModel: ...
 
 
@@ -146,10 +151,9 @@ def make_image_model(
     detector: AbstractDetector | None = None,
     *,
     quantity_mode: Literal["contrast", "intensity", "counts"] | None = None,
-    applies_translation: bool = True,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-    translate_mode: Literal["fft", "atom"] = "fft",
+    translate_mode: Literal["fft", "atom", "none"] = "fft",
 ) -> AbstractImageModel:
     """Construct an `AbstractImageModel` for most common use-cases.
 
@@ -176,9 +180,6 @@ def make_image_model(
     - `detector`:
         If `quantity_mode = 'counts'` is chosen, then an `AbstractDetector` class must be
         chosen to simulate electron counts.
-    - `applies_translation`:
-        If `True`, apply the in-plane translation in the `AbstractPose`
-        via phase shifts in fourier space.
     - `normalizes_signal`:
         If `True`, normalizes_signal the image before returning.
     - `signal_region`:
@@ -199,9 +200,25 @@ def make_image_model(
             If this is passed, a `detector` must also be passed.
     - `translate_mode`:
         If `'fft'`, apply in-plane translation via phase
-        shifts in the Fourier domain. If `'atoms'` apply translation
-        on atom positions before projection. Does nothing if
-        `applies_translation = False`.
+        shifts in the Fourier domain. If `'atoms'` apply
+        translation on atom positions before projection.
+        If `'none'`, does not apply a translation.
+
+    !!! warning
+        The `pose` given to `make_image_model` always represents a
+        rotation of the *object*, not of the frame. Some volume
+        projection methods (e.g. `FourierVoxelExtraction`) instead image
+        a rotation of the frame, so if `volume_parametrization` outputs
+        such a representation, the pose is transposed under the hood.
+
+        Rotations will still differ by a transpose if:
+
+        - The `volume_parametrization` outputs a custom volume that
+        implements a frame rotation
+        - The user instantiates an `AbstractImageModel` directly, rather
+        than through `make_image_model`.
+
+        In these cases, it is necessary to manually invert the pose.
 
     **Returns:**
 
@@ -212,8 +229,11 @@ def make_image_model(
     image = image_model.simulate()
     ```
     """
+    # Invert pose if volume expects frame rotation
+    if _use_inverse_pose(volume_parametrization):
+        pose = pose.to_inverse_rotation()
+    # Gather options
     options = dict(
-        applies_translation=applies_translation,
         normalizes_signal=normalizes_signal,
         signal_region=signal_region,
         translate_mode=translate_mode,
@@ -562,7 +582,7 @@ def render_voxel_volume(
 def make_linear_operator(
     simulate_fn: Callable[[Args], Array],
     args: Args,
-    where_volume: Callable[[Args], Any],
+    where_vector: Callable[[Args], Any],
     *,
     tags: object | Iterable[object] = (),
 ) -> tuple[lx.FunctionLinearOperator, Args]:
@@ -573,7 +593,7 @@ def make_linear_operator(
     In particular, instantiates a [`lineax.FunctionLinearOperator`](https://docs.kidger.site/lineax/api/operators/#lineax.FunctionLinearOperator)
     to simulate an image.
 
-    !!! info "Example"
+    !!! example
 
         ```python
         import cryojax.simulator as cxs
@@ -581,21 +601,19 @@ def make_linear_operator(
         # Instantiate a linear operator
         volume_representation = cxs.FourierVoxelGridVolume.from_real_voxel_grid(...)
         image_model = cxs.make_image_model(volume_representation, ...)
-        linear_operator, volume = cxs.make_linear_operator(
+        operator, vector = cxs.make_linear_operator(
             simulate_fn=lambda x: x.simulate(),
             args=image_model,
-            where_volume=lambda x: x.volume_parametrization.fourier_voxel_grid,
+            where_vector=lambda x: x.volume_parametrization.fourier_voxel_grid,
         )
         # Simulate an image
-        image = linear_operator.mv(volume)
-        # Access arguments other than those at `volume`
-        args = linear_operator.fn.args
+        image = operator.mv(vector)
     ```
 
     !!! warning
 
         This function promises that `simulate_fn` can be expressed as a
-        linear operator with respect to the input arguments at `where_volume`.
+        linear operator with respect to the input arguments at `where_vector`.
         CryoJAX does not explicitly check if this is the case, so JAX will
         throw errors downstream.
 
@@ -605,9 +623,9 @@ def make_linear_operator(
         A function with signature `image = simulate_fn(args)`
     - `args`:
         Input arguments to `simulate_fn`
-    - `where_volume`:
-        A pointer to where the arguments for the volume are in
-        `args`.
+    - `where_vector`:
+        A pointer to where the arguments for the volume
+        input space are in `args`.
     - `tags`:
         See `lineax.FunctionLinearOperator` for documentation.
 
@@ -615,29 +633,28 @@ def make_linear_operator(
 
     A tuple with first element `lineax.FunctionLinearOperator` and second element
     a pytree with the same structure as `pytree`, partitioned to only include the
-    arguments at `where_volume`.
+    arguments at `where_vector`.
     """  # noqa: E501
-    # Extract arguments for the volume corresponding to
-    # `where_volume`
-    filter_spec = make_filter_spec(args, where_volume)
-    volume, other_args = eqx.partition(args, filter_spec)
-    volume, static_args = eqx.partition(volume, eqx.is_array)
+    # Extract arguments for the volume at `where_vector`
+    filter_spec = make_filter_spec(args, where_vector)
+    volume_args, other_args = eqx.partition(args, filter_spec)
+    vector, static_args = eqx.partition(volume_args, eqx.is_array)
     other_args = eqx.combine(other_args, static_args)
     # Instantiate the `lineax.FunctionLinearOperator`
     simulate_wrapper = _SimulateFn(simulate_fn, other_args)
     input_structure = jax.tree.map(
-        lambda x: jax.ShapeDtypeStruct(x.shape, x.dtype), volume
+        lambda x: jax.ShapeDtypeStruct(x.shape, x.dtype), vector
     )
     linear_operator = lx.FunctionLinearOperator(
         fn=simulate_wrapper, input_structure=input_structure, tags=tags
     )
-    return linear_operator, volume
+    return linear_operator, vector
 
 
 class _SimulateFn(eqx.Module):
-    fn: Callable[[PyTree], Array]
+    simulate_fn: Callable[[PyTree], Array]
     args: PyTree
 
     def __call__(self, volume_args: PyTree) -> Array:
-        pytree = eqx.combine(volume_args, self.args)
-        return self.fn(pytree)
+        args = eqx.combine(volume_args, self.args)
+        return self.simulate_fn(args)

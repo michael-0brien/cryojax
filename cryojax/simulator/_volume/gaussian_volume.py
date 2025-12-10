@@ -247,7 +247,7 @@ class GaussianMixtureProjection(
     shape: tuple[int, int] | None
     n_batches: int
 
-    is_projection_approximation: ClassVar[bool] = True
+    outputs_ewald_sphere: ClassVar[bool] = False
 
     def __init__(
         self,

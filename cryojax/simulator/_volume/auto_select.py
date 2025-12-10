@@ -40,7 +40,7 @@ class AutoVolumeProjection(AbstractVolumeIntegrator[VolRep], strict=True):
 
     options: dict[str, Any] = eqx.field(default_factory=dict)
 
-    is_projection_approximation: ClassVar[bool] = True
+    outputs_ewald_sphere: ClassVar[bool] = False
 
     def _select_projection_method(
         self, volume: AbstractVolumeRepresentation

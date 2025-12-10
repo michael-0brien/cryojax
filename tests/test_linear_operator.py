@@ -1,3 +1,4 @@
+import cryojax.experimental as cxe
 import cryojax.simulator as cxs
 import jax.numpy as jnp
 import numpy as np
@@ -38,25 +39,25 @@ def image_model(voxel_volume, image_config):
 
 
 def test_simulate_equality(image_model):
-    linear_operator, volume = cxs.make_linear_operator(
+    linear_operator, vector = cxe.make_linear_operator(
         simulate_fn=lambda x: x.simulate(),
         args=image_model,
-        where_volume=lambda x: x.volume_parametrization.fourier_voxel_grid,
+        where_vector=lambda x: x.volume_parametrization.fourier_voxel_grid,
     )
     image_cxs = image_model.simulate()
-    image_lx = linear_operator.mv(volume)
+    image_lx = linear_operator.mv(vector)
     np.testing.assert_allclose(image_cxs, image_lx)
 
 
 def test_linear_transpose(image_model):
-    where_volume = lambda x: x.volume_parametrization.fourier_voxel_grid
-    linear_operator, _ = cxs.make_linear_operator(
+    where_vector = lambda x: x.volume_parametrization.fourier_voxel_grid
+    linear_operator, _ = cxe.make_linear_operator(
         simulate_fn=lambda x: x.simulate(),
         args=image_model,
-        where_volume=where_volume,
+        where_vector=where_vector,
     )
-    voxel_grid = where_volume(image_model)
-    backprojection = where_volume(
+    voxel_grid = where_vector(image_model)
+    backprojection = where_vector(
         linear_operator.T.mv(jnp.zeros(image_model.image_config.shape))
     )
     assert voxel_grid.shape == backprojection.shape
@@ -68,11 +69,11 @@ def test_bad_linear_transpose(sample_pdb_path, image_config):
         image_config,
         pose=cxs.EulerAnglePose(),
     )
-    where_volume = lambda x: x.volume_parametrization.positions
-    linear_operator, _ = cxs.make_linear_operator(
+    where_vector = lambda x: x.volume_parametrization.positions
+    linear_operator, _ = cxe.make_linear_operator(
         simulate_fn=lambda x: x.simulate(),
         args=image_model,
-        where_volume=where_volume,
+        where_vector=where_vector,
     )
     with pytest.raises(Exception):
         linear_operator.T
