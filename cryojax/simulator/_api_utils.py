@@ -1,18 +1,20 @@
 import pathlib
-from collections.abc import Callable
-from typing import Any, Literal, overload
+from collections.abc import Callable, Iterable
+from typing import Any, Literal, TypeVar, overload
 
 import equinox as eqx
 import equinox.internal as eqxi
+import jax
 import jax.numpy as jnp
+import lineax as lx
 import mmdf
 import pandas as pd
-from jaxtyping import Bool
+from jaxtyping import Array, Bool, PyTree
 
 from ..atom_util import split_atoms_by_element
 from ..constants import LobatoScatteringFactorParameters, PengScatteringFactorParameters
 from ..io import mmdf_to_atoms
-from ..jax_util import NDArrayLike
+from ..jax_util import NDArrayLike, make_filter_spec
 from ._detector import AbstractDetector
 from ._image_config import AbstractImageConfig, DoseImageConfig
 from ._image_model import (
@@ -21,7 +23,7 @@ from ._image_model import (
     ElectronCountsImageModel,
     IntensityImageModel,
     LinearImageModel,
-    ProjectionImageModel as ProjectionImageModel,
+    ProjectionImageModel,
 )
 from ._pose import AbstractPose
 from ._scattering_theory import WeakPhaseScatteringTheory
@@ -36,6 +38,8 @@ from ._volume import (
     IndependentAtomVolume,
 )
 
+
+Args = TypeVar("Args")
 
 identity_fn = eqxi.doc_repr(lambda x, _: x, "identity_fn")
 
@@ -457,3 +461,84 @@ def load_tabulated_volume(
         )
 
     return atom_volume
+
+
+def make_linear_operator(
+    simulate_fn: Callable[[Args], Array],
+    args: Args,
+    where_vector: Callable[[Args], Any],
+    *,
+    tags: object | Iterable[object] = (),
+) -> tuple[lx.FunctionLinearOperator, Args]:
+    """Convert from a cryoJAX abstraction for image simulation to a
+    [`lineax`](https://docs.kidger.site/lineax/)'s matrix-vector multiplication
+    abstraction.
+
+    In particular, instantiates a [`lineax.FunctionLinearOperator`](https://docs.kidger.site/lineax/api/operators/#lineax.FunctionLinearOperator)
+    to simulate an image.
+
+    !!! example
+
+        ```python
+        import cryojax.simulator as cxs
+
+        # Instantiate a linear operator
+        volume_representation = cxs.FourierVoxelGridVolume.from_real_voxel_grid(...)
+        image_model = cxs.make_image_model(volume_representation, ...)
+        operator, vector = cxs.make_linear_operator(
+            simulate_fn=lambda x: x.simulate(),
+            args=image_model,
+            where_vector=lambda x: x.volume_parametrization.fourier_voxel_grid,
+        )
+        # Simulate an image
+        image = operator.mv(vector)
+    ```
+
+    !!! warning
+
+        This function promises that `simulate_fn` can be expressed as a
+        linear operator with respect to the input arguments at `where_vector`.
+        CryoJAX does not explicitly check if this is the case, so JAX will
+        throw errors downstream.
+
+    **Arguments:**
+
+    - `simulate_fn`:
+        A function with signature `image = simulate_fn(args)`
+    - `args`:
+        Input arguments to `simulate_fn`
+    - `where_vector`:
+        A pointer to where the arguments for the volume
+        input space are in `args`.
+    - `tags`:
+        See `lineax.FunctionLinearOperator` for documentation.
+
+    **Returns:**
+
+    A tuple with first element `lineax.FunctionLinearOperator` and second element
+    a pytree with the same structure as `pytree`, partitioned to only include the
+    arguments at `where_vector`.
+    """  # noqa: E501
+    # Extract arguments for the volume at `where_vector`
+    filter_spec = make_filter_spec(args, where_vector)
+    volume_args, other_args = eqx.partition(args, filter_spec)
+    vector, static_args = eqx.partition(volume_args, eqx.is_array)
+    other_args = eqx.combine(other_args, static_args)
+    # Instantiate the `lineax.FunctionLinearOperator`
+    simulate_wrapper = _SimulateFn(simulate_fn, other_args)
+    input_structure = jax.tree.map(
+        lambda x: jax.ShapeDtypeStruct(x.shape, x.dtype), vector
+    )
+    linear_operator = lx.FunctionLinearOperator(
+        fn=simulate_wrapper, input_structure=input_structure, tags=tags
+    )
+    return linear_operator, vector
+
+
+class _SimulateFn(eqx.Module):
+    simulate_fn: Callable[[PyTree], Array]
+    args: PyTree
+
+    def __call__(self, volume_args: PyTree) -> Array:
+        args = eqx.combine(volume_args, self.args)
+        return self.simulate_fn(args)
