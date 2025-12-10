@@ -3,7 +3,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
 from ...jax_util import FloatLike, error_if_not_fractional
-from ...ndimage import FourierOperatorLike
+from ...ndimage import AbstractFourierOperator
 from .._image_config import AbstractImageConfig
 from .transfer_function import AbstractCTF
 
@@ -26,14 +26,14 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
     """
 
     ctf: AbstractCTF
-    envelope: FourierOperatorLike | None
+    envelope: AbstractFourierOperator | None
     amplitude_contrast_ratio: Float[Array, ""]
     phase_shift: Float[Array, ""]
 
     def __init__(
         self,
         ctf: AbstractCTF,
-        envelope: FourierOperatorLike | None = None,
+        envelope: AbstractFourierOperator | None = None,
         amplitude_contrast_ratio: FloatLike = 0.1,
         phase_shift: FloatLike = 0.0,
     ):

@@ -5,6 +5,7 @@ Masks to apply to images in real space.
 import abc
 import functools
 import operator
+from typing import ClassVar
 from typing_extensions import override
 
 import jax
@@ -17,6 +18,8 @@ from ._base_transform import AbstractImageTransform
 
 class AbstractMask(AbstractImageTransform, strict=True):
     """Base class for computing and applying an image mask."""
+
+    is_real_space: ClassVar[bool] = True
 
     @abc.abstractmethod
     def get(self) -> Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]:

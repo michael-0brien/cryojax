@@ -12,17 +12,18 @@ These classes are modified from the library `tinygp`.
 import functools
 import operator
 from abc import abstractmethod
-from typing import overload
+from collections.abc import Callable
+from typing import Any, overload
 from typing_extensions import override
 
+import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float, Inexact
 
 from ...jax_util import FloatLike, error_if_negative, error_if_not_positive
-from ._base_operator import AbstractImageOperator
 
 
-class AbstractFourierOperator(AbstractImageOperator, strict=True):
+class AbstractFourierOperator(eqx.Module, strict=True):
     """
     The base class for all fourier-based operators.
 
@@ -33,20 +34,8 @@ class AbstractFourierOperator(AbstractImageOperator, strict=True):
 
         1) Include the necessary parameters in
            the class definition.
-        2) Overrwrite the ``__call__`` method.
+        2) Overrwrite the `__call__` method.
     """
-
-    @overload
-    @abstractmethod
-    def __call__(
-        self, frequency_grid: Float[Array, "y_dim x_dim 2"]
-    ) -> Inexact[Array, "y_dim x_dim"]: ...
-
-    @overload
-    @abstractmethod
-    def __call__(  # type: ignore
-        self, frequency_grid: Float[Array, "z_dim y_dim x_dim 3"]
-    ) -> Inexact[Array, "z_dim y_dim x_dim"]: ...
 
     @abstractmethod
     def __call__(
@@ -57,8 +46,121 @@ class AbstractFourierOperator(AbstractImageOperator, strict=True):
     ) -> Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"]:
         raise NotImplementedError
 
+    def __add__(self, other) -> "AbstractFourierOperator":
+        if isinstance(other, AbstractFourierOperator):
+            return _SumFourierOperator(self, other)
+        return _SumFourierOperator(self, FourierConstant(other))
 
-FourierOperatorLike = AbstractFourierOperator | AbstractImageOperator
+    def __radd__(self, other) -> "AbstractFourierOperator":
+        if isinstance(other, AbstractFourierOperator):
+            return _SumFourierOperator(other, self)
+        return _SumFourierOperator(FourierConstant(other), self)
+
+    def __sub__(self, other) -> "AbstractFourierOperator":
+        if isinstance(other, AbstractFourierOperator):
+            return _DiffFourierOperator(self, other)
+        return _DiffFourierOperator(self, FourierConstant(other))
+
+    def __rsub__(self, other) -> "AbstractFourierOperator":
+        if isinstance(other, AbstractFourierOperator):
+            return _DiffFourierOperator(other, self)
+        return _DiffFourierOperator(FourierConstant(other), self)
+
+    def __mul__(self, other) -> "AbstractFourierOperator":
+        if isinstance(other, AbstractFourierOperator):
+            return _ProductFourierOperator(self, other)
+        return _ProductFourierOperator(self, FourierConstant(other))
+
+    def __rmul__(self, other) -> "AbstractFourierOperator":
+        if isinstance(other, AbstractFourierOperator):
+            return _ProductFourierOperator(other, self)
+        return _ProductFourierOperator(FourierConstant(other), self)
+
+
+class _SumFourierOperator(AbstractFourierOperator, strict=True):
+    """A helper to represent the sum of two operators."""
+
+    operator1: AbstractFourierOperator
+    operator2: AbstractFourierOperator
+
+    @override
+    def __call__(
+        self,
+        frequency_grid: (
+            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
+        ),
+    ) -> Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"]:
+        return self.operator1(frequency_grid) + self.operator2(frequency_grid)
+
+    def __repr__(self):
+        return f"{repr(self.operator1)} + {repr(self.operator2)}"
+
+
+class _DiffFourierOperator(AbstractFourierOperator, strict=True):
+    """A helper to represent the difference of two operators."""
+
+    operator1: AbstractFourierOperator
+    operator2: AbstractFourierOperator
+
+    @override
+    def __call__(
+        self,
+        frequency_grid: (
+            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
+        ),
+    ) -> Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"]:
+        return self.operator1(frequency_grid) - self.operator2(frequency_grid)
+
+    def __repr__(self):
+        return f"{repr(self.operator1)} - {repr(self.operator2)}"
+
+
+class _ProductFourierOperator(AbstractFourierOperator, strict=True):
+    """A helper to represent the product of two operators."""
+
+    operator1: AbstractFourierOperator
+    operator2: AbstractFourierOperator
+
+    @override
+    def __call__(
+        self,
+        frequency_grid: (
+            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
+        ),
+    ) -> Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"]:
+        return self.operator1(frequency_grid) * self.operator2(frequency_grid)
+
+    def __repr__(self):
+        return f"{repr(self.operator1)} * {repr(self.operator2)}"
+
+
+class CustomFourierOperator(AbstractFourierOperator, strict=True):
+    """An operator that calls a custom function."""
+
+    fn: Callable[..., Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"]]
+    args: Any
+    kwargs: dict[str, Any]
+
+    @override
+    def __call__(
+        self,
+        frequency_grid: (
+            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
+        ),
+    ) -> Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"]:
+        return self.fn(frequency_grid, *self.args, **self.kwargs)
+
+
+CustomFourierOperator.__init__.__doc__ = """**Arguments:**
+
+- `fn`:
+    The `Callable` wrapped into a `AbstractFourierOperator`.
+    Has signature `out = fn(frequency_grid, *args, **kwargs)`
+- `args`:
+    Passed to `fn`.
+- `kwargs`:
+    Passed to `fn`.
+"""
 
 
 class ZeroMode(AbstractFourierOperator, strict=True):
@@ -66,7 +168,7 @@ class ZeroMode(AbstractFourierOperator, strict=True):
 
     value: Float[Array, ""]
 
-    def __init__(self, value: float | Float[Array, ""] = 0.0):
+    def __init__(self, value: FloatLike = 0.0):
         """**Arguments:**
 
         - `value`: The value of the zero mode.
@@ -79,6 +181,29 @@ class ZeroMode(AbstractFourierOperator, strict=True):
     ) -> Float[Array, "y_dim x_dim"]:
         N1, N2 = frequency_grid.shape[0:-1]
         return jnp.zeros((N1, N2)).at[0, 0].set(self.value)
+
+
+class FourierConstant(AbstractFourierOperator, strict=True):
+    """An operator that is a constant."""
+
+    value: Float[Array, "..."]
+
+    def __init__(self, value: float | Float[Array, "..."]):
+        """**Arguments:**
+
+        - `value`: The value of the constant
+        """
+        self.value = jnp.asarray(value)
+
+    @override
+    def __call__(
+        self,
+        frequency_grid: (
+            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
+        ),
+    ) -> Float[Array, ""]:
+        del frequency_grid
+        return self.value
 
 
 class FourierExp2D(AbstractFourierOperator, strict=True):
@@ -106,8 +231,8 @@ class FourierExp2D(AbstractFourierOperator, strict=True):
 
     def __init__(
         self,
-        amplitude: float | Float[Array, ""] = 1.0,
-        length_scale: float | Float[Array, ""] = 1.0,
+        amplitude: FloatLike = 1.0,
+        length_scale: FloatLike = 1.0,
     ):
         """**Arguments:**
 
@@ -129,57 +254,6 @@ class FourierExp2D(AbstractFourierOperator, strict=True):
         return scaling
 
 
-class Lorenzian(AbstractFourierOperator, strict=True):
-    r"""This operator is the Lorenzian, given
-
-    .. math::
-        P(|k|) = \frac{\kappa}{\xi^2} \frac{1}{(\xi^{-2} + |k|^2)}.
-
-    Here :math:`\kappa` is a scale factor and :math:`\xi` is a length
-    scale.
-    """
-
-    amplitude: Float[Array, ""]
-    length_scale: Float[Array, ""]
-
-    def __init__(
-        self,
-        amplitude: float | Float[Array, ""] = 1.0,
-        length_scale: float | Float[Array, ""] = 1.0,
-    ):
-        """**Arguments:**
-
-        - `amplitude`: The amplitude of the operator, equal to $\\kappa$
-                in the above equation.
-        - `length_scale`: The length scale of the operator, equal to $\\xi$
-                    in the above equation.
-        """
-        self.amplitude = jnp.asarray(amplitude, dtype=float)
-        self.length_scale = error_if_not_positive(jnp.asarray(length_scale, dtype=float))
-
-    @overload
-    def __call__(
-        self, frequency_grid: Float[Array, "y_dim x_dim 2"]
-    ) -> Float[Array, "y_dim x_dim"]: ...
-
-    @overload
-    def __call__(  # type: ignore
-        self, frequency_grid: Float[Array, "z_dim y_dim x_dim 3"]
-    ) -> Float[Array, "z_dim y_dim x_dim"]: ...
-
-    @override
-    def __call__(
-        self,
-        frequency_grid: (
-            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
-        ),
-    ) -> Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]:
-        k_sqr = jnp.sum(frequency_grid**2, axis=-1)
-        scaling = 1.0 / (k_sqr + jnp.divide(1, self.length_scale**2))
-        scaling *= jnp.divide(self.amplitude, self.length_scale**2)
-        return scaling
-
-
 class FourierGaussian(AbstractFourierOperator, strict=True):
     r"""This operator represents a simple gaussian.
     Specifically, this is
@@ -197,8 +271,8 @@ class FourierGaussian(AbstractFourierOperator, strict=True):
 
     def __init__(
         self,
-        amplitude: float | Float[Array, ""] = 1.0,
-        b_factor: float | Float[Array, ""] = 1.0,
+        amplitude: FloatLike = 1.0,
+        b_factor: FloatLike = 1.0,
     ):
         """**Arguments:**
 
@@ -252,9 +326,9 @@ class FourierGaussianWithRadialOffset(AbstractFourierOperator, strict=True):
 
     def __init__(
         self,
-        amplitude: float | Float[Array, ""] = 1.0,
-        b_factor: float | Float[Array, ""] = 1.0,
-        offset: float | Float[Array, ""] = 0.0,
+        amplitude: FloatLike = 1.0,
+        b_factor: FloatLike = 1.0,
+        offset: FloatLike = 0.0,
     ):
         """**Arguments:**
 

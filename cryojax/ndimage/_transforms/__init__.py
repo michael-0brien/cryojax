@@ -1,6 +1,6 @@
 from ._base_transform import (
     AbstractImageTransform as AbstractImageTransform,
-    ProductImageTransform as ProductImageTransform,
+    ImageScaling as ImageScaling,
 )
 from ._filters import (
     AbstractFilter as AbstractFilter,

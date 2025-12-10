@@ -3,7 +3,7 @@ import equinox as eqx
 import numpy as np
 import pytest
 from cryojax.io import read_array_from_mrc, read_atoms_from_pdb
-from cryojax.ndimage import crop_to_shape
+from cryojax.ndimage import CircularCosineMask, ImageScaling, crop_to_shape
 
 
 @pytest.fixture
@@ -170,6 +170,44 @@ def test_bad_translate_mode(voxel_info, basic_config):
             voxel_volume, basic_config, pose=cxs.EulerAnglePose(), translate_mode="atom"
         )
         _ = model.simulate()
+
+
+@pytest.mark.parametrize("std", (2.0, 4.0))
+def test_transform(std, voxel_info, basic_config):
+    real_voxels, _ = voxel_info
+    voxel_volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxels)
+    image_model = cxs.make_image_model(
+        voxel_volume,
+        basic_config,
+        pose=cxs.EulerAnglePose(),
+        transform=ImageScaling(scale=std),
+        normalizes_signal=True,
+    )
+    image = compute_image(image_model)
+    np.testing.assert_approx_equal(np.std(image), std)
+
+
+@pytest.mark.parametrize("use_transform", (True, False))
+def test_mask_zeros_edges(use_transform, voxel_info, basic_config):
+    real_voxels, _ = voxel_info
+    voxel_volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxels)
+    image_model = cxs.make_image_model(
+        voxel_volume,
+        basic_config,
+        pose=cxs.EulerAnglePose(),
+        transform=(ImageScaling(scale=1.0) if use_transform else None),
+        normalizes_signal=True,
+    )
+    image = image_model.simulate(
+        mask=CircularCosineMask(
+            basic_config.coordinate_grid_in_pixels, radius=10, rolloff_width=0
+        )
+    )
+    ny, nx = image.shape
+    np.testing.assert_allclose(image[0, 0], 0.0)
+    np.testing.assert_allclose(image[ny, 0], 0.0)
+    np.testing.assert_allclose(image[0, nx], 0.0)
+    np.testing.assert_allclose(image[ny, nx], 0.0)
 
 
 @eqx.filter_jit

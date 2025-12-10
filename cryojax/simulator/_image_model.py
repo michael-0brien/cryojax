@@ -12,7 +12,7 @@ import jax.random as jr
 from jaxtyping import Array, Bool, Complex, Float, PRNGKeyArray
 
 from ..jax_util import NDArrayLike
-from ..ndimage import FilterLike, MaskLike, irfftn, rfftn
+from ..ndimage import AbstractImageTransform, FilterLike, MaskLike, irfftn, rfftn
 from ._detector import AbstractDetector
 from ._image_config import AbstractImageConfig, DoseImageConfig
 from ._pose import AbstractPose
@@ -51,8 +51,10 @@ class AbstractImageModel(eqx.Module, strict=True):
 
     image_config: eqx.AbstractVar[AbstractImageConfig]
     pose: eqx.AbstractVar[AbstractPose]
-    signal_region: eqx.AbstractVar[Bool[Array, "_ _"] | None]
 
+    transform: eqx.AbstractVar[AbstractImageTransform | None]
+
+    signal_region: eqx.AbstractVar[Bool[Array, "_ _"] | None]
     normalizes_signal: eqx.AbstractVar[bool]
 
     @abstractmethod
@@ -115,6 +117,7 @@ class AbstractImageModel(eqx.Module, strict=True):
         and normalization in either real or fourier space.
         """
         image_config = self.image_config
+        mask, filter = self._compose_transform(mask, filter)
         if (
             mask is None
             and image_config.padded_shape == image_config.shape
@@ -178,6 +181,23 @@ class AbstractImageModel(eqx.Module, strict=True):
                 f"Got a `{volrep.__class__.__name__}` class."
             )
 
+    def _compose_transform(
+        self, mask: MaskLike | None, filter: FilterLike | None
+    ) -> tuple[AbstractImageTransform | None, AbstractImageTransform | None]:
+        if self.transform is None:
+            return mask, filter
+        else:
+            if self.transform.is_real_space:
+                if mask is None:
+                    return self.transform, filter
+                else:
+                    return mask * self.transform, filter
+            else:
+                if filter is None:
+                    return mask, self.transform
+                else:
+                    return mask, filter * self.transform
+
     def _normalize_image(self, image: Array) -> Array:
         mean, std = (
             jnp.mean(image, where=self.signal_region),
@@ -217,6 +237,8 @@ class LinearImageModel(AbstractImageModel, strict=True):
     transfer_theory: ContrastTransferTheory
     image_config: AbstractImageConfig
 
+    transform: AbstractImageTransform | None
+
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
     translate_mode: Literal["fft", "atom", "none"]
@@ -229,6 +251,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
         volume_integrator: AbstractVolumeIntegrator,
         transfer_theory: ContrastTransferTheory,
         *,
+        transform: AbstractImageTransform | None = None,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
         translate_mode: Literal["fft", "atom", "none"] = "fft",
@@ -244,6 +267,9 @@ class LinearImageModel(AbstractImageModel, strict=True):
             and the wavelength.
         - `volume_integrator`: The method for integrating the scattering potential.
         - `transfer_theory`: The contrast transfer theory.
+        - `transform`:
+            A [`cryojax.ndimage.AbstractImageTransform`][] applied to the
+            image after simulation.
         - `normalizes_signal`:
             If `True`, normalizes_signal the image before returning.
         - `signal_region`:
@@ -263,6 +289,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
         self.volume_integrator = volume_integrator
         self.transfer_theory = transfer_theory
         # Options
+        self.transform = transform
         self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
         if signal_region is None:
@@ -320,6 +347,8 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
     volume_integrator: AbstractVolumeIntegrator
     image_config: AbstractImageConfig
 
+    transform: AbstractImageTransform | None
+
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
     translate_mode: Literal["fft", "atom", "none"]
@@ -331,6 +360,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
         image_config: AbstractImageConfig,
         volume_integrator: AbstractVolumeIntegrator,
         *,
+        transform: AbstractImageTransform | None = None,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
         translate_mode: Literal["fft", "atom", "none"] = "fft",
@@ -345,6 +375,9 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
             The configuration of the instrument, such as for the pixel size
             and the wavelength.
         - `volume_integrator`: The method for integrating the scattering potential.
+        - `transform`:
+            A [`cryojax.ndimage.AbstractImageTransform`][] applied to the
+            image after simulation.
         - `signal_region`:
             A boolean array that is 1 where there is signal,
             and 0 otherwise used to normalize the image.
@@ -361,6 +394,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
         self.image_config = image_config
         self.volume_integrator = volume_integrator
         # Options
+        self.transform = transform
         self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
         if signal_region is None:
@@ -421,6 +455,8 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
     image_config: AbstractImageConfig
     scattering_theory: AbstractScatteringTheory
 
+    transform: AbstractImageTransform | None
+
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
     translate_mode: Literal["fft", "atom", "none"]
@@ -432,6 +468,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
         image_config: AbstractImageConfig,
         scattering_theory: AbstractScatteringTheory,
         *,
+        transform: AbstractImageTransform | None = None,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
         translate_mode: Literal["fft", "atom", "none"] = "fft",
@@ -447,6 +484,9 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
             and the wavelength.
         - `scattering_theory`:
             The scattering theory.
+        - `transform`:
+            A [`cryojax.ndimage.AbstractImageTransform`][] applied to the
+            image after simulation.
         - `normalizes_signal`:
             If `True`, normalize the image before returning.
         - `signal_region`:
@@ -463,6 +503,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
         self.pose = pose
         self.image_config = image_config
         self.scattering_theory = scattering_theory
+        self.transform = transform
         self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
         if signal_region is None:
@@ -519,6 +560,8 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
     image_config: AbstractImageConfig
     scattering_theory: AbstractScatteringTheory
 
+    transform: AbstractImageTransform | None
+
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
     translate_mode: Literal["fft", "atom", "none"]
@@ -530,6 +573,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
         image_config: AbstractImageConfig,
         scattering_theory: AbstractScatteringTheory,
         *,
+        transform: AbstractImageTransform | None = None,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
         translate_mode: Literal["fft", "atom", "none"] = "fft",
@@ -545,6 +589,9 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
             and the wavelength.
         - `scattering_theory`:
             The scattering theory.
+        - `transform`:
+            A [`cryojax.ndimage.AbstractImageTransform`][] applied to the
+            image after simulation.
         - `normalizes_signal`:
             If `True`, normalize the image before returning.
         - `signal_region`:
@@ -561,6 +608,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
         self.pose = pose
         self.image_config = image_config
         self.scattering_theory = scattering_theory
+        self.transform = transform
         self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
         if signal_region is None:
@@ -617,6 +665,8 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
     scattering_theory: AbstractScatteringTheory
     detector: AbstractDetector
 
+    transform: AbstractImageTransform | None
+
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
     translate_mode: Literal["fft", "atom", "none"]
@@ -629,6 +679,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
         scattering_theory: AbstractScatteringTheory,
         detector: AbstractDetector,
         *,
+        transform: AbstractImageTransform | None = None,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
         translate_mode: Literal["fft", "atom", "none"] = "fft",
@@ -644,6 +695,9 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
             and the wavelength.
         - `scattering_theory`:
             The scattering theory.
+        - `transform`:
+            A [`cryojax.ndimage.AbstractImageTransform`][] applied to the
+            image after simulation.
         - `normalizes_signal`:
             If `True`, normalize the image before returning.
         - `signal_region`:
@@ -661,6 +715,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
         self.image_config = image_config
         self.scattering_theory = scattering_theory
         self.detector = detector
+        self.transform = transform
         self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
         if signal_region is None:

@@ -966,7 +966,7 @@ def test_write_starfile_different_envs():
         loads_envelope=True,
     )
 
-    particle_params = _make_particle_params(im.Constant(1.0))
+    particle_params = _make_particle_params(im.FourierConstant(1.0))
     new_parameters_file = RelionParticleParameterFile(
         path_to_starfile="tests/outputs/starfile_writing/test_particle_parameters.star",
         mode="w",
