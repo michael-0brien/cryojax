@@ -3,7 +3,7 @@ import equinox as eqx
 import numpy as np
 import pytest
 from cryojax.io import read_array_from_mrc, read_atoms_from_pdb
-from cryojax.ndimage import CircularCosineMask, ScalingTransform, crop_to_shape
+from cryojax.ndimage import CircularCosineMask, ImageScaling, crop_to_shape
 
 
 @pytest.fixture
@@ -180,7 +180,7 @@ def test_transform(std, voxel_info, basic_config):
         voxel_volume,
         basic_config,
         pose=cxs.EulerAnglePose(),
-        transform=ScalingTransform(scale=std),
+        transform=ImageScaling(scale=std),
         normalizes_signal=True,
     )
     image = compute_image(image_model)
@@ -195,7 +195,7 @@ def test_mask_zeros_edges(use_transform, voxel_info, basic_config):
         voxel_volume,
         basic_config,
         pose=cxs.EulerAnglePose(),
-        transform=(ScalingTransform(scale=1.0) if use_transform else None),
+        transform=(ImageScaling(scale=1.0) if use_transform else None),
         normalizes_signal=True,
     )
     image = image_model.simulate(
