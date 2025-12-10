@@ -1,3 +1,4 @@
+import cryojax.experimental as cxe
 import cryojax.simulator as cxs
 import jax.numpy as jnp
 import numpy as np
@@ -38,7 +39,7 @@ def image_model(voxel_volume, image_config):
 
 
 def test_simulate_equality(image_model):
-    linear_operator, vector = cxs.make_linear_operator(
+    linear_operator, vector = cxe.make_linear_operator(
         simulate_fn=lambda x: x.simulate(),
         args=image_model,
         where_vector=lambda x: x.volume_parametrization.fourier_voxel_grid,
@@ -50,7 +51,7 @@ def test_simulate_equality(image_model):
 
 def test_linear_transpose(image_model):
     where_vector = lambda x: x.volume_parametrization.fourier_voxel_grid
-    linear_operator, _ = cxs.make_linear_operator(
+    linear_operator, _ = cxe.make_linear_operator(
         simulate_fn=lambda x: x.simulate(),
         args=image_model,
         where_vector=where_vector,
@@ -69,7 +70,7 @@ def test_bad_linear_transpose(sample_pdb_path, image_config):
         pose=cxs.EulerAnglePose(),
     )
     where_vector = lambda x: x.volume_parametrization.positions
-    linear_operator, _ = cxs.make_linear_operator(
+    linear_operator, _ = cxe.make_linear_operator(
         simulate_fn=lambda x: x.simulate(),
         args=image_model,
         where_vector=where_vector,

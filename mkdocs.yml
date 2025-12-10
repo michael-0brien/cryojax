@@ -51,7 +51,7 @@ plugins:
             - equinox.Module
             - mdtraj.Topology
             - pandas.DataFrame
-            - lineax.FunctionLinearOperator
+            # - lineax.FunctionLinearOperator
     - mkdocstrings:
         handlers:
           python:
