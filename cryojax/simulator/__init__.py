@@ -74,6 +74,8 @@ from ._volume import (
     GaussianMixtureRenderFn as GaussianMixtureRenderFn,
     GaussianMixtureVolume as GaussianMixtureVolume,
     IndependentAtomVolume as IndependentAtomVolume,
+    LobatoScatteringFactor as LobatoScatteringFactor,
+    PengScatteringFactor as PengScatteringFactor,
     RealVoxelGridVolume as RealVoxelGridVolume,
     RealVoxelProjection as RealVoxelProjection,
 )

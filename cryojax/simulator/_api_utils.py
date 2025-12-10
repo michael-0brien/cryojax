@@ -10,7 +10,7 @@ import pandas as pd
 from jaxtyping import Bool
 
 from ..atom_util import split_atoms_by_element
-from ..constants import PengScatteringFactorParameters
+from ..constants import LobatoScatteringFactorParameters, PengScatteringFactorParameters
 from ..io import mmdf_to_atoms
 from ..jax_util import NDArrayLike
 from ._detector import AbstractDetector
@@ -302,7 +302,7 @@ def load_tabulated_volume(  # pyright: ignore[reportOverlappingOverload]
     path_or_mmdf: str | pathlib.Path | pd.DataFrame,
     *,
     output_type: type[IndependentAtomVolume] = IndependentAtomVolume,
-    tabulation: Literal["peng"] = "peng",
+    tabulation: Literal["peng", "lobato"] = "peng",
     include_b_factors: bool = True,
     b_factor_fn: Callable[[NDArrayLike, NDArrayLike], NDArrayLike] = identity_fn,
     selection_string: str = "all",
@@ -329,7 +329,7 @@ def load_tabulated_volume(
     output_type: type[
         IndependentAtomVolume | GaussianMixtureVolume
     ] = IndependentAtomVolume,
-    tabulation: Literal["peng"] = "peng",
+    tabulation: Literal["peng", "lobato"] = "peng",
     include_b_factors: bool = False,
     b_factor_fn: Callable[[NDArrayLike, NDArrayLike], NDArrayLike] = identity_fn,
     selection_string: str = "all",
@@ -368,7 +368,10 @@ def load_tabulated_volume(
         [`cryojax.simulator.IndependentAtomVolume`][].
     - `tabulation`:
         Specifies which electron scattering factor tabulation to use.
-        For now, only `tabulation = 'peng'` is supported.
+        Supported values are `tabulation = 'peng'` or `tabulation = 'lobato'`.
+        See [`cryojax.constants.PengScatteringFactorParameters`][] and
+        [`cryojax.constants.LobatoScatteringFactorParameters`][]
+        for more information.
     - `include_b_factors`:
         If `True`, include PDB B-factors in the volume.
     - `b_factor_fn`:
@@ -409,8 +412,14 @@ def load_tabulated_volume(
         **pdb_options,
     )
     if output_type is GaussianMixtureVolume:
-        # TODO: this is inefficient if this function is called multiple times,
-        # as the electron scattering factor parameter table is read on each call
+        if tabulation != "peng":
+            raise ValueError(
+                "Passed `output_type = GaussianMixtureVolume` to "
+                "`load_tabulated_volume`, but found that "
+                f"`tabulation = {tabulation}`, which "
+                "is not a mixture of gaussians. Use "
+                "`tabulation = 'peng'` instead."
+            )
         peng_parameters = PengScatteringFactorParameters(atomic_numbers)
         b_factors = (
             jnp.asarray(
@@ -430,15 +439,16 @@ def load_tabulated_volume(
             jnp.asarray(b_factor_fn(jnp.mean(b), atom_ids)) for b in b_factor_by_id
         )
         if tabulation == "peng":
-            scattering_parameters = PengScatteringFactorParameters(atom_ids)
+            parameters = PengScatteringFactorParameters(atom_ids)
+        elif tabulation == "lobato":
+            parameters = LobatoScatteringFactorParameters(atom_ids)
         else:
             raise ValueError(
-                "Only `tabulation = 'peng'` is supported in "
-                "`load_tabulated_volume`. "
-                "Additional tabulations are not yet implemented."
+                "Only `tabulation` equal to 'peng' or 'lobato' are supported in "
+                f"`load_tabulated_volume`. Instead, got `tabulation = {tabulation}`."
             )
         atom_volume = IndependentAtomVolume.from_tabulated_parameters(
-            positions_by_id, scattering_parameters, b_factor_by_element=b_factor_by_id
+            positions_by_id, parameters, b_factor_by_element=b_factor_by_id
         )
     else:
         raise ValueError(

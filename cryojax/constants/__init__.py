@@ -11,7 +11,7 @@ from ._physical_constants import (
     wavelength_from_kilovolts as wavelength_from_kilovolts,
 )
 from ._scattering_factor_parameters import (
+    LobatoScatteringFactorParameters as LobatoScatteringFactorParameters,
     PengScatteringFactorParameters as PengScatteringFactorParameters,
     check_atomic_numbers_supported as check_atomic_numbers_supported,
-    extract_scattering_factor_parameters as extract_scattering_factor_parameters,
 )

@@ -1,4 +1,5 @@
 import warnings
+from typing import Literal
 
 import jax.numpy as jnp
 import numpy as np
@@ -10,9 +11,9 @@ with install_import_hook("cryojax", "typeguard.typechecked"):
     import cryojax.ndimage as im
     import cryojax.simulator as cxs
     from cryojax.constants import (
+        LobatoScatteringFactorParameters,
         PengScatteringFactorParameters,
         check_atomic_numbers_supported,
-        extract_scattering_factor_parameters,
     )
     from cryojax.io import read_atoms_from_pdb
     from cryojax.ndimage import make_coordinate_grid
@@ -64,31 +65,49 @@ def toy_gaussian_cloud():
 #
 # Test volume tabulations
 #
-def test_load_atom_volume(sample_pdb_path: str):
+@pytest.mark.parametrize("tabulation", ("peng", "lobato"))
+def test_load_atom_volume(tabulation, sample_pdb_path: str):
     import pathlib
 
     import mmdf
 
     atom_volume = cxs.load_tabulated_volume(
-        sample_pdb_path, output_type=cxs.IndependentAtomVolume
+        sample_pdb_path,
+        output_type=cxs.IndependentAtomVolume,
+        tabulation=tabulation,
     )
     assert isinstance(atom_volume, cxs.IndependentAtomVolume)
-    atom_volume = cxs.load_tabulated_volume(
-        sample_pdb_path, output_type=cxs.GaussianMixtureVolume
-    )
-    assert isinstance(atom_volume, cxs.GaussianMixtureVolume)
+    if tabulation == "peng":
+        atom_volume = cxs.load_tabulated_volume(
+            sample_pdb_path,
+            output_type=cxs.GaussianMixtureVolume,
+            tabulation=tabulation,
+        )
+        assert isinstance(atom_volume, cxs.GaussianMixtureVolume)
+    else:
+        with pytest.raises(ValueError):
+            atom_volume = cxs.load_tabulated_volume(
+                sample_pdb_path,
+                output_type=cxs.GaussianMixtureVolume,
+                tabulation=tabulation,
+            )
     atom_data = mmdf.read(pathlib.Path(sample_pdb_path))
     atom_volume = cxs.load_tabulated_volume(
-        atom_data, output_type=cxs.IndependentAtomVolume
+        atom_data,
+        output_type=cxs.IndependentAtomVolume,
+        tabulation=tabulation,
     )
     assert isinstance(atom_volume, cxs.IndependentAtomVolume)
 
 
-def test_scattering_factor_parameters_correct(peng_parameters_path):
+def test_scattering_factor_parameters_correct(
+    peng_parameters_path, lobato_parameters_path
+):
     from cryojax.constants._scattering_factor_parameters import _SUPPORTED_ATOMIC_NUMBERS
 
     atomic_numbers = np.asarray(_SUPPORTED_ATOMIC_NUMBERS)
 
+    # Test Peng
     params = PengScatteringFactorParameters(atomic_numbers)
     a1, b1 = (params.a, params.b)
 
@@ -98,18 +117,42 @@ def test_scattering_factor_parameters_correct(peng_parameters_path):
     np.testing.assert_equal(a1, a2)
     np.testing.assert_equal(b1, b2)
 
+    # Test lobato
+    params = LobatoScatteringFactorParameters(atomic_numbers)
+    a1, b1 = (params.a, params.b)
 
-@pytest.mark.parametrize("tabulation", ("peng",))
+    lobato_table = np.load(lobato_parameters_path)
+    a2, b2 = lobato_table[:, atomic_numbers, :]
+
+    np.testing.assert_equal(a1, a2)
+    np.testing.assert_equal(b1, b2)
+
+
+def test_compare_hydrogen_scattering_factor():
+    shape, pixel_size = (32, 32), 1.0
+    frequencies = im.make_frequency_grid(shape, pixel_size)
+    hydrogen_id = np.asarray([1], dtype=int)
+    p, l = (
+        PengScatteringFactorParameters(hydrogen_id),
+        LobatoScatteringFactorParameters(hydrogen_id),
+    )
+    p_fac = cxs.PengScatteringFactor(p.a[0], p.b[0])
+    l_fac = cxs.LobatoScatteringFactor(l.a[0], l.b[0])
+    p_arr, l_arr = p_fac(frequencies), l_fac(frequencies)
+    np.testing.assert_allclose(p_arr, l_arr, atol=1e-3)
+
+
+@pytest.mark.parametrize("tabulation", ("peng", "lobato"))
 def test_invalid_atomic_numbers(tabulation):
     # Make sure has nan when expected
     bad_nan = np.asarray([2, 6])
-    params_nan = extract_scattering_factor_parameters(bad_nan, tabulation=tabulation)
+    params_nan = _make_scattering_parameters(bad_nan, tabulation)
     assert np.any(np.isnan(params_nan.a))
     assert np.any(np.isnan(params_nan.b))
     # Make sure throws out of bounds error when expected
     bad_oob = np.asarray([1, 31])
     with pytest.raises(IndexError):
-        extract_scattering_factor_parameters(bad_oob)
+        _make_scattering_parameters(bad_oob, tabulation)
     # Make sure error checks work
     with pytest.raises(ValueError):
         check_atomic_numbers_supported(bad_nan)
@@ -520,4 +563,14 @@ def test_gmm_shape():
         == gmm2.variances.shape
         == gmm2.amplitudes.shape
         == (n_atoms, n_gaussians)
+    )
+
+
+def _make_scattering_parameters(
+    atomic_numbers: np.ndarray, tabulation: Literal["peng", "lobato"]
+):
+    return (
+        PengScatteringFactorParameters(atomic_numbers)
+        if tabulation == "peng"
+        else LobatoScatteringFactorParameters(atomic_numbers)
     )
