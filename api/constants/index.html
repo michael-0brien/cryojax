@@ -12,13 +12,13 @@
         <meta name="author" content="Michael O'Brien">
       
       
-        <link rel="canonical" href="https://michael-0brien.github.io/cryojax/api/atom_util/">
+        <link rel="canonical" href="https://michael-0brien.github.io/cryojax/api/constants/">
       
       
-        <link rel="prev" href="../ndimage/">
+        <link rel="prev" href="../atom_util/">
       
       
-        <link rel="next" href="../constants/">
+        <link rel="next" href="../rotations/">
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
@@ -26,7 +26,7 @@
     
     
       
-        <title>Atom manipulation - cryoJAX</title>
+        <title>Physical constants - cryoJAX</title>
       
     
     
@@ -74,7 +74,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#atom-manipulation" class="md-skip">
+        <a href="#physical-constants" class="md-skip">
           Skip to content
         </a>
       
@@ -110,7 +110,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Atom manipulation
+              Physical constants
             
           </span>
         </div>
@@ -1056,6 +1056,28 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../atom_util/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Atom manipulation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -1072,7 +1094,7 @@
           
   
   <span class="md-ellipsis">
-    Atom manipulation
+    Physical constants
     
   </span>
   
@@ -1084,7 +1106,7 @@
         
   
   <span class="md-ellipsis">
-    Atom manipulation
+    Physical constants
     
   </span>
   
@@ -1107,19 +1129,37 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#chemistry" class="md-nav__link">
+  <a href="#scattering-factor-parameters" class="md-nav__link">
     <span class="md-ellipsis">
-      Chemistry
+      Scattering factor parameters
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Chemistry">
+    <nav class="md-nav" aria-label="Scattering factor parameters">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#cryojax.atom_util.split_atoms_by_element" class="md-nav__link">
+  <a href="#cryojax.constants.PengScatteringFactorParameters" class="md-nav__link">
     <span class="md-ellipsis">
-      <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;split_atoms_by_element
+      <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;PengScatteringFactorParameters
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cryojax.constants.LobatoScatteringFactorParameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;LobatoScatteringFactorParameters
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cryojax.constants.check_atomic_numbers_supported" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;check_atomic_numbers_supported
     </span>
   </a>
   
@@ -1131,19 +1171,70 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#geometry" class="md-nav__link">
+  <a href="#physical-units" class="md-nav__link">
     <span class="md-ellipsis">
-      Geometry
+      Physical units
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Geometry">
+    <nav class="md-nav" aria-label="Physical units">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#cryojax.atom_util.center_atom_positions" class="md-nav__link">
+  <a href="#cryojax.constants.wavelength_from_kilovolts" class="md-nav__link">
     <span class="md-ellipsis">
-      <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;center_atom_positions
+      <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;wavelength_from_kilovolts
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cryojax.constants.lorentz_factor_from_kilovolts" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;lorentz_factor_from_kilovolts
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cryojax.constants.interaction_constant_from_kilovolts" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;interaction_constant_from_kilovolts
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#converting-between-common-conventions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Converting between common conventions
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Converting between common conventions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cryojax.constants.b_factor_to_variance" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;b_factor_to_variance
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cryojax.constants.variance_to_b_factor" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;variance_to_b_factor
     </span>
   </a>
   
@@ -1158,28 +1249,6 @@
   
 </nav>
       
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../constants/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Physical constants
-    
-  </span>
-  
-
-      </a>
     </li>
   
 
@@ -1282,78 +1351,387 @@
 
 
 
-<h1 id="atom-manipulation">Atom manipulation<a class="headerlink" href="#atom-manipulation" title="Permanent link">¤</a></h1>
-<p><code>cryojax.atom_util</code> is a submodule that contains functions for manipulating arrays of atoms and their properties.</p>
-<h2 id="chemistry">Chemistry<a class="headerlink" href="#chemistry" title="Permanent link">¤</a></h2>
+<h1 id="physical-constants">Physical constants<a class="headerlink" href="#physical-constants" title="Permanent link">¤</a></h1>
+<p><code>cryojax.constants</code> stores and supports physical constants used when simulating cryo-EM images.</p>
+<h2 id="scattering-factor-parameters">Scattering factor parameters<a class="headerlink" href="#scattering-factor-parameters" title="Permanent link">¤</a></h2>
+<p>Modeling the electron scattering amplitudes of individual atoms is an important component of modeling cryo-EM images, as these are typically used to approximate the electrostatic potential. Typically, the scattering factor for each individual atom is numerically approximated with a fixed functional form but varying parameters for different atoms. These parameters are stored in lookup tables in the literature. This documentation provides these lookup tables and utilities for extracting them so that they may be used to compute electrostatic potentials in cryoJAX.</p>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="cryojax.constants.PengScatteringFactorParameters" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.constants.PengScatteringFactorParameters</code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/4163759e2e72e624343f231a1cd16d07fb46d68e/cryojax/constants/_scattering_factor_parameters.py#L11-L28"><code class='hippogriffe-repo-url'></code></a>
+
+
+<a href="#cryojax.constants.PengScatteringFactorParameters" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+
+        <p>Loads electron scattering factor
+parameters from "Robust Parameterization of Elastic and Absorptive
+Electron Atomic Scattering Factors" by Peng et al. (1996).</p>
+
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
 
 
 <div class="doc doc-object doc-function">
 
 
-<h4 id="cryojax.atom_util.split_atoms_by_element" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">atom_util</span><span class="o">.</span><span class="n">split_atoms_by_element</span><span class="p">(</span><span class="n">atomic_numbers</span><span class="p">:</span> <span class="n">Int</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;_&#39;</span><span class="p">],</span> <span class="n">atom_pytree</span><span class="p">:</span> <span class="n">PyTree</span><span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;T&#39;</span><span class="p">],</span> <span class="n">atom_axis</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">PyTree</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="s1">&#39;T&#39;</span><span class="p">],</span> <span class="n">Int</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;_&#39;</span><span class="p">]]</span></code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/4163759e2e72e624343f231a1cd16d07fb46d68e/cryojax/atom_util/_element_utils.py#L11-L44"><code class='hippogriffe-repo-url'></code></a>
+<h5 id="cryojax.constants.PengScatteringFactorParameters.__init__" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">atomic_numbers</span><span class="p">:</span> <span class="n">Int</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;n_atoms&#39;</span><span class="p">])</span></code>
+  
 
 
-<a href="#cryojax.atom_util.split_atoms_by_element" class="headerlink" title="Permanent link">¤</a></h4>
+<a href="#cryojax.constants.PengScatteringFactorParameters.__init__" class="headerlink" title="Permanent link">¤</a></h5>
 
 
-    <div class="doc doc-contents first">
+    <div class="doc doc-contents ">
 
-        <p>Given atomic numbers, split a pytree of numpy arrays
-representing atom properties into a tuple where each element
-is the pytree of tuples where each element is the array for
-a given atomic number.</p>
-<p><strong>Arguments:</strong></p>
+        <p><strong>Arguments:</strong></p>
 <ul>
 <li><code>atomic_numbers</code>:
-    Atomic numbers as a numpy arrays.</li>
-<li><code>atom_pytree</code>:
-    A pytree of numpy arrays,</li>
-<li><code>atom_axis</code>:
-    The axis representing the atom index. Leading axes
-    are assumed to be batched axes.</li>
+    An array of atomic numbers.</li>
 </ul>
-<p><strong>Returns:</strong></p>
-<p>A pytree with tree structure matching <code>atom_pytree</code>,
-where arrays have been replaced with tuples of arrays.</p>
 
 
     </div>
 
-</div><h2 id="geometry">Geometry<a class="headerlink" href="#geometry" title="Permanent link">¤</a></h2>
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div><hr />
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="cryojax.constants.LobatoScatteringFactorParameters" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.constants.LobatoScatteringFactorParameters</code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/4163759e2e72e624343f231a1cd16d07fb46d68e/cryojax/constants/_scattering_factor_parameters.py#L31-L49"><code class='hippogriffe-repo-url'></code></a>
+
+
+<a href="#cryojax.constants.LobatoScatteringFactorParameters" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+
+        <p>Loads electron scattering factor
+parameters from "An accurate parameterization for scattering factors,
+electron densities and electrostatic potentials for neutral atoms
+that obey all physical constraints" by Lobato et al. (2014).</p>
+
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
 
 
 <div class="doc doc-object doc-function">
 
 
-<h4 id="cryojax.atom_util.center_atom_positions" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">atom_util</span><span class="o">.</span><span class="n">center_atom_positions</span><span class="p">(</span><span class="n">atom_positions</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;... n_atoms 3&#39;</span><span class="p">],</span> <span class="n">atom_masses</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;... n_atoms&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">atom_axis</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;... n_atoms 3&#39;</span><span class="p">]</span></code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/4163759e2e72e624343f231a1cd16d07fb46d68e/cryojax/atom_util/_geometry.py#L5-L38"><code class='hippogriffe-repo-url'></code></a>
+<h5 id="cryojax.constants.LobatoScatteringFactorParameters.__init__" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">atomic_numbers</span><span class="p">:</span> <span class="n">Int</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;n_atoms&#39;</span><span class="p">])</span></code>
+  
 
 
-<a href="#cryojax.atom_util.center_atom_positions" class="headerlink" title="Permanent link">¤</a></h4>
+<a href="#cryojax.constants.LobatoScatteringFactorParameters.__init__" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p><strong>Arguments:</strong></p>
+<ul>
+<li><code>atomic_numbers</code>:
+    An array of atomic numbers.</li>
+</ul>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div><hr />
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Only electron scattering factors for elements found in PDB files (e.g. proteins, DNA/RNA,
+small molecules) are supported when instantiating <a class="autorefs autorefs-internal" href="#cryojax.constants.PengScatteringFactorParameters"><code>cryojax.constants.PengScatteringFactorParameters</code></a> or
+<a class="autorefs autorefs-internal" href="#cryojax.constants.LobatoScatteringFactorParameters"><code>cryojax.constants.LobatoScatteringFactorParameters</code></a>. These are the following <code>atomic_numbers</code>:</p>
+<pre><code>- 1: Hydrogen
+- 6: Carbon
+- 7: Nitrogen
+- 8: Oxygen
+- 9: Fluorine
+- 11: Sodium
+- 12: Magnesium
+- 15: Phosphorus
+- 16: Sulfur
+- 17: Chlorine
+- 19: Potassium
+- 20: Calcium
+- 25: Manganese
+- 26: Iron
+- 27: Colbalt
+- 29: Copper
+- 30: Zinc
+</code></pre>
+<p>If <code>atomic_numbers</code> contains values not in this list, scattering
+factor parameters returned yield <code>numpy.nan</code> values or an
+index out of bounds error. To check if
+<code>atomic_numbers</code> is a valid array, use
+<a class="autorefs autorefs-internal" href="#cryojax.constants.check_atomic_numbers_supported"><code>cryojax.constants.check_atomic_numbers_supported</code></a>.</p>
+</div>
+<hr />
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="cryojax.constants.check_atomic_numbers_supported" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">constants</span><span class="o">.</span><span class="n">check_atomic_numbers_supported</span><span class="p">(</span><span class="n">atomic_numbers</span><span class="p">:</span> <span class="n">Int</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;_&#39;</span><span class="p">])</span></code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/4163759e2e72e624343f231a1cd16d07fb46d68e/cryojax/constants/_scattering_factor_parameters.py#L52-L63"><code class='hippogriffe-repo-url'></code></a>
+
+
+<a href="#cryojax.constants.check_atomic_numbers_supported" class="headerlink" title="Permanent link">¤</a></h4>
 
 
     <div class="doc doc-contents first">
 
-        <p>Center positions of a numpy array of atoms.</p>
+        <p>Throw an error if <code>atomic_numbers</code> contains values not
+supported by cryoJAX electron scattering factor tabulations.</p>
+
+
+    </div>
+
+</div><h2 id="physical-units">Physical units<a class="headerlink" href="#physical-units" title="Permanent link">¤</a></h2>
+<p>Here, convenience methods for working with physical units are described.</p>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="cryojax.constants.wavelength_from_kilovolts" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">constants</span><span class="o">.</span><span class="n">wavelength_from_kilovolts</span><span class="p">(</span><span class="n">voltage_in_kilovolts</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span></code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/4163759e2e72e624343f231a1cd16d07fb46d68e/cryojax/constants/_physical_constants.py#L10-L29"><code class='hippogriffe-repo-url'></code></a>
+
+
+<a href="#cryojax.constants.wavelength_from_kilovolts" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+        <p>Get the relativistic electron wavelength at a given accelerating voltage. For
+reference, see Equation 2.5 in Section 2.1 from <em>Spence, John CH. High-resolution
+electron microscopy. OUP Oxford, 2013.</em>.</p>
 <p><strong>Arguments:</strong></p>
 <ul>
-<li><code>atom_positions</code>:
-    The array of atom positions.</li>
-<li><code>atom_masses</code>:
-    Optionally, provide the masses of the atoms
-    to center by mass.</li>
-<li><code>atom_axis</code>:
-    The axis representing the atom index. Leading axes
-    are assumed to be batched axes. <code>atom_positions</code>
-    and <code>atom_masses</code> are assumed to have the same
-    batched axes.</li>
+<li><code>voltage_in_kilovolts</code>:
+    The accelerating voltage given in kilovolts.</li>
 </ul>
 <p><strong>Returns:</strong></p>
-<p>The centered <code>atom_positions</code>. This is centered by
-geometry if <code>atom_masses = None</code> and by mass otherwise.</p>
+<p>The relativistically corrected electron wavelength in Angstroms corresponding to the
+energy <code>energy_in_keV</code>.</p>
+
+
+    </div>
+
+</div><hr />
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="cryojax.constants.lorentz_factor_from_kilovolts" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">constants</span><span class="o">.</span><span class="n">lorentz_factor_from_kilovolts</span><span class="p">(</span><span class="n">voltage_in_kilovolts</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span></code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/4163759e2e72e624343f231a1cd16d07fb46d68e/cryojax/constants/_physical_constants.py#L32-L49"><code class='hippogriffe-repo-url'></code></a>
+
+
+<a href="#cryojax.constants.lorentz_factor_from_kilovolts" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+        <p>Get the Lorentz factor given an accelerating voltage.</p>
+<p><strong>Arguments:</strong></p>
+<ul>
+<li><code>voltage_in_kilovolts</code>:
+    The accelerating voltage given in kilovolts.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p>The Lorentz factor.</p>
+
+
+    </div>
+
+</div><hr />
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="cryojax.constants.interaction_constant_from_kilovolts" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">constants</span><span class="o">.</span><span class="n">interaction_constant_from_kilovolts</span><span class="p">(</span><span class="n">voltage_in_kilovolts</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span></code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/4163759e2e72e624343f231a1cd16d07fb46d68e/cryojax/constants/_physical_constants.py#L52-L109"><code class='hippogriffe-repo-url'></code></a>
+
+
+<a href="#cryojax.constants.interaction_constant_from_kilovolts" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+        <p>Get the electron interaction constant given an accelerating voltage.</p>
+<p>The interaction constant is necessary to compute the object
+phase shift distribution from an electrostatic potential integrated
+on the plane.</p>
+<div class="admonition info">
+<p class="admonition-title">Info</p>
+<p>In the projection approximation in cryo-EM, the phase shifts in the
+exit plane are given by</p>
+<div class="arithmatex">\[\eta(x, y) = \sigma_e \int dz \ V(x, y, z),\]</div>
+<p>where <span class="arithmatex">\(\sigma_e\)</span> is typically referred to as the interaction
+constant. However, in <code>cryojax</code>, the potential is rescaled
+to units of inverse length squared as</p>
+<div class="arithmatex">\[U(x, y, z) = \frac{2 m_0 e}{\hbar^2} V(x, y, z).\]</div>
+<p>With this rescaling of the potential, the defined as with the
+equation</p>
+<div class="arithmatex">\[\eta(x, y) = \sigma_e \int dz \ U(x, y, z)\]</div>
+<p>with</p>
+<div class="arithmatex">\[\sigma_e = \lambda \gamma,\]</div>
+<p>where <span class="arithmatex">\(\lambda\)</span> the relativistic electron wavelength <span class="arithmatex">\(\gamma\)</span> is
+the lorentz factor.</p>
+<p><strong>References</strong>:</p>
+<ul>
+<li>For the definition of the rescaled potential, see
+Chapter 69, Page 2003, Equation 69.6 from <em>Hawkes, Peter W., and Erwin Kasper.
+Principles of Electron Optics, Volume 4: Advanced Wave Optics. Academic Press,
+2022.</em></li>
+<li>For the definition of the phase shifts in terms of the rescaled potential, see
+Chapter 69, Page 2012, Equation 69.34b from <em>Hawkes, Peter W., and Erwin Kasper.
+Principles of Electron Optics, Volume 4: Advanced Wave Optics. Academic Press,
+2022.</em></li>
+</ul>
+</div>
+<p>See the documentation on atom-based scattering potentials for more information.</p>
+<p><strong>Arguments:</strong></p>
+<ul>
+<li><code>voltage_in_kilovolts</code>:
+    The accelerating voltage given in kilovolts.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p>The electron interaction constant.</p>
+
+
+    </div>
+
+</div><h2 id="converting-between-common-conventions">Converting between common conventions<a class="headerlink" href="#converting-between-common-conventions" title="Permanent link">¤</a></h2>
+<p>Here, helper functions for converting between common conventions are described.</p>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="cryojax.constants.b_factor_to_variance" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">constants</span><span class="o">.</span><span class="n">b_factor_to_variance</span><span class="p">(</span><span class="n">b_factor</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;...&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;...&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;...&#39;</span><span class="p">]</span></code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/4163759e2e72e624343f231a1cd16d07fb46d68e/cryojax/constants/_conventions.py#L6-L27"><code class='hippogriffe-repo-url'></code></a>
+
+
+<a href="#cryojax.constants.b_factor_to_variance" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+        <p>From the B-factor of a gaussian, return the corresponding
+value of the variance of the gaussian. This simply does the
+conversion</p>
+<div class="arithmatex">\[\sigma^2 = B / (8 \pi^2)\]</div>
+<p>The purpose of this function is to make it easy to convert
+between conventions when defining gaussians.</p>
+<p><strong>Arguments:</strong></p>
+<ul>
+<li><code>b_factor</code>:
+    The B-factor of the gaussian.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p>The variance.</p>
+
+
+    </div>
+
+</div><hr />
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="cryojax.constants.variance_to_b_factor" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">constants</span><span class="o">.</span><span class="n">variance_to_b_factor</span><span class="p">(</span><span class="n">variance</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;...&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;...&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;...&#39;</span><span class="p">]</span></code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/4163759e2e72e624343f231a1cd16d07fb46d68e/cryojax/constants/_conventions.py#L30-L51"><code class='hippogriffe-repo-url'></code></a>
+
+
+<a href="#cryojax.constants.variance_to_b_factor" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+        <p>From the variance of a gaussian, return the corresponding
+value of the B-factor of the gaussian. This simply does the
+conversion</p>
+<div class="arithmatex">\[B = 8 \pi^2 * \sigma^2\]</div>
+<p>The purpose of this function is to make it easy to convert
+between conventions when defining gaussians.</p>
+<p><strong>Arguments:</strong></p>
+<ul>
+<li><code>variance</code>:
+    The variance of the gaussian.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p>The B-factor.</p>
 
 
     </div>

@@ -5,7 +5,23 @@
          <lastmod>2025-12-10</lastmod>
     </url>
     <url>
+         <loc>https://michael-0brien.github.io/cryojax/overview/</loc>
+         <lastmod>2025-12-10</lastmod>
+    </url>
+    <url>
          <loc>https://michael-0brien.github.io/cryojax/api/atom_util/</loc>
+         <lastmod>2025-12-10</lastmod>
+    </url>
+    <url>
+         <loc>https://michael-0brien.github.io/cryojax/api/constants/</loc>
+         <lastmod>2025-12-10</lastmod>
+    </url>
+    <url>
+         <loc>https://michael-0brien.github.io/cryojax/api/dataset/</loc>
+         <lastmod>2025-12-10</lastmod>
+    </url>
+    <url>
+         <loc>https://michael-0brien.github.io/cryojax/api/io/</loc>
          <lastmod>2025-12-10</lastmod>
     </url>
     <url>
@@ -13,63 +29,23 @@
          <lastmod>2025-12-10</lastmod>
     </url>
     <url>
-         <loc>https://michael-0brien.github.io/cryojax/api/constants/conventions/</loc>
+         <loc>https://michael-0brien.github.io/cryojax/api/ndimage/</loc>
          <lastmod>2025-12-10</lastmod>
     </url>
     <url>
-         <loc>https://michael-0brien.github.io/cryojax/api/constants/scattering_factor_parameters/</loc>
-         <lastmod>2025-12-10</lastmod>
-    </url>
-    <url>
-         <loc>https://michael-0brien.github.io/cryojax/api/constants/units/</loc>
-         <lastmod>2025-12-10</lastmod>
-    </url>
-    <url>
-         <loc>https://michael-0brien.github.io/cryojax/api/coordinates/making_coordinates/</loc>
-         <lastmod>2025-12-10</lastmod>
-    </url>
-    <url>
-         <loc>https://michael-0brien.github.io/cryojax/api/coordinates/transforming_coordinates/</loc>
-         <lastmod>2025-12-10</lastmod>
-    </url>
-    <url>
-         <loc>https://michael-0brien.github.io/cryojax/api/dataset/relion/</loc>
-         <lastmod>2025-12-10</lastmod>
-    </url>
-    <url>
-         <loc>https://michael-0brien.github.io/cryojax/api/io/atom_loading/</loc>
-         <lastmod>2025-12-10</lastmod>
-    </url>
-    <url>
-         <loc>https://michael-0brien.github.io/cryojax/api/io/mrc/</loc>
-         <lastmod>2025-12-10</lastmod>
-    </url>
-    <url>
-         <loc>https://michael-0brien.github.io/cryojax/api/ndimage/functions/</loc>
-         <lastmod>2025-12-10</lastmod>
-    </url>
-    <url>
-         <loc>https://michael-0brien.github.io/cryojax/api/ndimage/operators/</loc>
-         <lastmod>2025-12-10</lastmod>
-    </url>
-    <url>
-         <loc>https://michael-0brien.github.io/cryojax/api/ndimage/transforms/</loc>
-         <lastmod>2025-12-10</lastmod>
-    </url>
-    <url>
-         <loc>https://michael-0brien.github.io/cryojax/api/rotations/conversions/</loc>
-         <lastmod>2025-12-10</lastmod>
-    </url>
-    <url>
-         <loc>https://michael-0brien.github.io/cryojax/api/rotations/lie_groups/</loc>
-         <lastmod>2025-12-10</lastmod>
-    </url>
-    <url>
-         <loc>https://michael-0brien.github.io/cryojax/api/simulator/api/</loc>
+         <loc>https://michael-0brien.github.io/cryojax/api/rotations/</loc>
          <lastmod>2025-12-10</lastmod>
     </url>
     <url>
          <loc>https://michael-0brien.github.io/cryojax/api/simulator/config/</loc>
+         <lastmod>2025-12-10</lastmod>
+    </url>
+    <url>
+         <loc>https://michael-0brien.github.io/cryojax/api/simulator/detector/</loc>
+         <lastmod>2025-12-10</lastmod>
+    </url>
+    <url>
+         <loc>https://michael-0brien.github.io/cryojax/api/simulator/entry-point/</loc>
          <lastmod>2025-12-10</lastmod>
     </url>
     <url>
