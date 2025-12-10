@@ -72,7 +72,7 @@ class _FourierProductImageTransform(_AbstractProductImageTransform):
     is_real_space: ClassVar[bool] = False
 
 
-class ScalingTransform(AbstractImageTransform, strict=True):
+class ImageScaling(AbstractImageTransform, strict=True):
     scale: Float[Array, ""]
     offset: Float[Array, ""]
 

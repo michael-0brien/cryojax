@@ -10,11 +10,27 @@ This documentation is a collection of functions used to work with coordinate sys
 
 ::: cryojax.ndimage.make_coordinate_grid
 
+---
+
 ::: cryojax.ndimage.make_frequency_grid
+
+---
+
+::: cryojax.ndimage.make_radial_coordinate_grid
+
+---
+
+::: cryojax.ndimage.make_radial_frequency_grid
+
+---
 
 ::: cryojax.ndimage.make_frequency_slice
 
+---
+
 ::: cryojax.ndimage.make_1d_coordinate_grid
+
+---
 
 ::: cryojax.ndimage.make_1d_frequency_grid
 
@@ -37,6 +53,13 @@ This documentation is a collection of functions used to work with coordinate sys
                 - __call__
 
 
+::: cryojax.ndimage.ImageScaling
+        options:
+            members:
+                - __init__
+                - __call__
+
+
 ### Filters
 
 ??? abstract "`cryojax.ndimage.AbstractFilter`"
@@ -46,6 +69,41 @@ This documentation is a collection of functions used to work with coordinate sys
                 - get
 
 
+::: cryojax.ndimage.LowpassFilter
+        options:
+            members:
+                - __init__
+                - get
+                - __call__
+
+---
+
+::: cryojax.ndimage.HighpassFilter
+        options:
+            members:
+                - __init__
+                - get
+                - __call__
+
+---
+
+::: cryojax.ndimage.WhiteningFilter
+        options:
+            members:
+                - __init__
+                - get
+                - __call__
+
+---
+
+::: cryojax.ndimage.CustomFilter
+        options:
+            members:
+                - __init__
+                - get
+                - __call__
+
+
 ### Masks
 
 ??? abstract "`cryojax.ndimage.AbstractMask`"
@@ -53,6 +111,67 @@ This documentation is a collection of functions used to work with coordinate sys
         options:
             members:
                 - get
+
+::: cryojax.ndimage.CircularCosineMask
+        options:
+            members:
+                - __init__
+                - get
+                - __call__
+
+---
+
+::: cryojax.ndimage.SphericalCosineMask
+        options:
+            members:
+                - __init__
+                - get
+                - __call__
+
+---
+
+::: cryojax.ndimage.SquareCosineMask
+        options:
+            members:
+                - __init__
+                - get
+                - __call__
+
+---
+
+::: cryojax.ndimage.Rectangular2DCosineMask
+        options:
+            members:
+                - __init__
+                - get
+                - __call__
+
+---
+
+::: cryojax.ndimage.Rectangular3DCosineMask
+        options:
+            members:
+                - __init__
+                - get
+                - __call__
+
+---
+
+::: cryojax.ndimage.Cylindrical2DCosineMask
+        options:
+            members:
+                - __init__
+                - get
+                - __call__
+
+---
+
+::: cryojax.ndimage.CustomMask
+        options:
+            members:
+                - __init__
+                - get
+                - __call__
 
 ::: cryojax.ndimage.InverseSincMask
         options:
@@ -65,11 +184,53 @@ This documentation is a collection of functions used to work with coordinate sys
 
 ## Operators
 
-??? abstract "`cryojax.ndimage.AbstractImageOperator`"
-    ::: cryojax.ndimage.AbstractImageOperator
+### Fourier-space
+
+???+ abstract "`cryojax.ndimage.AbstractFourierOperator`"
+    ::: cryojax.ndimage.AbstractFourierOperator
         options:
             members:
                 - __call__
+
+
+::: cryojax.ndimage.FourierGaussian
+        options:
+            members:
+                - __init__
+                - __call__
+
+---
+
+::: cryojax.ndimage.FourierConstant
+        options:
+            members:
+                - __init__
+                - __call__
+
+---
+
+::: cryojax.ndimage.FourierSinc
+        options:
+            members:
+                - __init__
+                - __call__
+
+---
+
+::: cryojax.ndimage.FourierExp2D
+        options:
+            members:
+                - __init__
+                - __call__
+
+---
+
+::: cryojax.ndimage.ZeroMode
+        options:
+            members:
+                - __init__
+                - __call__
+
 
 ### Real-space
 
@@ -79,14 +240,21 @@ This documentation is a collection of functions used to work with coordinate sys
             members:
                 - __call__
 
-### Fourier-space
-
-???+ abstract "`cryojax.ndimage.AbstractFourierOperator`"
-    ::: cryojax.ndimage.AbstractFourierOperator
+::: cryojax.ndimage.RealGaussian
         options:
             members:
+                - __init__
                 - __call__
 
+---
+
+::: cryojax.ndimage.RealConstant
+        options:
+            members:
+                - __init__
+                - __call__
+
+---
 
 
 ## Utility functions
