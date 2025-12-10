@@ -470,8 +470,6 @@ def make_linear_operator(
         )
         # Simulate an image
         image = operator.mv(vector)
-        # Access arguments other than those at `vector`
-        args = operator.fn.args
     ```
 
     !!! warning
