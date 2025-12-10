@@ -8,6 +8,10 @@ Modeling the electron scattering amplitudes of individual atoms is an important 
 
 ::: cryojax.constants.extract_scattering_factor_parameters
 
+---
+
+::: cryojax.constants.check_atomic_numbers_supported
+
 ### Peng scattering factor parameters
 
 ::: cryojax.constants.PengScatteringFactorParameters
@@ -18,8 +22,6 @@ Modeling the electron scattering amplitudes of individual atoms is an important 
             - b
 
 ---
-
-::: cryojax.constants.read_peng_scattering_factor_parameter_table
 
 
 ## Physical units

@@ -3,7 +3,7 @@ from typing import Generic, TypeVar
 from typing_extensions import Self, override
 
 import equinox as eqx
-from jaxtyping import Array, Complex, Float, PRNGKeyArray
+from jaxtyping import Array, Complex, Float, Inexact, PRNGKeyArray
 
 from ...jax_util import NDArrayLike
 from .._image_config import AbstractImageConfig
@@ -32,6 +32,11 @@ ProjectionArray = (
 EwaldSphereArray = (
     Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
     | Float[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
+)
+
+VoxelArray = (
+    Inexact[Array, "{self.shape[0]} {self.shape[1]} {self.shape[2]}"]
+    | Complex[Array, "{self.shape[0]} {self.shape[1]} {self.shape[2]}//2+1"]
 )
 
 

@@ -9,7 +9,11 @@ from jaxtyping import Array, Float, install_import_hook
 with install_import_hook("cryojax", "typeguard.typechecked"):
     import cryojax.ndimage as im
     import cryojax.simulator as cxs
-    from cryojax.constants import PengScatteringFactorParameters
+    from cryojax.constants import (
+        PengScatteringFactorParameters,
+        check_atomic_numbers_supported,
+        extract_scattering_factor_parameters,
+    )
     from cryojax.io import read_atoms_from_pdb
     from cryojax.ndimage import make_coordinate_grid
 
@@ -58,7 +62,7 @@ def toy_gaussian_cloud():
 
 
 #
-# Test `load_tabulated_volume`
+# Test volume tabulations
 #
 def test_load_atom_volume(sample_pdb_path: str):
     import pathlib
@@ -78,6 +82,39 @@ def test_load_atom_volume(sample_pdb_path: str):
         atom_data, output_type=cxs.IndependentAtomVolume
     )
     assert isinstance(atom_volume, cxs.IndependentAtomVolume)
+
+
+def test_scattering_factor_parameters_correct(peng_parameters_path):
+    from cryojax.constants._scattering_factor_parameters import _SUPPORTED_ATOMIC_NUMBERS
+
+    atomic_numbers = np.asarray(_SUPPORTED_ATOMIC_NUMBERS)
+
+    params = PengScatteringFactorParameters(atomic_numbers)
+    a1, b1 = (params.a, params.b)
+
+    peng_table = np.load(peng_parameters_path)
+    a2, b2 = peng_table[:, atomic_numbers, :]
+
+    np.testing.assert_equal(a1, a2)
+    np.testing.assert_equal(b1, b2)
+
+
+@pytest.mark.parametrize("tabulation", ("peng",))
+def test_invalid_atomic_numbers(tabulation):
+    # Make sure has nan when expected
+    bad_nan = np.asarray([2, 6])
+    params_nan = extract_scattering_factor_parameters(bad_nan, tabulation=tabulation)
+    assert np.any(np.isnan(params_nan.a))
+    assert np.any(np.isnan(params_nan.b))
+    # Make sure throws out of bounds error when expected
+    bad_oob = np.asarray([1, 31])
+    with pytest.raises(IndexError):
+        extract_scattering_factor_parameters(bad_oob)
+    # Make sure error checks work
+    with pytest.raises(ValueError):
+        check_atomic_numbers_supported(bad_nan)
+    with pytest.raises(ValueError):
+        check_atomic_numbers_supported(bad_oob)
 
 
 #

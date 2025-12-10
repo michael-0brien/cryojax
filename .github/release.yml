@@ -22,6 +22,10 @@ changelog:
       labels:
         - feature
         - enhancement
+    - title: "Performance improvements"
+      labels:
+        - efficiency
+        - accuracy
     - title: "Maintenance"
       labels:
         - refactor

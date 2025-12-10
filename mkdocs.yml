@@ -46,7 +46,6 @@ plugins:
     - ipynb
     - hippogriffe:
         extra_public_objects:
-            - xarray.Dataset
             - numpy.ndarray
             - equinox.Module
             - mdtraj.Topology

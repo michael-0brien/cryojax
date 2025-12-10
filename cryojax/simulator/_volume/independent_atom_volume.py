@@ -5,7 +5,7 @@ from typing_extensions import Self, override
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, Float, Inexact, PyTree
+from jaxtyping import Array, Float, PyTree
 
 from ...constants import PengScatteringFactorParameters
 from ...jax_util import FloatLike, NDArrayLike, error_if_not_positive
@@ -27,6 +27,7 @@ from .base_volume import (
     AbstractVolumeIntegrator,
     AbstractVolumeRenderFn,
     ProjectionArray,
+    VoxelArray,
 )
 
 
@@ -246,7 +247,7 @@ class FFTAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True
         outputs_real_space: bool = True,
         outputs_rfft: bool = False,
         fftshifted: bool = False,
-    ) -> Inexact[Array, "{self.shape[0]} {self.shape[1]} {self.shape[2]}"]:
+    ) -> VoxelArray:
         """**Arguments:**
 
         - `volume_representation`:
