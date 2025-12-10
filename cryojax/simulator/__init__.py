@@ -10,7 +10,6 @@ from ._api_utils import (
 from ._detector import (
     AbstractDetector as AbstractDetector,
     AbstractDQE as AbstractDQE,
-    CountingDQE as CountingDQE,
     GaussianDetector as GaussianDetector,
     NullDQE as NullDQE,
     PoissonDetector as PoissonDetector,

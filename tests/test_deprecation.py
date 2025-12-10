@@ -77,7 +77,7 @@ def test_future_deprecated(sample_pdb_path):
 
     with pytest.warns(FutureWarning) as record:
         func = cx.ndimage.downsample_to_shape_with_fourier_cropping
-        assert func is cx.ndimage.fourier_crop_downsample_to_shape
+        assert func is cx.ndimage.fourier_crop_to_shape
         assert not should_be_removed(record)
 
     # ndimage submodules

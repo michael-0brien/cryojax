@@ -14,11 +14,10 @@ from ._coordinates import (
 from ._downsample import (
     block_reduce_downsample as block_reduce_downsample,
     fourier_crop_downsample as fourier_crop_downsample,
-    fourier_crop_downsample_to_shape as fourier_crop_downsample_to_shape,
+    fourier_crop_to_shape as fourier_crop_to_shape,
 )
 from ._edges import (
     crop_to_shape as crop_to_shape,
-    crop_to_shape_with_center as crop_to_shape_with_center,
     pad_to_shape as pad_to_shape,
     resize_with_crop_or_pad as resize_with_crop_or_pad,
 )
@@ -58,7 +57,7 @@ from ._operators import (
 )
 from ._radial_average import (
     compute_binned_radial_average as compute_binned_radial_average,
-    interpolate_radial_average_on_grid as interpolate_radial_average_on_grid,
+    radial_average_to_grid as radial_average_to_grid,
 )
 from ._rescale_pixel_size import (
     rescale_pixel_size as rescale_pixel_size,
@@ -99,12 +98,12 @@ def __getattr__(name: str) -> _Any:
     if name == "downsample_to_shape_with_fourier_cropping":
         _warnings.warn(
             "'downsample_to_shape_with_fourier_cropping' is deprecated"
-            "has been renamed to 'fourier_crop_downsample_to_shape'. "
+            "has been renamed to 'fourier_crop_to_shape'. "
             "The old name will be deprecated in cryoJAX 0.6.0.",
             category=FutureWarning,
             stacklevel=2,
         )
-        return fourier_crop_downsample_to_shape
+        return fourier_crop_to_shape
     if name == "operators":
         _warnings.warn(
             "Submodule `cryojax.ndimage.operators` is deprecated and "
