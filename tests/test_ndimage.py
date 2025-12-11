@@ -45,6 +45,29 @@ def test_fft_agrees_with_jax_numpy(shape):
 # Cropping and padding
 #
 @pytest.mark.parametrize(
+    "shape, cropped_shape, center, safe_crop",
+    (
+        ((10, 10), (5, 5), (5, 5), True),
+        ((10, 10, 10), (5, 5, 5), (5, 5, 5), True),
+        ((20, 20), (5, 5), (5, 5), True),
+        ((20, 20), (5, 5), (5, 5), False),
+        ((20, 20, 20), (5, 5, 5), (5, 5, 5), True),
+        ((20, 20, 20), (5, 5, 5), (5, 5, 5), False),
+        ((21, 21), (5, 5), (5, 5), True),
+        ((21, 21), (5, 5), (5, 5), False),
+        ((20, 20), (6, 6), (6, 6), True),
+        ((21, 21), (6, 6), (6, 6), False),
+    ),
+)
+def test_crop_with_center(shape, cropped_shape, center, safe_crop):
+    coordinate_grid = cxi.make_radial_coordinate_grid(shape)
+    if not safe_crop:
+        center = tuple(jnp.asarray(c) for c in center)
+    cropped_grid = cxi.crop_to_shape(coordinate_grid, cropped_shape, center=center)  # type: ignore
+    assert cropped_grid.shape == cropped_shape
+
+
+@pytest.mark.parametrize(
     "shape, cropped_shape",
     (
         ((10, 10), (5, 5)),

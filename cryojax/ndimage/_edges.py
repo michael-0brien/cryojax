@@ -59,11 +59,7 @@ def crop_to_shape(
         start_indices = tuple(
             jnp.asarray(x - s // 2) for x, s in zip(center[::-1], shape)
         )
-        cropped = jax.lax.dynamic_slice(
-            image_or_volume,
-            start_indices,
-            shape,
-        )
+        cropped = jax.lax.dynamic_slice(image_or_volume, start_indices, shape)
     else:
         if len(shape) == 2:
             assert len(center) == 2
@@ -88,9 +84,10 @@ def crop_to_shape(
                 min(zc + d // 2 + d % 2, volume.shape[0]),
             )
             cropped = volume[z0:zn, y0:yn, x0:xn]
-    if cropped.shape != shape:
+    if cropped.shape != tuple(shape):
         raise ValueError(
-            "The cropped shape was not equal to the desired shape in "
+            f"The cropped shape {cropped.shape} was not equal to the desired shape "
+            f"{shape} in "
             "`cryojax.ndimage.crop_to_shape`. This can happen if the crop is "
             "near the image edges."
         )
