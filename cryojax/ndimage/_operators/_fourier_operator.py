@@ -141,6 +141,18 @@ class CustomFourierOperator(AbstractFourierOperator, strict=True):
     args: Any
     kwargs: dict[str, Any]
 
+    def __init__(
+        self,
+        fn: Callable[
+            ..., Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"]
+        ],
+        *args: Any,
+        **kwargs: dict[str, Any],
+    ):
+        self.fn = fn
+        self.args = args
+        self.kwargs = kwargs
+
     @override
     def __call__(
         self,
