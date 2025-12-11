@@ -54,7 +54,7 @@ def make_radial_coordinate_grid(
     A radial coordinate system in real space.
     """
     # Make a cartesian grid
-    coordinate_grid = make_frequency_grid(
+    coordinate_grid = make_coordinate_grid(
         shape=shape,
         grid_spacing=grid_spacing,
     )
