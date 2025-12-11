@@ -55,8 +55,9 @@ plugins:
         handlers:
           python:
             options:
+                annotations_path: brief
                 force_inspection: true
-                heading_level: 4
+                heading_level: 3
                 inherited_members: true
                 members_order: source
                 show_bases: false
@@ -67,6 +68,8 @@ plugins:
                 show_source: false
                 show_symbol_type_heading: true
                 show_symbol_type_toc: true
+                separate_signature: true
+                line_length: 140
 
 nav:
     - 'index.md'
