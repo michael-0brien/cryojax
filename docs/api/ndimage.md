@@ -201,6 +201,14 @@ This documentation is a collection of functions used to work with coordinate sys
 
 ---
 
+::: cryojax.ndimage.PeakedFourierGaussian
+        options:
+            members:
+                - __init__
+                - __call__
+
+---
+
 ::: cryojax.ndimage.FourierConstant
         options:
             members:
@@ -225,7 +233,16 @@ This documentation is a collection of functions used to work with coordinate sys
 
 ---
 
-::: cryojax.ndimage.ZeroMode
+::: cryojax.ndimage.FourierDC
+        options:
+            members:
+                - __init__
+                - __call__
+
+
+---
+
+::: cryojax.ndimage.CustomFourierOperator
         options:
             members:
                 - __init__
