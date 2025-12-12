@@ -105,14 +105,14 @@ is_pose = lambda x: isinstance(x, cxs.AbstractPose)
 filter_spec = jax.tree.map(is_pose, image_model, is_leaf=is_pose)
 model_grad, model_nograd = eqx.partition(image_model, filter_spec)
 
-@eqx.filter_grad
-def gradient_fn(model_grad, model_nograd, observed_image):
+@eqx.filter_value_and_grad
+def loss_fn(model_grad, model_nograd, observed_image):
     """Compute gradients with respect to the pose."""
     image_model = eqx.combine(model_grad, model_nograd)
     return jnp.sum((image_model.simulate() - observed_image)**2)
 
-# Compute gradients
-gradients = gradient_fn(model_grad, model_nograd, observed_image)
+# Compute the loss and gradients
+loss, gradients = loss_fn(model_grad, model_nograd, observed_image)
 ```
 
 ### Vectorizing image simulation
@@ -120,9 +120,9 @@ gradients = gradient_fn(model_grad, model_nograd, observed_image)
 ```python
 import equinox as eqx
 
-# Vectorize model instantiation
+# Vectorize model instantiation over poses
 @eqx.filter_vmap(in_axes=(0, None, None, None), out_axes=(eqx.if_array(0), None))
-def make_image_model_vmap(wxyz, volume, image_config, transfer_theory):
+def make_model_vmap(wxyz, volume, image_config, transfer_theory):
     pose = cxs.QuaternionPose(wxyz=wxyz)
     image_model = cxs.make_image_model(
         volume, image_config, pose, transfer_theory, normalizes_signal=True
@@ -134,7 +134,7 @@ def make_image_model_vmap(wxyz, volume, image_config, transfer_theory):
     return model_vmap, model_novmap
 
 
-# Define image simulation function
+# Define image simulation function with respect to vectorized arguments
 @eqx.filter_vmap(in_axes=(eqx.if_array(0), None))
 def simulate_fn_vmap(model_vmap, model_novmap):
     image_model = eqx.combine(model_vmap, model_novmap)
@@ -142,7 +142,7 @@ def simulate_fn_vmap(model_vmap, model_novmap):
 
 # Batch image simulation over poses
 wxyz = ...  # ... load quaternions
-model_vmap, model_novmap = make_image_model_vmap(wxyz, volume, image_config, transfer_theory)
+model_vmap, model_novmap = make_model_vmap(wxyz, volume, image_config, transfer_theory)
 images = simulate_fn_vmap(model_vmap, model_novmap)
 ```
 
