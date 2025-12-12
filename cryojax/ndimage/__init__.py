@@ -47,12 +47,13 @@ from ._operators import (
     AbstractRealOperator as AbstractRealOperator,
     CustomFourierOperator as CustomFourierOperator,
     FourierConstant as FourierConstant,
+    FourierDC as FourierDC,
     FourierExp2D as FourierExp2D,
     FourierGaussian as FourierGaussian,
     FourierSinc as FourierSinc,
+    PeakedFourierGaussian as PeakedFourierGaussian,
     RealConstant as RealConstant,
     RealGaussian as RealGaussian,
-    ZeroMode as ZeroMode,
 )
 from ._radial_average import (
     compute_binned_radial_average as compute_binned_radial_average,

@@ -286,11 +286,12 @@ def test_operators_instantiate():
 
 _fourier_operators_2d = [
     im.FourierGaussian(),
-    im.FourierGaussian(radial_offset=0.1),
+    im.PeakedFourierGaussian(),
     im.FourierConstant(1.0),
     im.FourierSinc(),
     im.FourierExp2D(),
     im.CustomFourierOperator(lambda _, a, b: a + b, 1.0, b=1.0),
+    im.FourierDC(),
     im.FourierConstant(1.0) + im.FourierConstant(1.0),
     im.FourierConstant(1.0) - im.FourierConstant(1.0),
     im.FourierConstant(1.0) * im.FourierConstant(1.0),
@@ -299,10 +300,11 @@ _fourier_operators_2d = [
 
 _fourier_operators_3d = [
     im.FourierGaussian(),
-    im.FourierGaussian(radial_offset=0.1),
+    im.PeakedFourierGaussian(),
     im.FourierConstant(1.0),
     im.FourierSinc(),
     im.CustomFourierOperator(lambda _, a, b: a + b, 1.0, b=1.0),
+    im.FourierDC(),
     im.FourierConstant(1.0) + im.FourierConstant(1.0),
     im.FourierConstant(1.0) - im.FourierConstant(1.0),
     im.FourierConstant(1.0) * im.FourierConstant(1.0),
