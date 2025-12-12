@@ -86,8 +86,8 @@ class AbstractImageModel(eqx.Module, strict=True):
         - `removes_padding`:
             If `True`, return an image cropped to `image_config.shape`.
             Otherwise, return an image at the `image_config.padded_shape`.
-            If `removes_padding = False`, the `filter`
-            and `mask` are not applied.
+            If `removes_padding = False`, the `filter`, `mask`, and
+            `image_model.transform` are not applied.
         - `outputs_real_space`:
             If `True`, return the image in real space.
         - `mask`:
@@ -112,12 +112,14 @@ class AbstractImageModel(eqx.Module, strict=True):
         outputs_real_space: bool = True,
         mask: MaskLike | None = None,
         filter: FilterLike | None = None,
+        apply_transform: bool = True,
     ) -> Array:
         """Return an image postprocessed with filters, cropping, masking,
         and normalization in either real or fourier space.
         """
         image_config = self.image_config
-        mask, filter = self._compose_transform(mask, filter)
+        if apply_transform:
+            mask, filter = self._compose_transform(mask, filter)
         if (
             mask is None
             and image_config.padded_shape == image_config.shape
@@ -144,9 +146,9 @@ class AbstractImageModel(eqx.Module, strict=True):
                         "Found that the `filter` was shape "
                         f"{filter.array.shape}, but expected it to be "
                         f"shape {padded_rfft_shape}. You may have passed a "
-                        f"fitler according to the "
-                        "`AbstractImageModel.image_config.shape`, "
-                        "when the `AbstractImageModel.image_config.padded_shape` "
+                        f"filter according to the "
+                        f"`{image_config.__class__.__name__}.shape`, "
+                        f"when the `{image_config.__class__.__name__}.padded_shape` "
                         "was expected."
                     )
                 fourier_image = filter(fourier_image)
@@ -215,10 +217,15 @@ class AbstractImageModel(eqx.Module, strict=True):
         outputs_real_space: bool = True,
         mask: MaskLike | None = None,
         filter: FilterLike | None = None,
+        apply_transform: bool = True,
     ) -> Array:
         if removes_padding:
             return self.postprocess(
-                image, outputs_real_space=outputs_real_space, mask=mask, filter=filter
+                image,
+                outputs_real_space=outputs_real_space,
+                mask=mask,
+                filter=filter,
+                apply_transform=apply_transform,
             )
         else:
             return (
