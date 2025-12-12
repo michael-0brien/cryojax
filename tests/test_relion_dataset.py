@@ -744,7 +744,7 @@ def test_set_wrong_parameters_error():
     # Wrong parameters
     wrong_pose = cxs.QuaternionPose()
     wrong_transfer_theory = cxs.ContrastTransferTheory(
-        ctf=cxs.AstigmaticCTF(), envelope=im.ZeroMode()
+        ctf=cxs.AstigmaticCTF(), envelope=im.FourierDC()
     )
     # Right parameters
     right_pose = cxs.EulerAnglePose()
@@ -989,7 +989,7 @@ def test_write_starfile_different_envs():
     new_parameters_file.save(overwrite=True)
 
     with pytest.raises(ValueError):
-        particle_params = _make_particle_params(im.ZeroMode(1.0))
+        particle_params = _make_particle_params(im.FourierDC(1.0))
         new_parameters_file = RelionParticleParameterFile(
             path_to_starfile="tests/outputs/starfile_writing/test_particle_parameters.star",
             mode="w",
