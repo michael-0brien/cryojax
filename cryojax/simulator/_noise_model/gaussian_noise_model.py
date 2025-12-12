@@ -202,6 +202,7 @@ class GaussianWhiteNoiseModel(AbstractGaussianNoiseModel, strict=True):
             outputs_real_space=outputs_real_space,
             mask=mask,
             filter=filter,
+            apply_transform=False,
         )
 
         return noise
@@ -235,11 +236,7 @@ class GaussianWhiteNoiseModel(AbstractGaussianNoiseModel, strict=True):
         """
         variance = self.variance
         # Create simulated data
-        simulated = self.compute_signal(
-            outputs_real_space=True,
-            mask=mask,
-            filter=filter,
-        )
+        simulated = self.compute_signal(outputs_real_space=True, mask=mask, filter=filter)
         # Compute residuals
         residuals = simulated - observed
         # Compute standard normal random variables
@@ -327,6 +324,7 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
             outputs_real_space=outputs_real_space,
             mask=mask,
             filter=filter,
+            apply_transform=False,
         )
 
         return noise
