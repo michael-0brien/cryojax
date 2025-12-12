@@ -3,14 +3,14 @@ Implementation of operators on images in real-space.
 """
 
 from abc import abstractmethod
+from collections.abc import Sequence
 from typing_extensions import override
 
 import equinox as eqx
 import jax.numpy as jnp
-import numpy as np
 from jaxtyping import Array, Float, Inexact
 
-from ...jax_util import error_if_not_positive
+from ...jax_util import FloatLike, NDArrayLike, error_if_not_positive
 
 
 class AbstractRealOperator(eqx.Module, strict=True):
@@ -134,13 +134,13 @@ class RealGaussian(AbstractRealOperator, strict=True):
 
     amplitude: Float[Array, ""]
     variance: Float[Array, ""]
-    offset: Float[Array, "2"]
+    offset: Float[Array, " _"] | None
 
     def __init__(
         self,
-        amplitude: float | Float[Array, ""] = 1.0,
-        variance: float | Float[Array, ""] = 1.0,
-        offset: Float[Array | np.ndarray, "2"] | tuple[float, float] = (0.0, 0.0),
+        amplitude: FloatLike = 1.0,
+        variance: FloatLike = 1.0,
+        offset: Float[NDArrayLike, " _"] | Sequence[float] | None = None,
     ):
         """**Arguments:**
 
@@ -156,14 +156,18 @@ class RealGaussian(AbstractRealOperator, strict=True):
         """
         self.amplitude = jnp.asarray(amplitude, dtype=float)
         self.variance = error_if_not_positive(jnp.asarray(variance, dtype=float))
-        self.offset = jnp.asarray(offset, dtype=float)
+        if offset is not None:
+            self.offset = jnp.asarray(offset, dtype=float)
+        else:
+            self.offset = None
 
     @override
     def __call__(
         self, coordinate_grid: Float[Array, "y_dim x_dim 2"]
     ) -> Float[Array, "y_dim x_dim"]:
-        r_squared = jnp.sum((coordinate_grid - self.offset) ** 2, axis=-1)
-        ndim = r_squared.ndim
+        ndim = coordinate_grid.ndim - 1
+        offset = jnp.zeros((ndim,), dtype=float) if self.offset is None else self.offset
+        r_squared = jnp.sum((coordinate_grid - offset) ** 2, axis=-1)
         scaling = (
             self.amplitude / jnp.sqrt(2 * jnp.pi * self.variance) ** ndim
         ) * jnp.exp(-0.5 * r_squared / self.variance)
@@ -175,7 +179,7 @@ class RealConstant(AbstractRealOperator, strict=True):
 
     value: Float[Array, "..."]
 
-    def __init__(self, value: float | Float[Array, "..."]):
+    def __init__(self, value: float | Float[NDArrayLike, "..."]):
         """**Arguments:**
 
         - `value`: The value of the constant

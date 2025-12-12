@@ -4,7 +4,6 @@ from ._fourier_operator import (
     FourierConstant as FourierConstant,
     FourierExp2D as FourierExp2D,
     FourierGaussian as FourierGaussian,
-    FourierGaussianWithRadialOffset as FourierGaussianWithRadialOffset,
     FourierSinc as FourierSinc,
     ZeroMode as ZeroMode,
 )

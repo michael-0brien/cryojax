@@ -49,7 +49,6 @@ from ._operators import (
     FourierConstant as FourierConstant,
     FourierExp2D as FourierExp2D,
     FourierGaussian as FourierGaussian,
-    FourierGaussianWithRadialOffset as FourierGaussianWithRadialOffset,
     FourierSinc as FourierSinc,
     RealConstant as RealConstant,
     RealGaussian as RealGaussian,

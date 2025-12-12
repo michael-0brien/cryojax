@@ -15,7 +15,6 @@ from ..jax_util import error_if_negative
 from ..ndimage import (
     AbstractFourierOperator,
     FourierGaussian,
-    FourierGaussianWithRadialOffset,
     ifftn,
     irfftn,
     rescale_image,
@@ -56,10 +55,10 @@ class SolventMixturePower(AbstractFourierOperator, strict=True):
                 b_factor=2 / PARKHURST2024_POWER_CONSTANTS.s_1**2,
             )
         if peak_fn is None:
-            self.peak_fn = FourierGaussianWithRadialOffset(
+            self.peak_fn = FourierGaussian(
                 amplitude=PARKHURST2024_POWER_CONSTANTS.a_2,
                 b_factor=2 / PARKHURST2024_POWER_CONSTANTS.s_2**2,
-                offset=PARKHURST2024_POWER_CONSTANTS.m,
+                radial_offset=PARKHURST2024_POWER_CONSTANTS.m,
             )
 
     @override

@@ -13,14 +13,14 @@ import functools
 import operator
 from abc import abstractmethod
 from collections.abc import Callable
-from typing import Any, overload
+from typing import Any
 from typing_extensions import override
 
 import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float, Inexact
 
-from ...jax_util import FloatLike, error_if_negative, error_if_not_positive
+from ...jax_util import FloatLike, error_if_not_positive
 
 
 class AbstractFourierOperator(eqx.Module, strict=True):
@@ -139,7 +139,7 @@ class CustomFourierOperator(AbstractFourierOperator, strict=True):
 
     fn: Callable[..., Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"]]
     args: Any
-    kwargs: dict[str, Any]
+    kwargs: Any
 
     def __init__(
         self,
@@ -147,7 +147,7 @@ class CustomFourierOperator(AbstractFourierOperator, strict=True):
             ..., Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"]
         ],
         *args: Any,
-        **kwargs: dict[str, Any],
+        **kwargs: Any,
     ):
         self.fn = fn
         self.args = args
@@ -280,11 +280,14 @@ class FourierGaussian(AbstractFourierOperator, strict=True):
 
     amplitude: Float[Array, ""]
     b_factor: Float[Array, ""]
+    radial_offset: Float[Array, ""] | None
 
     def __init__(
         self,
         amplitude: FloatLike = 1.0,
         b_factor: FloatLike = 1.0,
+        *,
+        radial_offset: FloatLike | None = None,
     ):
         """**Arguments:**
 
@@ -294,19 +297,17 @@ class FourierGaussian(AbstractFourierOperator, strict=True):
         - `b_factor`:
             The B-factor of the gaussian, equal to $\\beta$
             in the above equation.
+        - `radial_offset`:
+            The frequency shell of the gaussian peak.
         """
         self.amplitude = jnp.asarray(amplitude, dtype=float)
         self.b_factor = error_if_not_positive(jnp.asarray(b_factor, dtype=float))
-
-    @overload
-    def __call__(
-        self, frequency_grid: Float[Array, "y_dim x_dim 2"]
-    ) -> Float[Array, "y_dim x_dim"]: ...
-
-    @overload
-    def __call__(  # type: ignore
-        self, frequency_grid: Float[Array, "z_dim y_dim x_dim 3"]
-    ) -> Float[Array, "z_dim y_dim x_dim"]: ...
+        if radial_offset is None:
+            self.radial_offset = None
+        else:
+            self.radial_offset = error_if_not_positive(
+                jnp.asarray(radial_offset, dtype=float)
+            )
 
     @override
     def __call__(
@@ -315,68 +316,15 @@ class FourierGaussian(AbstractFourierOperator, strict=True):
             Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
         ),
     ) -> Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]:
-        k_sqr = jnp.sum(frequency_grid**2, axis=-1)
-        scaling = self.amplitude * jnp.exp(-0.25 * self.b_factor * k_sqr)
-        return scaling
-
-
-class FourierGaussianWithRadialOffset(AbstractFourierOperator, strict=True):
-    r"""This operator represents a gaussian with a radial offset.
-    Specifically, this is
-
-    .. math::
-        P(k) = \kappa \exp(- \beta (|k| - m)^2 / 4),
-
-    where :math:`k^2 = k_x^2 + k_y^2` is the length of the
-    wave vector. Here, :math:`\beta` has dimensions of length
-    squared.
-    """
-
-    amplitude: Float[Array, ""]
-    b_factor: Float[Array, ""]
-    offset: Float[Array, ""]
-
-    def __init__(
-        self,
-        amplitude: FloatLike = 1.0,
-        b_factor: FloatLike = 1.0,
-        offset: FloatLike = 0.0,
-    ):
-        """**Arguments:**
-
-        - `amplitude`:
-            The amplitude of the operator, equal to $\\kappa$
-            in the above equation.
-        - `b_factor`:
-            The B-factor of the gaussian, equal to $\\beta$
-            in the above equation.
-        - `offset`:
-            The radial offset of the gaussian.
-        """
-        self.amplitude = jnp.asarray(amplitude, dtype=float)
-        self.b_factor = error_if_not_positive(jnp.asarray(b_factor, dtype=float))
-        self.offset = error_if_negative(jnp.asarray(offset, dtype=float))
-
-    @overload
-    def __call__(
-        self, frequency_grid: Float[Array, "y_dim x_dim 2"]
-    ) -> Float[Array, "y_dim x_dim"]: ...
-
-    @overload
-    def __call__(  # type: ignore
-        self, frequency_grid: Float[Array, "z_dim y_dim x_dim 3"]
-    ) -> Float[Array, "z_dim y_dim x_dim"]: ...
-
-    @override
-    def __call__(
-        self,
-        frequency_grid: (
-            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
-        ),
-    ) -> Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]:
-        k = jnp.linalg.norm(frequency_grid, axis=-1)
-        scaling = self.amplitude * jnp.exp(-0.25 * self.b_factor * (k - self.offset) ** 2)
-        return scaling
+        if self.radial_offset is None:
+            k_sqr = jnp.sum(frequency_grid**2, axis=-1)
+            gaussian = self.amplitude * jnp.exp(-0.25 * self.b_factor * k_sqr)
+        else:
+            k = jnp.linalg.norm(frequency_grid, axis=-1)
+            gaussian = self.amplitude * jnp.exp(
+                -0.25 * self.b_factor * (k - self.radial_offset) ** 2
+            )
+        return gaussian
 
 
 class FourierSinc(AbstractFourierOperator, strict=True):
