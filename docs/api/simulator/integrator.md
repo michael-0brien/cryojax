@@ -22,8 +22,6 @@
             members:
                 - __init__
                 - integrate
-                - extract_fourier_slice_from_spline
-                - extract_fourier_slice_from_grid
 
 ---
 
@@ -32,7 +30,6 @@
             members:
                 - __init__
                 - integrate
-                - project_voxel_cloud_with_nufft
 
 ## Integration methods for atom-based based structures
 
