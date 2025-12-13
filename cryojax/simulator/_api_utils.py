@@ -209,8 +209,7 @@ def make_image_model(
         to physical units using the `LinearImageModel`.
         Options are
         - 'contrast':
-            Uses the `ContrastImageModel` to simulate contrast. This is
-            default.
+            Uses the `ContrastImageModel` to simulate contrast.
         - 'intensity':
             Uses the `IntensityImageModel` to simulate intensity.
         - 'counts':

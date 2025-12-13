@@ -38,7 +38,7 @@ def dose_config(volume_and_pixel_size):
         shape=volume.shape[0:2],
         pixel_size=pixel_size,
         voltage_in_kilovolts=300.0,
-        electrons_per_angstrom_squared=100.0,
+        electron_dose=100.0,
     )
 
 

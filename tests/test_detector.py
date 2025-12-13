@@ -12,11 +12,9 @@ def test_constant_wavefunction_gives_constant_expected_events():
         (25, 25),
         1.0,
         voltage_in_kilovolts=300.0,
-        electrons_per_angstrom_squared=10000.0,
+        electron_dose=10000.0,
     )
-    electrons_per_pixel = (
-        image_config.electrons_per_angstrom_squared * image_config.pixel_size**2
-    )
+    electrons_per_pixel = image_config.electron_dose * image_config.pixel_size**2
     # Create squared wavefunction of just vacuum, i.e. 1 everywhere
     vacuum_squared_wavefunction = jnp.ones(image_config.shape, dtype=float)
     fourier_vacuum_squared_wavefunction = rfftn(vacuum_squared_wavefunction)
@@ -43,12 +41,10 @@ def test_gaussian_limit():
         (25, 25),
         1.0,
         voltage_in_kilovolts=300.0,
-        electrons_per_angstrom_squared=10000.0,
+        electron_dose=10000.0,
     )
     n_pixels = np.prod(image_config.padded_shape)
-    electrons_per_pixel = (
-        image_config.electrons_per_angstrom_squared * image_config.pixel_size**2
-    )
+    electrons_per_pixel = image_config.electron_dose * image_config.pixel_size**2
     # Create squared wavefunction of just vacuum, i.e. 1 everywhere
     vacuum_squared_wavefunction = jnp.ones(image_config.shape, dtype=float)
     fourier_vacuum_squared_wavefunction = rfftn(vacuum_squared_wavefunction)

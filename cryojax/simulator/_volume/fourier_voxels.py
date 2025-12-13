@@ -22,6 +22,7 @@ from ...ndimage import (
     map_coordinates,
     map_coordinates_spline,
     pad_to_shape,
+    resize_with_crop_or_pad,
     rfftn,
 )
 from .._image_config import AbstractImageConfig
@@ -326,8 +327,8 @@ class FourierSliceExtraction(
         # Resize the image to match the AbstractImageConfig.padded_shape
         if image_config.padded_shape != (N, N):
             fourier_projection = rfftn(
-                image_config.crop_or_pad_to_padded_shape(
-                    irfftn(fourier_projection, s=(N, N))
+                resize_with_crop_or_pad(
+                    irfftn(fourier_projection, s=(N, N)), image_config.padded_shape
                 )
             )
         # Scale by voxel size to convert from projection to integral
@@ -523,8 +524,8 @@ class EwaldSphereExtraction(
         # Resize the image to match the AbstractImageConfig.padded_shape
         if image_config.padded_shape != (N, N):
             ewald_sphere_surface = fftn(
-                image_config.crop_or_pad_to_padded_shape(
-                    ifftn(ewald_sphere_surface, s=(N, N))
+                resize_with_crop_or_pad(
+                    ifftn(ewald_sphere_surface, s=(N, N)), image_config.padded_shape
                 )
             )
         # Scale by voxel size to convert from projection to integral
