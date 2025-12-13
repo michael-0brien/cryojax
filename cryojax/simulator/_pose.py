@@ -191,13 +191,12 @@ class AbstractPose(Module, strict=True):
             jnp.asarray(offset_in_angstroms, dtype=float),
         )
 
+    @abstractmethod
     def to_inverse_rotation(self) -> Self:
         """Convert an `AbstractPose` to the inverse of its rotation
         representation.
         """
-        return self.from_rotation_and_translation(
-            self.rotation.inverse(), self.offset_in_angstroms
-        )
+        raise NotImplementedError
 
 
 class EulerAnglePose(AbstractPose, strict=True):
@@ -279,6 +278,18 @@ class EulerAnglePose(AbstractPose, strict=True):
         )
         return cls(phi_angle=phi_angle, theta_angle=theta_angle, psi_angle=psi_angle)
 
+    @override
+    def to_inverse_rotation(self) -> Self:
+        return eqx.tree_at(
+            lambda x: (x.phi_angle, x.theta_angle, x.psi_angle),
+            self,
+            (
+                _negate_angle(self.psi_angle),
+                _negate_angle(self.theta_angle),
+                _negate_angle(self.phi_angle),
+            ),
+        )
+
 
 class QuaternionPose(AbstractPose, strict=True):
     """An `AbstractPose` represented by unit quaternions."""
@@ -333,6 +344,11 @@ class QuaternionPose(AbstractPose, strict=True):
     @classmethod
     def from_rotation(cls, rotation: SO3) -> Self:
         return cls(wxyz=rotation.wxyz)
+
+    @override
+    def to_inverse_rotation(self) -> Self:
+        inverse_rotation = self.rotation.inverse()
+        return eqx.tree_at(lambda _pose: _pose.wxyz, self, inverse_rotation.wxyz)
 
 
 class AxisAnglePose(AbstractPose, strict=True):
@@ -401,3 +417,13 @@ class AxisAnglePose(AbstractPose, strict=True):
         # Compute the euler vector from the logarithmic map
         euler_vector = jnp.rad2deg(rotation.log())
         return cls(euler_vector=euler_vector)
+
+    @override
+    def to_inverse_rotation(self) -> Self:
+        return self.from_rotation_and_translation(
+            self.rotation.inverse(), self.offset_in_angstroms
+        )
+
+
+def _negate_angle(angle):
+    return ((-angle + 180) % 360) - 180

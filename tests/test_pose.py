@@ -80,3 +80,23 @@ def test_euler_angle_conversion(phi, theta, psi):
             )
         ),
     )
+
+
+@pytest.mark.parametrize(
+    "wxyz",
+    [
+        (1.0, 0.0, 0.0, 0.0),
+        (0.2, 0.4, 0.3, -0.1),
+        (-0.1, -0.25, 0.6, -0.2),
+    ],
+)
+def test_inverse(wxyz):
+    wxyz = jnp.asarray(wxyz)
+    wxyz = wxyz / jnp.linalg.norm(wxyz)
+    euler = cxs.EulerAnglePose.from_rotation(SO3(wxyz))
+    quat = cxs.QuaternionPose.from_rotation(SO3(wxyz))
+    aa = cxs.AxisAnglePose.from_rotation(SO3(wxyz))
+    wxyz_inverse = lambda pose: pose.to_inverse_rotation().rotation.wxyz
+    check_quat_equal = lambda q1, q2: np.allclose(q1, q2) or np.allclose(q1, -q2)
+    assert check_quat_equal(wxyz_inverse(euler), wxyz_inverse(quat))
+    assert check_quat_equal(wxyz_inverse(quat), wxyz_inverse(aa))
