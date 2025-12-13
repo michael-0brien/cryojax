@@ -6,7 +6,6 @@ The `AbstractImageConfig` is an object at the core of simulating images in `cryo
     ::: cryojax.simulator.AbstractImageConfig
             members:
                 - wavelength_in_angstroms
-                - wavenumber_in_inverse_angstroms
                 - lorentz_factor
                 - interaction_constant
                 - n_pixels
@@ -27,9 +26,6 @@ The `AbstractImageConfig` is an object at the core of simulating images in `cryo
                 - padded_frequency_grid_in_angstroms
                 - padded_full_frequency_grid_in_pixels
                 - padded_full_frequency_grid_in_angstroms
-                - crop_to_shape
-                - pad_to_padded_shape
-                - crop_or_pad_to_padded_shape
 
 
 ---

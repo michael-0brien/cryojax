@@ -116,9 +116,7 @@ class AbstractDetector(Module, strict=True):
         """Pass the image through the detector model."""
         n_pixels = np.prod(image_config.padded_shape)
         # Compute the time-integrated electron flux in pixels
-        electrons_per_pixel = (
-            image_config.electrons_per_angstrom_squared * image_config.pixel_size**2
-        )
+        electrons_per_pixel = image_config.electron_dose * image_config.pixel_size**2
         # ... now the total number of electrons over the entire image
         electrons_per_image = n_pixels * electrons_per_pixel
         # Normalize the squared wavefunction to a set of probabilities

@@ -1,27 +1,20 @@
 """The image configuration and utility manager."""
 
 import math
-from collections.abc import Callable
 from functools import cached_property
 from typing import Any, TypedDict
 
 import equinox as eqx
 import jax.numpy as jnp
-from jaxtyping import Array, Float, Inexact
+from jaxtyping import Array, Float
 
 from ..constants import (
     interaction_constant_from_kilovolts,
     lorentz_factor_from_kilovolts,
     wavelength_from_kilovolts,
 )
-from ..jax_util import error_if_not_positive
-from ..ndimage import (
-    crop_to_shape,
-    make_coordinate_grid,
-    make_frequency_grid,
-    pad_to_shape,
-    resize_with_crop_or_pad,
-)
+from ..jax_util import FloatLike, error_if_not_positive
+from ..ndimage import make_coordinate_grid, make_frequency_grid
 
 
 class GridHelper(eqx.Module, strict=True):
@@ -41,7 +34,6 @@ class GridHelper(eqx.Module, strict=True):
 class PadOptions(TypedDict):
     shape: tuple[int, int]
     grid_helper: GridHelper | None
-    mode: str | Callable
 
 
 class AbstractImageConfig(eqx.Module, strict=True):
@@ -66,13 +58,6 @@ class AbstractImageConfig(eqx.Module, strict=True):
         energy `voltage_in_kilovolts`.
         """
         return wavelength_from_kilovolts(self.voltage_in_kilovolts)
-
-    @property
-    def wavenumber_in_inverse_angstroms(self) -> Float[Array, ""]:
-        """The incident electron wavenumber corresponding to the beam
-        energy `voltage_in_kilovolts`.
-        """
-        return 2 * jnp.pi / self.wavelength_in_angstroms
 
     @property
     def lorentz_factor(self) -> Float[Array, ""]:
@@ -146,10 +131,6 @@ class AbstractImageConfig(eqx.Module, strict=True):
     @property
     def padded_shape(self):
         return self.pad_options["shape"]
-
-    @property
-    def pad_mode(self):
-        return self.pad_options["mode"]
 
     @cached_property
     def padded_coordinate_grid_in_pixels(
@@ -227,26 +208,6 @@ class AbstractImageConfig(eqx.Module, strict=True):
             self.padded_full_frequency_grid_in_pixels, 1 / self.pixel_size
         )
 
-    def crop_to_shape(
-        self, image: Inexact[Array, "y_dim x_dim"]
-    ) -> Inexact[Array, "{self.y_dim} {self.x_dim}"]:
-        """Crop an image to `shape`."""
-        return crop_to_shape(image, self.shape)
-
-    def pad_to_padded_shape(
-        self, image: Inexact[Array, "y_dim x_dim"], **kwargs: Any
-    ) -> Inexact[Array, "{self.padded_y_dim} {self.padded_x_dim}"]:
-        """Pad an image to `padded_shape`."""
-        return pad_to_shape(image, self.padded_shape, mode=self.pad_mode, **kwargs)
-
-    def crop_or_pad_to_padded_shape(
-        self, image: Inexact[Array, "y_dim x_dim"], **kwargs: Any
-    ) -> Inexact[Array, "{self.padded_y_dim} {self.padded_x_dim}"]:
-        """Reshape an image to `padded_shape` using cropping or padding."""
-        return resize_with_crop_or_pad(
-            image, self.padded_shape, mode=self.pad_mode, **kwargs
-        )
-
     @property
     def n_pixels(self) -> int:
         """Convenience property for `math.prod(shape)`"""
@@ -293,8 +254,8 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
     def __init__(
         self,
         shape: tuple[int, int],
-        pixel_size: float | Float[Array, ""],
-        voltage_in_kilovolts: float | Float[Array, ""],
+        pixel_size: FloatLike,
+        voltage_in_kilovolts: FloatLike,
         *,
         grid_helper: GridHelper | None = None,
         pad_options: dict[str, Any] = {},
@@ -307,8 +268,6 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
             The pixel size of the image in angstroms.
         - `voltage_in_kilovolts`:
             The incident energy of the electron beam.
-        - `electrons_per_angstrom_squared`:
-            The integrated dose rate of the electron beam.
         - `grid_helper`:
             The `GridHelper` object, which stores the coordinate grids
             for image shape `shape`.
@@ -318,9 +277,6 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
             - `shape`:
                 The shape of the image after padding. By default, equal
                 to `shape`.
-            - `mode`:
-                The method of image padding. By default, equal
-                to `"constant"`. For all options, see `jax.numpy.pad`.
             - `grid_helper`:
                 The `GridHelper` object, which stores coordinate grids
                 for the padded shape. If not passed, grid are computed
@@ -346,7 +302,7 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
     shape: tuple[int, int]
     pixel_size: Float[Array, ""]
     voltage_in_kilovolts: Float[Array, ""]
-    electrons_per_angstrom_squared: Float[Array, ""]
+    electron_dose: Float[Array, ""]
 
     grid_helper: GridHelper | None
     pad_options: PadOptions
@@ -354,9 +310,9 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
     def __init__(
         self,
         shape: tuple[int, int],
-        pixel_size: float | Float[Array, ""],
-        voltage_in_kilovolts: float | Float[Array, ""],
-        electrons_per_angstrom_squared: float | Float[Array, ""],
+        pixel_size: FloatLike,
+        voltage_in_kilovolts: FloatLike,
+        electron_dose: FloatLike,
         *,
         grid_helper: GridHelper | None = None,
         pad_options: dict[str, Any] = {},
@@ -369,8 +325,9 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
             The pixel size of the image in angstroms.
         - `voltage_in_kilovolts`:
             The incident energy of the electron beam.
-        - `electrons_per_angstrom_squared`:
-            The integrated dose rate of the electron beam.
+        - `electron_dose`:
+            The integrated dose rate of the electron beam in
+            $e^-/A^2$
         - `grid_helper`:
             The `GridHelper` object, which stores the coordinate grids
             for image shape `shape`.
@@ -380,9 +337,6 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
             - `shape`:
                 The shape of the image after padding. By default, equal
                 to `shape`.
-            - `mode`:
-                The method of image padding. By default, equal
-                to `"constant"`. For all options, see `jax.numpy.pad`.
             - `grid_helper`:
                 The `GridHelper` object, which stores coordinate grids
                 for the padded shape. If not passed, grid are computed
@@ -393,9 +347,7 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
         self.voltage_in_kilovolts = error_if_not_positive(
             jnp.asarray(voltage_in_kilovolts, dtype=float)
         )
-        self.electrons_per_angstrom_squared = jnp.asarray(
-            electrons_per_angstrom_squared, dtype=float
-        )
+        self.electron_dose = jnp.asarray(electron_dose, dtype=float)
         # Set shape
         self.shape = shape
         # Set pad options
@@ -415,7 +367,6 @@ def _safe_multiply_by_constant(
 
 def _dict_to_pad_options(d: dict[str, Any], default_shape: tuple[int, int]) -> PadOptions:
     shape = d["shape"] if "shape" in d else default_shape
-    mode = d["mode"] if "mode" in d else "constant"
     grid_helper = d["grid_helper"] if "grid_helper" in d else None
 
-    return PadOptions(shape=shape, mode=mode, grid_helper=grid_helper)
+    return PadOptions(shape=shape, grid_helper=grid_helper)

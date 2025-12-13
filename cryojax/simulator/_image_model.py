@@ -12,7 +12,14 @@ import jax.random as jr
 from jaxtyping import Array, Bool, Complex, Float, PRNGKeyArray
 
 from ..jax_util import NDArrayLike
-from ..ndimage import AbstractImageTransform, FilterLike, MaskLike, irfftn, rfftn
+from ..ndimage import (
+    AbstractImageTransform,
+    FilterLike,
+    MaskLike,
+    crop_to_shape,
+    irfftn,
+    rfftn,
+)
 from ._detector import AbstractDetector
 from ._image_config import AbstractImageConfig, DoseImageConfig
 from ._pose import AbstractPose
@@ -154,7 +161,7 @@ class AbstractImageModel(eqx.Module, strict=True):
                 fourier_image = filter(fourier_image)
             image = irfftn(fourier_image, s=image_config.padded_shape)
             if image_config.padded_shape != image_config.shape:
-                image = image_config.crop_to_shape(image)
+                image = crop_to_shape(image, image_config.shape)
             if self.normalizes_signal:
                 image = self._normalize_image(image)
             if mask is not None:

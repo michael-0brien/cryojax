@@ -179,7 +179,7 @@ def test_pad_options(sample_starfile_path):
     """Test the pad_options argument to the parameter file."""
     # Test with a valid input
 
-    pad_options = dict(mode="constant", shape=(22, 22))
+    pad_options = dict(shape=(22, 22))
     parameter_file = RelionParticleParameterFile(
         path_to_starfile=sample_starfile_path,
         loads_envelope=True,
@@ -201,7 +201,6 @@ def test_pad_options(sample_starfile_path):
     )
 
     assert image_config.padded_shape == ref_config.padded_shape
-    assert image_config.pad_mode == ref_config.pad_mode
 
 
 def test_load_starfile_envelope_params(sample_starfile_path):
