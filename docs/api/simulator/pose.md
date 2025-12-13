@@ -39,6 +39,14 @@
     ::: cryojax.simulator.AbstractPose
         options:
             members:
+                - rotation
+                - from_rotation
+                - to_inverse_rotation
+
+::: cryojax.simulator.EulerAnglePose
+        options:
+            members:
+                - __init__
                 - compute_translation_operator
                 - translate_image
                 - rotate_coordinates
@@ -48,17 +56,20 @@
                 - from_rotation_and_translation
                 - to_inverse_rotation
 
-::: cryojax.simulator.EulerAnglePose
-        options:
-            members:
-                - __init__
-
 ---
 
 ::: cryojax.simulator.QuaternionPose
         options:
             members:
                 - __init__
+                - compute_translation_operator
+                - translate_image
+                - rotate_coordinates
+                - offset_in_angstroms
+                - rotation
+                - from_rotation
+                - from_rotation_and_translation
+                - to_inverse_rotation
 
 ---
 
@@ -66,3 +77,11 @@
         options:
             members:
                 - __init__
+                - compute_translation_operator
+                - translate_image
+                - rotate_coordinates
+                - offset_in_angstroms
+                - rotation
+                - from_rotation
+                - from_rotation_and_translation
+                - to_inverse_rotation
