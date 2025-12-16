@@ -18,8 +18,12 @@ def block_reduce_downsample(
     downsample_factor: int,
     operation: Callable[[Array, Array], Array] = lax.add,
 ) -> Inexact[Array, "_ _"] | Inexact[Array, "_ _ _"]:
-    """Downsample an array by pooling together blocks, keeping
-    the center position of the array unchanged. Wraps `equinox.nn.Pool`.
+    """Downsample an array by pooling together blocks.
+    Wraps `equinox.nn.Pool`.
+
+    !!! warning
+        If `downsample_factor` is even, the center of the array
+        is shifted.
 
     **Arguments:**
 
@@ -62,17 +66,10 @@ def block_reduce_downsample(
     # Pooling function downsamples array
     shape = array.shape
     kernel_size = array.ndim * (downsample_factor,)
-    if downsample_factor % 2 == 0:
-        raise ValueError(
-            "Called `block_reduce_downsample` with "
-            f"`downsample_factor = {downsample_factor}`, but "
-            "only odd-valued numbers are supported."
-        )
-    else:
-        padding = tuple(
-            ((k - 1) // 2, (k - 1) // 2) if s % 2 == 0 else (0, 0)
-            for k, s in zip(kernel_size, shape)
-        )
+    padding = tuple(
+        ((k - 1) // 2, (k - 1) // 2) if s % 2 == 0 else (0, 0)
+        for k, s in zip(kernel_size, shape)
+    )
     block_reduce_fn = lambda x: eqx.nn.Pool(
         init=jnp.asarray(0.0, array.dtype),
         operation=operation,
