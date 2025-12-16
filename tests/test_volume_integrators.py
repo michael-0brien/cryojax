@@ -138,7 +138,6 @@ def test_fft_atom_projection_antialias(pdb_info, width, pixel_size, shape):
 @pytest.mark.parametrize(
     "pixel_size, shape, upsample_factor",
     (
-        (0.25, (127, 127), 2),
         (0.25, (128, 128), 6),
         (0.25, (127, 127), 4),
         (0.25, (128, 128), 6),

@@ -579,10 +579,7 @@ def _project_with_nufft(shape, ps, pos, kernel, freqs, eps=1e-6, opts=None):
 
 
 def _block_average(x, factor):
-    return (
-        block_reduce_downsample(x, factor, jax.lax.add, center_correct=False)
-        / factor**x.ndim
-    )
+    return block_reduce_downsample(x, factor, jax.lax.add) / factor**x.ndim
 
 
 def _half_pixel_shift(target_shape, fourier_image, frequency_grid, k):
