@@ -288,7 +288,7 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
         # Properties for writing
         self._updates_optics_group = updates_optics_group
         # Shared
-        self._rotation_mode = rotation_mode
+        self._rotation_mode = _validate_rotation_mode(rotation_mode)
 
     @override
     def __getitem__(
@@ -535,7 +535,7 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
 
     @rotation_mode.setter
     def rotation_mode(self, value: Literal["object", "frame"]):
-        self._rotation_mode = value
+        self._rotation_mode = _validate_rotation_mode(value)
 
 
 class RelionParticleStackDataset(
@@ -924,6 +924,15 @@ def _validate_mode(mode: str) -> Literal["r", "w"]:
     if mode not in ["r", "w"]:
         raise ValueError(
             f"Passed unsupported `mode = {mode}`. Supported modes are 'r' and 'w'."
+        )
+    return mode  # type: ignore
+
+
+def _validate_rotation_mode(mode: str) -> Literal["frame", "object"]:
+    if mode not in ["frame", "object"]:
+        raise ValueError(
+            f"Passed unsupported `rotation_mode = {mode}`. "
+            "Supported modes are 'object' and 'frame'."
         )
     return mode  # type: ignore
 
