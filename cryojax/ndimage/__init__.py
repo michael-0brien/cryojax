@@ -43,7 +43,7 @@ from ._map_coordinates import (
 )
 from ._normalize import (
     background_subtract_image as background_subtract_image,
-    rescale_image as rescale_image,
+    compute_edge_value as compute_edge_value,
     standardize_image as standardize_image,
 )
 from ._operators import (
@@ -108,7 +108,16 @@ def __getattr__(name: str) -> _Any:
         return fourier_crop_to_shape
     if name == "normalize_image":
         _warnings.warn(
-            "'normalize_image' is deprecated"
+            "'normalize_image' is deprecated and "
+            "has been renamed to 'standardize_image'. "
+            "The old name will be deprecated in cryoJAX 0.6.0.",
+            category=FutureWarning,
+            stacklevel=2,
+        )
+        return standardize_image
+    if name == "rescale_image":
+        _warnings.warn(
+            "'rescale_image' is deprecated and "
             "has been renamed to 'standardize_image'. "
             "The old name will be deprecated in cryoJAX 0.6.0.",
             category=FutureWarning,

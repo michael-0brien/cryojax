@@ -16,6 +16,7 @@ from ..ndimage import (
     AbstractFilter,
     AbstractImageTransform,
     AbstractMask,
+    compute_edge_value,
     crop_to_shape,
     irfftn,
     rfftn,
@@ -63,16 +64,17 @@ class AbstractImageModel(eqx.Module, strict=True):
     transform: eqx.AbstractVar[AbstractImageTransform | None]
 
     signal_region: eqx.AbstractVar[Bool[Array, "_ _"] | None]
-    normalize_mode: eqx.AbstractVar[Literal["bg_subtract", "standardize", "none"]]
+    normalizes_signal: eqx.AbstractVar[bool]
+    offset_mode: eqx.AbstractVar[Literal["bg", "mean"]]
     translate_mode: eqx.AbstractVar[Literal["fft", "atom", "none"]]
 
     def __check_init__(self):
-        if self.normalize_mode not in ["bg_subtract", "standardize", "none"]:
+        if self.offset_mode not in ["bg", "mean"]:
             raise ValueError(
                 "Found invalid value for "
-                f"`{self.__class__.__name__}(..., normalize_mode=...)`. "
-                "Values 'standardize', 'bg_subtract', and 'none' are "
-                f"supported, but got {self.normalize_mode}."
+                f"`{self.__class__.__name__}(..., offset_mode=...)`. "
+                "Values 'bg' and 'mean' are "
+                f"supported, but got {self.offset_mode}."
             )
         if self.translate_mode not in ["fft", "atom", "none"]:
             raise ValueError(
@@ -144,7 +146,7 @@ class AbstractImageModel(eqx.Module, strict=True):
         if (
             mask_c is None
             and image_config.padded_shape == image_config.shape
-            and self.normalize_mode == "none"
+            and not self.normalizes_signal
         ):
             # ... if there are no masks, we don't need to crop, and we are
             # not normalizing, minimize moving back and forth between real
@@ -179,10 +181,10 @@ class AbstractImageModel(eqx.Module, strict=True):
                 image = crop_to_shape(padded_image, image_config.shape)
             else:
                 image = padded_image
-            if self.normalize_mode == "standardize":
-                image = self._standardize_signal(image)
-            elif self.normalize_mode == "bg_subtract":
-                image = self._bg_subtract_signal(image, padded_image)
+            if self.normalizes_signal and self.offset_mode == "mean":
+                image = self._mean_subtract_normalize(image)
+            elif self.normalizes_signal and self.offset_mode == "bg":
+                image = self._bg_subtract_normalize(image, padded_image)
             if mask_c is not None:
                 image = mask_c(image)
             return image if outputs_real_space else rfftn(image)
@@ -226,7 +228,7 @@ class AbstractImageModel(eqx.Module, strict=True):
                 else:
                     return mask, filter * self.transform
 
-    def _standardize_signal(self, image: Array) -> Array:
+    def _mean_subtract_normalize(self, image: Array) -> Array:
         mean, std = (
             jnp.mean(image, where=self.signal_region),
             jnp.std(image, where=self.signal_region),
@@ -235,17 +237,11 @@ class AbstractImageModel(eqx.Module, strict=True):
 
         return image
 
-    def _bg_subtract_signal(self, image: Array, padded_image: Array) -> Array:
-        edge_values = jnp.concatenate(
-            (
-                padded_image[0, :],
-                padded_image[-1, :],
-                padded_image[1:-1, 0],
-                padded_image[1:-1, -1],
-            ),
-            axis=0,
+    def _bg_subtract_normalize(self, image: Array, padded_image: Array) -> Array:
+        bg_value, std = (
+            compute_edge_value(padded_image),
+            jnp.std(image, where=self.signal_region),
         )
-        bg_value, std = jnp.median(edge_values), jnp.std(image, where=self.signal_region)
         image = (image - bg_value) / std
 
         return image
@@ -261,8 +257,9 @@ class LinearImageModel(AbstractImageModel, strict=True):
     image_config: AbstractImageConfig
 
     transform: AbstractImageTransform | None
+    normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
-    normalize_mode: Literal["standardize", "bg_subtract", "none"]
+    offset_mode: Literal["bg", "mean"]
     translate_mode: Literal["fft", "atom", "none"]
 
     def __init__(
@@ -274,8 +271,9 @@ class LinearImageModel(AbstractImageModel, strict=True):
         volume_integrator: AbstractVolumeIntegrator = AutoVolumeProjection(),
         *,
         transform: AbstractImageTransform | None = None,
+        normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-        normalize_mode: Literal["standardize", "bg_subtract", "none"] = "none",
+        offset_mode: Literal["bg", "mean"] = "mean",
         translate_mode: Literal["fft", "atom", "none"] = "fft",
     ):
         """**Arguments:**
@@ -292,23 +290,25 @@ class LinearImageModel(AbstractImageModel, strict=True):
         - `transform`:
             A [`cryojax.ndimage.AbstractImageTransform`][] applied to the
             image after simulation.
+        - `normalizes_signal`:
+            Whether or not to normalize the output of `image_model.simulate()`.
+            If `True`, see `offset_mode` for options.
         - `signal_region`:
             A boolean array that is 1 where there is signal,
             and 0 otherwise used to normalize the image.
             Must have shape equal to `AbstractImageConfig.shape`.
-        - `normalize_mode`:
-            How to normalize the image. Options are
-            - 'standardize':
-                Normalize the image to be mean 0 and
-                standard deviation 1 within `signal_region`.
-            - 'bg_subtract':
-                Subtract mean value at image edges and divide by
-                the image standard deviation within `signal_region`.
-                This makes the image fades to a background with values
+        - `offset_mode`:
+            How to calculate the offset for normalization when
+            `normalizes_signal = True`. Options are
+            - 'mean':
+                Normalize the image to be mean 0
+                within `signal_region`.
+            - 'bg':
+                Subtract mean value at the image edges.
+                This makes the image fade to a background with values
                 equal to zero. Requires that `image_config.padded_shape`
                 is large enough so that the signal sufficiently decays.
-            - 'none':
-                Do not normalize the image.
+            Ignored if `normalizes_signal = False`.
         - `translate_mode`:
             How to apply in-plane translation to the volume. Options are
             - 'fft':
@@ -330,7 +330,8 @@ class LinearImageModel(AbstractImageModel, strict=True):
         # Options
         self.transform = transform
         self.translate_mode = translate_mode
-        self.normalize_mode = normalize_mode
+        self.normalizes_signal = normalizes_signal
+        self.offset_mode = offset_mode
         if signal_region is None:
             self.signal_region = None
         else:
@@ -387,8 +388,9 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
     image_config: AbstractImageConfig
 
     transform: AbstractImageTransform | None
+    normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
-    normalize_mode: Literal["standardize", "bg_subtract", "none"]
+    offset_mode: Literal["bg", "mean"]
     translate_mode: Literal["fft", "atom", "none"]
 
     def __init__(
@@ -399,8 +401,9 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
         volume_integrator: AbstractVolumeIntegrator = AutoVolumeProjection(),
         *,
         transform: AbstractImageTransform | None = None,
+        normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-        normalize_mode: Literal["standardize", "bg_subtract", "none"] = "none",
+        offset_mode: Literal["bg", "mean"] = "mean",
         translate_mode: Literal["fft", "atom", "none"] = "fft",
     ):
         """**Arguments:**
@@ -416,23 +419,25 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
         - `transform`:
             A [`cryojax.ndimage.AbstractImageTransform`][] applied to the
             image after simulation.
+        - `normalizes_signal`:
+            Whether or not to normalize the output of `image_model.simulate()`.
+            If `True`, see `offset_mode` for options.
         - `signal_region`:
             A boolean array that is 1 where there is signal,
             and 0 otherwise used to normalize the image.
             Must have shape equal to `AbstractImageConfig.shape`.
-        - `normalize_mode`:
-            How to normalize the image. Options are
-            - 'standardize':
-                Normalize the image to be mean 0 and
-                standard deviation 1 within `signal_region`.
-            - 'bg_subtract':
-                Subtract mean value at image edges and divide by
-                the image standard deviation within `signal_region`.
-                This makes the image fades to a background with values
+        - `offset_mode`:
+            How to calculate the offset for normalization when
+            `normalizes_signal = True`. Options are
+            - 'mean':
+                Normalize the image to be mean 0
+                within `signal_region`.
+            - 'bg':
+                Subtract mean value at the image edges.
+                This makes the image fade to a background with values
                 equal to zero. Requires that `image_config.padded_shape`
                 is large enough so that the signal sufficiently decays.
-            - 'none':
-                Do not normalize the image.
+            Ignored if `normalizes_signal = False`.
         - `translate_mode`:
             How to apply in-plane translation to the volume. Options are
             - 'fft':
@@ -453,7 +458,8 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
         # Options
         self.transform = transform
         self.translate_mode = translate_mode
-        self.normalize_mode = normalize_mode
+        self.normalizes_signal = normalizes_signal
+        self.offset_mode = offset_mode
         if signal_region is None:
             self.signal_region = None
         else:
@@ -513,8 +519,9 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
     scattering_theory: AbstractScatteringTheory
 
     transform: AbstractImageTransform | None
+    normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
-    normalize_mode: Literal["standardize", "bg_subtract", "none"]
+    offset_mode: Literal["bg", "mean"]
     translate_mode: Literal["fft", "atom", "none"]
 
     def __init__(
@@ -525,8 +532,9 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
         scattering_theory: AbstractScatteringTheory,
         *,
         transform: AbstractImageTransform | None = None,
+        normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-        normalize_mode: Literal["standardize", "bg_subtract", "none"] = "none",
+        offset_mode: Literal["bg", "mean"] = "mean",
         translate_mode: Literal["fft", "atom", "none"] = "fft",
     ):
         self.volume_parametrization = volume_parametrization
@@ -535,7 +543,8 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
         self.scattering_theory = scattering_theory
         self.transform = transform
         self.translate_mode = translate_mode
-        self.normalize_mode = normalize_mode
+        self.normalizes_signal = normalizes_signal
+        self.offset_mode = offset_mode
         if signal_region is None:
             self.signal_region = None
         else:
@@ -591,8 +600,9 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
     scattering_theory: AbstractScatteringTheory
 
     transform: AbstractImageTransform | None
+    normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
-    normalize_mode: Literal["standardize", "bg_subtract", "none"]
+    offset_mode: Literal["bg", "mean"]
     translate_mode: Literal["fft", "atom", "none"]
 
     def __init__(
@@ -603,8 +613,9 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
         scattering_theory: AbstractScatteringTheory,
         *,
         transform: AbstractImageTransform | None = None,
+        normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-        normalize_mode: Literal["standardize", "bg_subtract", "none"] = "none",
+        offset_mode: Literal["bg", "mean"] = "mean",
         translate_mode: Literal["fft", "atom", "none"] = "fft",
     ):
         self.volume_parametrization = volume_parametrization
@@ -613,7 +624,8 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
         self.scattering_theory = scattering_theory
         self.transform = transform
         self.translate_mode = translate_mode
-        self.normalize_mode = normalize_mode
+        self.normalizes_signal = normalizes_signal
+        self.offset_mode = offset_mode
         if signal_region is None:
             self.signal_region = None
         else:
@@ -669,8 +681,9 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
     detector: AbstractDetector
 
     transform: AbstractImageTransform | None
+    normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
-    normalize_mode: Literal["standardize", "bg_subtract", "none"]
+    offset_mode: Literal["bg", "mean"]
     translate_mode: Literal["fft", "atom", "none"]
 
     def __init__(
@@ -682,8 +695,9 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
         detector: AbstractDetector,
         *,
         transform: AbstractImageTransform | None = None,
+        normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-        normalize_mode: Literal["standardize", "bg_subtract", "none"] = "none",
+        offset_mode: Literal["bg", "mean"] = "mean",
         translate_mode: Literal["fft", "atom", "none"] = "fft",
     ):
         self.volume_parametrization = volume_parametrization
@@ -693,7 +707,8 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
         self.detector = detector
         self.transform = transform
         self.translate_mode = translate_mode
-        self.normalize_mode = normalize_mode
+        self.normalizes_signal = normalizes_signal
+        self.offset_mode = offset_mode
         if signal_region is None:
             self.signal_region = None
         else:
@@ -782,23 +797,25 @@ _init_doc = """**Arguments:**
 - `transform`:
     A [`cryojax.ndimage.AbstractImageTransform`][] applied to the
     image after simulation.
+- `normalizes_signal`:
+    Whether or not to normalize the output of `image_model.simulate()`.
+    If `True`, see `offset_mode` for options.
 - `signal_region`:
     A boolean array that is 1 where there is signal,
     and 0 otherwise used to normalize the image.
     Must have shape equal to `AbstractImageConfig.shape`.
-- `normalize_mode`:
-    How to normalize the image. Options are
-    - 'standardize':
-        Normalize the image to be mean 0 and
-        standard deviation 1 within `signal_region`.
-    - 'bg_subtract':
-        Subtract mean value at image edges and divide by
-        the image standard deviation within `signal_region`.
-        This makes the image fades to a background with values
+- `offset_mode`:
+    How to calculate the offset for normalization when
+    `normalizes_signal = True`. Options are
+    - 'mean':
+        Normalize the image to be mean 0
+        within `signal_region`.
+    - 'bg':
+        Subtract mean value at the image edges.
+        This makes the image fade to a background with values
         equal to zero. Requires that `image_config.padded_shape`
         is large enough so that the signal sufficiently decays.
-    - 'none':
-        Do not normalize the image.
+    Ignored if `normalizes_signal = False`.
 - `translate_mode`:
     How to apply in-plane translation to the volume. Options are
     - 'fft':

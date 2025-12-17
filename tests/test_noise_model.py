@@ -66,7 +66,7 @@ def detector_image_model(volume, dose_config):
         pose=cxs.EulerAnglePose(),
         scattering_theory=scattering_theory,
         detector=detector,
-        normalize_mode="bg_subtract",
+        normalizes_signal=True,
     )
     return image_model
 
@@ -85,7 +85,7 @@ def solvent_image_model(volume, basic_config):
         image_config=basic_config,
         pose=cxs.EulerAnglePose(),
         scattering_theory=scattering_theory,
-        normalize_mode="bg_subtract",
+        normalizes_signal=True,
     )
     return image_model
 

@@ -179,15 +179,15 @@ def test_bad_translate_mode(voxel_info, basic_config):
 
 
 @pytest.mark.parametrize(
-    "std, normalize_mode",
+    "std, offset_mode",
     (
-        (2.0, "standardize"),
-        (4.0, "standardize"),
-        (2.0, "bg_subtract"),
-        (4.0, "bg_subtract"),
+        (2.0, "mean"),
+        (4.0, "mean"),
+        (2.0, "bg"),
+        (4.0, "bg"),
     ),
 )
-def test_normalize_and_transform(std, normalize_mode, voxel_info, basic_config):
+def test_normalize_and_transform(std, offset_mode, voxel_info, basic_config):
     real_voxels, _ = voxel_info
     voxel_volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxels)
     image_model = cxs.make_image_model(
@@ -195,7 +195,8 @@ def test_normalize_and_transform(std, normalize_mode, voxel_info, basic_config):
         basic_config,
         pose=cxs.EulerAnglePose(),
         transform=ImageScaling(scale=std),
-        normalize_mode=normalize_mode,
+        normalizes_signal=True,
+        offset_mode=offset_mode,
     )
     image = compute_image(image_model)
     np.testing.assert_approx_equal(np.std(image), std)
@@ -210,7 +211,7 @@ def test_mask_zeros_edges(use_transform, voxel_info, basic_config):
         basic_config,
         pose=cxs.EulerAnglePose(),
         transform=(ImageScaling(scale=1.0) if use_transform else None),
-        normalize_mode="standardize",
+        normalizes_signal=True,
     )
     image = image_model.simulate(
         mask=CircularCosineMask(
@@ -264,7 +265,8 @@ def test_bg_subtract(voxel_info):
         image_config,
         pose=cxs.EulerAnglePose(),
         transfer_theory=transfer_theory,
-        normalize_mode="bg_subtract",
+        normalizes_signal=True,
+        offset_mode="bg",
         quantity_mode="intensity",
     )
     image = compute_image(image_model)

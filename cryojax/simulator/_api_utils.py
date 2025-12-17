@@ -1,5 +1,4 @@
 import pathlib
-import warnings
 from collections.abc import Callable, Iterable
 from typing import Any, Literal, TypeVar, overload
 
@@ -76,7 +75,7 @@ def make_image_model(
     transform: AbstractImageTransform | None = None,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-    normalize_mode: Literal["standardize", "bg_subtract", "none"] = "none",
+    offset_mode: Literal["bg", "mean"] = "mean",
     translate_mode: Literal["fft", "atom", "none"] = "fft",
     quantity_mode: None = None,
 ) -> ProjectionImageModel: ...
@@ -94,7 +93,7 @@ def make_image_model(  # pyright: ignore[reportOverlappingOverload]
     transform: AbstractImageTransform | None = None,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-    normalize_mode: Literal["standardize", "bg_subtract", "none"] = "none",
+    offset_mode: Literal["bg", "mean"] = "mean",
     translate_mode: Literal["fft", "atom", "none"] = "fft",
     quantity_mode: None = None,
 ) -> LinearImageModel: ...
@@ -112,7 +111,7 @@ def make_image_model(
     transform: AbstractImageTransform | None = None,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-    normalize_mode: Literal["standardize", "bg_subtract", "none"] = "none",
+    offset_mode: Literal["bg", "mean"] = "mean",
     translate_mode: Literal["fft", "atom", "none"] = "fft",
     quantity_mode: Literal["contrast"] = "contrast",
 ) -> ContrastImageModel: ...
@@ -130,7 +129,7 @@ def make_image_model(
     transform: AbstractImageTransform | None = None,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-    normalize_mode: Literal["standardize", "bg_subtract", "none"] = "none",
+    offset_mode: Literal["bg", "mean"] = "mean",
     translate_mode: Literal["fft", "atom", "none"] = "fft",
     quantity_mode: Literal["intensity"] = "intensity",
 ) -> IntensityImageModel: ...
@@ -148,7 +147,7 @@ def make_image_model(
     transform: AbstractImageTransform | None = None,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-    normalize_mode: Literal["standardize", "bg_subtract", "none"] = "none",
+    offset_mode: Literal["bg", "mean"] = "mean",
     translate_mode: Literal["fft", "atom", "none"] = "fft",
     quantity_mode: Literal["counts"] = "counts",
 ) -> ElectronCountsImageModel: ...
@@ -165,7 +164,7 @@ def make_image_model(
     transform: AbstractImageTransform | None = None,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-    normalize_mode: Literal["standardize", "bg_subtract", "none"] = "none",
+    offset_mode: Literal["bg", "mean"] = "mean",
     translate_mode: Literal["fft", "atom", "none"] = "fft",
     quantity_mode: Literal["contrast", "intensity", "counts"] | None = None,
 ) -> AbstractImageModel:
@@ -206,23 +205,25 @@ def make_image_model(
         is applied before masking and after normalization, and
         if it is a fourier-space transform it is applied
         before filtering and before normalization.
+    - `normalizes_signal`:
+        Whether or not to normalize the output of `image_model.simulate()`.
+        If `True`, see `offset_mode` for options.
     - `signal_region`:
         A boolean array that is 1 where there is signal,
         and 0 otherwise used to normalize the image.
         Must have shape equal to `AbstractImageConfig.shape`.
-    - `normalize_mode`:
-        How to normalize the image. Options are
-        - 'standardize':
-            Normalize the image to be mean 0 and
-            standard deviation 1 within `signal_region`.
-        - 'bg_subtract':
-            Subtract mean value at image edges and divide by
-            the image standard deviation within `signal_region`.
-            This makes the image fades to a background with values
+    - `offset_mode`:
+        How to calculate the offset for normalization when
+        `normalizes_signal = True`. Options are
+        - 'mean':
+            Normalize the image to be mean 0
+            within `signal_region`.
+        - 'bg':
+            Subtract mean value at the image edges.
+            This makes the image fade to a background with values
             equal to zero. Requires that `image_config.padded_shape`
             is large enough so that the signal sufficiently decays.
-        - 'none':
-            Do not normalize the image.
+        Ignored if `normalizes_signal = False`.
     - `translate_mode`:
         How to apply in-plane translation to the volume. Options are
         - 'fft':
@@ -279,19 +280,9 @@ def make_image_model(
     # Invert pose if volume expects frame rotation
     if _use_inverse_pose(volume_parametrization):
         pose = pose.to_inverse_rotation()
-    # Gather options
-    if normalizes_signal:
-        warnings.warn(
-            "`make_image_model(..., normalizes_signal=True)` has "
-            "been depecated in favor of "
-            "`make_image_model(..., normalize_mode='standardize')` "
-            "and will be removed in cryoJAX 0.6.0.",
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        normalize_mode = "standardize"
     options = dict(
-        normalize_mode=normalize_mode,
+        normalizes_signal=normalizes_signal,
+        offset_mode=offset_mode,
         signal_region=signal_region,
         translate_mode=translate_mode,
         transform=transform,

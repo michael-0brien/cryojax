@@ -13,54 +13,8 @@ from ..jax_util import FloatLike, NDArrayLike
 def standardize_image(
     image: Inexact[NDArrayLike, "y_dim x_dim"],
     *,
-    input_is_real_space: bool = True,
-    where: Bool[Array, "y_dim x_dim"] | None = None,
-    input_is_rfft: bool = True,
-    shape_in_real_space: tuple[int, int] | None = None,
-) -> Inexact[Array, "y_dim x_dim"]:
-    """Normalize an image to zero mean and unit standard
-    deviation.
-
-    **Parameters:**
-
-    - `image`:
-        The image in either the real or fourier domain.
-        If in fourier, pass `input_is_real_space = True`
-        and ensure the zero frequency
-        component is in the corner.
-    - `std`:
-        Intensity standard deviation.
-    - `mean`:
-        Intensity offset.
-    - `input_is_real_space`:
-        If `True`, the given `image` is in real
-        space. If `False`, it is in Fourier space.
-    - `where`:
-        As `where` in `jax.numpy.std` and
-        `jax.numpy.mean`. This argument is ignored if
-        `input_is_real_space = False`.
-
-
-    **Returns:**
-
-    Image rescaled to the given mean and standard deviation.
-    """
-    return rescale_image(
-        image,
-        1.0,
-        0.0,
-        input_is_real_space=input_is_real_space,
-        where=where,
-        input_is_rfft=input_is_rfft,
-        shape_in_real_space=shape_in_real_space,
-    )
-
-
-def rescale_image(
-    image: Inexact[NDArrayLike, "y_dim x_dim"],
-    std: FloatLike,
-    mean: FloatLike,
-    *,
+    std: FloatLike = 1.0,
+    mean: FloatLike = 0.0,
     input_is_real_space: bool = True,
     where: Bool[Array, "y_dim x_dim"] | None = None,
     input_is_rfft: bool = True,
@@ -77,9 +31,9 @@ def rescale_image(
         and ensure the zero frequency
         component is in the corner.
     - `std`:
-        Intensity standard deviation.
+        Optionally, rescale to this standard deviation.
     - `mean`:
-        Intensity offset.
+        Optionally, rescale to this mean.
     - `input_is_real_space`:
         If `True`, the given `image` is in real
         space. If `False`, it is in Fourier space.
@@ -95,7 +49,7 @@ def rescale_image(
     """
     if where is not None and not input_is_real_space:
         raise ValueError(
-            "`cryojax.ndimage.rescale_image` does "
+            "`cryojax.ndimage.standardize_image` does "
             "not support argument `where` if `input_is_real_space` "
             "is `False`."
         )
@@ -147,8 +101,24 @@ def background_subtract_image(image: Float[NDArrayLike, "y_dim x_dim"]):
 
     The background subtracted image.
     """
+    return jnp.asarray(image) - compute_edge_value(image)
+
+
+def compute_edge_value(image: Float[NDArrayLike, "y_dim x_dim"]):
+    """Compute the median of the values at the image edges.
+    Useful for background subtraction.
+
+    **Arguments:**
+
+    - `image`:
+        The image to retrieve the edge value of.
+
+    **Returns:**
+
+    The median edge value.
+    """
     image = jnp.asarray(image)
     edge_values = jnp.concatenate(
         (image[0, :], image[-1, :], image[1:-1, 0], image[1:-1, -1]), axis=0
     )
-    return image - jnp.median(edge_values)
+    return jnp.median(edge_values)
