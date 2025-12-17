@@ -65,16 +65,16 @@ class AbstractImageModel(eqx.Module, strict=True):
 
     signal_region: eqx.AbstractVar[Bool[Array, "_ _"] | None]
     normalizes_signal: eqx.AbstractVar[bool]
-    offset_mode: eqx.AbstractVar[Literal["bg", "mean"]]
+    signal_centering: eqx.AbstractVar[Literal["bg", "mean"]]
     translate_mode: eqx.AbstractVar[Literal["fft", "atom", "none"]]
 
     def __check_init__(self):
-        if self.offset_mode not in ["bg", "mean"]:
+        if self.signal_centering not in ["bg", "mean"]:
             raise ValueError(
                 "Found invalid value for "
-                f"`{self.__class__.__name__}(..., offset_mode=...)`. "
+                f"`{self.__class__.__name__}(..., signal_centering=...)`. "
                 "Values 'bg' and 'mean' are "
-                f"supported, but got {self.offset_mode}."
+                f"supported, but got {self.signal_centering}."
             )
         if self.translate_mode not in ["fft", "atom", "none"]:
             raise ValueError(
@@ -181,9 +181,9 @@ class AbstractImageModel(eqx.Module, strict=True):
                 image = crop_to_shape(padded_image, image_config.shape)
             else:
                 image = padded_image
-            if self.normalizes_signal and self.offset_mode == "mean":
+            if self.normalizes_signal and self.signal_centering == "mean":
                 image = self._mean_subtract_normalize(image)
-            elif self.normalizes_signal and self.offset_mode == "bg":
+            elif self.normalizes_signal and self.signal_centering == "bg":
                 image = self._bg_subtract_normalize(image, padded_image)
             if mask_c is not None:
                 image = mask_c(image)
@@ -259,7 +259,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
     transform: AbstractImageTransform | None
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
-    offset_mode: Literal["bg", "mean"]
+    signal_centering: Literal["bg", "mean"]
     translate_mode: Literal["fft", "atom", "none"]
 
     def __init__(
@@ -273,7 +273,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
         transform: AbstractImageTransform | None = None,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-        offset_mode: Literal["bg", "mean"] = "mean",
+        signal_centering: Literal["bg", "mean"] = "mean",
         translate_mode: Literal["fft", "atom", "none"] = "fft",
     ):
         """**Arguments:**
@@ -292,12 +292,12 @@ class LinearImageModel(AbstractImageModel, strict=True):
             image after simulation.
         - `normalizes_signal`:
             Whether or not to normalize the output of `image_model.simulate()`.
-            If `True`, see `offset_mode` for options.
+            If `True`, see `signal_centering` for options.
         - `signal_region`:
             A boolean array that is 1 where there is signal,
             and 0 otherwise used to normalize the image.
             Must have shape equal to `AbstractImageConfig.shape`.
-        - `offset_mode`:
+        - `signal_centering`:
             How to calculate the offset for normalization when
             `normalizes_signal = True`. Options are
             - 'mean':
@@ -331,7 +331,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
         self.transform = transform
         self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
-        self.offset_mode = offset_mode
+        self.signal_centering = signal_centering
         if signal_region is None:
             self.signal_region = None
         else:
@@ -390,7 +390,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
     transform: AbstractImageTransform | None
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
-    offset_mode: Literal["bg", "mean"]
+    signal_centering: Literal["bg", "mean"]
     translate_mode: Literal["fft", "atom", "none"]
 
     def __init__(
@@ -403,7 +403,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
         transform: AbstractImageTransform | None = None,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-        offset_mode: Literal["bg", "mean"] = "mean",
+        signal_centering: Literal["bg", "mean"] = "mean",
         translate_mode: Literal["fft", "atom", "none"] = "fft",
     ):
         """**Arguments:**
@@ -421,12 +421,12 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
             image after simulation.
         - `normalizes_signal`:
             Whether or not to normalize the output of `image_model.simulate()`.
-            If `True`, see `offset_mode` for options.
+            If `True`, see `signal_centering` for options.
         - `signal_region`:
             A boolean array that is 1 where there is signal,
             and 0 otherwise used to normalize the image.
             Must have shape equal to `AbstractImageConfig.shape`.
-        - `offset_mode`:
+        - `signal_centering`:
             How to calculate the offset for normalization when
             `normalizes_signal = True`. Options are
             - 'mean':
@@ -459,7 +459,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
         self.transform = transform
         self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
-        self.offset_mode = offset_mode
+        self.signal_centering = signal_centering
         if signal_region is None:
             self.signal_region = None
         else:
@@ -521,7 +521,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
     transform: AbstractImageTransform | None
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
-    offset_mode: Literal["bg", "mean"]
+    signal_centering: Literal["bg", "mean"]
     translate_mode: Literal["fft", "atom", "none"]
 
     def __init__(
@@ -534,7 +534,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
         transform: AbstractImageTransform | None = None,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-        offset_mode: Literal["bg", "mean"] = "mean",
+        signal_centering: Literal["bg", "mean"] = "mean",
         translate_mode: Literal["fft", "atom", "none"] = "fft",
     ):
         self.volume_parametrization = volume_parametrization
@@ -544,7 +544,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
         self.transform = transform
         self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
-        self.offset_mode = offset_mode
+        self.signal_centering = signal_centering
         if signal_region is None:
             self.signal_region = None
         else:
@@ -602,7 +602,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
     transform: AbstractImageTransform | None
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
-    offset_mode: Literal["bg", "mean"]
+    signal_centering: Literal["bg", "mean"]
     translate_mode: Literal["fft", "atom", "none"]
 
     def __init__(
@@ -615,7 +615,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
         transform: AbstractImageTransform | None = None,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-        offset_mode: Literal["bg", "mean"] = "mean",
+        signal_centering: Literal["bg", "mean"] = "mean",
         translate_mode: Literal["fft", "atom", "none"] = "fft",
     ):
         self.volume_parametrization = volume_parametrization
@@ -625,7 +625,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
         self.transform = transform
         self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
-        self.offset_mode = offset_mode
+        self.signal_centering = signal_centering
         if signal_region is None:
             self.signal_region = None
         else:
@@ -683,7 +683,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
     transform: AbstractImageTransform | None
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
-    offset_mode: Literal["bg", "mean"]
+    signal_centering: Literal["bg", "mean"]
     translate_mode: Literal["fft", "atom", "none"]
 
     def __init__(
@@ -697,7 +697,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
         transform: AbstractImageTransform | None = None,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-        offset_mode: Literal["bg", "mean"] = "mean",
+        signal_centering: Literal["bg", "mean"] = "mean",
         translate_mode: Literal["fft", "atom", "none"] = "fft",
     ):
         self.volume_parametrization = volume_parametrization
@@ -708,7 +708,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
         self.transform = transform
         self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
-        self.offset_mode = offset_mode
+        self.signal_centering = signal_centering
         if signal_region is None:
             self.signal_region = None
         else:
@@ -799,12 +799,12 @@ _init_doc = """**Arguments:**
     image after simulation.
 - `normalizes_signal`:
     Whether or not to normalize the output of `image_model.simulate()`.
-    If `True`, see `offset_mode` for options.
+    If `True`, see `signal_centering` for options.
 - `signal_region`:
     A boolean array that is 1 where there is signal,
     and 0 otherwise used to normalize the image.
     Must have shape equal to `AbstractImageConfig.shape`.
-- `offset_mode`:
+- `signal_centering`:
     How to calculate the offset for normalization when
     `normalizes_signal = True`. Options are
     - 'mean':

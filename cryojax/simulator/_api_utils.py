@@ -75,7 +75,7 @@ def make_image_model(
     transform: AbstractImageTransform | None = None,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-    offset_mode: Literal["bg", "mean"] = "mean",
+    signal_centering: Literal["bg", "mean"] = "mean",
     translate_mode: Literal["fft", "atom", "none"] = "fft",
     quantity_mode: None = None,
 ) -> ProjectionImageModel: ...
@@ -93,7 +93,7 @@ def make_image_model(  # pyright: ignore[reportOverlappingOverload]
     transform: AbstractImageTransform | None = None,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-    offset_mode: Literal["bg", "mean"] = "mean",
+    signal_centering: Literal["bg", "mean"] = "mean",
     translate_mode: Literal["fft", "atom", "none"] = "fft",
     quantity_mode: None = None,
 ) -> LinearImageModel: ...
@@ -111,7 +111,7 @@ def make_image_model(
     transform: AbstractImageTransform | None = None,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-    offset_mode: Literal["bg", "mean"] = "mean",
+    signal_centering: Literal["bg", "mean"] = "mean",
     translate_mode: Literal["fft", "atom", "none"] = "fft",
     quantity_mode: Literal["contrast"] = "contrast",
 ) -> ContrastImageModel: ...
@@ -129,7 +129,7 @@ def make_image_model(
     transform: AbstractImageTransform | None = None,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-    offset_mode: Literal["bg", "mean"] = "mean",
+    signal_centering: Literal["bg", "mean"] = "mean",
     translate_mode: Literal["fft", "atom", "none"] = "fft",
     quantity_mode: Literal["intensity"] = "intensity",
 ) -> IntensityImageModel: ...
@@ -147,7 +147,7 @@ def make_image_model(
     transform: AbstractImageTransform | None = None,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-    offset_mode: Literal["bg", "mean"] = "mean",
+    signal_centering: Literal["bg", "mean"] = "mean",
     translate_mode: Literal["fft", "atom", "none"] = "fft",
     quantity_mode: Literal["counts"] = "counts",
 ) -> ElectronCountsImageModel: ...
@@ -164,7 +164,7 @@ def make_image_model(
     transform: AbstractImageTransform | None = None,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
-    offset_mode: Literal["bg", "mean"] = "mean",
+    signal_centering: Literal["bg", "mean"] = "mean",
     translate_mode: Literal["fft", "atom", "none"] = "fft",
     quantity_mode: Literal["contrast", "intensity", "counts"] | None = None,
 ) -> AbstractImageModel:
@@ -207,12 +207,12 @@ def make_image_model(
         before filtering and before normalization.
     - `normalizes_signal`:
         Whether or not to normalize the output of `image_model.simulate()`.
-        If `True`, see `offset_mode` for options.
+        If `True`, see `signal_centering` for options.
     - `signal_region`:
         A boolean array that is 1 where there is signal,
         and 0 otherwise used to normalize the image.
         Must have shape equal to `AbstractImageConfig.shape`.
-    - `offset_mode`:
+    - `signal_centering`:
         How to calculate the offset for normalization when
         `normalizes_signal = True`. Options are
         - 'mean':
@@ -282,7 +282,7 @@ def make_image_model(
         pose = pose.to_inverse_rotation()
     options = dict(
         normalizes_signal=normalizes_signal,
-        offset_mode=offset_mode,
+        signal_centering=signal_centering,
         signal_region=signal_region,
         translate_mode=translate_mode,
         transform=transform,

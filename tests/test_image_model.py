@@ -179,7 +179,7 @@ def test_bad_translate_mode(voxel_info, basic_config):
 
 
 @pytest.mark.parametrize(
-    "std, offset_mode",
+    "std, signal_centering",
     (
         (2.0, "mean"),
         (4.0, "mean"),
@@ -187,7 +187,7 @@ def test_bad_translate_mode(voxel_info, basic_config):
         (4.0, "bg"),
     ),
 )
-def test_normalize_and_transform(std, offset_mode, voxel_info, basic_config):
+def test_normalize_and_transform(std, signal_centering, voxel_info, basic_config):
     real_voxels, _ = voxel_info
     voxel_volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxels)
     image_model = cxs.make_image_model(
@@ -196,7 +196,7 @@ def test_normalize_and_transform(std, offset_mode, voxel_info, basic_config):
         pose=cxs.EulerAnglePose(),
         transform=ImageScaling(scale=std),
         normalizes_signal=True,
-        offset_mode=offset_mode,
+        signal_centering="bg",
     )
     image = compute_image(image_model)
     np.testing.assert_approx_equal(np.std(image), std)
@@ -266,7 +266,7 @@ def test_bg_subtract(voxel_info):
         pose=cxs.EulerAnglePose(),
         transfer_theory=transfer_theory,
         normalizes_signal=True,
-        offset_mode="bg",
+        signal_centering="bg",
         quantity_mode="intensity",
     )
     image = compute_image(image_model)
