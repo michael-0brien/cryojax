@@ -190,12 +190,12 @@ class AbstractParticleStarFile(
 
     @property
     @abc.abstractmethod
-    def rotation_mode(self) -> Literal["object", "frame"]:
+    def rotation_convention(self) -> Literal["object", "frame"]:
         raise NotImplementedError
 
-    @rotation_mode.setter
+    @rotation_convention.setter
     @abc.abstractmethod
-    def rotation_mode(self, value: Literal["object", "frame"]):
+    def rotation_convention(self, value: Literal["object", "frame"]):
         raise NotImplementedError
 
     def copy(self) -> Self:
@@ -219,7 +219,7 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
         broadcasts_image_config: bool = True,
         loads_envelope: bool = False,
         updates_optics_group: bool = False,
-        rotation_mode: Literal["frame", "object"] = "object",
+        rotation_convention: Literal["frame", "object"] = "object",
         pad_options: dict = {},
     ):
         """**Arguments:**
@@ -260,13 +260,13 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
         - `updates_optics_group`:
             If `True`, when re-writing STAR file entries via
             `dataset[idx] = parameters` syntax, creates a new optics group entry.
-        - `rotation_mode`:
+        - `rotation_convention`:
             If `'object'`, the loader loads/writes poses in the convention that
             the rotation is of the *object*. If `'frame'`, the rotation is of
             the frame (i.e. the rotation is inverted).
             The pose passed to [`cryojax.simulator.make_image_model`][]
             is always of the object, but advanced considerations may require
-            setting `rotation_mode = 'frame'` (or manually calling
+            setting `rotation_convention = 'frame'` (or manually calling
             `pose.to_inverse_rotation()`) to correctly match RELION and
             cryoJAX conventions.
         - `pad_options`:
@@ -288,7 +288,7 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
         # Properties for writing
         self._updates_optics_group = updates_optics_group
         # Shared
-        self._rotation_mode = _validate_rotation_mode(rotation_mode)
+        self._rotation_convention = _validate_rotation_convention(rotation_convention)
 
     @override
     def __getitem__(
@@ -312,7 +312,7 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
             self.broadcasts_image_config,
             self.loads_envelope,
             self._pad_options,
-            self._rotation_mode,
+            self._rotation_convention,
         )
         if self.loads_metadata:
             # ... convert to dataframe for serialization
@@ -352,7 +352,7 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
         _validate_parameters(value, force_keys=False)
         # Invert the pose if desired
         if "pose" in value:
-            if self.rotation_mode == "frame":
+            if self.rotation_convention == "frame":
                 value["pose"] = _invert_rotation(value["pose"])
         # Grab the current and new optics and particle data
         if self.updates_optics_group:
@@ -396,7 +396,7 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
         _validate_parameters(value, force_keys=True)
         # Invert the pose if desired
         if "pose" in value:
-            if self.rotation_mode == "frame":
+            if self.rotation_convention == "frame":
                 value["pose"] = _invert_rotation(value["pose"])
         # Make new optics group
         optics_group_index = _make_optics_group_index(self.starfile_data["optics"])
@@ -530,12 +530,12 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
         self._updates_optics_group = value
 
     @property
-    def rotation_mode(self) -> Literal["object", "frame"]:
-        return self._rotation_mode  # pyright: ignore[reportReturnType]
+    def rotation_convention(self) -> Literal["object", "frame"]:
+        return self._rotation_convention  # pyright: ignore[reportReturnType]
 
-    @rotation_mode.setter
-    def rotation_mode(self, value: Literal["object", "frame"]):
-        self._rotation_mode = _validate_rotation_mode(value)
+    @rotation_convention.setter
+    def rotation_convention(self, value: Literal["object", "frame"]):
+        self._rotation_convention = _validate_rotation_convention(value)
 
 
 class RelionParticleStackDataset(
@@ -928,10 +928,10 @@ def _validate_mode(mode: str) -> Literal["r", "w"]:
     return mode  # type: ignore
 
 
-def _validate_rotation_mode(mode: str) -> Literal["frame", "object"]:
+def _validate_rotation_convention(mode: str) -> Literal["frame", "object"]:
     if mode not in ["frame", "object"]:
         raise ValueError(
-            f"Passed unsupported `rotation_mode = {mode}`. "
+            f"Passed unsupported `rotation_convention = {mode}`. "
             "Supported modes are 'object' and 'frame'."
         )
     return mode  # type: ignore
@@ -995,7 +995,7 @@ def _make_pytrees_from_starfile(
     broadcasts_image_config,
     loads_envelope,
     pad_options,
-    rotation_mode,
+    rotation_convention,
 ) -> tuple[BasicImageConfig, ContrastTransferTheory, EulerAnglePose]:
     float_dtype = jax.dtypes.canonicalize_dtype(float)
     # Load CTF parameters. First from particle data
@@ -1133,7 +1133,7 @@ def _make_pytrees_from_starfile(
         transfer_theory = _make_transfer_theory(*transfer_theory_params)  # type: ignore
         # ... finally the `EulerAnglePose`
         pose = _make_pose(*pose_params)
-        if rotation_mode == "frame":
+        if rotation_convention == "frame":
             pose = _invert_rotation(pose)
     # Now, convert arrays to numpy in case the user wishes to do preprocessing
     pytree_dynamic, pytree_static = eqx.partition(

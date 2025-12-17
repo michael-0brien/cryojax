@@ -317,7 +317,7 @@ def test_load_starfile_pose_params(sample_starfile_path):
         path_to_starfile=sample_starfile_path,
         loads_envelope=False,
         loads_metadata=True,
-        rotation_mode="object",
+        rotation_convention="object",
     )
 
     parameters = parameter_file[:]
@@ -367,13 +367,13 @@ def test_load_starfile_pose_inverse(sample_starfile_path):
         path_to_starfile=sample_starfile_path,
         loads_envelope=False,
         loads_metadata=True,
-        rotation_mode="object",
+        rotation_convention="object",
     )
     parameter_file_inverse = RelionParticleParameterFile(
         path_to_starfile=sample_starfile_path,
         loads_envelope=False,
         loads_metadata=True,
-        rotation_mode="frame",
+        rotation_convention="frame",
     )
 
     # Without batch dim
