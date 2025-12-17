@@ -3,7 +3,7 @@ import equinox as eqx
 import numpy as np
 import pytest
 from cryojax.io import read_array_from_mrc, read_atoms_from_pdb
-from cryojax.ndimage import CircularCosineMask, ImageScaling, crop_to_shape
+from cryojax.ndimage import CircularCosineMask, ImageScaling, LowpassFilter, crop_to_shape
 
 
 @pytest.fixture
@@ -208,6 +208,29 @@ def test_mask_zeros_edges(use_transform, voxel_info, basic_config):
     np.testing.assert_allclose(image[ny, 0], 0.0)
     np.testing.assert_allclose(image[0, nx], 0.0)
     np.testing.assert_allclose(image[ny, nx], 0.0)
+
+
+def test_filter_padded_shape(voxel_info, basic_config):
+    real_voxels, _ = voxel_info
+    voxel_volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxels)
+    image_model = cxs.make_image_model(
+        voxel_volume,
+        basic_config,
+        pose=cxs.EulerAnglePose(),
+    )
+    _ = image_model.simulate(
+        filter=LowpassFilter(
+            basic_config.padded_frequency_grid_in_pixels,
+            grid_spacing=basic_config.pixel_size,
+        )
+    )
+    with pytest.raises(ValueError):
+        _ = image_model.simulate(
+            filter=LowpassFilter(
+                basic_config.frequency_grid_in_pixels,
+                grid_spacing=basic_config.pixel_size,
+            )
+        )
 
 
 @eqx.filter_jit

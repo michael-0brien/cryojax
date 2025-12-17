@@ -13,9 +13,9 @@ from jaxtyping import Array, Bool, Complex, Float, PRNGKeyArray
 
 from ..jax_util import NDArrayLike
 from ..ndimage import (
+    AbstractFilter,
     AbstractImageTransform,
-    FilterLike,
-    MaskLike,
+    AbstractMask,
     crop_to_shape,
     irfftn,
     rfftn,
@@ -80,8 +80,8 @@ class AbstractImageModel(eqx.Module, strict=True):
         *,
         removes_padding: bool = True,
         outputs_real_space: bool = True,
-        mask: MaskLike | None = None,
-        filter: FilterLike | None = None,
+        mask: AbstractMask | None = None,
+        filter: AbstractFilter | None = None,
     ) -> Array:
         """Render an image.
 
@@ -117,8 +117,8 @@ class AbstractImageModel(eqx.Module, strict=True):
         fourier_image: Array,
         *,
         outputs_real_space: bool = True,
-        mask: MaskLike | None = None,
-        filter: FilterLike | None = None,
+        mask: AbstractMask | None = None,
+        filter: AbstractFilter | None = None,
         apply_transform: bool = True,
     ) -> Array:
         """Return an image postprocessed with filters, cropping, masking,
@@ -126,17 +126,19 @@ class AbstractImageModel(eqx.Module, strict=True):
         """
         image_config = self.image_config
         if apply_transform:
-            mask, filter = self._compose_transform(mask, filter)
+            mask_c, filter_c = self._compose_transform(mask, filter)
+        else:
+            mask_c, filter_c = mask, filter
         if (
-            mask is None
+            mask_c is None
             and image_config.padded_shape == image_config.shape
             and not self.normalizes_signal
         ):
             # ... if there are no masks, we don't need to crop, and we are
             # not normalizing, minimize moving back and forth between real
             # and fourier space
-            if filter is not None:
-                fourier_image = filter(fourier_image)
+            if filter_c is not None:
+                fourier_image = filter_c(fourier_image)
             return (
                 irfftn(fourier_image, s=image_config.shape)
                 if outputs_real_space
@@ -146,26 +148,27 @@ class AbstractImageModel(eqx.Module, strict=True):
             # ... otherwise, apply filter, crop, and mask, again trying to
             # minimize moving back and forth between real and fourier space
             padded_rfft_shape = image_config.padded_frequency_grid_in_pixels.shape[0:2]
-            if filter is not None:
+            if filter_c is not None:
                 # ... apply the filter
-                if not filter.array.shape == padded_rfft_shape:
-                    raise ValueError(
-                        "Found that the `filter` was shape "
-                        f"{filter.array.shape}, but expected it to be "
-                        f"shape {padded_rfft_shape}. You may have passed a "
-                        f"filter according to the "
-                        f"`{image_config.__class__.__name__}.shape`, "
-                        f"when the `{image_config.__class__.__name__}.padded_shape` "
-                        "was expected."
-                    )
-                fourier_image = filter(fourier_image)
+                if filter is not None:
+                    if not filter.get().shape == padded_rfft_shape:
+                        raise ValueError(
+                            "Found that the `filter` was shape "
+                            f"{filter.get().shape}, but expected it to be "
+                            f"shape {padded_rfft_shape}. You may have passed a "
+                            f"filter according to the "
+                            f"`{image_config.__class__.__name__}.shape`, "
+                            f"when the `{image_config.__class__.__name__}.padded_shape` "
+                            "was expected."
+                        )
+                fourier_image = filter_c(fourier_image)
             image = irfftn(fourier_image, s=image_config.padded_shape)
             if image_config.padded_shape != image_config.shape:
                 image = crop_to_shape(image, image_config.shape)
             if self.normalizes_signal:
                 image = self._normalize_image(image)
-            if mask is not None:
-                image = mask(image)
+            if mask_c is not None:
+                image = mask_c(image)
             return image if outputs_real_space else rfftn(image)
 
     def _phase_shift_translate(self, fourier_image: Array) -> Array:
@@ -191,7 +194,7 @@ class AbstractImageModel(eqx.Module, strict=True):
             )
 
     def _compose_transform(
-        self, mask: MaskLike | None, filter: FilterLike | None
+        self, mask: AbstractMask | None, filter: AbstractFilter | None
     ) -> tuple[AbstractImageTransform | None, AbstractImageTransform | None]:
         if self.transform is None:
             return mask, filter
@@ -222,8 +225,8 @@ class AbstractImageModel(eqx.Module, strict=True):
         *,
         removes_padding: bool = True,
         outputs_real_space: bool = True,
-        mask: MaskLike | None = None,
-        filter: FilterLike | None = None,
+        mask: AbstractMask | None = None,
+        filter: AbstractFilter | None = None,
         apply_transform: bool = True,
     ) -> Array:
         if removes_padding:

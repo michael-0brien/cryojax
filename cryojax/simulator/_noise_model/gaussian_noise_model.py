@@ -12,10 +12,10 @@ from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
 from ...jax_util import FloatLike, error_if_not_positive
 from ...ndimage import (
+    AbstractFilter,
     AbstractFourierOperator,
-    FilterLike,
+    AbstractMask,
     FourierConstant,
-    MaskLike,
     rfftn,
 )
 from .._image_model import AbstractImageModel
@@ -53,8 +53,8 @@ class AbstractGaussianNoiseModel(
         rng_key: PRNGKeyArray,
         *,
         outputs_real_space: bool = True,
-        mask: MaskLike | None = None,
-        filter: FilterLike | None = None,
+        mask: AbstractMask | None = None,
+        filter: AbstractFilter | None = None,
     ) -> ImageArray:
         """Sample a noisy image from the gaussian noise model.
 
@@ -90,8 +90,8 @@ class AbstractGaussianNoiseModel(
         self,
         *,
         outputs_real_space: bool = True,
-        mask: MaskLike | None = None,
-        filter: FilterLike | None = None,
+        mask: AbstractMask | None = None,
+        filter: AbstractFilter | None = None,
     ) -> ImageArray:
         """Render the signal from the image formation model.
 
@@ -119,8 +119,8 @@ class AbstractGaussianNoiseModel(
         rng_key: PRNGKeyArray,
         *,
         outputs_real_space: bool = True,
-        mask: MaskLike | None = None,
-        filter: FilterLike | None = None,
+        mask: AbstractMask | None = None,
+        filter: AbstractFilter | None = None,
     ) -> ImageArray:
         """Draw a realization from the gaussian noise model and return either in
         real or fourier space.
@@ -173,8 +173,8 @@ class GaussianWhiteNoiseModel(AbstractGaussianNoiseModel, strict=True):
         rng_key: PRNGKeyArray,
         *,
         outputs_real_space: bool = True,
-        mask: MaskLike | None = None,
-        filter: FilterLike | None = None,
+        mask: AbstractMask | None = None,
+        filter: AbstractFilter | None = None,
     ) -> ImageArray:
         """Sample a realization of the noise from the distribution.
 
@@ -212,8 +212,8 @@ class GaussianWhiteNoiseModel(AbstractGaussianNoiseModel, strict=True):
         self,
         observed: RealImageArray,
         *,
-        mask: MaskLike | None = None,
-        filter: FilterLike | None = None,
+        mask: AbstractMask | None = None,
+        filter: AbstractFilter | None = None,
     ) -> Float[Array, ""]:
         """Evaluate the log-likelihood of the gaussian noise model.
 
@@ -295,8 +295,8 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
         rng_key: PRNGKeyArray,
         *,
         outputs_real_space: bool = True,
-        mask: MaskLike | None = None,
-        filter: FilterLike | None = None,
+        mask: AbstractMask | None = None,
+        filter: AbstractFilter | None = None,
     ) -> ImageArray:
         """Sample a realization of the noise from the distribution.
 
@@ -334,8 +334,8 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
         self,
         observed: FourierImageArray,
         *,
-        mask: MaskLike | None = None,
-        filter: FilterLike | None = None,
+        mask: AbstractMask | None = None,
+        filter: AbstractFilter | None = None,
     ) -> Float[Array, ""]:
         """Evaluate the log-likelihood of the gaussian noise model.
 
