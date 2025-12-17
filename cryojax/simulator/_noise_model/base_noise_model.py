@@ -8,7 +8,7 @@ import equinox as eqx
 import jax
 from jaxtyping import Array, Float, Inexact, PRNGKeyArray
 
-from ...ndimage import FilterLike, MaskLike
+from ...ndimage import AbstractFilter, AbstractMask
 from .._detector import AbstractDetector
 from .._solvent_2d import AbstractRandomSolvent2D
 
@@ -22,8 +22,8 @@ class AbstractNoiseModel(eqx.Module, strict=True):
         rng_key: PRNGKeyArray,
         *,
         outputs_real_space: bool = True,
-        mask: MaskLike | None = None,
-        filter: FilterLike | None = None,
+        mask: AbstractMask | None = None,
+        filter: AbstractFilter | None = None,
     ) -> Inexact[Array, "y_dim x_dim"]:
         """Sample from the distribution.
 
@@ -39,8 +39,8 @@ class AbstractNoiseModel(eqx.Module, strict=True):
         self,
         *,
         outputs_real_space: bool = True,
-        mask: MaskLike | None = None,
-        filter: FilterLike | None = None,
+        mask: AbstractMask | None = None,
+        filter: AbstractFilter | None = None,
     ) -> Inexact[Array, "y_dim x_dim"]:
         """Compute the signal of the image formation model."""
         raise NotImplementedError
@@ -54,8 +54,8 @@ class AbstractLikelihoodNoiseModel(AbstractNoiseModel, strict=True):
         self,
         observed: Inexact[Array, "y_dim x_dim"],
         *,
-        mask: MaskLike | None = None,
-        filter: FilterLike | None = None,
+        mask: AbstractMask | None = None,
+        filter: AbstractFilter | None = None,
     ) -> Float[Array, ""]:
         """Evaluate the log likelihood.
 

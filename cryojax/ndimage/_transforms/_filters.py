@@ -36,9 +36,6 @@ class AbstractFilter(AbstractImageTransform, strict=True):
         return image * self.get()
 
 
-FilterLike = AbstractFilter | AbstractImageTransform
-
-
 class CustomFilter(AbstractFilter, strict=True):
     """Pass a custom filter as an array."""
 

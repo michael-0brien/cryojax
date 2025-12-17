@@ -31,9 +31,6 @@ class AbstractMask(AbstractImageTransform, strict=True):
         return image * self.get()
 
 
-MaskLike = AbstractMask | AbstractImageTransform
-
-
 class CustomMask(AbstractMask, strict=True):
     """Pass a custom mask as an array."""
 

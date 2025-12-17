@@ -15,8 +15,7 @@ from ..jax_util import NDArrayLike
 from ..ndimage import (
     AbstractFilter,
     AbstractImageTransform,
-    FilterLike,
-    MaskLike,
+    AbstractMask,
     crop_to_shape,
     irfftn,
     rfftn,
@@ -81,8 +80,8 @@ class AbstractImageModel(eqx.Module, strict=True):
         *,
         removes_padding: bool = True,
         outputs_real_space: bool = True,
-        mask: MaskLike | None = None,
-        filter: FilterLike | None = None,
+        mask: AbstractMask | None = None,
+        filter: AbstractFilter | None = None,
     ) -> Array:
         """Render an image.
 
@@ -118,8 +117,8 @@ class AbstractImageModel(eqx.Module, strict=True):
         fourier_image: Array,
         *,
         outputs_real_space: bool = True,
-        mask: MaskLike | None = None,
-        filter: FilterLike | None = None,
+        mask: AbstractMask | None = None,
+        filter: AbstractFilter | None = None,
         apply_transform: bool = True,
     ) -> Array:
         """Return an image postprocessed with filters, cropping, masking,
@@ -151,7 +150,7 @@ class AbstractImageModel(eqx.Module, strict=True):
             padded_rfft_shape = image_config.padded_frequency_grid_in_pixels.shape[0:2]
             if filter_c is not None:
                 # ... apply the filter
-                if isinstance(filter, AbstractFilter):
+                if filter is not None:
                     if not filter.get().shape == padded_rfft_shape:
                         raise ValueError(
                             "Found that the `filter` was shape "
@@ -195,7 +194,7 @@ class AbstractImageModel(eqx.Module, strict=True):
             )
 
     def _compose_transform(
-        self, mask: MaskLike | None, filter: FilterLike | None
+        self, mask: AbstractMask | None, filter: AbstractFilter | None
     ) -> tuple[AbstractImageTransform | None, AbstractImageTransform | None]:
         if self.transform is None:
             return mask, filter
@@ -226,8 +225,8 @@ class AbstractImageModel(eqx.Module, strict=True):
         *,
         removes_padding: bool = True,
         outputs_real_space: bool = True,
-        mask: MaskLike | None = None,
-        filter: FilterLike | None = None,
+        mask: AbstractMask | None = None,
+        filter: AbstractFilter | None = None,
         apply_transform: bool = True,
     ) -> Array:
         if removes_padding:
