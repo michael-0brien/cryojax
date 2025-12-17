@@ -67,7 +67,18 @@ def test_future_deprecated(sample_pdb_path):
         assert not should_be_removed(record)
 
     with pytest.warns(FutureWarning) as record:
-        volume = cxs.GaussianMixtureProjection(use_error_functions=True)  # type: ignore
+        _ = cxs.GaussianMixtureProjection(use_error_functions=True)  # type: ignore
+        assert not should_be_removed(record)
+
+    with pytest.warns(FutureWarning) as record:
+        _ = (
+            cxs.make_image_model(
+                volume,
+                image_config=cxs.BasicImageConfig((10, 10), 1.0, 300.0),
+                pose=cxs.EulerAnglePose(),
+                normalizes_signal=True,
+            ),
+        )
         assert not should_be_removed(record)
 
     with pytest.warns(FutureWarning) as record:
@@ -78,6 +89,11 @@ def test_future_deprecated(sample_pdb_path):
     with pytest.warns(FutureWarning) as record:
         func = cx.ndimage.downsample_to_shape_with_fourier_cropping
         assert func is cx.ndimage.fourier_crop_to_shape
+        assert not should_be_removed(record)
+
+    with pytest.warns(FutureWarning) as record:
+        func = cx.ndimage.normalize_image
+        assert func is cx.ndimage.standardize_image
         assert not should_be_removed(record)
 
     # ndimage submodules

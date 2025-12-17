@@ -41,7 +41,11 @@ from ._map_coordinates import (
     map_coordinates as map_coordinates,
     map_coordinates_spline as map_coordinates_spline,
 )
-from ._normalize import normalize_image as normalize_image, rescale_image as rescale_image
+from ._normalize import (
+    background_subtract_image as background_subtract_image,
+    rescale_image as rescale_image,
+    standardize_image as standardize_image,
+)
 from ._operators import (
     AbstractFourierOperator as AbstractFourierOperator,
     AbstractRealOperator as AbstractRealOperator,
@@ -102,6 +106,15 @@ def __getattr__(name: str) -> _Any:
             stacklevel=2,
         )
         return fourier_crop_to_shape
+    if name == "normalize_image":
+        _warnings.warn(
+            "'normalize_image' is deprecated"
+            "has been renamed to 'standardize_image'. "
+            "The old name will be deprecated in cryoJAX 0.6.0.",
+            category=FutureWarning,
+            stacklevel=2,
+        )
+        return standardize_image
     if name == "operators":
         _warnings.warn(
             "Submodule `cryojax.ndimage.operators` is deprecated and "

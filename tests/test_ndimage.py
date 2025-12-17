@@ -164,6 +164,13 @@ def test_pad(padded_shape, shape):
     )
 
 
+# Normalization
+def test_bg_subtract():
+    image = jnp.ones((10, 10))
+    image = np.asarray(im.background_subtract_image(image))
+    assert np.all(image == 0.0)
+
+
 # Fourier statistics
 @pytest.mark.parametrize(
     "shape",
