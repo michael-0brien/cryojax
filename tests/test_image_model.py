@@ -52,8 +52,8 @@ def image_model(voxel_volume, basic_config):
 def test_real_shape(model, request):
     """Make sure shapes are as expected in real space."""
     model = request.getfixturevalue(model)
-    image = model.simulate()
-    padded_image = model.simulate(removes_padding=False)
+    image = model.simulate(outputs_real_space=True)
+    padded_image = model.raw_simulate(outputs_real_space=True)
     assert image.shape == model.image_config.shape
     assert padded_image.shape == model.image_config.padded_shape
 
@@ -63,7 +63,7 @@ def test_fourier_shape(model, request):
     """Make sure shapes are as expected in fourier space."""
     model = request.getfixturevalue(model)
     image = model.simulate(outputs_real_space=False)
-    padded_image = model.simulate(removes_padding=False, outputs_real_space=False)
+    padded_image = model.raw_simulate(outputs_real_space=False)
     assert image.shape == model.image_config.frequency_grid_in_pixels.shape[0:2]
     assert (
         padded_image.shape

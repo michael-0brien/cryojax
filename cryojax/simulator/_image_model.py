@@ -78,7 +78,6 @@ class AbstractImageModel(eqx.Module, strict=True):
         self,
         rng_key: PRNGKeyArray | None = None,
         *,
-        removes_padding: bool = True,
         outputs_real_space: bool = True,
         mask: AbstractMask | None = None,
         filter: AbstractFilter | None = None,
@@ -90,11 +89,6 @@ class AbstractImageModel(eqx.Module, strict=True):
         - `rng_key`:
             The random number generator key. If not passed, render an image
             with no stochasticity.
-        - `removes_padding`:
-            If `True`, return an image cropped to `image_config.shape`.
-            Otherwise, return an image at the `image_config.padded_shape`.
-            If `removes_padding = False`, the `filter`, `mask`, and
-            `image_model.transform` are not applied.
         - `outputs_real_space`:
             If `True`, return the image in real space.
         - `mask`:
@@ -104,12 +98,12 @@ class AbstractImageModel(eqx.Module, strict=True):
         """
         fourier_image = self.raw_simulate(rng_key, outputs_real_space=False)
 
-        return self._maybe_postprocess(
+        return self.postprocess(
             fourier_image,
-            removes_padding=removes_padding,
             outputs_real_space=outputs_real_space,
             mask=mask,
             filter=filter,
+            apply_transform=True,
         )
 
     def postprocess(
@@ -218,31 +212,6 @@ class AbstractImageModel(eqx.Module, strict=True):
         image = (image - mean) / std
 
         return image
-
-    def _maybe_postprocess(
-        self,
-        image: Array,
-        *,
-        removes_padding: bool = True,
-        outputs_real_space: bool = True,
-        mask: AbstractMask | None = None,
-        filter: AbstractFilter | None = None,
-        apply_transform: bool = True,
-    ) -> Array:
-        if removes_padding:
-            return self.postprocess(
-                image,
-                outputs_real_space=outputs_real_space,
-                mask=mask,
-                filter=filter,
-                apply_transform=apply_transform,
-            )
-        else:
-            return (
-                irfftn(image, s=self.image_config.padded_shape)
-                if outputs_real_space
-                else image
-            )
 
 
 class LinearImageModel(AbstractImageModel, strict=True):
