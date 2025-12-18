@@ -3,7 +3,13 @@ import equinox as eqx
 import numpy as np
 import pytest
 from cryojax.io import read_array_from_mrc, read_atoms_from_pdb
-from cryojax.ndimage import CircularCosineMask, ImageScaling, LowpassFilter, crop_to_shape
+from cryojax.ndimage import (
+    CircularCosineMask,
+    ImageScaling,
+    LowpassFilter,
+    crop_to_shape,
+    pad_to_shape,
+)
 
 
 @pytest.fixture
@@ -144,16 +150,16 @@ def test_translate_mode(pdb_info, offset_xy, pixel_size, shape, pad_scale):
         volume,
         pose,
         image_config,
-        integrator,
         transfer_theory,
+        integrator,
         translate_mode="fft",
     )
     atom_im_model = cxs.LinearImageModel(
         volume,
         pose,
         image_config,
-        integrator,
         transfer_theory,
+        integrator,
         translate_mode="atom",
     )
     atom_translate_im = compute_image(atom_im_model)
@@ -172,8 +178,16 @@ def test_bad_translate_mode(voxel_info, basic_config):
         _ = model.simulate()
 
 
-@pytest.mark.parametrize("std", (2.0, 4.0))
-def test_transform(std, voxel_info, basic_config):
+@pytest.mark.parametrize(
+    "std, signal_centering",
+    (
+        (2.0, "mean"),
+        (4.0, "mean"),
+        (2.0, "bg"),
+        (4.0, "bg"),
+    ),
+)
+def test_normalize_and_transform(std, signal_centering, voxel_info, basic_config):
     real_voxels, _ = voxel_info
     voxel_volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxels)
     image_model = cxs.make_image_model(
@@ -182,6 +196,7 @@ def test_transform(std, voxel_info, basic_config):
         pose=cxs.EulerAnglePose(),
         transform=ImageScaling(scale=std),
         normalizes_signal=True,
+        signal_centering="bg",
     )
     image = compute_image(image_model)
     np.testing.assert_approx_equal(np.std(image), std)
@@ -231,6 +246,31 @@ def test_filter_padded_shape(voxel_info, basic_config):
                 grid_spacing=basic_config.pixel_size,
             )
         )
+
+
+def test_bg_subtract(voxel_info):
+    real_voxels, voxel_size = voxel_info
+    dim = real_voxels.shape[0]
+    padded_dim = 2 * dim
+    real_voxels = pad_to_shape(real_voxels, tuple(3 * [padded_dim]))
+    image_config = cxs.BasicImageConfig(
+        shape=(padded_dim, padded_dim),
+        pixel_size=voxel_size,
+        voltage_in_kilovolts=300.0,
+    )
+    voxel_volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxels)
+    transfer_theory = cxs.ContrastTransferTheory(cxs.AstigmaticCTF())
+    image_model = cxs.make_image_model(
+        voxel_volume,
+        image_config,
+        pose=cxs.EulerAnglePose(),
+        transfer_theory=transfer_theory,
+        normalizes_signal=True,
+        signal_centering="bg",
+        quantity_mode="intensity",
+    )
+    image = compute_image(image_model)
+    np.testing.assert_allclose(image[:, 0], 0.0, atol=5e-2)
 
 
 @eqx.filter_jit
