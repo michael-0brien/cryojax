@@ -10,11 +10,11 @@ from jaxtyping import Array, Bool, Float, Inexact
 from ..jax_util import FloatLike, NDArrayLike
 
 
-def standardize_image(
+def rescale_image(
     image: Inexact[NDArrayLike, "y_dim x_dim"],
-    *,
-    std: FloatLike = 1.0,
     mean: FloatLike = 0.0,
+    std: FloatLike = 1.0,
+    *,
     input_is_real_space: bool = True,
     where: Bool[Array, "y_dim x_dim"] | None = None,
     input_is_rfft: bool = True,
@@ -31,9 +31,9 @@ def standardize_image(
         and ensure the zero frequency
         component is in the corner.
     - `std`:
-        Optionally, rescale to this standard deviation.
+        Rescale to this standard deviation.
     - `mean`:
-        Optionally, rescale to this mean.
+        Rescale to this mean.
     - `input_is_real_space`:
         If `True`, the given `image` is in real
         space. If `False`, it is in Fourier space.
@@ -83,6 +83,48 @@ def standardize_image(
         normalized_image = image_with_zero_mean / image_std
         rescaled_image = (normalized_image * std).at[0, 0].set(mean * n_pixels)
     return rescaled_image
+
+
+def standardize_image(
+    image: Inexact[NDArrayLike, "y_dim x_dim"],
+    *,
+    input_is_real_space: bool = True,
+    where: Bool[Array, "y_dim x_dim"] | None = None,
+    input_is_rfft: bool = True,
+    shape_in_real_space: tuple[int, int] | None = None,
+) -> Inexact[Array, "y_dim x_dim"]:
+    """Normalize so that the image is mean 0
+    and standard deviation 1 in real space.
+
+    **Parameters:**
+
+    - `image`:
+        The image in either the real or fourier domain.
+        If in fourier, pass `input_is_real_space = True`
+        and ensure the zero frequency
+        component is in the corner.
+    - `input_is_real_space`:
+        If `True`, the given `image` is in real
+        space. If `False`, it is in Fourier space.
+    - `where`:
+        As `where` in `jax.numpy.std` and
+        `jax.numpy.mean`. This argument is ignored if
+        `input_is_real_space = False`.
+
+
+    **Returns:**
+
+    The standardized image
+    """
+    return rescale_image(
+        image,
+        mean=0.0,
+        std=1.0,
+        input_is_real_space=input_is_real_space,
+        where=where,
+        input_is_rfft=input_is_rfft,
+        shape_in_real_space=shape_in_real_space,
+    )
 
 
 def background_subtract_image(image: Float[NDArrayLike, "y_dim x_dim"]):

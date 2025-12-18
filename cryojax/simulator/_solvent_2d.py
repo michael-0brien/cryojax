@@ -18,7 +18,7 @@ from ..ndimage import (
     PeakedFourierGaussian,
     ifftn,
     irfftn,
-    standardize_image,
+    rescale_image,
 )
 from ._image_config import AbstractImageConfig
 
@@ -252,7 +252,7 @@ class GRFSolvent2D(AbstractRandomSolvent2D, strict=True):
         )
         mean = self.total_potential_per_molecule * molecules_per_angstrom_squared
         std = 1.0  # TODO: set standard deviation
-        fourier_in_plane_potential_of_solvent = standardize_image(
+        fourier_in_plane_potential_of_solvent = rescale_image(
             solvent_grf,
             mean=mean,
             std=std,

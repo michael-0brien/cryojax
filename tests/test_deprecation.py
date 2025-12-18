@@ -85,11 +85,6 @@ def test_future_deprecated(sample_pdb_path):
         assert func is cx.ndimage.standardize_image
         assert not should_be_removed(record)
 
-    with pytest.warns(FutureWarning) as record:
-        func = cx.ndimage.rescale_image
-        assert func is cx.ndimage.standardize_image
-        assert not should_be_removed(record)
-
     # ndimage submodules
     with pytest.warns(FutureWarning) as record:
         from cryojax.coordinates import make_frequency_grid as make_1
