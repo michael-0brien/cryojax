@@ -12,7 +12,6 @@ from .base_volume import (
     AbstractVolumeRenderFn,
     AbstractVolumeRepresentation,
     ProjectionArray,
-    VolRep,
     VoxelArray,
 )
 from .fourier_voxels import (
@@ -33,7 +32,9 @@ from .independent_atom_volume import (
 from .real_voxels import RealVoxelGridVolume, RealVoxelProjection
 
 
-class AutoVolumeProjection(AbstractVolumeIntegrator[VolRep], strict=True):
+class AutoVolumeProjection(
+    AbstractVolumeIntegrator[AbstractVolumeRepresentation], strict=True
+):
     """Volume projection auto selection from cryoJAX
     `AbstractVolumeIntegrator` implementations.
 
@@ -84,7 +85,7 @@ class AutoVolumeProjection(AbstractVolumeIntegrator[VolRep], strict=True):
     @override
     def integrate(
         self,
-        volume_representation: VolRep,
+        volume_representation: AbstractVolumeRepresentation,
         image_config: AbstractImageConfig,
         outputs_real_space: bool = False,
     ) -> ProjectionArray:
@@ -120,7 +121,9 @@ AutoVolumeProjection.__init__.__doc__ = """**Arguments:**
 """
 
 
-class AutoVolumeRenderFn(AbstractVolumeRenderFn[VolRep], strict=True):
+class AutoVolumeRenderFn(
+    AbstractVolumeRenderFn[AbstractVolumeRepresentation], strict=True
+):
     """Volume rendering auto selection from cryoJAX
     `AbstractVolumeRenderFn` implementations.
 
@@ -185,7 +188,7 @@ class AutoVolumeRenderFn(AbstractVolumeRenderFn[VolRep], strict=True):
     @override
     def __call__(
         self,
-        volume_representation: VolRep,
+        volume_representation: AbstractVolumeRepresentation,
         *,
         outputs_real_space: bool = True,
         outputs_rfft: bool = False,

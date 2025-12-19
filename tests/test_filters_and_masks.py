@@ -7,7 +7,7 @@ from cryojax.ndimage import make_coordinate_grid, make_frequency_grid
 
 def test_mask_2d_running():
     classes = [
-        im.InverseSincMask,
+        im.SincCorrectionMask,
         im.SquareCosineMask,
         im.CircularCosineMask,
         im.Cylindrical2DCosineMask,
@@ -29,7 +29,7 @@ def test_mask_2d_running():
 
 
 def test_mask_3d_running():
-    classes = [im.InverseSincMask, im.SphericalCosineMask, im.Rectangular3DCosineMask]
+    classes = [im.SincCorrectionMask, im.SphericalCosineMask, im.Rectangular3DCosineMask]
     kwargs = [
         dict(),
         dict(radius=5, rolloff_width=2),

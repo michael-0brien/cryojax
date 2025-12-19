@@ -281,11 +281,15 @@ class Rectangular3DCosineMask(AbstractMask, strict=True):
         return self.array
 
 
-class InverseSincMask(AbstractMask, strict=True):
-    """Apply sinc-correction to an image or volume.
+class SincCorrectionMask(AbstractMask, strict=True):
+    """Divide an image or volume by a 2D or 3D rectangular
+    squared sinc function computed on the unit box. This is used
+    for correcting scaling in [`cryojax.simulator.FourierSliceExtraction`][].
 
-    This mask divides an image or volume by a 2D or 3D rectangular
-    sinc function computed on the unit box.
+    Linear interpolation in the Fourier domain can be thought of as
+    a convolution with a triangular kernel, whose Fourier
+    transform pair is the squared sinc. This mask
+    acts to deconvolve this function with a division in real-space.
     """
 
     array: Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]
@@ -299,18 +303,23 @@ class InverseSincMask(AbstractMask, strict=True):
         """**Arguments:**
 
         - `coordinate_grid_in_pixels`:
-            The image or volume coordinates.
+            The image or volume coordinates. This should be
+            generated with `make_coordinate_grid(shape)`, *not*
+            `make_coordinate_grid(shape, grid_spacing)`.
         """
         ndim = coordinate_grid_in_pixels.ndim - 1
         box_dims = coordinate_grid_in_pixels.shape[0:ndim][::-1]
-        self.array = jax.lax.reciprocal(
-            functools.reduce(
-                operator.mul,
-                [
-                    jnp.sinc(coordinate_grid_in_pixels[..., i] / box_dims[i])
-                    for i in range(ndim)
-                ],
+        self.array = (
+            jax.lax.reciprocal(
+                functools.reduce(
+                    operator.mul,
+                    [
+                        jnp.sinc(coordinate_grid_in_pixels[..., i] / box_dims[i])
+                        for i in range(ndim)
+                    ],
+                )
             )
+            ** 2
         )
 
     @override

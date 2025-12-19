@@ -14,9 +14,9 @@ from ._masks import (
     CircularCosineMask as CircularCosineMask,
     CustomMask as CustomMask,
     Cylindrical2DCosineMask as Cylindrical2DCosineMask,
-    InverseSincMask as InverseSincMask,
     Rectangular2DCosineMask as Rectangular2DCosineMask,
     Rectangular3DCosineMask as Rectangular3DCosineMask,
+    SincCorrectionMask as SincCorrectionMask,
     SphericalCosineMask as SphericalCosineMask,
     SquareCosineMask as SquareCosineMask,
 )
