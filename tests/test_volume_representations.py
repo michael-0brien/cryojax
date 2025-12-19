@@ -15,7 +15,7 @@ with install_import_hook("cryojax", "typeguard.typechecked"):
         PengScatteringFactorParameters,
         check_atomic_numbers_supported,
     )
-    from cryojax.io import read_atoms_from_pdb
+    from cryojax.io import read_array_from_mrc, read_atoms_from_pdb
     from cryojax.ndimage import make_coordinate_grid
 
 try:
@@ -189,6 +189,14 @@ def test_voxel_volume_loaders():
         Float[Array, "1 _ _ 3"],  # type: ignore
     )
     assert isinstance(real_volume.coordinate_grid_in_pixels, Float[Array, "_ _ _ 3"])  # type: ignore
+
+
+@pytest.mark.parametrize("pad_scale", (1, 1.1))
+def test_sinc_correction(sample_mrc_path, pad_scale):
+    real_voxel_grid = read_array_from_mrc(sample_mrc_path)
+    _ = cxs.FourierVoxelGridVolume.from_real_voxel_grid(
+        real_voxel_grid, sinc_correction=True, pad_scale=pad_scale
+    )
 
 
 def test_fourier_vs_real_agreement(sample_pdb_path):

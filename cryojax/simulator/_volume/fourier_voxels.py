@@ -11,13 +11,13 @@ from jaxtyping import Array, Complex, Float
 
 from ...jax_util import NDArrayLike
 from ...ndimage import (
-    AbstractFilter,
-    InverseSincMask,
+    SincCorrectionMask,
     compute_spline_coefficients,
     convert_fftn_to_rfftn,
     fftn,
     ifftn,
     irfftn,
+    make_coordinate_grid,
     make_frequency_slice,
     map_coordinates,
     map_coordinates_spline,
@@ -83,21 +83,25 @@ class FourierVoxelGridVolume(AbstractFourierVoxelVolume, strict=True):
         cls,
         real_voxel_grid: Float[NDArrayLike, "dim dim dim"],
         *,
+        sinc_correction: bool = False,
         pad_scale: float = 1.0,
         pad_mode: str = "constant",
-        filter: AbstractFilter | None = None,
     ) -> Self:
         """Load from a real-valued 3D voxel grid.
 
         **Arguments:**
 
-        - `real_voxel_grid`: A voxel grid in real space.
-        - `pad_scale`: Scale factor at which to pad `real_voxel_grid` before fourier
-                     transform. Must be a value greater than `1.0`.
-        - `pad_mode`: Padding method. See `jax.numpy.pad` for documentation.
-        - `filter`: A filter to apply to the result of the fourier transform of
-                  `real_voxel_grid`, i.e. `fftn(real_voxel_grid)`. Note that the zero
-                  frequency component is assumed to be in the corner.
+        - `real_voxel_grid`:
+            A voxel grid in real space.
+        - `sinc_correction`:
+            If `True`, apply a [`cryojax.ndimage.SincCorrectionMask`][]
+            to correct for errors incurred from linear interpolation in
+            the Fourier domain via [`cryojax.simulator.FourierSliceExtraction`][].
+        - `pad_scale`:
+            Scale factor at which to pad `real_voxel_grid` before fourier
+            transform. Must be a value greater than `1.0`.
+        - `pad_mode`:
+            Padding method. See `jax.numpy.pad` for documentation.
         """
         # Cast to jax array
         real_voxel_grid = jnp.asarray(real_voxel_grid, dtype=float)
@@ -113,14 +117,14 @@ class FourierVoxelGridVolume(AbstractFourierVoxelVolume, strict=True):
         padded_real_voxel_grid = pad_to_shape(
             real_voxel_grid, padded_shape, mode=pad_mode
         )
+        if sinc_correction:
+            coordinate_grid = make_coordinate_grid(padded_shape)
+            correction_mask = SincCorrectionMask(coordinate_grid)
+            padded_real_voxel_grid = correction_mask(padded_real_voxel_grid)
         # Load grid and coordinates. For now, do not store the
         # fourier grid only on the half space. Fourier slice extraction
         # does not currently work if rfftn is used.
-        fourier_voxel_grid_with_zero_in_corner = (
-            fftn(padded_real_voxel_grid)
-            if filter is None
-            else filter(fftn(padded_real_voxel_grid))
-        )
+        fourier_voxel_grid_with_zero_in_corner = fftn(padded_real_voxel_grid)
         # ... store the grid with the zero frequency component in the center
         fourier_voxel_grid = jnp.fft.fftshift(fourier_voxel_grid_with_zero_in_corner)
         # ... create in-plane frequency slice on the half space
@@ -175,7 +179,6 @@ class FourierVoxelSplineVolume(AbstractFourierVoxelVolume, strict=True):
         *,
         pad_scale: float = 1.0,
         pad_mode: str = "constant",
-        filter: AbstractFilter | None = None,
     ) -> Self:
         """Load from a real-valued 3D voxel grid.
 
@@ -185,9 +188,6 @@ class FourierVoxelSplineVolume(AbstractFourierVoxelVolume, strict=True):
         - `pad_scale`: Scale factor at which to pad `real_voxel_grid` before fourier
                      transform. Must be a value greater than `1.0`.
         - `pad_mode`: Padding method. See `jax.numpy.pad` for documentation.
-        - `filter`: A filter to apply to the result of the fourier transform of
-                  `real_voxel_grid`, i.e. `fftn(real_voxel_grid)`. Note that the zero
-                  frequency component is assumed to be in the corner.
         """
         # Cast to jax array
         real_voxel_grid = jnp.asarray(real_voxel_grid, dtype=float)
@@ -206,11 +206,7 @@ class FourierVoxelSplineVolume(AbstractFourierVoxelVolume, strict=True):
         # Load grid and coordinates. For now, do not store the
         # fourier grid only on the half space. Fourier slice extraction
         # does not currently work if rfftn is used.
-        fourier_voxel_grid_with_zero_in_corner = (
-            fftn(padded_real_voxel_grid)
-            if filter is None
-            else filter(fftn(padded_real_voxel_grid))
-        )
+        fourier_voxel_grid_with_zero_in_corner = fftn(padded_real_voxel_grid)
         # ... store the grid with the zero frequency component in the center
         fourier_voxel_grid = jnp.fft.fftshift(fourier_voxel_grid_with_zero_in_corner)
         # ... compute spline coefficients
@@ -237,7 +233,6 @@ class FourierSliceExtraction(
     """
 
     outputs_integral: bool
-    correction_mask: InverseSincMask | None
     out_of_bounds_mode: str
     fill_value: complex
 
@@ -247,7 +242,6 @@ class FourierSliceExtraction(
         self,
         *,
         outputs_integral: bool = True,
-        correction_mask: InverseSincMask | None = None,
         out_of_bounds_mode: str = "fill",
         fill_value: complex = 0.0 + 0.0j,
     ):
@@ -258,11 +252,6 @@ class FourierSliceExtraction(
             *multiplied by the voxel size*. Including the voxel size
             numerical approximates the projection integral and is
             necessary for simulating images in physical units.
-        - `correction_mask`:
-            A `cryojax.ndimage.InverseSincMask` for performing
-            sinc-correction on the linear-interpolated projections. This
-            should be computed on a coordinate grid with shape matching
-            the `FourierVoxelGridVolume.shape`.
         - `out_of_bounds_mode`:
             Specify how to handle out of bounds indexing. See
             `cryojax.ndimage.map_coordinates` for documentation.
@@ -271,7 +260,6 @@ class FourierSliceExtraction(
             `out_of_bounds_mode = "fill"`.
         """
         self.outputs_integral = outputs_integral
-        self.correction_mask = correction_mask
         self.out_of_bounds_mode = out_of_bounds_mode
         self.fill_value = fill_value
 
@@ -323,8 +311,6 @@ class FourierSliceExtraction(
                 mode=self.out_of_bounds_mode,
                 cval=self.fill_value,
             )
-            if self.correction_mask is not None:
-                fourier_projection = fftn(self.correction_mask(ifftn(fourier_projection)))
         else:
             raise ValueError(
                 "Supported types for `volume_representation` are "
@@ -361,7 +347,6 @@ class EwaldSphereExtraction(
     """
 
     outputs_integral: bool
-    correction_mask: InverseSincMask | None
     out_of_bounds_mode: str
     fill_value: complex
 
@@ -371,7 +356,6 @@ class EwaldSphereExtraction(
         self,
         *,
         outputs_integral: bool = True,
-        correction_mask: InverseSincMask | None = None,
         out_of_bounds_mode: str = "fill",
         fill_value: complex = 0.0 + 0.0j,
     ):
@@ -382,11 +366,6 @@ class EwaldSphereExtraction(
             *multiplied by the voxel size*. Including the voxel size
             numerical approximates the projection integral and is
             necessary for simulating images in physical units.
-        - `correction_mask`:
-            A `cryojax.ndimage.transforms.SincCorrectionMask` for performing
-            sinc-correction on the linear-interpolated projections. This
-            should be computed on a coordinate grid with shape matching
-            the `FourierVoxelGridVolume.shape`.
         - `out_of_bounds_mode`:
             Specify how to handle out of bounds indexing. See
             `cryojax.image.map_coordinates` for documentation.
@@ -395,7 +374,6 @@ class EwaldSphereExtraction(
             `out_of_bounds_mode = "fill"`.
         """
         self.outputs_integral = outputs_integral
-        self.correction_mask = correction_mask
         self.out_of_bounds_mode = out_of_bounds_mode
         self.fill_value = fill_value
 
@@ -451,10 +429,6 @@ class EwaldSphereExtraction(
                 mode=self.out_of_bounds_mode,
                 cval=self.fill_value,
             )
-            if self.correction_mask is not None:
-                ewald_sphere_surface = fftn(
-                    self.correction_mask(ifftn(ewald_sphere_surface))
-                )
         else:
             raise ValueError(
                 "Supported types for `volume_representation` are "
