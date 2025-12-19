@@ -173,7 +173,7 @@ This documentation is a collection of functions used to work with coordinate sys
                 - get
                 - __call__
 
-::: cryojax.ndimage.InverseSincMask
+::: cryojax.ndimage.SincCorrectionMask
         options:
             members:
                 - __init__
