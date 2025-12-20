@@ -1332,7 +1332,7 @@ simulating an image, such as the pose, the volume, and the CTF and 2) Images are
 <span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/43fb92a3acff4f3c946b1c969655b890.png" /></p>
+<p><img alt="img" src="../_data/4df09db901994b51a399fc2c12bc795c.png" /></p>
 <p>Alternatively, the user can simulate an image with noise from a particular statistical distribution. In this example, we use the <code>GaussianWhiteNoiseModel</code>.</p>
 <p>Here, we will directly control image SNR by transforming the final image output using a <code>cryojax.ndimage.ImageScaling</code>.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">cryojax.ndimage</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">im</span>
@@ -1356,7 +1356,7 @@ simulating an image, such as the pose, the volume, and the CTF and 2) Images are
     <span class="n">pose</span><span class="p">,</span>
     <span class="n">transfer_theory</span><span class="p">,</span>
     <span class="n">normalizes_signal</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-    <span class="n">transform</span><span class="o">=</span><span class="n">im</span><span class="o">.</span><span class="n">ImageScaling</span><span class="p">(</span><span class="n">scale</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">snr</span><span class="p">),</span> <span class="n">offset</span><span class="o">=</span><span class="mf">0.0</span><span class="p">),</span>
+    <span class="n">transform</span><span class="o">=</span><span class="n">im</span><span class="o">.</span><span class="n">ImageScaling</span><span class="p">(</span><span class="n">scale</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">snr</span><span class="p">)),</span>
 <span class="p">)</span>
 <span class="n">noise_model</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">GaussianWhiteNoiseModel</span><span class="p">(</span><span class="n">image_model</span><span class="p">,</span> <span class="n">variance</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
 <span class="c1"># ... then, either simulate an image from this `noise_model``</span>
@@ -1377,7 +1377,7 @@ simulating an image, such as the pose, the volume, and the CTF and 2) Images are
 <span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/0877cfa161d344f3aa10f203462695f4.png" /></p>
+<p><img alt="img" src="../_data/9c8240ed2a994a6ebd32c48491853eee.png" /></p>
 <div class="highlight"><pre><span></span><code>
 </code></pre></div>
 
