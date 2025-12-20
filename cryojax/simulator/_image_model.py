@@ -3,11 +3,10 @@ Image formation models.
 """
 
 from abc import abstractmethod
-from typing import Any, Literal
+from typing import Literal
 from typing_extensions import override
 
 import equinox as eqx
-import equinox.internal as eqxi
 import jax.numpy as jnp
 import jax.random as jr
 from jaxtyping import Array, Bool, Complex, Float, PRNGKeyArray
@@ -126,7 +125,6 @@ class AbstractImageModel(eqx.Module, strict=True):
             filter=filter,
         )
 
-    @eqxi.doc_remove_args("options")
     def postprocess(
         self,
         fourier_image: Array,
@@ -134,17 +132,12 @@ class AbstractImageModel(eqx.Module, strict=True):
         outputs_real_space: bool = True,
         mask: AbstractMask | None = None,
         filter: AbstractFilter | None = None,
-        options: dict[str, Any] = {},
     ) -> Array:
         """Return an image postprocessed with filters, cropping, masking,
         and normalization in either real or fourier space.
         """
-        options = _make_postprocess_options(options)
         image_config = self.image_config
-        if options["do_transform"]:
-            mask_c, filter_c = self._compose_transform(mask, filter)
-        else:
-            mask_c, filter_c = mask, filter
+        mask_c, filter_c = self._compose_transform(mask, filter)
         if (
             mask_c is None
             and image_config.padded_shape == image_config.shape
@@ -183,12 +176,11 @@ class AbstractImageModel(eqx.Module, strict=True):
                 image = crop_to_shape(padded_image, image_config.shape)
             else:
                 image = padded_image
-            if options["do_normalize"]:
-                if self.normalizes_signal:
-                    if self.signal_centering == "mean":
-                        image = self._mean_subtract_normalize(image)
-                    elif self.signal_centering == "bg":
-                        image = self._bg_subtract_normalize(image, padded_image)
+            if self.normalizes_signal:
+                if self.signal_centering == "mean":
+                    image = self._mean_subtract_normalize(image)
+                elif self.signal_centering == "bg":
+                    image = self._bg_subtract_normalize(image, padded_image)
             if mask_c is not None:
                 image = mask_c(image)
             return image if outputs_real_space else rfftn(image)
@@ -836,9 +828,3 @@ _init_doc = """**Arguments:**
 ContrastImageModel.__init__.__doc__ = _init_doc
 IntensityImageModel.__init__.__doc__ = _init_doc
 ElectronCountsImageModel.__init__.__doc__ = _init_doc
-
-
-def _make_postprocess_options(d):
-    do_normalize = True if "do_normalize" not in d else d["do_normalize"]
-    do_transform = True if "do_transform" not in d else d["do_transform"]
-    return dict(do_normalize=do_normalize, do_transform=do_transform)

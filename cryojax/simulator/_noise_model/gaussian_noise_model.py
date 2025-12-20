@@ -5,9 +5,9 @@ Image formation models simulated from gaussian noise distributions.
 from abc import abstractmethod
 from typing_extensions import override
 
+import equinox as eqx
 import jax.numpy as jnp
 import jax.random as jr
-from equinox import AbstractVar
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
 from ...jax_util import FloatLike, error_if_not_positive
@@ -43,9 +43,9 @@ class AbstractGaussianNoiseModel(
     make different assumptions about the variance / covariance.
     """
 
-    image_model: AbstractVar[AbstractImageModel]
-    signal_scale_factor: AbstractVar[Float[Array, ""]]
-    signal_offset: AbstractVar[Float[Array, ""]]
+    image_model: eqx.AbstractVar[AbstractImageModel]
+    signal_scale_factor: eqx.AbstractVar[Float[Array, ""]]
+    signal_offset: eqx.AbstractVar[Float[Array, ""]]
 
     @override
     def sample(
@@ -193,7 +193,13 @@ class GaussianWhiteNoiseModel(AbstractGaussianNoiseModel, strict=True):
         # Compute the zero mean variance and scale up to be independent of the number of
         # pixels
         std = jnp.sqrt(n_pixels * self.variance)
-        noise = self.image_model.postprocess(
+        model = eqx.tree_at(
+            lambda x: (x.transform, x.normalizes_signal),
+            self.image_model,
+            (None, False),
+            is_leaf=lambda x: x is None,
+        )
+        noise = model.postprocess(
             std
             * jr.normal(rng_key, shape=frequency_grid.shape[0:-1])
             .at[0, 0]
@@ -202,7 +208,6 @@ class GaussianWhiteNoiseModel(AbstractGaussianNoiseModel, strict=True):
             outputs_real_space=outputs_real_space,
             mask=mask,
             filter=filter,
-            options=dict(do_normalize=False, do_transform=False),
         )
 
         return noise
@@ -315,7 +320,13 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
         # Compute the zero mean variance and scale up to be independent of the number of
         # pixels
         std = jnp.sqrt(n_pixels * self.variance_fn(frequency_grid))
-        noise = self.image_model.postprocess(
+        model = eqx.tree_at(
+            lambda x: (x.transform, x.normalizes_signal),
+            self.image_model,
+            (None, False),
+            is_leaf=lambda x: x is None,
+        )
+        noise = model.postprocess(
             std
             * jr.normal(rng_key, shape=frequency_grid.shape[0:-1])
             .at[0, 0]
@@ -324,7 +335,6 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
             outputs_real_space=outputs_real_space,
             mask=mask,
             filter=filter,
-            options=dict(do_normalize=False, do_transform=False),
         )
 
         return noise
