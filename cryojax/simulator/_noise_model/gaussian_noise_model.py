@@ -202,7 +202,7 @@ class GaussianWhiteNoiseModel(AbstractGaussianNoiseModel, strict=True):
             outputs_real_space=outputs_real_space,
             mask=mask,
             filter=filter,
-            apply_transform=False,
+            options=dict(do_normalize=False, do_transform=False),
         )
 
         return noise
@@ -324,7 +324,7 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
             outputs_real_space=outputs_real_space,
             mask=mask,
             filter=filter,
-            apply_transform=False,
+            options=dict(do_normalize=False, do_transform=False),
         )
 
         return noise
