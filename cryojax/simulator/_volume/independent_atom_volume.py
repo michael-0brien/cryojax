@@ -428,14 +428,6 @@ class FFTAtomProjection(
         self.eps = eps
         self.opts = opts
 
-    def __check_init__(self):
-        if self.upsample_factor is not None:
-            if self.upsample_factor % 2 == 0:
-                raise ValueError(
-                    f"Set `upsample_factor = {self.upsample_factor}` when instantiating "
-                    "`FFTAtomProjection`, but only odd `upsample_factor` are supported."
-                )
-
     @override
     def integrate(
         self,
@@ -498,6 +490,14 @@ class FFTAtomProjection(
         if self.sampling_mode == "average":
             antialias_fn = FourierSinc(box_width=pixel_size_u)
             fourier_projection *= antialias_fn(frequency_grid)
+        # If upsample factor is even, need subpixel center correction
+        if u is not None and u % 2 == 0:
+            fourier_projection = _apply_subpixel_shift(
+                shape,
+                fourier_projection,
+                pixel_size_u * frequency_grid,
+                u,
+            )
         # Shift zero frequency component to corner and convert to
         # rfft
         fourier_projection = convert_fftn_to_rfftn(
@@ -580,4 +580,24 @@ def _project_with_nufft(shape, ps, pos, kernel, freqs, eps=1e-6, opts=None):
 
 
 def _block_average(x, factor):
-    return block_reduce_downsample(x, factor, jax.lax.add) / factor**x.ndim
+    return (
+        block_reduce_downsample(x, factor, jax.lax.add, center_correct=False)
+        / factor**x.ndim
+    )
+
+
+def _apply_subpixel_shift(target_shape, fourier_image, frequency_grid, k):
+    if len(set(target_shape)) > 1:
+        raise NotImplementedError(
+            "Even `upsample_factor` and non-square image shape not "
+            f"supported in `FFTAtomProjection`. Got `upsample_factor = {k}` "
+            f"and `shape = {target_shape}`."
+        )
+    dim = target_shape[0]
+    if dim % 2 == 0:
+        shift = jnp.full((2,), (k - 1) / 2)
+    else:
+        shift = jnp.full((2,), -0.5)
+    return (
+        jnp.exp(-1.0j * (2 * jnp.pi * jnp.matmul(frequency_grid, shift))) * fourier_image
+    )

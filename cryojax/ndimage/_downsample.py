@@ -9,6 +9,7 @@ from jax import lax
 from jaxtyping import Array, Complex, Float, Inexact
 
 from ..jax_util import NDArrayLike
+from ._coordinates import make_frequency_grid
 from ._edges import crop_to_shape
 from ._fft import fftn, ifftn, rfftn
 
@@ -17,9 +18,10 @@ def block_reduce_downsample(
     image_or_volume: Inexact[NDArrayLike, "_ _"] | Inexact[NDArrayLike, "_ _ _"],
     downsample_factor: int,
     operation: Callable[[Array, Array], Array] = lax.add,
+    center_correct: bool = True,
 ) -> Inexact[Array, "_ _"] | Inexact[Array, "_ _ _"]:
-    """Downsample an array by pooling together blocks, keeping
-    the center position of the array unchanged. Wraps `equinox.nn.Pool`.
+    """Downsample an array by pooling together blocks.
+    Wraps `equinox.nn.Pool`.
 
     **Arguments:**
 
@@ -34,14 +36,18 @@ def block_reduce_downsample(
         where `x` and `y` are JAX arrays. See [`equinox.nn.Pool`]
         (https://docs.kidger.site/equinox/api/nn/pool/#equinox.nn.Pool)
         for documentation.
+    - `center_correct`:
+        If `True`, apply a phase shift in the fourier domain to correct
+        the array center after downsampling. Applies only to even
+        `downsample_factor`.
 
     **Returns:**
 
     The downsampled `image_or_volume` at shape reduced by
     `downsample_factor`.
     """
-    array = image_or_volume
-    if downsample_factor < 1:
+    array, k = image_or_volume, downsample_factor
+    if k < 1:
         raise ValueError(
             "Called `block_reduce_downsample` with `downsample_factor` less than 1."
         )
@@ -51,7 +57,7 @@ def block_reduce_downsample(
             f"`ndim = {array.ndim}`, but this function "
             "only supports images and volumes as input."
         )
-    if any(s % downsample_factor != 0 for s in array.shape):
+    if any(s % k != 0 for s in array.shape):
         raise ValueError(
             "`block_reduce_downsample` only supports "
             "downsampling arrays with dimensions that "
@@ -61,18 +67,33 @@ def block_reduce_downsample(
         )
     # Pooling function downsamples array
     shape = array.shape
-    kernel_size = array.ndim * (downsample_factor,)
-    if downsample_factor % 2 == 0:
-        raise ValueError(
-            "Called `block_reduce_downsample` with "
-            f"`downsample_factor = {downsample_factor}`, but "
-            "only odd-valued numbers are supported."
-        )
-    else:
+    target_shape = tuple(s // k for s in shape)
+    kernel_size = array.ndim * (k,)
+    if k % 2 == 1:
         padding = tuple(
             ((k - 1) // 2, (k - 1) // 2) if s % 2 == 0 else (0, 0)
             for k, s in zip(kernel_size, shape)
         )
+    else:
+        padding = tuple((0, 0) for _ in shape)
+        if center_correct:
+            is_complex = jnp.iscomplexobj(array)
+            q = make_frequency_grid(array.shape, outputs_rfftfreqs=False)
+            if len(set(target_shape)) > 1:
+                raise NotImplementedError(
+                    "Tried to call `block_reduce_downsample` "
+                    "with `center_correct = True`, even `downsample_factor`, "
+                    "and a non-square image/volume. This is not implemented."
+                )
+            dim = target_shape[0]
+            if dim % 2 == 0:
+                shift = jnp.full((array.ndim,), (k - 1) / 2)
+            else:
+                shift = jnp.full((array.ndim,), -0.5)
+            phase_shift = jnp.exp(-1.0j * (2 * jnp.pi * jnp.matmul(q, shift)))
+            array = ifftn(phase_shift * fftn(array))
+            if not is_complex:
+                array = array.real
     block_reduce_fn = lambda x: eqx.nn.Pool(
         init=jnp.asarray(0.0, array.dtype),
         operation=operation,

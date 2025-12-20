@@ -29,23 +29,29 @@ To make use of the full power of JAX, it is highly recommended to learn about [e
 ::: cryojax.jax_util.NDArrayLike
     options:
         members: false
+        show_symbol_type_heading: false
 
 ::: cryojax.jax_util.FloatLike
     options:
         members: false
+        show_symbol_type_heading: false
 
 ::: cryojax.jax_util.ComplexLike
     options:
         members: false
+        show_symbol_type_heading: false
 
 ::: cryojax.jax_util.InexactLike
     options:
         members: false
+        show_symbol_type_heading: false
 
 ::: cryojax.jax_util.IntLike
     options:
         members: false
+        show_symbol_type_heading: false
 
 ::: cryojax.jax_util.BoolLike
     options:
         members: false
+        show_symbol_type_heading: false

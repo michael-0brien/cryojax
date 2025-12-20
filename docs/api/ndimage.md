@@ -173,7 +173,7 @@ This documentation is a collection of functions used to work with coordinate sys
                 - get
                 - __call__
 
-::: cryojax.ndimage.InverseSincMask
+::: cryojax.ndimage.SincCorrectionMask
         options:
             members:
                 - __init__
@@ -194,6 +194,14 @@ This documentation is a collection of functions used to work with coordinate sys
 
 
 ::: cryojax.ndimage.FourierGaussian
+        options:
+            members:
+                - __init__
+                - __call__
+
+---
+
+::: cryojax.ndimage.PeakedFourierGaussian
         options:
             members:
                 - __init__
@@ -225,7 +233,16 @@ This documentation is a collection of functions used to work with coordinate sys
 
 ---
 
-::: cryojax.ndimage.ZeroMode
+::: cryojax.ndimage.FourierDC
+        options:
+            members:
+                - __init__
+                - __call__
+
+
+---
+
+::: cryojax.ndimage.CustomFourierOperator
         options:
             members:
                 - __init__

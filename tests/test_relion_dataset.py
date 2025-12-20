@@ -179,7 +179,7 @@ def test_pad_options(sample_starfile_path):
     """Test the pad_options argument to the parameter file."""
     # Test with a valid input
 
-    pad_options = dict(mode="constant", shape=(22, 22))
+    pad_options = dict(shape=(22, 22))
     parameter_file = RelionParticleParameterFile(
         path_to_starfile=sample_starfile_path,
         loads_envelope=True,
@@ -201,7 +201,6 @@ def test_pad_options(sample_starfile_path):
     )
 
     assert image_config.padded_shape == ref_config.padded_shape
-    assert image_config.pad_mode == ref_config.pad_mode
 
 
 def test_load_starfile_envelope_params(sample_starfile_path):
@@ -318,7 +317,7 @@ def test_load_starfile_pose_params(sample_starfile_path):
         path_to_starfile=sample_starfile_path,
         loads_envelope=False,
         loads_metadata=True,
-        inverts_rotation=False,
+        rotation_convention="object",
     )
 
     parameters = parameter_file[:]
@@ -368,13 +367,13 @@ def test_load_starfile_pose_inverse(sample_starfile_path):
         path_to_starfile=sample_starfile_path,
         loads_envelope=False,
         loads_metadata=True,
-        inverts_rotation=False,
+        rotation_convention="object",
     )
     parameter_file_inverse = RelionParticleParameterFile(
         path_to_starfile=sample_starfile_path,
         loads_envelope=False,
         loads_metadata=True,
-        inverts_rotation=True,
+        rotation_convention="frame",
     )
 
     # Without batch dim
@@ -744,7 +743,7 @@ def test_set_wrong_parameters_error():
     # Wrong parameters
     wrong_pose = cxs.QuaternionPose()
     wrong_transfer_theory = cxs.ContrastTransferTheory(
-        ctf=cxs.AstigmaticCTF(), envelope=im.ZeroMode()
+        ctf=cxs.AstigmaticCTF(), envelope=im.FourierDC()
     )
     # Right parameters
     right_pose = cxs.EulerAnglePose()
@@ -989,7 +988,7 @@ def test_write_starfile_different_envs():
     new_parameters_file.save(overwrite=True)
 
     with pytest.raises(ValueError):
-        particle_params = _make_particle_params(im.ZeroMode(1.0))
+        particle_params = _make_particle_params(im.FourierDC(1.0))
         new_parameters_file = RelionParticleParameterFile(
             path_to_starfile="tests/outputs/starfile_writing/test_particle_parameters.star",
             mode="w",

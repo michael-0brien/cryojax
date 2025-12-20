@@ -11,17 +11,18 @@ from jaxtyping import Array, Complex, Float
 
 from ...jax_util import NDArrayLike
 from ...ndimage import (
-    AbstractFilter,
-    InverseSincMask,
+    SincCorrectionMask,
     compute_spline_coefficients,
     convert_fftn_to_rfftn,
     fftn,
     ifftn,
     irfftn,
+    make_coordinate_grid,
     make_frequency_slice,
     map_coordinates,
     map_coordinates_spline,
     pad_to_shape,
+    resize_with_crop_or_pad,
     rfftn,
 )
 from .._image_config import AbstractImageConfig
@@ -82,21 +83,25 @@ class FourierVoxelGridVolume(AbstractFourierVoxelVolume, strict=True):
         cls,
         real_voxel_grid: Float[NDArrayLike, "dim dim dim"],
         *,
+        sinc_correction: bool = False,
         pad_scale: float = 1.0,
         pad_mode: str = "constant",
-        filter: AbstractFilter | None = None,
     ) -> Self:
         """Load from a real-valued 3D voxel grid.
 
         **Arguments:**
 
-        - `real_voxel_grid`: A voxel grid in real space.
-        - `pad_scale`: Scale factor at which to pad `real_voxel_grid` before fourier
-                     transform. Must be a value greater than `1.0`.
-        - `pad_mode`: Padding method. See `jax.numpy.pad` for documentation.
-        - `filter`: A filter to apply to the result of the fourier transform of
-                  `real_voxel_grid`, i.e. `fftn(real_voxel_grid)`. Note that the zero
-                  frequency component is assumed to be in the corner.
+        - `real_voxel_grid`:
+            A voxel grid in real space.
+        - `sinc_correction`:
+            If `True`, apply a [`cryojax.ndimage.SincCorrectionMask`][]
+            to correct for errors incurred from linear interpolation in
+            the Fourier domain via [`cryojax.simulator.FourierSliceExtraction`][].
+        - `pad_scale`:
+            Scale factor at which to pad `real_voxel_grid` before fourier
+            transform. Must be a value greater than `1.0`.
+        - `pad_mode`:
+            Padding method. See `jax.numpy.pad` for documentation.
         """
         # Cast to jax array
         real_voxel_grid = jnp.asarray(real_voxel_grid, dtype=float)
@@ -112,14 +117,14 @@ class FourierVoxelGridVolume(AbstractFourierVoxelVolume, strict=True):
         padded_real_voxel_grid = pad_to_shape(
             real_voxel_grid, padded_shape, mode=pad_mode
         )
+        if sinc_correction:
+            coordinate_grid = make_coordinate_grid(padded_shape)
+            correction_mask = SincCorrectionMask(coordinate_grid)
+            padded_real_voxel_grid = correction_mask(padded_real_voxel_grid)
         # Load grid and coordinates. For now, do not store the
         # fourier grid only on the half space. Fourier slice extraction
         # does not currently work if rfftn is used.
-        fourier_voxel_grid_with_zero_in_corner = (
-            fftn(padded_real_voxel_grid)
-            if filter is None
-            else filter(fftn(padded_real_voxel_grid))
-        )
+        fourier_voxel_grid_with_zero_in_corner = fftn(padded_real_voxel_grid)
         # ... store the grid with the zero frequency component in the center
         fourier_voxel_grid = jnp.fft.fftshift(fourier_voxel_grid_with_zero_in_corner)
         # ... create in-plane frequency slice on the half space
@@ -174,7 +179,6 @@ class FourierVoxelSplineVolume(AbstractFourierVoxelVolume, strict=True):
         *,
         pad_scale: float = 1.0,
         pad_mode: str = "constant",
-        filter: AbstractFilter | None = None,
     ) -> Self:
         """Load from a real-valued 3D voxel grid.
 
@@ -184,9 +188,6 @@ class FourierVoxelSplineVolume(AbstractFourierVoxelVolume, strict=True):
         - `pad_scale`: Scale factor at which to pad `real_voxel_grid` before fourier
                      transform. Must be a value greater than `1.0`.
         - `pad_mode`: Padding method. See `jax.numpy.pad` for documentation.
-        - `filter`: A filter to apply to the result of the fourier transform of
-                  `real_voxel_grid`, i.e. `fftn(real_voxel_grid)`. Note that the zero
-                  frequency component is assumed to be in the corner.
         """
         # Cast to jax array
         real_voxel_grid = jnp.asarray(real_voxel_grid, dtype=float)
@@ -205,11 +206,7 @@ class FourierVoxelSplineVolume(AbstractFourierVoxelVolume, strict=True):
         # Load grid and coordinates. For now, do not store the
         # fourier grid only on the half space. Fourier slice extraction
         # does not currently work if rfftn is used.
-        fourier_voxel_grid_with_zero_in_corner = (
-            fftn(padded_real_voxel_grid)
-            if filter is None
-            else filter(fftn(padded_real_voxel_grid))
-        )
+        fourier_voxel_grid_with_zero_in_corner = fftn(padded_real_voxel_grid)
         # ... store the grid with the zero frequency component in the center
         fourier_voxel_grid = jnp.fft.fftshift(fourier_voxel_grid_with_zero_in_corner)
         # ... compute spline coefficients
@@ -236,7 +233,6 @@ class FourierSliceExtraction(
     """
 
     outputs_integral: bool
-    correction_mask: InverseSincMask | None
     out_of_bounds_mode: str
     fill_value: complex
 
@@ -246,7 +242,6 @@ class FourierSliceExtraction(
         self,
         *,
         outputs_integral: bool = True,
-        correction_mask: InverseSincMask | None = None,
         out_of_bounds_mode: str = "fill",
         fill_value: complex = 0.0 + 0.0j,
     ):
@@ -257,11 +252,6 @@ class FourierSliceExtraction(
             *multiplied by the voxel size*. Including the voxel size
             numerical approximates the projection integral and is
             necessary for simulating images in physical units.
-        - `correction_mask`:
-            A `cryojax.ndimage.transforms.InverseSincMask` for performing
-            sinc-correction on the linear-interpolated projections. This
-            should be computed on a coordinate grid with shape matching
-            the `FourierVoxelGridVolume.shape`.
         - `out_of_bounds_mode`:
             Specify how to handle out of bounds indexing. See
             `cryojax.ndimage.map_coordinates` for documentation.
@@ -270,7 +260,6 @@ class FourierSliceExtraction(
             `out_of_bounds_mode = "fill"`.
         """
         self.outputs_integral = outputs_integral
-        self.correction_mask = correction_mask
         self.out_of_bounds_mode = out_of_bounds_mode
         self.fill_value = fill_value
 
@@ -308,14 +297,19 @@ class FourierSliceExtraction(
             )
         # Compute the fourier projection
         if isinstance(volume_representation, FourierVoxelSplineVolume):
-            fourier_projection = self.extract_fourier_slice_from_spline(
+            fourier_projection = _extract_slice_spline(
                 volume_representation.spline_coefficients,
                 frequency_slice,
+                mode=self.out_of_bounds_mode,
+                cval=self.fill_value,
             )
         elif isinstance(volume_representation, FourierVoxelGridVolume):
-            fourier_projection = self.extract_fourier_slice_from_grid(
+            fourier_projection = _extract_slice(
                 volume_representation.fourier_voxel_grid,
                 frequency_slice,
+                interpolation_order=1,
+                mode=self.out_of_bounds_mode,
+                cval=self.fill_value,
             )
         else:
             raise ValueError(
@@ -326,8 +320,8 @@ class FourierSliceExtraction(
         # Resize the image to match the AbstractImageConfig.padded_shape
         if image_config.padded_shape != (N, N):
             fourier_projection = rfftn(
-                image_config.crop_or_pad_to_padded_shape(
-                    irfftn(fourier_projection, s=(N, N))
+                resize_with_crop_or_pad(
+                    irfftn(fourier_projection, s=(N, N)), image_config.padded_shape
                 )
             )
         # Scale by voxel size to convert from projection to integral
@@ -338,82 +332,6 @@ class FourierSliceExtraction(
             if outputs_real_space
             else fourier_projection
         )
-
-    def extract_fourier_slice_from_spline(
-        self,
-        spline_coefficients: Complex[Array, "coeff_dim coeff_dim coeff_dim"],
-        frequency_slice_in_pixels: Float[Array, "1 dim dim 3"],
-    ) -> Complex[Array, "dim dim//2+1"]:
-        """Extract a fourier slice using the interpolation defined by
-        `spline_coefficients` at coordinates `frequency_slice_in_pixels`.
-
-        **Arguments:**
-
-        - `spline_coefficients`:
-            Spline coefficients of the density grid in fourier space.
-            The coefficients should be computed from a `fourier_voxel_grid`
-            with the zero frequency component in the center. These are
-            typically computed with the function
-            `cryojax.image.compute_spline_coefficients`.
-        - `frequency_slice_in_pixels`:
-            Frequency central slice coordinate system. The zero
-            frequency component should be in the center.
-        - `voxel_size`:
-            The voxel size of the `fourier_voxel_grid`. This argument is
-            not used in the `FourierSliceExtraction` class.
-        - `wavelength_in_angstroms`:
-            The wavelength of the incident electron beam. This argument is
-            not used in the `FourierSliceExtraction` class.
-
-        **Returns:**
-
-        The interpolated fourier slice at coordinates `frequency_slice_in_pixels`.
-        """
-        return _extract_slice_with_cubic_spline(
-            spline_coefficients,
-            frequency_slice_in_pixels,
-            mode=self.out_of_bounds_mode,
-            cval=self.fill_value,
-        )
-
-    def extract_fourier_slice_from_grid(
-        self,
-        fourier_voxel_grid: Complex[Array, "dim dim dim"],
-        frequency_slice_in_pixels: Float[Array, "1 dim dim 3"],
-    ) -> Complex[Array, "dim dim//2+1"]:
-        """Extract a fourier slice of the `fourier_voxel_grid` at coordinates
-        `frequency_slice_in_pixels`.
-
-        **Arguments:**
-
-        - `fourier_voxel_grid`:
-            Density grid in fourier space. The zero frequency component
-            should be in the center.
-        - `frequency_slice_in_pixels`:
-            Frequency central slice coordinate system. The zero
-            frequency component should be in the center.
-        - `voxel_size`:
-            The voxel size of the `fourier_voxel_grid`. This argument is
-            not used in the `FourierSliceExtraction` class.
-        - `wavelength_in_angstroms`:
-            The wavelength of the incident electron beam. This argument is
-            not used in the `FourierSliceExtraction` class.
-
-        **Returns:**
-
-        The interpolated fourier slice at coordinates `frequency_slice_in_pixels`.
-        """
-        fourier_slice = _extract_slice(
-            fourier_voxel_grid,
-            frequency_slice_in_pixels,
-            interpolation_order=1,
-            mode=self.out_of_bounds_mode,
-            cval=self.fill_value,
-        )
-        if self.correction_mask is not None:
-            fourier_slice = fftn(self.correction_mask(ifftn(fourier_slice)))
-
-        return fourier_slice
 
 
 class EwaldSphereExtraction(
@@ -429,7 +347,6 @@ class EwaldSphereExtraction(
     """
 
     outputs_integral: bool
-    correction_mask: InverseSincMask | None
     out_of_bounds_mode: str
     fill_value: complex
 
@@ -439,7 +356,6 @@ class EwaldSphereExtraction(
         self,
         *,
         outputs_integral: bool = True,
-        correction_mask: InverseSincMask | None = None,
         out_of_bounds_mode: str = "fill",
         fill_value: complex = 0.0 + 0.0j,
     ):
@@ -450,11 +366,6 @@ class EwaldSphereExtraction(
             *multiplied by the voxel size*. Including the voxel size
             numerical approximates the projection integral and is
             necessary for simulating images in physical units.
-        - `correction_mask`:
-            A `cryojax.ndimage.transforms.SincCorrectionMask` for performing
-            sinc-correction on the linear-interpolated projections. This
-            should be computed on a coordinate grid with shape matching
-            the `FourierVoxelGridVolume.shape`.
         - `out_of_bounds_mode`:
             Specify how to handle out of bounds indexing. See
             `cryojax.image.map_coordinates` for documentation.
@@ -463,7 +374,6 @@ class EwaldSphereExtraction(
             `out_of_bounds_mode = "fill"`.
         """
         self.outputs_integral = outputs_integral
-        self.correction_mask = correction_mask
         self.out_of_bounds_mode = out_of_bounds_mode
         self.fill_value = fill_value
 
@@ -501,18 +411,23 @@ class EwaldSphereExtraction(
             )
         # Compute the fourier projection
         if isinstance(volume_representation, FourierVoxelSplineVolume):
-            ewald_sphere_surface = self.extract_ewald_sphere_from_spline_coefficients(
+            ewald_sphere_surface = _extract_ewald_sphere_spline(
                 volume_representation.spline_coefficients,
                 frequency_slice,
                 image_config.pixel_size,
                 image_config.wavelength_in_angstroms,
+                mode=self.out_of_bounds_mode,
+                cval=self.fill_value,
             )
         elif isinstance(volume_representation, FourierVoxelGridVolume):
-            ewald_sphere_surface = self.extract_ewald_sphere_from_grid_points(
+            ewald_sphere_surface = _extract_ewald_sphere(
                 volume_representation.fourier_voxel_grid,
                 frequency_slice,
                 image_config.pixel_size,
                 image_config.wavelength_in_angstroms,
+                interpolation_order=1,
+                mode=self.out_of_bounds_mode,
+                cval=self.fill_value,
             )
         else:
             raise ValueError(
@@ -523,8 +438,8 @@ class EwaldSphereExtraction(
         # Resize the image to match the AbstractImageConfig.padded_shape
         if image_config.padded_shape != (N, N):
             ewald_sphere_surface = fftn(
-                image_config.crop_or_pad_to_padded_shape(
-                    ifftn(ewald_sphere_surface, s=(N, N))
+                resize_with_crop_or_pad(
+                    ifftn(ewald_sphere_surface, s=(N, N)), image_config.padded_shape
                 )
             )
         # Scale by voxel size to convert from projection to integral
@@ -535,90 +450,6 @@ class EwaldSphereExtraction(
             if outputs_real_space
             else ewald_sphere_surface
         )
-
-    def extract_ewald_sphere_from_spline_coefficients(
-        self,
-        spline_coefficients: Complex[Array, "coeff_dim coeff_dim coeff_dim"],
-        frequency_slice_in_pixels: Float[Array, "1 dim dim 3"],
-        voxel_size: Float[Array, ""],
-        wavelength_in_angstroms: Float[Array, ""],
-    ) -> Complex[Array, "dim dim"]:
-        """Extract an ewald sphere surface of the `fourier_voxel_grid` at
-        coordinates normal to `frequency_slice_in_pixels` at wavelength
-        `wavelength_in_angstroms`.
-
-        **Arguments:**
-
-        - `spline_coefficients`:
-            Spline coefficients of the density grid in fourier space.
-            The coefficients should be computed from a `fourier_voxel_grid`
-            with the zero frequency component in the center. These are
-            typically computed with the function
-            `cryojax.image.compute_spline_coefficients`.
-        - `frequency_slice_in_pixels`:
-            Frequency central slice coordinate system. The zero
-            frequency component should be in the center.
-        - `voxel_size`:
-            The voxel size of the `fourier_voxel_grid`.
-        - `wavelength_in_angstroms`:
-            The wavelength of the incident electron beam.
-
-        **Returns:**
-
-        The interpolated ewald sphere surface at coordinates normal to
-        `frequency_slice_in_pixels`.
-        """
-        return _extract_ewald_sphere_surface_with_cubic_spline(
-            spline_coefficients,
-            frequency_slice_in_pixels,
-            voxel_size,
-            wavelength_in_angstroms,
-            mode=self.out_of_bounds_mode,
-            cval=self.fill_value,
-        )
-
-    def extract_ewald_sphere_from_grid_points(
-        self,
-        fourier_voxel_grid: Complex[Array, "dim dim dim"],
-        frequency_slice_in_pixels: Float[Array, "1 dim dim 3"],
-        voxel_size: Float[Array, ""],
-        wavelength_in_angstroms: Float[Array, ""],
-    ) -> Complex[Array, "dim dim"]:
-        """Extract an ewald sphere surface of the `fourier_voxel_grid` at
-        coordinates normal to `frequency_slice_in_pixels` at wavelength
-        `wavelength_in_angstroms`.
-
-        **Arguments:**
-
-        - `fourier_voxel_grid`:
-            Density grid in fourier space. The zero frequency component
-            should be in the center.
-        - `frequency_slice_in_pixels`:
-            Frequency central slice coordinate system. The zero
-            frequency component should be in the center.
-        - `voxel_size`:
-            The voxel size of the `fourier_voxel_grid`.
-        - `wavelength_in_angstroms`:
-            The wavelength of the incident electron beam.
-
-        **Returns:**
-
-        The interpolated ewald sphere surface at coordinates normal to
-        `frequency_slice_in_pixels`.
-        """
-        ewald_sphere_surface = _extract_ewald_sphere_surface(
-            fourier_voxel_grid,
-            frequency_slice_in_pixels,
-            voxel_size,
-            wavelength_in_angstroms,
-            interpolation_order=1,
-            mode=self.out_of_bounds_mode,
-            cval=self.fill_value,
-        )
-        if self.correction_mask is not None:
-            ewald_sphere_surface = fftn(self.correction_mask(ifftn(ewald_sphere_surface)))
-
-        return ewald_sphere_surface
 
 
 def _extract_slice(
@@ -639,7 +470,7 @@ def _extract_slice(
     )
 
 
-def _extract_slice_with_cubic_spline(
+def _extract_slice_spline(
     spline_coefficients, frequency_slice, **kwargs
 ) -> Complex[Array, "dim dim//2+1"]:
     return convert_fftn_to_rfftn(
@@ -650,7 +481,7 @@ def _extract_slice_with_cubic_spline(
     )
 
 
-def _extract_ewald_sphere_surface(
+def _extract_ewald_sphere(
     fourier_voxel_grid,
     frequency_slice,
     voxel_size,
@@ -670,7 +501,7 @@ def _extract_ewald_sphere_surface(
     )
 
 
-def _extract_ewald_sphere_surface_with_cubic_spline(
+def _extract_ewald_sphere_spline(
     spline_coefficients, frequency_slice, voxel_size, wavelength, **kwargs
 ) -> Complex[Array, "dim dim"]:
     ewald_sphere_frequencies = _get_ewald_sphere_surface_from_slice(

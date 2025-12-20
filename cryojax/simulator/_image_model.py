@@ -12,7 +12,15 @@ import jax.random as jr
 from jaxtyping import Array, Bool, Complex, Float, PRNGKeyArray
 
 from ..jax_util import NDArrayLike
-from ..ndimage import AbstractImageTransform, FilterLike, MaskLike, irfftn, rfftn
+from ..ndimage import (
+    AbstractFilter,
+    AbstractImageTransform,
+    AbstractMask,
+    compute_edge_value,
+    crop_to_shape,
+    irfftn,
+    rfftn,
+)
 from ._detector import AbstractDetector
 from ._image_config import AbstractImageConfig, DoseImageConfig
 from ._pose import AbstractPose
@@ -23,6 +31,7 @@ from ._volume import (
     AbstractVolumeIntegrator,
     AbstractVolumeParametrization,
     AbstractVolumeRepresentation,
+    AutoVolumeProjection,
 )
 
 
@@ -56,6 +65,24 @@ class AbstractImageModel(eqx.Module, strict=True):
 
     signal_region: eqx.AbstractVar[Bool[Array, "_ _"] | None]
     normalizes_signal: eqx.AbstractVar[bool]
+    signal_centering: eqx.AbstractVar[Literal["bg", "mean"]]
+    translate_mode: eqx.AbstractVar[Literal["fft", "atom", "none"]]
+
+    def __check_init__(self):
+        if self.signal_centering not in ["bg", "mean"]:
+            raise ValueError(
+                "Found invalid value for "
+                f"`{self.__class__.__name__}(..., signal_centering=...)`. "
+                "Values 'bg' and 'mean' are "
+                f"supported, but got {self.signal_centering}."
+            )
+        if self.translate_mode not in ["fft", "atom", "none"]:
+            raise ValueError(
+                "Found invalid value for "
+                f"`{self.__class__.__name__}(..., translate_mode=...)`. "
+                "Values 'fft', 'atom', and 'none' are "
+                f"supported, but got {self.translate_mode}."
+            )
 
     @abstractmethod
     def raw_simulate(
@@ -71,10 +98,9 @@ class AbstractImageModel(eqx.Module, strict=True):
         self,
         rng_key: PRNGKeyArray | None = None,
         *,
-        removes_padding: bool = True,
         outputs_real_space: bool = True,
-        mask: MaskLike | None = None,
-        filter: FilterLike | None = None,
+        mask: AbstractMask | None = None,
+        filter: AbstractFilter | None = None,
     ) -> Array:
         """Render an image.
 
@@ -83,11 +109,6 @@ class AbstractImageModel(eqx.Module, strict=True):
         - `rng_key`:
             The random number generator key. If not passed, render an image
             with no stochasticity.
-        - `removes_padding`:
-            If `True`, return an image cropped to `image_config.shape`.
-            Otherwise, return an image at the `image_config.padded_shape`.
-            If `removes_padding = False`, the `filter`
-            and `mask` are not applied.
         - `outputs_real_space`:
             If `True`, return the image in real space.
         - `mask`:
@@ -97,9 +118,8 @@ class AbstractImageModel(eqx.Module, strict=True):
         """
         fourier_image = self.raw_simulate(rng_key, outputs_real_space=False)
 
-        return self._maybe_postprocess(
+        return self.postprocess(
             fourier_image,
-            removes_padding=removes_padding,
             outputs_real_space=outputs_real_space,
             mask=mask,
             filter=filter,
@@ -110,24 +130,24 @@ class AbstractImageModel(eqx.Module, strict=True):
         fourier_image: Array,
         *,
         outputs_real_space: bool = True,
-        mask: MaskLike | None = None,
-        filter: FilterLike | None = None,
+        mask: AbstractMask | None = None,
+        filter: AbstractFilter | None = None,
     ) -> Array:
         """Return an image postprocessed with filters, cropping, masking,
         and normalization in either real or fourier space.
         """
         image_config = self.image_config
-        mask, filter = self._compose_transform(mask, filter)
+        mask_c, filter_c = self._compose_transform(mask, filter)
         if (
-            mask is None
+            mask_c is None
             and image_config.padded_shape == image_config.shape
             and not self.normalizes_signal
         ):
             # ... if there are no masks, we don't need to crop, and we are
             # not normalizing, minimize moving back and forth between real
             # and fourier space
-            if filter is not None:
-                fourier_image = filter(fourier_image)
+            if filter_c is not None:
+                fourier_image = filter_c(fourier_image)
             return (
                 irfftn(fourier_image, s=image_config.shape)
                 if outputs_real_space
@@ -137,26 +157,32 @@ class AbstractImageModel(eqx.Module, strict=True):
             # ... otherwise, apply filter, crop, and mask, again trying to
             # minimize moving back and forth between real and fourier space
             padded_rfft_shape = image_config.padded_frequency_grid_in_pixels.shape[0:2]
-            if filter is not None:
+            if filter_c is not None:
                 # ... apply the filter
-                if not filter.array.shape == padded_rfft_shape:
-                    raise ValueError(
-                        "Found that the `filter` was shape "
-                        f"{filter.array.shape}, but expected it to be "
-                        f"shape {padded_rfft_shape}. You may have passed a "
-                        f"fitler according to the "
-                        "`AbstractImageModel.image_config.shape`, "
-                        "when the `AbstractImageModel.image_config.padded_shape` "
-                        "was expected."
-                    )
-                fourier_image = filter(fourier_image)
-            image = irfftn(fourier_image, s=image_config.padded_shape)
+                if filter is not None:
+                    if not filter.get().shape == padded_rfft_shape:
+                        raise ValueError(
+                            "Found that the `filter` was shape "
+                            f"{filter.get().shape}, but expected it to be "
+                            f"shape {padded_rfft_shape}. You may have passed a "
+                            f"filter according to the "
+                            f"`{image_config.__class__.__name__}.shape`, "
+                            f"when the `{image_config.__class__.__name__}.padded_shape` "
+                            "was expected."
+                        )
+                fourier_image = filter_c(fourier_image)
+            padded_image = irfftn(fourier_image, s=image_config.padded_shape)
             if image_config.padded_shape != image_config.shape:
-                image = image_config.crop_to_shape(image)
+                image = crop_to_shape(padded_image, image_config.shape)
+            else:
+                image = padded_image
             if self.normalizes_signal:
-                image = self._normalize_image(image)
-            if mask is not None:
-                image = mask(image)
+                if self.signal_centering == "mean":
+                    image = self._mean_subtract_normalize(image)
+                elif self.signal_centering == "bg":
+                    image = self._bg_subtract_normalize(image, padded_image)
+            if mask_c is not None:
+                image = mask_c(image)
             return image if outputs_real_space else rfftn(image)
 
     def _phase_shift_translate(self, fourier_image: Array) -> Array:
@@ -182,7 +208,7 @@ class AbstractImageModel(eqx.Module, strict=True):
             )
 
     def _compose_transform(
-        self, mask: MaskLike | None, filter: FilterLike | None
+        self, mask: AbstractMask | None, filter: AbstractFilter | None
     ) -> tuple[AbstractImageTransform | None, AbstractImageTransform | None]:
         if self.transform is None:
             return mask, filter
@@ -198,7 +224,7 @@ class AbstractImageModel(eqx.Module, strict=True):
                 else:
                     return mask, filter * self.transform
 
-    def _normalize_image(self, image: Array) -> Array:
+    def _mean_subtract_normalize(self, image: Array) -> Array:
         mean, std = (
             jnp.mean(image, where=self.signal_region),
             jnp.std(image, where=self.signal_region),
@@ -207,25 +233,14 @@ class AbstractImageModel(eqx.Module, strict=True):
 
         return image
 
-    def _maybe_postprocess(
-        self,
-        image: Array,
-        *,
-        removes_padding: bool = True,
-        outputs_real_space: bool = True,
-        mask: MaskLike | None = None,
-        filter: FilterLike | None = None,
-    ) -> Array:
-        if removes_padding:
-            return self.postprocess(
-                image, outputs_real_space=outputs_real_space, mask=mask, filter=filter
-            )
-        else:
-            return (
-                irfftn(image, s=self.image_config.padded_shape)
-                if outputs_real_space
-                else image
-            )
+    def _bg_subtract_normalize(self, image: Array, padded_image: Array) -> Array:
+        bg_value, std = (
+            compute_edge_value(padded_image),
+            jnp.std(image, where=self.signal_region),
+        )
+        image = (image - bg_value) / std
+
+        return image
 
 
 class LinearImageModel(AbstractImageModel, strict=True):
@@ -238,9 +253,9 @@ class LinearImageModel(AbstractImageModel, strict=True):
     image_config: AbstractImageConfig
 
     transform: AbstractImageTransform | None
-
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
+    signal_centering: Literal["bg", "mean"]
     translate_mode: Literal["fft", "atom", "none"]
 
     def __init__(
@@ -248,12 +263,13 @@ class LinearImageModel(AbstractImageModel, strict=True):
         volume_parametrization: AbstractVolumeParametrization,
         pose: AbstractPose,
         image_config: AbstractImageConfig,
-        volume_integrator: AbstractVolumeIntegrator,
         transfer_theory: ContrastTransferTheory,
+        volume_integrator: AbstractVolumeIntegrator = AutoVolumeProjection(),
         *,
         transform: AbstractImageTransform | None = None,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
+        signal_centering: Literal["bg", "mean"] = "mean",
         translate_mode: Literal["fft", "atom", "none"] = "fft",
     ):
         """**Arguments:**
@@ -265,22 +281,41 @@ class LinearImageModel(AbstractImageModel, strict=True):
         - `image_config`:
             The configuration of the instrument, such as for the pixel size
             and the wavelength.
-        - `volume_integrator`: The method for integrating the scattering potential.
+        - `volume_integrator`: The method for integrating the volume onto the plane.
         - `transfer_theory`: The contrast transfer theory.
         - `transform`:
             A [`cryojax.ndimage.AbstractImageTransform`][] applied to the
             image after simulation.
         - `normalizes_signal`:
-            If `True`, normalizes_signal the image before returning.
+            Whether or not to normalize the output of `image_model.simulate()`.
+            If `True`, see `signal_centering` for options.
         - `signal_region`:
             A boolean array that is 1 where there is signal,
             and 0 otherwise used to normalize the image.
             Must have shape equal to `AbstractImageConfig.shape`.
+        - `signal_centering`:
+            How to calculate the offset for normalization when
+            `normalizes_signal = True`. Options are
+            - 'mean':
+                Normalize the image to be mean 0
+                within `signal_region`.
+            - 'bg':
+                Subtract mean value at the image edges.
+                This makes the image fade to a background with values
+                equal to zero. Requires that `image_config.padded_shape`
+                is large enough so that the signal sufficiently decays.
+            Ignored if `normalizes_signal = False`.
         - `translate_mode`:
-            If `'fft'`, apply in-plane translation via phase
-            shifts in the Fourier domain. If `'atoms'`,
-            apply translation on atom positions before projection.
-            If `'none'`, does not apply a translation.
+            How to apply in-plane translation to the volume. Options are
+            - 'fft':
+                Apply phase shifts in the Fourier domain.
+            - 'atom':
+                Apply translation to atom positions before
+                projection. For this method, the
+                [`cryojax.simulator.AbstractVolumeParametrization`][]
+                must be or return an [`cryojax.simulator.AbstractAtomVolume`][].
+            - 'none':
+                Do not apply the translation.
         """
         # Simulator components
         self.volume_parametrization = volume_parametrization
@@ -292,6 +327,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
         self.transform = transform
         self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
+        self.signal_centering = signal_centering
         if signal_region is None:
             self.signal_region = None
         else:
@@ -348,9 +384,9 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
     image_config: AbstractImageConfig
 
     transform: AbstractImageTransform | None
-
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
+    signal_centering: Literal["bg", "mean"]
     translate_mode: Literal["fft", "atom", "none"]
 
     def __init__(
@@ -358,11 +394,12 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
         volume_parametrization: AbstractVolumeParametrization,
         pose: AbstractPose,
         image_config: AbstractImageConfig,
-        volume_integrator: AbstractVolumeIntegrator,
+        volume_integrator: AbstractVolumeIntegrator = AutoVolumeProjection(),
         *,
         transform: AbstractImageTransform | None = None,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
+        signal_centering: Literal["bg", "mean"] = "mean",
         translate_mode: Literal["fft", "atom", "none"] = "fft",
     ):
         """**Arguments:**
@@ -374,19 +411,40 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
         - `image_config`:
             The configuration of the instrument, such as for the pixel size
             and the wavelength.
-        - `volume_integrator`: The method for integrating the scattering potential.
+        - `volume_integrator`: The method for integrating the volume onto the plane.
         - `transform`:
             A [`cryojax.ndimage.AbstractImageTransform`][] applied to the
             image after simulation.
+        - `normalizes_signal`:
+            Whether or not to normalize the output of `image_model.simulate()`.
+            If `True`, see `signal_centering` for options.
         - `signal_region`:
             A boolean array that is 1 where there is signal,
             and 0 otherwise used to normalize the image.
             Must have shape equal to `AbstractImageConfig.shape`.
+        - `signal_centering`:
+            How to calculate the offset for normalization when
+            `normalizes_signal = True`. Options are
+            - 'mean':
+                Normalize the image to be mean 0
+                within `signal_region`.
+            - 'bg':
+                Subtract mean value at the image edges.
+                This makes the image fade to a background with values
+                equal to zero. Requires that `image_config.padded_shape`
+                is large enough so that the signal sufficiently decays.
+            Ignored if `normalizes_signal = False`.
         - `translate_mode`:
-            If `'fft'`, apply in-plane translation via phase
-            shifts in the Fourier domain. If `'atoms'`,
-            apply translation on atom positions before projection.
-            If `'none'`, does not apply a translation.
+            How to apply in-plane translation to the volume. Options are
+            - 'fft':
+                Apply phase shifts in the Fourier domain.
+            - 'atom':
+                Apply translation to atom positions before
+                projection. For this method, the
+                [`cryojax.simulator.AbstractVolumeParametrization`][]
+                must be or return an [`cryojax.simulator.AbstractAtomVolume`][].
+            - 'none':
+                Do not apply the translation.
         """
         # Simulator components
         self.volume_parametrization = volume_parametrization
@@ -397,6 +455,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
         self.transform = transform
         self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
+        self.signal_centering = signal_centering
         if signal_region is None:
             self.signal_region = None
         else:
@@ -456,9 +515,9 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
     scattering_theory: AbstractScatteringTheory
 
     transform: AbstractImageTransform | None
-
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
+    signal_centering: Literal["bg", "mean"]
     translate_mode: Literal["fft", "atom", "none"]
 
     def __init__(
@@ -471,34 +530,9 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
         transform: AbstractImageTransform | None = None,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
+        signal_centering: Literal["bg", "mean"] = "mean",
         translate_mode: Literal["fft", "atom", "none"] = "fft",
     ):
-        """**Arguments:**
-
-        - `volume_parametrization`:
-            The parametrization of the imaging volume.
-        - `pose`:
-            The pose of the volume.
-        - `image_config`:
-            The configuration of the instrument, such as for the pixel size
-            and the wavelength.
-        - `scattering_theory`:
-            The scattering theory.
-        - `transform`:
-            A [`cryojax.ndimage.AbstractImageTransform`][] applied to the
-            image after simulation.
-        - `normalizes_signal`:
-            If `True`, normalize the image before returning.
-        - `signal_region`:
-            A boolean array that is 1 where there is signal,
-            and 0 otherwise used to normalize the image.
-            Must have shape equal to `AbstractImageConfig.shape`.
-        - `translate_mode`:
-            If `'fft'`, apply in-plane translation via phase
-            shifts in the Fourier domain. If `'atoms'`,
-            apply translation on atom positions before projection.
-            If `'none'`, does not apply a translation.
-        """
         self.volume_parametrization = volume_parametrization
         self.pose = pose
         self.image_config = image_config
@@ -506,6 +540,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
         self.transform = transform
         self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
+        self.signal_centering = signal_centering
         if signal_region is None:
             self.signal_region = None
         else:
@@ -561,9 +596,9 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
     scattering_theory: AbstractScatteringTheory
 
     transform: AbstractImageTransform | None
-
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
+    signal_centering: Literal["bg", "mean"]
     translate_mode: Literal["fft", "atom", "none"]
 
     def __init__(
@@ -576,34 +611,9 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
         transform: AbstractImageTransform | None = None,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
+        signal_centering: Literal["bg", "mean"] = "mean",
         translate_mode: Literal["fft", "atom", "none"] = "fft",
     ):
-        """**Arguments:**
-
-        - `volume_parametrization`:
-            The parametrization of the imaging volume.
-        - `pose`:
-            The pose of the volume.
-        - `image_config`:
-            The configuration of the instrument, such as for the pixel size
-            and the wavelength.
-        - `scattering_theory`:
-            The scattering theory.
-        - `transform`:
-            A [`cryojax.ndimage.AbstractImageTransform`][] applied to the
-            image after simulation.
-        - `normalizes_signal`:
-            If `True`, normalize the image before returning.
-        - `signal_region`:
-            A boolean array that is 1 where there is signal,
-            and 0 otherwise used to normalize the image.
-            Must have shape equal to `AbstractImageConfig.shape`.
-        - `translate_mode`:
-            If `'fft'`, apply in-plane translation via phase
-            shifts in the Fourier domain. If `'atoms'`,
-            apply translation on atom positions before projection.
-            If `'none'`, does not apply a translation.
-        """
         self.volume_parametrization = volume_parametrization
         self.pose = pose
         self.image_config = image_config
@@ -611,6 +621,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
         self.transform = transform
         self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
+        self.signal_centering = signal_centering
         if signal_region is None:
             self.signal_region = None
         else:
@@ -666,9 +677,9 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
     detector: AbstractDetector
 
     transform: AbstractImageTransform | None
-
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
+    signal_centering: Literal["bg", "mean"]
     translate_mode: Literal["fft", "atom", "none"]
 
     def __init__(
@@ -682,34 +693,9 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
         transform: AbstractImageTransform | None = None,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
+        signal_centering: Literal["bg", "mean"] = "mean",
         translate_mode: Literal["fft", "atom", "none"] = "fft",
     ):
-        """**Arguments:**
-
-        - `volume_parametrization`:
-            The parametrization of the imaging volume.
-        - `pose`:
-            The pose of the volume.
-        - `image_config`:
-            The configuration of the instrument, such as for the pixel size
-            and the wavelength.
-        - `scattering_theory`:
-            The scattering theory.
-        - `transform`:
-            A [`cryojax.ndimage.AbstractImageTransform`][] applied to the
-            image after simulation.
-        - `normalizes_signal`:
-            If `True`, normalize the image before returning.
-        - `signal_region`:
-            A boolean array that is 1 where there is signal,
-            and 0 otherwise used to normalize the image.
-            Must have shape equal to `AbstractImageConfig.shape`.
-        - `translate_mode`:
-            If `'fft'`, apply in-plane translation via phase
-            shifts in the Fourier domain. If `'atoms'`,
-            apply translation on atom positions before projection.
-            If `'none'`, does not apply a translation.
-        """
         self.volume_parametrization = volume_parametrization
         self.pose = pose
         self.image_config = image_config
@@ -718,6 +704,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
         self.transform = transform
         self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
+        self.signal_centering = signal_centering
         if signal_region is None:
             self.signal_region = None
         else:
@@ -790,3 +777,54 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
                 if outputs_real_space
                 else fourier_detector_readout
             )
+
+
+_init_doc = """**Arguments:**
+
+- `volume_parametrization`:
+    The parametrization of the imaging volume.
+- `pose`:
+    The pose of the volume.
+- `image_config`:
+    The configuration of the instrument, such as for the pixel size
+    and the wavelength.
+- `scattering_theory`:
+    The scattering theory.
+- `transform`:
+    A [`cryojax.ndimage.AbstractImageTransform`][] applied to the
+    image after simulation.
+- `normalizes_signal`:
+    Whether or not to normalize the output of `image_model.simulate()`.
+    If `True`, see `signal_centering` for options.
+- `signal_region`:
+    A boolean array that is 1 where there is signal,
+    and 0 otherwise used to normalize the image.
+    Must have shape equal to `AbstractImageConfig.shape`.
+- `signal_centering`:
+    How to calculate the offset for normalization when
+    `normalizes_signal = True`. Options are
+    - 'mean':
+        Normalize the image to be mean 0
+        within `signal_region`.
+    - 'bg':
+        Subtract mean value at the image edges.
+        This makes the image fade to a background with values
+        equal to zero. Requires that `image_config.padded_shape`
+        is large enough so that the signal sufficiently decays.
+    Ignored if `normalizes_signal = False`.
+- `translate_mode`:
+    How to apply in-plane translation to the volume. Options are
+    - 'fft':
+        Apply phase shifts in the Fourier domain.
+    - 'atom':
+        Apply translation to atom positions before
+        projection. For this method, the
+        [`cryojax.simulator.AbstractVolumeParametrization`][]
+        must be or return an [`cryojax.simulator.AbstractAtomVolume`][].
+    - 'none':
+        Do not apply the translation.
+"""
+
+ContrastImageModel.__init__.__doc__ = _init_doc
+IntensityImageModel.__init__.__doc__ = _init_doc
+ElectronCountsImageModel.__init__.__doc__ = _init_doc
