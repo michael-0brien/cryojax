@@ -1219,7 +1219,7 @@
 <div class="highlight"><pre><span></span><code><span class="c1"># Import the cryoJAX simulator</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">cryojax.simulator</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">cxs</span>
 </code></pre></div>
-<p>This tutorial starts by instantiating the representation of the volume. This is a fourier voxel representation of the protein electrostatic potential. See the tutorial on <a href="To see how the electrostatic potential array is computed, see the documentation [here](https://michael-0brien.github.io/cryojax/examples/compute-potential/)">rendering volumes</a> from atomic models for more information.</p>
+<p>This tutorial starts by instantiating the representation of the volume. This is a fourier voxel representation of the protein electrostatic potential. See the tutorial on <a href="https://michael-0brien.github.io/cryojax/examples/compute-potential/">rendering volumes</a> from atomic models for more information.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">cryojax.io</span><span class="w"> </span><span class="kn">import</span> <span class="n">read_array_from_mrc</span>
 
 
@@ -1301,11 +1301,12 @@ simulating an image, such as the pose, the volume, and the CTF and 2) Images are
     pixel_size=f32[],
     voltage_in_kilovolts=f32[],
     grid_helper=None,
-    pad_options={&#39;shape&#39;: (160, 160), &#39;mode&#39;: &#39;constant&#39;, &#39;grid_helper&#39;: None}
+    pad_options={&#39;shape&#39;: (160, 160), &#39;grid_helper&#39;: None}
   ),
   transform=None,
   normalizes_signal=True,
   signal_region=None,
+  signal_centering=&#39;mean&#39;,
   translate_mode=&#39;fft&#39;
 )
 </code></pre></div>
@@ -1331,7 +1332,7 @@ simulating an image, such as the pose, the volume, and the CTF and 2) Images are
 <span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/43ae55f6b705417c99daa28a58357b86.png" /></p>
+<p><img alt="img" src="../_data/43fb92a3acff4f3c946b1c969655b890.png" /></p>
 <p>Alternatively, the user can simulate an image with noise from a particular statistical distribution. In this example, we use the <code>GaussianWhiteNoiseModel</code>.</p>
 <p>Here, we will directly control image SNR by transforming the final image output using a <code>cryojax.ndimage.ImageScaling</code>.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">cryojax.ndimage</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">im</span>
@@ -1376,7 +1377,9 @@ simulating an image, such as the pose, the volume, and the CTF and 2) Images are
 <span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/687f12ac3b39474891af68db3ce5f50c.png" /></p>
+<p><img alt="img" src="../_data/0877cfa161d344f3aa10f203462695f4.png" /></p>
+<div class="highlight"><pre><span></span><code>
+</code></pre></div>
 
 
 

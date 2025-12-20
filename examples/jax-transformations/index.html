@@ -1283,9 +1283,9 @@
 <span class="o">%</span><span class="n">timeit</span> <span class="n">simulate_fn</span><span class="p">(</span><span class="n">image_model</span><span class="p">)</span><span class="o">.</span><span class="n">block_until_ready</span><span class="p">()</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code>Simulate an image without JIT
-23.8 ms ± 745 μs per loop (mean ± std. dev. of 7 runs, 1 loop each)
+23.2 ms ± 1.77 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
 Simulate an image with JIT
-827 μs ± 91.9 μs per loop (mean ± std. dev. of 7 runs, 1 loop each)
+1.01 ms ± 233 μs per loop (mean ± std. dev. of 7 runs, 1 loop each)
 </code></pre></div>
 <p>Indeed there is a large speedup!</p>
 <p>Next, let's compute our first gradient. If you haven't yet read about <a href="https://docs.kidger.site/equinox/all-of-equinox/#2-filtering">filtered transformations</a> in <code>equinox</code>, stop and do this now. In particular, read about <code>equinox.partition</code> and <code>equinox.combine</code>.</p>
@@ -1315,15 +1315,15 @@ Simulate an image with JIT
 <span class="c1"># Define the gradient function whose first argument is the gradient parameters.</span>
 <span class="c1"># Use `eqx.combine`` after crossing the gradient boundary</span>
 <span class="nd">@eqx</span><span class="o">.</span><span class="n">filter_jit</span>
-<span class="nd">@eqx</span><span class="o">.</span><span class="n">filter_grad</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">gradient_fn</span><span class="p">(</span><span class="n">model_grad</span><span class="p">,</span> <span class="n">model_nograd</span><span class="p">,</span> <span class="n">observed_image</span><span class="p">):</span>
+<span class="nd">@eqx</span><span class="o">.</span><span class="n">filter_value_and_grad</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">loss_fn</span><span class="p">(</span><span class="n">model_grad</span><span class="p">,</span> <span class="n">model_nograd</span><span class="p">,</span> <span class="n">observed_image</span><span class="p">):</span>
     <span class="n">image_model</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">combine</span><span class="p">(</span><span class="n">model_grad</span><span class="p">,</span> <span class="n">model_nograd</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sum</span><span class="p">((</span><span class="n">simulate_fn</span><span class="p">(</span><span class="n">image_model</span><span class="p">)</span> <span class="o">-</span> <span class="n">observed_image</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
 
 
 <span class="c1"># Compute and extract the gradients. We took the gradient with respect to</span>
 <span class="c1"># a cryoJAX `EulerAnglePose` object</span>
-<span class="n">gradients</span> <span class="o">=</span> <span class="n">gradient_fn</span><span class="p">(</span><span class="n">model_grad</span><span class="p">,</span> <span class="n">model_nograd</span><span class="p">,</span> <span class="n">observed_image</span><span class="p">)</span>
+<span class="n">loss</span><span class="p">,</span> <span class="n">gradients</span> <span class="o">=</span> <span class="n">loss_fn</span><span class="p">(</span><span class="n">model_grad</span><span class="p">,</span> <span class="n">model_nograd</span><span class="p">,</span> <span class="n">observed_image</span><span class="p">)</span>
 <span class="n">eqx</span><span class="o">.</span><span class="n">tree_pprint</span><span class="p">(</span><span class="n">where_pose</span><span class="p">(</span><span class="n">gradients</span><span class="p">),</span> <span class="n">short_arrays</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code>EulerAnglePose(
@@ -1379,7 +1379,7 @@ Simulate an image with JIT
 <span class="n">images</span> <span class="o">=</span> <span class="n">simulate_batch_fn</span><span class="p">(</span><span class="n">model_vmap</span><span class="p">,</span> <span class="n">model_novmap</span><span class="p">)</span>
 <span class="n">plot_image_stack</span><span class="p">(</span><span class="n">images</span><span class="p">)</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/06a179dc4c994a048f5a41e8b3ab2a25.png" /></p>
+<p><img alt="img" src="../_data/4a7495cfa73b4757a543cae682e11e6b.png" /></p>
 <p>Here, we use a <code>eqx.filter_vmap</code> for model instantiation and image simulation.</p>
 <div class="admonition info">
 <p class="admonition-title">Why do we set <code>out_axes=(0, None)</code>?</p>

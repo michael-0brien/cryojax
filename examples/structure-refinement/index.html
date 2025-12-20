@@ -1308,10 +1308,10 @@
         <span class="n">transfer_theory</span><span class="p">,</span>
         <span class="n">normalizes_signal</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
         <span class="n">signal_region</span><span class="o">=</span><span class="n">circular_mask</span><span class="o">.</span><span class="n">get</span><span class="p">()</span> <span class="o">==</span> <span class="mf">1.0</span><span class="p">,</span>
+        <span class="n">signal_centering</span><span class="o">=</span><span class="s2">&quot;bg&quot;</span><span class="p">,</span>
+        <span class="n">transform</span><span class="o">=</span><span class="n">im</span><span class="o">.</span><span class="n">ImageScaling</span><span class="p">(</span><span class="n">scale</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">SNR</span><span class="p">)),</span>
     <span class="p">)</span>
-    <span class="n">noise_model</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">GaussianWhiteNoiseModel</span><span class="p">(</span>
-        <span class="n">image_model</span><span class="p">,</span> <span class="n">variance</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">signal_scale_factor</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">SNR</span><span class="p">)</span>
-    <span class="p">)</span>
+    <span class="n">noise_model</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">GaussianWhiteNoiseModel</span><span class="p">(</span><span class="n">image_model</span><span class="p">,</span> <span class="n">variance</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
     <span class="n">parameters</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
         <span class="n">pose</span><span class="o">=</span><span class="n">pose</span><span class="p">,</span> <span class="n">transfer_theory</span><span class="o">=</span><span class="n">transfer_theory</span><span class="p">,</span> <span class="n">image_config</span><span class="o">=</span><span class="n">image_config</span>
     <span class="p">)</span>
@@ -1350,7 +1350,7 @@
 <span class="p">)</span>
 <span class="n">plot_image_stack</span><span class="p">(</span><span class="n">dataset_images</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">9</span><span class="p">])</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/771bf05fd61f4fdc934cad53bb3548ee.png" /></p>
+<p><img alt="img" src="../_data/ef4b929f6b6a47239fbbe632fc756827.png" /></p>
 <p>Next, define the loss function. We will naively do a gradient descent on the positions of the C-alpha atoms to see if we can capture the large-scale difference of the conformational change.</p>
 <div class="highlight"><pre><span></span><code><span class="nd">@eqx</span><span class="o">.</span><span class="n">filter_value_and_grad</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">compute_loss</span><span class="p">(</span><span class="n">atom_positions</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
@@ -1383,7 +1383,7 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">cryojax.dataset</span><span class="w"> </span><span class="kn">import</span> <span class="n">AbstractDataset</span>
 
 
-<span class="k">class</span><span class="w"> </span><span class="nc">PyTreeDataset</span><span class="p">(</span><span class="n">AbstractDataset</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">InMemoryDataset</span><span class="p">(</span><span class="n">AbstractDataset</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Dataset as an arbitrary in-memory PyTree, where all arrays</span>
 <span class="sd">    have a batch dimension.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -1443,7 +1443,7 @@
 
 <span class="c1"># Run optimization</span>
 <span class="n">pytree</span> <span class="o">=</span> <span class="p">(</span><span class="n">dataset_images</span><span class="p">,</span> <span class="n">dataset_parameters</span><span class="p">,</span> <span class="n">masks</span><span class="p">)</span>
-<span class="n">dataset</span> <span class="o">=</span> <span class="n">PyTreeDataset</span><span class="p">(</span><span class="n">pytree</span><span class="p">)</span>
+<span class="n">dataset</span> <span class="o">=</span> <span class="n">InMemoryDataset</span><span class="p">(</span><span class="n">pytree</span><span class="p">)</span>
 <span class="n">opt_positions</span><span class="p">,</span> <span class="n">opt_state</span><span class="p">,</span> <span class="n">loss_values</span> <span class="o">=</span> <span class="p">(</span>
     <span class="n">initial_positions</span><span class="p">,</span>
     <span class="n">OPTIM</span><span class="o">.</span><span class="n">init</span><span class="p">(</span><span class="n">initial_positions</span><span class="p">),</span>
@@ -1459,24 +1459,27 @@
 <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">NUM_STEPS</span><span class="p">),</span> <span class="n">loss_values</span><span class="p">)</span>
 <span class="n">ax</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">xlabel</span><span class="o">=</span><span class="s2">&quot;step number&quot;</span><span class="p">,</span> <span class="n">ylabel</span><span class="o">=</span><span class="s2">&quot;cross-correlation loss&quot;</span><span class="p">)</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code>step=0, loss=-82155.5703125
-step=10, loss=-107472.546875
-step=20, loss=-110045.171875
-step=30, loss=-112131.34375
-step=40, loss=-113150.8203125
-step=50, loss=-111471.2734375
-step=60, loss=-113307.5390625
-step=70, loss=-113006.1328125
-step=80, loss=-112330.8828125
-step=90, loss=-111785.6484375
-step=99, loss=-111047.25
+<div class="highlight"><pre><span></span><code>step=0, loss=-88048.3203125
+step=10, loss=-113102.859375
+step=20, loss=-117009.8984375
+step=30, loss=-119113.3984375
+step=40, loss=-119229.15625
+step=50, loss=-119328.78125
+step=60, loss=-118316.46875
+step=70, loss=-117720.765625
+step=80, loss=-119700.703125
+step=90, loss=-119675.4609375
+step=99, loss=-117238.9296875
 </code></pre></div>
 <div class="highlight"><pre><span></span><code>[Text(0.5, 0, &#39;step number&#39;), Text(0, 0.5, &#39;cross-correlation loss&#39;)]
 </code></pre></div>
-<p><img alt="img" src="../_data/c344e1e9005940b9a02df8d32205d244.png" /></p>
+<p><img alt="img" src="../_data/bf558c0a0de547e7acc99a0e7e5c676c.png" /></p>
 <p>Now let's check the results! Let's first look at FSC curves between the ground truth and structure before and after refinement.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">cryojax.coordinates</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_radial_frequency_grid</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">cryojax.ndimage</span><span class="w"> </span><span class="kn">import</span> <span class="n">compute_fourier_shell_correlation</span><span class="p">,</span> <span class="n">rfftn</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">cryojax.ndimage</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">compute_fourier_shell_correlation</span><span class="p">,</span>
+    <span class="n">make_radial_frequency_grid</span><span class="p">,</span>
+    <span class="n">rfftn</span><span class="p">,</span>
+<span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">plot_fsc</span><span class="p">(</span><span class="n">pos1</span><span class="p">,</span> <span class="n">pos2</span><span class="p">,</span> <span class="n">ax</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
@@ -1516,10 +1519,7 @@ step=99, loss=-111047.25
 <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code>/var/folders/37/7n3d9k7903zc8cy1_374smt00000gn/T/ipykernel_87098/740336328.py:1: FutureWarning: Submodule `cryojax.coordinates` is deprecated and has been moved to the `cryojax.ndimage` namespace. `cryojax.coordinates` will be removed in cryoJAX 0.6.0.
-  from cryojax.coordinates import make_radial_frequency_grid
-</code></pre></div>
-<p><img alt="img" src="../_data/4c584c0b43374044b1162a163bdf1327.png" /></p>
+<p><img alt="img" src="../_data/5c0c26daef7a4b7385ec04fe5dcd9daa.png" /></p>
 <p>The above FSC curves quantifies the increase in correlation after gradient descent refinement. Indeed, visually the refinement is able to (roughly) recover the ground truth conformation!</p>
 <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_cross_sections</span><span class="p">(</span>
     <span class="n">pos1</span><span class="p">,</span> <span class="n">pos2</span><span class="p">,</span> <span class="n">axes</span><span class="p">,</span> <span class="n">label1</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">label2</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">color1</span><span class="o">=</span><span class="s2">&quot;b&quot;</span><span class="p">,</span> <span class="n">color2</span><span class="o">=</span><span class="s2">&quot;orange&quot;</span>
@@ -1558,7 +1558,7 @@ step=99, loss=-111047.25
 <span class="n">fig</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s2">&quot;Central cross sections of GMM positions&quot;</span><span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/fe7e5b16db0b4c82a6c1d442fb59cfdb.png" /></p>
+<p><img alt="img" src="../_data/2b0d24b9022a4ee4b8340225b2de1c25.png" /></p>
 <p>Interactive plots of the 3D point clouds can be generated locally using <code>plotly</code> with the following code block:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">plotly.graph_objects</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">go</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">plotly.subplots</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_subplots</span>

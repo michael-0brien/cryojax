@@ -1290,13 +1290,15 @@
 <div class="doc doc-object doc-function">
 
 
-<h4 id="cryojax.atom_util.split_atoms_by_element" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">atom_util</span><span class="o">.</span><span class="n">split_atoms_by_element</span><span class="p">(</span><span class="n">atomic_numbers</span><span class="p">:</span> <span class="n">Int</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;_&#39;</span><span class="p">],</span> <span class="n">atom_pytree</span><span class="p">:</span> <span class="n">PyTree</span><span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;T&#39;</span><span class="p">],</span> <span class="n">atom_axis</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">PyTree</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="s1">&#39;T&#39;</span><span class="p">],</span> <span class="n">Int</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;_&#39;</span><span class="p">]]</span></code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/94ee555e382a230aeeb66545f609cf463e2e0a4a/cryojax/atom_util/_element_utils.py#L11-L44"><code class='hippogriffe-repo-url'></code></a>
+<h3 id="cryojax.atom_util.split_atoms_by_element" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">cryojax.atom_util.split_atoms_by_element</span>
+
+  <a href="https://github.com/michael-0brien/cryojax/blob/12205415d1fce3cd3439edacd090ddca63dc3324/cryojax/atom_util/_element_utils.py#L11-L44"><code class='hippogriffe-repo-url'></code></a>
 
 
-<a href="#cryojax.atom_util.split_atoms_by_element" class="headerlink" title="Permanent link">¤</a></h4>
-
+<a href="#cryojax.atom_util.split_atoms_by_element" class="headerlink" title="Permanent link">¤</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">split_atoms_by_element</span><span class="p">(</span><span class="n">atomic_numbers</span><span class="p">:</span> <span class="n">Int</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;_&#39;</span><span class="p">],</span> <span class="n">atom_pytree</span><span class="p">:</span> <span class="n">PyTree</span><span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;T&#39;</span><span class="p">],</span> <span class="n">atom_axis</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">PyTree</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="s1">&#39;T&#39;</span><span class="p">],</span> <span class="n">Int</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;_&#39;</span><span class="p">]]</span>
+</code></pre></div>
 
     <div class="doc doc-contents first">
 
@@ -1327,13 +1329,15 @@ where arrays have been replaced with tuples of arrays.</p>
 <div class="doc doc-object doc-function">
 
 
-<h4 id="cryojax.atom_util.center_atom_positions" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">atom_util</span><span class="o">.</span><span class="n">center_atom_positions</span><span class="p">(</span><span class="n">atom_positions</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;... n_atoms 3&#39;</span><span class="p">],</span> <span class="n">atom_masses</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;... n_atoms&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">atom_axis</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;... n_atoms 3&#39;</span><span class="p">]</span></code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/94ee555e382a230aeeb66545f609cf463e2e0a4a/cryojax/atom_util/_geometry.py#L5-L38"><code class='hippogriffe-repo-url'></code></a>
+<h3 id="cryojax.atom_util.center_atom_positions" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">cryojax.atom_util.center_atom_positions</span>
+
+  <a href="https://github.com/michael-0brien/cryojax/blob/12205415d1fce3cd3439edacd090ddca63dc3324/cryojax/atom_util/_geometry.py#L5-L38"><code class='hippogriffe-repo-url'></code></a>
 
 
-<a href="#cryojax.atom_util.center_atom_positions" class="headerlink" title="Permanent link">¤</a></h4>
-
+<a href="#cryojax.atom_util.center_atom_positions" class="headerlink" title="Permanent link">¤</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">center_atom_positions</span><span class="p">(</span><span class="n">atom_positions</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;... n_atoms 3&#39;</span><span class="p">],</span> <span class="n">atom_masses</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;... n_atoms&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">atom_axis</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;... n_atoms 3&#39;</span><span class="p">]</span>
+</code></pre></div>
 
     <div class="doc doc-contents first">
 

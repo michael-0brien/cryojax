@@ -1369,21 +1369,21 @@ python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </sp
 <span class="n">filter_spec</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">tree</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">is_pose</span><span class="p">,</span> <span class="n">image_model</span><span class="p">,</span> <span class="n">is_leaf</span><span class="o">=</span><span class="n">is_pose</span><span class="p">)</span>
 <span class="n">model_grad</span><span class="p">,</span> <span class="n">model_nograd</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">partition</span><span class="p">(</span><span class="n">image_model</span><span class="p">,</span> <span class="n">filter_spec</span><span class="p">)</span>
 
-<span class="nd">@eqx</span><span class="o">.</span><span class="n">filter_grad</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">gradient_fn</span><span class="p">(</span><span class="n">model_grad</span><span class="p">,</span> <span class="n">model_nograd</span><span class="p">,</span> <span class="n">observed_image</span><span class="p">):</span>
+<span class="nd">@eqx</span><span class="o">.</span><span class="n">filter_value_and_grad</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">loss_fn</span><span class="p">(</span><span class="n">model_grad</span><span class="p">,</span> <span class="n">model_nograd</span><span class="p">,</span> <span class="n">observed_image</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Compute gradients with respect to the pose.&quot;&quot;&quot;</span>
     <span class="n">image_model</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">combine</span><span class="p">(</span><span class="n">model_grad</span><span class="p">,</span> <span class="n">model_nograd</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sum</span><span class="p">((</span><span class="n">image_model</span><span class="o">.</span><span class="n">simulate</span><span class="p">()</span> <span class="o">-</span> <span class="n">observed_image</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
 
-<span class="c1"># Compute gradients</span>
-<span class="n">gradients</span> <span class="o">=</span> <span class="n">gradient_fn</span><span class="p">(</span><span class="n">model_grad</span><span class="p">,</span> <span class="n">model_nograd</span><span class="p">,</span> <span class="n">observed_image</span><span class="p">)</span>
+<span class="c1"># Compute the loss and gradients</span>
+<span class="n">loss</span><span class="p">,</span> <span class="n">gradients</span> <span class="o">=</span> <span class="n">loss_fn</span><span class="p">(</span><span class="n">model_grad</span><span class="p">,</span> <span class="n">model_nograd</span><span class="p">,</span> <span class="n">observed_image</span><span class="p">)</span>
 </code></pre></div>
 <h3 id="vectorizing-image-simulation">Vectorizing image simulation<a class="headerlink" href="#vectorizing-image-simulation" title="Permanent link">¤</a></h3>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">equinox</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">eqx</span>
 
-<span class="c1"># Vectorize model instantiation</span>
+<span class="c1"># Vectorize model instantiation over poses</span>
 <span class="nd">@eqx</span><span class="o">.</span><span class="n">filter_vmap</span><span class="p">(</span><span class="n">in_axes</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span> <span class="n">out_axes</span><span class="o">=</span><span class="p">(</span><span class="n">eqx</span><span class="o">.</span><span class="n">if_array</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="kc">None</span><span class="p">))</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">make_image_model_vmap</span><span class="p">(</span><span class="n">wxyz</span><span class="p">,</span> <span class="n">volume</span><span class="p">,</span> <span class="n">image_config</span><span class="p">,</span> <span class="n">transfer_theory</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">make_model_vmap</span><span class="p">(</span><span class="n">wxyz</span><span class="p">,</span> <span class="n">volume</span><span class="p">,</span> <span class="n">image_config</span><span class="p">,</span> <span class="n">transfer_theory</span><span class="p">):</span>
     <span class="n">pose</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">QuaternionPose</span><span class="p">(</span><span class="n">wxyz</span><span class="o">=</span><span class="n">wxyz</span><span class="p">)</span>
     <span class="n">image_model</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">make_image_model</span><span class="p">(</span>
         <span class="n">volume</span><span class="p">,</span> <span class="n">image_config</span><span class="p">,</span> <span class="n">pose</span><span class="p">,</span> <span class="n">transfer_theory</span><span class="p">,</span> <span class="n">normalizes_signal</span><span class="o">=</span><span class="kc">True</span>
@@ -1395,7 +1395,7 @@ python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </sp
     <span class="k">return</span> <span class="n">model_vmap</span><span class="p">,</span> <span class="n">model_novmap</span>
 
 
-<span class="c1"># Define image simulation function</span>
+<span class="c1"># Define image simulation function with respect to vectorized arguments</span>
 <span class="nd">@eqx</span><span class="o">.</span><span class="n">filter_vmap</span><span class="p">(</span><span class="n">in_axes</span><span class="o">=</span><span class="p">(</span><span class="n">eqx</span><span class="o">.</span><span class="n">if_array</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="kc">None</span><span class="p">))</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">simulate_fn_vmap</span><span class="p">(</span><span class="n">model_vmap</span><span class="p">,</span> <span class="n">model_novmap</span><span class="p">):</span>
     <span class="n">image_model</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">combine</span><span class="p">(</span><span class="n">model_vmap</span><span class="p">,</span> <span class="n">model_novmap</span><span class="p">)</span>
@@ -1403,7 +1403,7 @@ python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </sp
 
 <span class="c1"># Batch image simulation over poses</span>
 <span class="n">wxyz</span> <span class="o">=</span> <span class="o">...</span>  <span class="c1"># ... load quaternions</span>
-<span class="n">model_vmap</span><span class="p">,</span> <span class="n">model_novmap</span> <span class="o">=</span> <span class="n">make_image_model_vmap</span><span class="p">(</span><span class="n">wxyz</span><span class="p">,</span> <span class="n">volume</span><span class="p">,</span> <span class="n">image_config</span><span class="p">,</span> <span class="n">transfer_theory</span><span class="p">)</span>
+<span class="n">model_vmap</span><span class="p">,</span> <span class="n">model_novmap</span> <span class="o">=</span> <span class="n">make_model_vmap</span><span class="p">(</span><span class="n">wxyz</span><span class="p">,</span> <span class="n">volume</span><span class="p">,</span> <span class="n">image_config</span><span class="p">,</span> <span class="n">transfer_theory</span><span class="p">)</span>
 <span class="n">images</span> <span class="o">=</span> <span class="n">simulate_fn_vmap</span><span class="p">(</span><span class="n">model_vmap</span><span class="p">,</span> <span class="n">model_novmap</span><span class="p">)</span>
 </code></pre></div>
 <h2 id="acknowledgements">Acknowledgements<a class="headerlink" href="#acknowledgements" title="Permanent link">¤</a></h2>

@@ -1267,30 +1267,37 @@
 <div class="doc doc-object doc-function">
 
 
-<h4 id="cryojax.simulator.make_image_model" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">make_image_model</span><span class="p">(</span><span class="n">volume_parametrization</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractVolumeParametrization</span><span class="p">,</span> <span class="n">image_config</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractImageConfig</span><span class="p">,</span> <span class="n">pose</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractPose</span><span class="p">,</span> <span class="n">transfer_theory</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">ContrastTransferTheory</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">volume_integrator</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractVolumeIntegrator</span> <span class="o">=</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AutoVolumeProjection</span><span class="p">(</span><span class="n">options</span><span class="o">=</span><span class="p">{}),</span> <span class="n">detector</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractDetector</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">transform</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">ndimage</span><span class="o">.</span><span class="n">AbstractImageTransform</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">normalizes_signal</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">signal_region</span><span class="p">:</span> <span class="n">Bool</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;_ _&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">translate_mode</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s1">&#39;fft&#39;</span><span class="p">,</span> <span class="s1">&#39;atom&#39;</span><span class="p">,</span> <span class="s1">&#39;none&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;fft&#39;</span><span class="p">,</span> <span class="n">quantity_mode</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s1">&#39;contrast&#39;</span><span class="p">,</span> <span class="s1">&#39;intensity&#39;</span><span class="p">,</span> <span class="s1">&#39;counts&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractImageModel</span></code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/94ee555e382a230aeeb66545f609cf463e2e0a4a/cryojax/simulator/_api_utils.py#L151-L323"><code class='hippogriffe-repo-url'></code></a>
+<h3 id="cryojax.simulator.make_image_model" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">cryojax.simulator.make_image_model</span>
+
+  <a href="https://github.com/michael-0brien/cryojax/blob/12205415d1fce3cd3439edacd090ddca63dc3324/cryojax/simulator/_api_utils.py#L156-L358"><code class='hippogriffe-repo-url'></code></a>
 
 
-<a href="#cryojax.simulator.make_image_model" class="headerlink" title="Permanent link">¤</a></h4>
-
+<a href="#cryojax.simulator.make_image_model" class="headerlink" title="Permanent link">¤</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">make_image_model</span><span class="p">(</span><span class="n">volume_parametrization</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractVolumeParametrization</span><span class="p">,</span> <span class="n">image_config</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractImageConfig</span><span class="p">,</span> <span class="n">pose</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractPose</span><span class="p">,</span> <span class="n">transfer_theory</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">ContrastTransferTheory</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">volume_integrator</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractVolumeIntegrator</span> <span class="o">=</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AutoVolumeProjection</span><span class="p">(</span><span class="n">options</span><span class="o">=</span><span class="p">{}),</span> <span class="n">detector</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractDetector</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">transform</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">ndimage</span><span class="o">.</span><span class="n">AbstractImageTransform</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">normalizes_signal</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">signal_region</span><span class="p">:</span> <span class="n">Bool</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;_ _&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">signal_centering</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s1">&#39;bg&#39;</span><span class="p">,</span> <span class="s1">&#39;mean&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;mean&#39;</span><span class="p">,</span> <span class="n">translate_mode</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s1">&#39;fft&#39;</span><span class="p">,</span> <span class="s1">&#39;atom&#39;</span><span class="p">,</span> <span class="s1">&#39;none&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;fft&#39;</span><span class="p">,</span> <span class="n">quantity_mode</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s1">&#39;contrast&#39;</span><span class="p">,</span> <span class="s1">&#39;intensity&#39;</span><span class="p">,</span> <span class="s1">&#39;counts&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractImageModel</span>
+</code></pre></div>
 
     <div class="doc doc-contents first">
 
-        <p>Construct an <code>AbstractImageModel</code> for most common use-cases.</p>
+        <p>Construct an <a class="autorefs autorefs-internal" href="../image_model/#cryojax.simulator.AbstractImageModel"><code>cryojax.simulator.AbstractImageModel</code></a> for
+most common use-cases.</p>
 <p><strong>Arguments:</strong></p>
 <ul>
 <li><code>volume_parametrization</code>:
-    The representation of the protein volume.
-    Common choices are the <code>FourierVoxelGridVolume</code>
-    for fourier-space voxel grids or the <code>GaussianMixtureVolume</code>.</li>
+    The representation of the volume for imaging.
+    Common choices are the <a class="autorefs autorefs-internal" href="../volume/#cryojax.simulator.FourierVoxelGridVolume"><code>cryojax.simulator.FourierVoxelGridVolume</code></a>
+    for fourier-space voxel grids or <a class="autorefs autorefs-internal" href="../volume/#cryojax.simulator.GaussianMixtureVolume"><code>cryojax.simulator.GaussianMixtureVolume</code></a>
+    for gaussian mixture models.</li>
 <li><code>image_config</code>:
-    The configuration for the image and imagining instrument. Unless using
+    The configuration for the image and imaging instrument. Unless using
     a model that uses the electron dose as a parameter, choose the
-    <code>BasicImageConfig</code>. Otherwise, choose the <code>DoseImageConfig</code>.</li>
+    <a class="autorefs autorefs-internal" href="../config/#cryojax.simulator.BasicImageConfig"><code>cryojax.simulator.BasicImageConfig</code></a>. Otherwise, choose the
+    <a class="autorefs autorefs-internal" href="../config/#cryojax.simulator.DoseImageConfig"><code>cryojax.simulator.DoseImageConfig</code></a>.</li>
 <li><code>pose</code>:
     The pose in a particular parameterization convention. Common options
-    are the <code>EulerAnglePose</code>, <code>QuaternionPose</code>, or <code>AxisAnglePose</code>.</li>
+    are the <a class="autorefs autorefs-internal" href="../pose/#cryojax.simulator.EulerAnglePose"><code>cryojax.simulator.EulerAnglePose</code></a>,
+    <a class="autorefs autorefs-internal" href="../pose/#cryojax.simulator.QuaternionPose"><code>cryojax.simulator.QuaternionPose</code></a>, or
+    <a class="autorefs autorefs-internal" href="../pose/#cryojax.simulator.AxisAnglePose"><code>cryojax.simulator.AxisAnglePose</code></a>.</li>
 <li><code>transfer_theory</code>:
     The contrast transfer function and its theory for how it is applied
     to the image.</li>
@@ -1299,8 +1306,9 @@
     the plane (e.g. projection via fourier slice extraction). If not provided,
     a default option is chosen.</li>
 <li><code>detector</code>:
-    If <code>quantity_mode = 'counts'</code> is chosen, then an <code>AbstractDetector</code> class must be
-    chosen to simulate electron counts.</li>
+    If <code>quantity_mode = 'counts'</code> is chosen, then an
+    <a class="autorefs autorefs-internal" href="../detector/#cryojax.simulator.AbstractDetector"><code>cryojax.simulator.AbstractDetector</code></a> class must be chosen to
+    simulate electron counts.</li>
 <li><code>transform</code>:
     A <a class="autorefs autorefs-internal" href="../../ndimage/#cryojax.ndimage.AbstractImageTransform"><code>cryojax.ndimage.AbstractImageTransform</code></a> applied to the
     image after simulation. If this is a real-space transform it
@@ -1308,27 +1316,52 @@
     if it is a fourier-space transform it is applied
     before filtering and before normalization.</li>
 <li><code>normalizes_signal</code>:
-    If <code>True</code>, normalizes_signal the image before returning.</li>
+    Whether or not to normalize the output of <code>image_model.simulate()</code>.
+    If <code>True</code>, see <code>signal_centering</code> for options.</li>
 <li><code>signal_region</code>:
     A boolean array that is 1 where there is signal,
     and 0 otherwise used to normalize the image.
     Must have shape equal to <code>AbstractImageConfig.shape</code>.</li>
+<li><code>signal_centering</code>:
+    How to calculate the offset for normalization when
+    <code>normalizes_signal = True</code>. Options are<ul>
+<li>'mean':
+    Normalize the image to be mean 0
+    within <code>signal_region</code>.</li>
+<li>'bg':
+    Subtract mean value at the image edges.
+    This makes the image fade to a background with values
+    equal to zero. Requires that <code>image_config.padded_shape</code>
+    is large enough so that the signal sufficiently decays.
+Ignored if <code>normalizes_signal = False</code>.</li>
+</ul>
+</li>
 <li><code>translate_mode</code>:
-    If <code>'fft'</code>, apply in-plane translation via phase
-    shifts in the Fourier domain. If <code>'atoms'</code> apply
-    translation on atom positions before projection.
-    If <code>'none'</code>, does not apply a translation.</li>
+    How to apply in-plane translation to the volume. Options are<ul>
+<li>'fft':
+    Apply phase shifts in the Fourier domain.</li>
+<li>'atom':
+    Apply translation to atom positions before
+    projection. For this method, the
+    <a class="autorefs autorefs-internal" href="../volume/#cryojax.simulator.AbstractVolumeParametrization"><code>cryojax.simulator.AbstractVolumeParametrization</code></a>
+    must be or return an <a class="autorefs autorefs-internal" href="../volume/#cryojax.simulator.AbstractAtomVolume"><code>cryojax.simulator.AbstractAtomVolume</code></a>.</li>
+<li>'none':
+    Do not apply the translation.</li>
+</ul>
+</li>
 <li><code>quantity_mode</code>:
     The physical observable to simulate. If <code>None</code>, simulate without scaling
-    to physical units using the <code>LinearImageModel</code>.
+    to physical units using the <a class="autorefs autorefs-internal" href="../image_model/#cryojax.simulator.LinearImageModel"><code>cryojax.simulator.LinearImageModel</code></a>.
     Options are<ul>
 <li>'contrast':
-    Uses the <code>ContrastImageModel</code> to simulate contrast. This is
-    default.</li>
+    Uses the <a class="autorefs autorefs-internal" href="../image_model/#cryojax.simulator.ContrastImageModel"><code>cryojax.simulator.ContrastImageModel</code></a>
+    to simulate contrast.</li>
 <li>'intensity':
-    Uses the <code>IntensityImageModel</code> to simulate intensity.</li>
+    Uses the <a class="autorefs autorefs-internal" href="../image_model/#cryojax.simulator.IntensityImageModel"><code>cryojax.simulator.IntensityImageModel</code></a>
+    to simulate intensity.</li>
 <li>'counts':
-    Uses the <code>ElectronCountsImageModel</code> to simulate electron counts.
+    Uses the <a class="autorefs autorefs-internal" href="../image_model/#cryojax.simulator.ElectronCountsImageModel"><code>cryojax.simulator.ElectronCountsImageModel</code></a>
+    to simulate electron counts.
     If this is passed, a <code>detector</code> must also be passed.</li>
 </ul>
 </li>
@@ -1337,20 +1370,22 @@
 <p class="admonition-title">Warning</p>
 <p>The <code>pose</code> given to <code>make_image_model</code> always represents a
 rotation of the <em>object</em>, not of the frame. Some volume
-projection methods (e.g. <code>FourierVoxelExtraction</code>) instead image
+projection methods (e.g. <a class="autorefs autorefs-internal" href="../integrator/#cryojax.simulator.FourierSliceExtraction"><code>cryojax.simulator.FourierSliceExtraction</code></a>)
+instead image
 a rotation of the frame, so if <code>volume_parametrization</code> outputs
 such a representation, the pose is transposed under the hood.</p>
 <p>Rotations will still differ by a transpose if:</p>
 <ul>
 <li>The <code>volume_parametrization</code> outputs a custom volume that
 implements a frame rotation</li>
-<li>The user instantiates an <code>AbstractImageModel</code> directly, rather
-than through <code>make_image_model</code>.</li>
+<li>The user instantiates an <a class="autorefs autorefs-internal" href="../image_model/#cryojax.simulator.AbstractImageModel"><code>cryojax.simulator.AbstractImageModel</code></a>
+directly, rather than through <code>make_image_model</code>.</li>
 </ul>
 <p>In these cases, it is necessary to manually invert the pose.</p>
 </div>
 <p><strong>Returns:</strong></p>
-<p>An <code>AbstractImageModel</code>. Simulate an image with syntax</p>
+<p>An <a class="autorefs autorefs-internal" href="../image_model/#cryojax.simulator.AbstractImageModel"><code>cryojax.simulator.AbstractImageModel</code></a>. Simulate an image with
+syntax</p>
 <div class="highlight"><pre><span></span><code><span class="n">image_model</span> <span class="o">=</span> <span class="n">make_image_model</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
 <span class="n">image</span> <span class="o">=</span> <span class="n">image_model</span><span class="o">.</span><span class="n">simulate</span><span class="p">()</span>
 </code></pre></div>
@@ -1364,13 +1399,15 @@ than through <code>make_image_model</code>.</li>
 <div class="doc doc-object doc-function">
 
 
-<h4 id="cryojax.simulator.load_tabulated_volume" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">load_tabulated_volume</span><span class="p">(</span><span class="n">path_or_mmdf</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span> <span class="o">|</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">output_type</span><span class="p">:</span> <span class="nb">type</span><span class="p">[</span><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">IndependentAtomVolume</span> <span class="o">|</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">GaussianMixtureVolume</span><span class="p">]</span> <span class="o">=</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">IndependentAtomVolume</span><span class="p">,</span> <span class="n">tabulation</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s1">&#39;peng&#39;</span><span class="p">,</span> <span class="s1">&#39;lobato&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;peng&#39;</span><span class="p">,</span> <span class="n">include_b_factors</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">b_factor_fn</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">NDArrayLike</span><span class="p">],</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">NDArrayLike</span><span class="p">]</span> <span class="o">=</span> <span class="n">identity_fn</span><span class="p">,</span> <span class="n">selection_string</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;all&#39;</span><span class="p">,</span> <span class="n">pdb_options</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{})</span> <span class="o">-&gt;</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">IndependentAtomVolume</span> <span class="o">|</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">GaussianMixtureVolume</span></code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/94ee555e382a230aeeb66545f609cf463e2e0a4a/cryojax/simulator/_api_utils.py#L352-L485"><code class='hippogriffe-repo-url'></code></a>
+<h3 id="cryojax.simulator.load_tabulated_volume" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">cryojax.simulator.load_tabulated_volume</span>
+
+  <a href="https://github.com/michael-0brien/cryojax/blob/12205415d1fce3cd3439edacd090ddca63dc3324/cryojax/simulator/_api_utils.py#L387-L520"><code class='hippogriffe-repo-url'></code></a>
 
 
-<a href="#cryojax.simulator.load_tabulated_volume" class="headerlink" title="Permanent link">¤</a></h4>
-
+<a href="#cryojax.simulator.load_tabulated_volume" class="headerlink" title="Permanent link">¤</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">load_tabulated_volume</span><span class="p">(</span><span class="n">path_or_mmdf</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span> <span class="o">|</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">output_type</span><span class="p">:</span> <span class="nb">type</span><span class="p">[</span><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">IndependentAtomVolume</span> <span class="o">|</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">GaussianMixtureVolume</span><span class="p">]</span> <span class="o">=</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">IndependentAtomVolume</span><span class="p">,</span> <span class="n">tabulation</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s1">&#39;peng&#39;</span><span class="p">,</span> <span class="s1">&#39;lobato&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;peng&#39;</span><span class="p">,</span> <span class="n">include_b_factors</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">b_factor_fn</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">NDArrayLike</span><span class="p">],</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">NDArrayLike</span><span class="p">]</span> <span class="o">=</span> <span class="n">identity_fn</span><span class="p">,</span> <span class="n">selection_string</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;all&#39;</span><span class="p">,</span> <span class="n">pdb_options</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{})</span> <span class="o">-&gt;</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">IndependentAtomVolume</span> <span class="o">|</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">GaussianMixtureVolume</span>
+</code></pre></div>
 
     <div class="doc doc-contents first">
 
@@ -1438,13 +1475,15 @@ a <a class="autorefs autorefs-internal" href="../volume/#cryojax.simulator.Indep
 <div class="doc doc-object doc-function">
 
 
-<h4 id="cryojax.simulator.render_voxel_volume" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">render_voxel_volume</span><span class="p">(</span><span class="n">atom_volume</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractAtomVolume</span><span class="p">,</span> <span class="n">render_fn</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractVolumeRenderFn</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">output_type</span><span class="p">:</span> <span class="nb">type</span><span class="p">[</span><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelGridVolume</span> <span class="o">|</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelSplineVolume</span> <span class="o">|</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">RealVoxelGridVolume</span><span class="p">]</span> <span class="o">=</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelGridVolume</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelGridVolume</span> <span class="o">|</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelSplineVolume</span> <span class="o">|</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">RealVoxelGridVolume</span></code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/94ee555e382a230aeeb66545f609cf463e2e0a4a/cryojax/simulator/_api_utils.py#L515-L593"><code class='hippogriffe-repo-url'></code></a>
+<h3 id="cryojax.simulator.render_voxel_volume" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">cryojax.simulator.render_voxel_volume</span>
+
+  <a href="https://github.com/michael-0brien/cryojax/blob/12205415d1fce3cd3439edacd090ddca63dc3324/cryojax/simulator/_api_utils.py#L550-L628"><code class='hippogriffe-repo-url'></code></a>
 
 
-<a href="#cryojax.simulator.render_voxel_volume" class="headerlink" title="Permanent link">¤</a></h4>
-
+<a href="#cryojax.simulator.render_voxel_volume" class="headerlink" title="Permanent link">¤</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">render_voxel_volume</span><span class="p">(</span><span class="n">atom_volume</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractAtomVolume</span><span class="p">,</span> <span class="n">render_fn</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractVolumeRenderFn</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">output_type</span><span class="p">:</span> <span class="nb">type</span><span class="p">[</span><span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelGridVolume</span> <span class="o">|</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelSplineVolume</span> <span class="o">|</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">RealVoxelGridVolume</span><span class="p">]</span> <span class="o">=</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelGridVolume</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelGridVolume</span> <span class="o">|</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelSplineVolume</span> <span class="o">|</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">RealVoxelGridVolume</span>
+</code></pre></div>
 
     <div class="doc doc-contents first">
 
