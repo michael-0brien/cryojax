@@ -184,10 +184,11 @@ class AbstractImageModel(eqx.Module, strict=True):
             else:
                 image = padded_image
             if options["do_normalize"]:
-                if self.normalizes_signal and self.signal_centering == "mean":
-                    image = self._mean_subtract_normalize(image)
-                elif self.normalizes_signal and self.signal_centering == "bg":
-                    image = self._bg_subtract_normalize(image, padded_image)
+                if self.normalizes_signal:
+                    if self.signal_centering == "mean":
+                        image = self._mean_subtract_normalize(image)
+                    elif self.signal_centering == "bg":
+                        image = self._bg_subtract_normalize(image, padded_image)
             if mask_c is not None:
                 image = mask_c(image)
             return image if outputs_real_space else rfftn(image)
