@@ -68,7 +68,7 @@ def interaction_constant_from_kilovolts(
         constant. However, in `cryojax`, the potential is rescaled
         to units of inverse length squared as
 
-        $$U(x, y, z) = \\frac{2 m_0 e}{\\hbar^2} V(x, y, z).$$
+        $$U(x, y, z) = \\frac{m_0 e}{2 \\pi \\hbar^2} V(x, y, z).$$
 
         With this rescaling of the potential, the defined as with the
         equation
