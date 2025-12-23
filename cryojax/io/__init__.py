@@ -4,6 +4,9 @@ from ._atomic_models import (
     read_atoms_from_pdb as read_atoms_from_pdb,
     read_topology_from_pdb as read_topology_from_pdb,
 )
+from ._csparc import (
+    read_csparc_data as read_csparc_data,
+)
 from ._mrc import (
     read_array_from_mrc as read_array_from_mrc,
     write_image_stack_to_mrc as write_image_stack_to_mrc,
