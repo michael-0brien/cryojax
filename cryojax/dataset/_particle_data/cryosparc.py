@@ -766,7 +766,7 @@ def _make_pytrees_from_csparc_metadata(
     with jax.default_device(cpu_device):
         # First, create the `BasicImageConfig`
         if len(batch_shape) > 0:
-            image_shape = tuple(int(x) for x in csparc_data["blob/shape"][0])
+            image_shape = tuple(int(x) for x in csparc_data["blob/shape"].values[0])
         else:
             image_shape = tuple(int(x) for x in csparc_data["blob/shape"])
         image_config = _make_config(
@@ -920,9 +920,11 @@ def _load_image_stack_from_mrc(
     path_to_relion_project: str | pathlib.Path,
 ) -> Float[np.ndarray, "... y_dim x_dim"]:
     # Load particle image stack rlnImageName
-    mrc_filenames_and_indices = particle_dataframe_at_index[
-        ["blob/path", "blob/idx"]
-    ].copy()
+    mrc_filenames_and_indices = (
+        particle_dataframe_at_index[["blob/path", "blob/idx"]]
+        .copy()
+        .reset_index(drop=True)
+    )
     mrc_filenames_and_indices["idx_in_df"] = mrc_filenames_and_indices.index.copy()
     try:
         mrc_filenames_and_indices.loc[:, "blob/path"] = mrc_filenames_and_indices[
