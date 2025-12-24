@@ -737,7 +737,11 @@ def _make_pytrees_from_csparc_metadata(
 
     # Now transform the angles and shift to the EulerAnglePose convention
     pose_rotation_matrix = _csparc_to_rotation_matrix(csparc_pose_angles)
-    pose_shift = csparc_pose_shift * csparc_data["blob/psize_A"].to_numpy()[:, None]
+
+    if len(batch_shape) > 0:
+        pose_shift = csparc_pose_shift * pixel_size[:, None]
+    else:
+        pose_shift = csparc_pose_shift * pixel_size
 
     # Now, flip the sign of the translations and transpose rotations.
     maybe_make_full = lambda param, ndim: (
@@ -745,16 +749,26 @@ def _make_pytrees_from_csparc_metadata(
         if len(batch_shape) > 0 and param.ndim == ndim
         else param
     )
+
+    def _tranpose_rot_matrix(rot_matrix):
+        if rot_matrix.ndim == 2:
+            return rot_matrix.T
+        elif rot_matrix.ndim == 3:
+            return np.transpose(rot_matrix, (0, 2, 1))
+
     pose_params = (
         -maybe_make_full(pose_shift, 1),
-        np.transpose(maybe_make_full(pose_rotation_matrix, 2), (0, 2, 1)),
+        _tranpose_rot_matrix(maybe_make_full(pose_rotation_matrix, 2)),
     )
 
     # Now, create cryojax objects. Do this on the CPU
     cpu_device = jax.devices(backend="cpu")[0]
     with jax.default_device(cpu_device):
         # First, create the `BasicImageConfig`
-        image_shape = tuple(int(x) for x in csparc_data["blob/shape"][0])
+        if len(batch_shape) > 0:
+            image_shape = tuple(int(x) for x in csparc_data["blob/shape"][0])
+        else:
+            image_shape = tuple(int(x) for x in csparc_data["blob/shape"])
         image_config = _make_config(
             image_shape, pixel_size, voltage_in_kilovolts, pad_options
         )
