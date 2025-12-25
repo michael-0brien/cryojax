@@ -227,7 +227,6 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
         - `path_to_starfile`:
             The path to the RELION STAR file. If the path does not exist
             and `mode = 'w'`, an empty dataset will be created.
-        - `path_to_relion_project`: The path to the RELION project directory.
         - `mode`:
             - If `mode = 'w'`, the dataset is prepared to write new
             *parameters*. This is done by storing an empty dataset in

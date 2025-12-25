@@ -18,12 +18,11 @@ from jaxtyping import Float, Int
 from ...io import read_csparc_data
 from ...jax_util import NDArrayLike
 from ...ndimage import FourierConstant, FourierGaussian
-from ...rotations import SO3
 from ...simulator import (
     AstigmaticCTF,
+    AxisAnglePose,
     BasicImageConfig,
     ContrastTransferTheory,
-    EulerAnglePose,
 )
 from .._particle_data import (
     AbstractParticleParameterFile,
@@ -69,7 +68,7 @@ class ParticleParameterInfo(TypedDict):
     """Parameters for a particle stack from CSPARC."""
 
     image_config: BasicImageConfig
-    pose: EulerAnglePose
+    pose: AxisAnglePose
     transfer_theory: ContrastTransferTheory
 
     metadata: pd.DataFrame | None
@@ -95,7 +94,7 @@ class MrcfileSettings(TypedDict):
     compression: str | None
 
 
-class AbstractParticleStarFile(
+class AbstractParticleCryoSparcFile(
     AbstractParticleParameterFile[ParticleParameterInfo, ParticleParameterLike]
 ):
     @property
@@ -182,9 +181,9 @@ class AbstractParticleStarFile(
         return deepcopy(self)
 
 
-class CryoSparcParticleParameterFile(AbstractParticleStarFile):
+class CryoSparcParticleParameterFile(AbstractParticleCryoSparcFile):
     """A dataset that wraps a CSPARC particle stack in
-    [STAR](https://relion.readthedocs.io/en/latest/Reference/Conventions.html)
+    [CryoSPARC  ](https://guide.cryosparc.com/setup-configuration-and-management/software-system-guides/manipulating-.cs-files-created-by-cryosparc)
     format.
     """
 
@@ -196,26 +195,23 @@ class CryoSparcParticleParameterFile(AbstractParticleStarFile):
         loads_metadata: bool = False,
         broadcasts_image_config: bool = True,
         loads_envelope: bool = False,
-        updates_optics_group: bool = False,
         inverts_rotation: bool = False,
-        pad_options: dict = {},
     ):
         """**Arguments:**
 
-        - `path_to_starlnOriginXAngstrfile`:
-            The path to the CSPARC STAR file. If the path does not exist
+        - `path_to_csparc_metadata`:
+            The path to the CryoSPARC metadata file. If the path does not exist
             and `mode = 'w'`, an empty dataset will be created.
-        - `path_to_relion_project`: The path to the CSPARC project directory.
         - `selection_filter`:
             A dictionary used to include only particular dataset elements.
-            The keys of this dictionary should be any data entry in the STAR
-            file, while the values should be a function that takes in a
+            The keys of this dictionary should be any data entry in the CryoSparc
+            metadata file, while the values should be a function that takes in a
             column and returns a boolean mask for the column. For example,
             filter by class using
-            `selection_filter["rlnClassNumber"] = lambda x: x == 0`.
+            `selection_filter["alignments3D/class"] = lambda x: x == 0`.
         - `loads_metadata`:
             If `True`, the resulting `ParticleParameterInfo` dict loads
-            the raw metadata from the STAR file that is not otherwise included
+            the raw metadata from the .cs file that is not otherwise included
             in the `ParticleParameterInfo` as a `pandas.DataFrame`.
             If this is set to `True`, note that dictionaries cannot pass through
             JIT boundaries without removing the metadata.
@@ -225,20 +221,12 @@ class CryoSparcParticleParameterFile(AbstractParticleStarFile):
         - `loads_envelope`:
             If `True`, read in the parameters of the CTF envelope function, i.e.
             "rlnCtfScalefactor" and "rlnCtfBfactor".
-        - `updates_optics_group`:
-            If `True`, when re-writing STAR file entries via
-            `dataset[idx] = parameters` syntax, creates a new optics group entry.
         - `inverts_rotation`:
             If `True`, invert the pose representation upon return. Depending on
             the image formation process used in `cryojax`, this may be necessary
             for matching to CSPARC convention. For example, set to `True` when
             using the fourier slice extraction and other voxel representations.
-        - `pad_options`:
-            Padding options for image simulation, passed to the `BasicImageConfig`.
-            See `BasicImageConfig` for documentation.
         """
-        # Private attributes
-        self._pad_options = pad_options
 
         # The CryoSparc file metadata
         self._path_to_metadata = pathlib.Path(path_to_metadata)
@@ -249,8 +237,6 @@ class CryoSparcParticleParameterFile(AbstractParticleStarFile):
         self._loads_metadata = loads_metadata
         self._broadcasts_image_config = broadcasts_image_config
         self._loads_envelope = loads_envelope
-        # Properties for writing
-        self._updates_optics_group = updates_optics_group
         # Shared
         self._inverts_rotation = inverts_rotation
 
@@ -264,12 +250,11 @@ class CryoSparcParticleParameterFile(AbstractParticleStarFile):
         # ... read particle data at the requested indice
         csparc_data_at_index = self.csparc_metadata.iloc[index]
 
-        # Load the image stack and STAR file parameters
+        # Load the image stack and CryoSPARC file parameters
         image_config, transfer_theory, pose = _make_pytrees_from_csparc_metadata(
             csparc_data_at_index,
             self.broadcasts_image_config,
             self.loads_envelope,
-            self._pad_options,
             self._inverts_rotation,
         )
         if self.loads_metadata:
@@ -354,12 +339,12 @@ class CryoSparcParticleParameterFile(AbstractParticleStarFile):
     @property
     @override
     def updates_optics_group(self) -> bool:
-        return self._updates_optics_group
+        raise NotImplementedError
 
     @updates_optics_group.setter
     @override
     def updates_optics_group(self, value: bool):
-        self._updates_optics_group = value
+        raise NotImplementedError
 
     @property
     def inverts_rotation(self) -> bool:
@@ -400,13 +385,14 @@ class CryoSparcParticleParameterFile(AbstractParticleStarFile):
 class CryoSparcParticleStackDataset(
     AbstractParticleStackDataset[ParticleStackInfo, ParticleStackLike]
 ):
-    """A dataset that wraps a CSPARC particle stack in
-    [STAR](https://relion.readthedocs.io/en/latest/Reference/Conventions.html) format.
+    """A dataset that wraps a CryoSPARC particle stack in
+    [CryoSPARC](https://guide.cryosparc.com/setup-configuration-and-management/software-system-guides/manipulating-.cs-files-created-by-cryosparc)
+    format.
     """
 
     def __init__(
         self,
-        parameter_file: AbstractParticleStarFile,
+        parameter_file: AbstractParticleCryoSparcFile,
         path_to_relion_project: str | pathlib.Path,
         *,
         loads_parameters: bool = True,
@@ -414,42 +400,11 @@ class CryoSparcParticleStackDataset(
         """**Arguments:**
 
         - `path_to_relion_project`:
-            In CSPARC STAR files, only a relative path is added to the
-            'rlnImageName' column. This is relative to the path to the
+            In CryoSPARC files, only a relative path is added to the
+            'blob/path' column. This is relative to the path to the
             "project", which is given by this parameter.
         - `parameter_file`:
-            The `RelionParticleParameterFile`.
-        - `mode`:
-            - If `mode = 'w'`, the dataset is prepared to write new
-            *images*. This is done by removing 'rlnImageName' from
-            `parameter_file.csparc_metadata`, if it exists at all.
-            does not have a column 'rlnImageName' and image files
-            are not yet written.
-            - If `mode = 'r'`, images are read from the 'rlnImageName'
-            stored in the `parameter_file.csparc_metadata`.
-        - `mrcfile_settings`:
-            A dictionary with the following keys:
-            - 'prefix':
-                A `str` which acts as the prefix to the filenames. If this
-                is equal to `"f"`, then the filename for image stack 0 will
-                be called "f-00000.mrcs", for `delimiter = '-'` and
-                `n_characters = 5`.
-                are of format "filenam"
-            - 'output_folder':
-                A `str` or `pathlib.Path` type where to write MRC files,
-                relative to the `path_to_relion_project`.
-            - 'n_characters':
-                An `int` for the number of characters to write the filename
-                number string. If this is equal to `5`, then the filename
-                for image stack 0 will be called "f-00000.mrcs", for
-                `delimiter = '-'` and `prefix = 'f'`.
-             - 'delimiter':
-                A `str` for the delimiter between the filename prefix
-                and number string. If this is equal to `'-'`, then the
-                filename for image stack 0 will be called "f-00000.mrcs",
-                for `n_characters = 5` and `prefix = 'f'`.
-            - 'overwrite':
-                If `True`, overwrite existing MRC file path if it exists.
+            The `CryoSparcParticleParameterFile`.
         - `loads_parameters`:
             If `True`, load parameters and images. Otherwise, load only images.
         """
@@ -470,13 +425,7 @@ class CryoSparcParticleStackDataset(
                 "Could not find column 'blob/path' in the CryoSparc metadata file. "
             )
         if not project_exists:
-            raise FileNotFoundError(
-                "`CryoSparcParticleStackDataset` opened in "
-                "'mode = `r`', but the CSPARC project directory "
-                "`path_to_relion_project` does not exist. "
-                "To write images in a STAR file in a new CSPARC project, "
-                "set `mode = 'w'`."
-            )
+            raise FileNotFoundError("The CSPARC project directory does not exist.")
 
     @override
     def __getitem__(
@@ -484,7 +433,7 @@ class CryoSparcParticleStackDataset(
     ) -> ParticleStackInfo:
         if self.loads_parameters:
             # Load images and parameters. First, read parameters
-            # and metadata from the STAR file
+            # and metadata from the .cs file
             loads_metadata = self.parameter_file.loads_metadata
             self.parameter_file.loads_metadata = True
             # ... read parameters
@@ -539,7 +488,7 @@ class CryoSparcParticleStackDataset(
 
     @property
     @override
-    def parameter_file(self) -> AbstractParticleStarFile:
+    def parameter_file(self) -> AbstractParticleCryoSparcFile:
         return self._parameter_file
 
     @property
@@ -597,65 +546,64 @@ def _load_csparc_metadata(
     return csparc_metadata
 
 
-def _select_particles(
-    csparc_metadata: dict[str, pd.DataFrame], selection_filter: dict[str, Callable]
-) -> dict[str, pd.DataFrame]:
-    particle_data = csparc_metadata
-    boolean_mask = pd.Series(True, index=particle_data.index)
-    for key in selection_filter:
-        if key in particle_data.columns:
-            fn = selection_filter[key]
-            column = particle_data[key]
-            base_error_message = (
-                f"Error filtering key '{key}' in the `selection_filter`. "
-                f"To filter the STAR file entries, `selection_filter['{key}']`"
-                "must be a function that takes in an array and returns a "
-                "boolean mask."
-            )
-            if isinstance(selection_filter[key], Callable):
-                try:
-                    mask_at_column = fn(column)
-                except Exception as err:
-                    raise ValueError(
-                        f"{base_error_message} "
-                        "When calling the function, caught an error:\n"
-                        f"{err}"
-                    )
-                if not pd.api.types.is_bool_dtype(mask_at_column):
-                    raise ValueError(
-                        f"{base_error_message} "
-                        "Found that the function did not return "
-                        "a boolean dtype."
-                    )
-            else:
-                raise ValueError(base_error_message)
-            # Update mask
-            boolean_mask = mask_at_column & boolean_mask
-        else:
-            raise ValueError(
-                f"Included key '{key}' in the `selection_filter`, "
-                "but this entry could not be found in the STAR file. "
-                "The `selection_filter` must be a dictionary whose "
-                "keys are strings in the STAR file and whose values "
-                "are functions that take in columns and return boolean "
-                "masks."
-            )
-    # Select particles using mask
-    csparc_metadata = particle_data[boolean_mask]
+# def _select_particles(
+#     csparc_metadata: dict[str, pd.DataFrame], selection_filter: dict[str, Callable]
+# ) -> dict[str, pd.DataFrame]:
+#     particle_data = csparc_metadata
+#     boolean_mask = pd.Series(True, index=particle_data.index)
+#     for key in selection_filter:
+#         if key in particle_data.columns:
+#             fn = selection_filter[key]
+#             column = particle_data[key]
+#             base_error_message = (
+#                 f"Error filtering key '{key}' in the `selection_filter`. "
+#                 f"To filter the STAR file entries, `selection_filter['{key}']`"
+#                 "must be a function that takes in an array and returns a "
+#                 "boolean mask."
+#             )
+#             if isinstance(selection_filter[key], Callable):
+#                 try:
+#                     mask_at_column = fn(column)
+#                 except Exception as err:
+#                     raise ValueError(
+#                         f"{base_error_message} "
+#                         "When calling the function, caught an error:\n"
+#                         f"{err}"
+#                     )
+#                 if not pd.api.types.is_bool_dtype(mask_at_column):
+#                     raise ValueError(
+#                         f"{base_error_message} "
+#                         "Found that the function did not return "
+#                         "a boolean dtype."
+#                     )
+#             else:
+#                 raise ValueError(base_error_message)
+#             # Update mask
+#             boolean_mask = mask_at_column & boolean_mask
+#         else:
+#             raise ValueError(
+#                 f"Included key '{key}' in the `selection_filter`, "
+#                 "but this entry could not be found in the STAR file. "
+#                 "The `selection_filter` must be a dictionary whose "
+#                 "keys are strings in the STAR file and whose values "
+#                 "are functions that take in columns and return boolean "
+#                 "masks."
+#             )
+#     # Select particles using mask
+#     csparc_metadata = particle_data[boolean_mask]
 
-    return csparc_metadata
+#     return csparc_metadata
 
 
 #
-# STAR file reading
+# CryoSPARC file reading
 #
 def _make_pytrees_from_csparc_metadata(
     csparc_data,
     broadcasts_image_config,
     loads_envelope,
-    pad_options,
     inverts_rotation,
-) -> tuple[BasicImageConfig, ContrastTransferTheory, EulerAnglePose]:
+) -> tuple[BasicImageConfig, ContrastTransferTheory, AxisAnglePose]:
     float_dtype = jax.dtypes.canonicalize_dtype(float)
     # Load CTF parameters. First from particle data
     defocus_in_angstroms = (
@@ -730,13 +678,15 @@ def _make_pytrees_from_csparc_metadata(
         csparc_pose_angles = np.array(
             [angles for angles in csparc_data["alignments_class_0/pose"]]
         )
+
     else:
         csparc_pose_angles = np.array([0.0, 0.0, 0.0])
 
+    csparc_pose_angles = np.rad2deg(csparc_pose_angles)
     # TODO: support for helices, need a dataset to check how it works!
 
-    # Now transform the angles and shift to the EulerAnglePose convention
-    pose_rotation_matrix = _csparc_to_rotation_matrix(csparc_pose_angles)
+    # Now transform the angles and shift to the AxisAnglePose convention
+    # pose_rotation_matrix = _csparc_to_rotation_matrix(csparc_pose_angles)
 
     if len(batch_shape) > 0:
         pose_shift = csparc_pose_shift * pixel_size[:, None]
@@ -750,15 +700,16 @@ def _make_pytrees_from_csparc_metadata(
         else param
     )
 
-    def _tranpose_rot_matrix(rot_matrix):
-        if rot_matrix.ndim == 2:
-            return rot_matrix.T
-        elif rot_matrix.ndim == 3:
-            return np.transpose(rot_matrix, (0, 2, 1))
+    # def _tranpose_rot_matrix(rot_matrix):
+    #     if rot_matrix.ndim == 2:
+    #         return rot_matrix.T
+    #     elif rot_matrix.ndim == 3:
+    #         return np.transpose(rot_matrix, (0, 2, 1))
 
     pose_params = (
         -maybe_make_full(pose_shift, 1),
-        _tranpose_rot_matrix(maybe_make_full(pose_rotation_matrix, 2)),
+        # _tranpose_rot_matrix(maybe_make_full(pose_rotation_matrix, 2)),
+        -maybe_make_full(csparc_pose_angles, 1),
     )
 
     # Now, create cryojax objects. Do this on the CPU
@@ -769,9 +720,7 @@ def _make_pytrees_from_csparc_metadata(
             image_shape = tuple(int(x) for x in csparc_data["blob/shape"].values[0])
         else:
             image_shape = tuple(int(x) for x in csparc_data["blob/shape"])
-        image_config = _make_config(
-            image_shape, pixel_size, voltage_in_kilovolts, pad_options
-        )
+        image_config = _make_config(image_shape, pixel_size, voltage_in_kilovolts)
 
         # ... now the `ContrastTransferTheory`
         envelope = (
@@ -780,7 +729,7 @@ def _make_pytrees_from_csparc_metadata(
         transfer_theory_params = (*ctf_params, envelope)
         transfer_theory = _make_transfer_theory(*transfer_theory_params)  # type: ignore
 
-        # ... finally the `EulerAnglePose`
+        # ... finally the `AxisAnglePose`
         pose = _make_pose(*pose_params)
         if inverts_rotation:
             pose = _invert_rotation(pose)
@@ -794,69 +743,27 @@ def _make_pytrees_from_csparc_metadata(
     return image_config, transfer_theory, pose
 
 
-def _map_to_lie_algebra(v):
-    """Map a point in R^N to the tangent space at the identity, i.e.
-    to the Lie Algebra
-    Arg:
-        v = vector in R^N, (..., 3) in our case
-    Return:
-        R = v converted to Lie Algebra element, (3,3) in our case"""
-
-    # make sure this is a sample from R^3
-    assert v.shape[-1] == 3
-
-    R_x = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, -1.0], [0.0, 1.0, 0.0]], dtype=v.dtype)
-
-    R_y = np.array([[0.0, 0.0, 1.0], [0.0, 0.0, 0.0], [-1.0, 0.0, 0.0]], dtype=v.dtype)
-
-    R_z = np.array([[0.0, -1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 0.0]], dtype=v.dtype)
-    R = (
-        R_x * v[..., 0, None, None]
-        + R_y * v[..., 1, None, None]
-        + R_z * v[..., 2, None, None]
-    )
-    return R
-
-
-def _csparc_to_rotation_matrix(csparc_angles):
-    """
-    Convert CryoSparc angles to rotation matrix.
-    This code was adapted from cryoDRGN.
-    """
-    theta = np.linalg.norm(csparc_angles, ord=2, axis=-1, keepdims=True)
-    # normalize K
-    K = _map_to_lie_algebra(csparc_angles / theta)
-
-    rotation_matrix = (
-        np.eye(3, dtype=csparc_angles.dtype)
-        + np.sin(theta)[..., None] * K
-        + (1.0 - np.cos(theta))[..., None] * (K @ K)
-    )
-    return rotation_matrix
-
-
 def _make_config(
     image_shape,
     pixel_size,
     voltage_in_kilovolts,
-    pad_options,
 ):
     return eqx.tree_at(
         lambda x: (x.pixel_size, x.voltage_in_kilovolts),
-        BasicImageConfig(image_shape, 1.0, 1.0, pad_options=pad_options),
+        BasicImageConfig(image_shape, 1.0, 1.0),
         (pixel_size, voltage_in_kilovolts),
     )
 
 
-def _make_pose(shift, rotation_matrix):
-    _make_fn = (
-        lambda _shift, _rotation_matrix: EulerAnglePose.from_rotation_and_translation(
-            SO3.from_matrix(_rotation_matrix), _shift
-        )
+def _make_pose(shift, euler_vector):
+    _make_fn = lambda _shift, _euler_vector: AxisAnglePose(
+        _shift[0],
+        _shift[1],
+        _euler_vector,
     )
     if shift.ndim == 2:
         _make_fn = eqx.filter_vmap(_make_fn)
-    return _make_fn(shift, rotation_matrix)
+    return _make_fn(shift, euler_vector)
 
 
 def _make_envelope_function(amp, b_factor):
@@ -864,7 +771,7 @@ def _make_envelope_function(amp, b_factor):
         warnings.warn(
             "`loads_envelope` was set to True, but no envelope parameters were found. "
             "Setting envelope as None. "
-            "Make sure your starfile is correctly formatted or set "
+            "Make sure your .cs file is correctly formatted or set "
             "`loads_envelope=False`."
         )
         return None
@@ -901,16 +808,12 @@ def _make_transfer_theory(defocus, astig, angle, sph, ac, ps, env=None):
     )
 
 
-def _invert_rotation(pose: EulerAnglePose) -> EulerAnglePose:
-    negate_angle = lambda angle: ((-angle + 180) % 360) - 180
+def _invert_rotation(pose: AxisAnglePose) -> AxisAnglePose:
+    negate_euler_vector = lambda angle: -angle
     return eqx.tree_at(
-        lambda x: (x.phi_angle, x.theta_angle, x.psi_angle),
+        lambda x: (x.euler_vector),
         pose,
-        (
-            negate_angle(pose.psi_angle),
-            negate_angle(pose.theta_angle),
-            negate_angle(pose.phi_angle),
-        ),
+        (negate_euler_vector(pose.euler_vector),),
     )
 
 
@@ -955,8 +858,8 @@ def _load_image_stack_from_mrc(
                 raise ValueError(
                     f"The shape of the MRC with filename {filename} "
                     "was found to not have the same shape loaded from "
-                    "the 'rlnImageSize'. Check your MRC files and also "
-                    "the STAR file optics group formatting."
+                    "the 'blob/shape'. Check your MRC files and also "
+                    "the .cs file formatting."
                 )
             idx_in_filename = np.array(
                 grouped_filenames.loc[filename, "blob/idx"], dtype=int
@@ -1004,7 +907,7 @@ def _validate_csparc_metadata(csparc_metadata: pd.DataFrame):
     required_particle_keys, _ = zip(*CSPARC_REQUIRED_PARTICLE_ENTRIES)
     if not set(required_particle_keys).issubset(set(csparc_metadata.keys())):
         raise ValueError(
-            "Missing required keys in starfile 'particles' group. "
+            "Missing required keys in .cs file items. "
             f"Required keys are {required_particle_keys}."
         )
 
