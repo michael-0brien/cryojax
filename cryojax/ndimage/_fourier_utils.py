@@ -25,7 +25,7 @@ def convert_fftn_to_rfftn(
     - `fftn_array`:
         The output of a call to `jax.numpy.fft.fftn`.
     - `mode`:
-        See the function`enforce_self_conjugate_rfftn_components`
+        See the function`enforce_rfftn_self_conjugates`
         for documentation. If this is `None`, do not call this
         function.
 
@@ -48,22 +48,22 @@ def convert_fftn_to_rfftn(
             f"Passed an array with `ndim = {fftn_array.ndim}`."
         )
     if mode is not None:
-        rfftn_array = enforce_self_conjugate_rfftn_components(
+        rfftn_array = enforce_rfftn_self_conjugates(
             rfftn_array,
-            shape,  # type: ignore
-            includes_zero_frequency=False,
-            mode=mode,
+            shape,
+            includes_dc=False,
+            mode=mode,  # type: ignore
         )
     return rfftn_array
 
 
-def enforce_self_conjugate_rfftn_components(
+def enforce_rfftn_self_conjugates(
     rfftn_array: (
         Complex[Array, "{shape[0]} {shape[1]}//2+1"]
         | Complex[Array, "{shape[0]} {shape[1]} {shape[2]}//2+1"]
     ),
     shape: tuple[int, int] | tuple[int, int, int],
-    includes_zero_frequency: bool = False,
+    includes_dc: bool = False,
     mode: Literal["zero", "one", "real"] = "zero",
 ) -> (
     Complex[Array, "{shape[0]} {shape[1]}//2+1"]
@@ -83,7 +83,7 @@ def enforce_self_conjugate_rfftn_components(
         component in the corner.
     - `shape`:
         The shape of the `rfftn_array` in real-space.
-    - `includes_zero_frequency`:
+    - `includes_dc`:
         If `True`, enforce that `rfftn_array[0, 0]` is real.
         Otherwise, leave this component unmodified.
     - `mode`:
@@ -110,13 +110,13 @@ def enforce_self_conjugate_rfftn_components(
     else:
         raise NotImplementedError(
             f"`mode = {mode}` not supported for function "
-            "`enforce_self_conjugate_rfftn_components`. "
+            "`enforce_rfftn_self_conjugates`. "
             "The supported modes are 'zero', 'one', and 'real'."
         )
     if rfftn_array.ndim == 2:
         assert len(shape) == 2
         y_dim, x_dim = shape
-        if includes_zero_frequency:
+        if includes_dc:
             rfftn_array = rfftn_array.at[0, 0].set(replace_fn(rfftn_array[0, 0]))
         if y_dim % 2 == 0:
             rfftn_array = rfftn_array.at[y_dim // 2, 0].set(
@@ -133,7 +133,7 @@ def enforce_self_conjugate_rfftn_components(
     elif rfftn_array.ndim == 3:
         assert len(shape) == 3
         z_dim, y_dim, x_dim = shape
-        if includes_zero_frequency:
+        if includes_dc:
             rfftn_array = rfftn_array.at[0, 0, 0].set(replace_fn(rfftn_array[0, 0, 0]))
         if z_dim % 2 == 0:
             rfftn_array = rfftn_array.at[0, z_dim // 2, 0].set(
@@ -166,7 +166,7 @@ def enforce_self_conjugate_rfftn_components(
     else:
         raise NotImplementedError(
             "Only 2D and 3D arrays are supported "
-            "in function `enforce_self_conjugate_rfftn_components`. "
+            "in function `enforce_rfftn_self_conjugates`. "
             f"Passed an array with `ndim = {rfftn_array.ndim}`."
         )
     return rfftn_array

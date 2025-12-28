@@ -14,7 +14,7 @@ from equinox import AbstractVar, Module
 from jaxtyping import Array, Complex, Float
 
 from ..jax_util import FloatLike, NDArrayLike
-from ..ndimage import enforce_self_conjugate_rfftn_components
+from ..ndimage import enforce_rfftn_self_conjugates
 from ..rotations import SO3, convert_quaternion_to_euler_angles
 
 
@@ -89,8 +89,8 @@ class AbstractPose(Module, strict=True):
         The translated `fourier_image`, taking care to avoid image
         artifacts when applying the phase shifts.
         """
-        fourier_image = enforce_self_conjugate_rfftn_components(
-            fourier_image, shape, includes_zero_frequency=False, mode="zero"
+        fourier_image = enforce_rfftn_self_conjugates(
+            fourier_image, shape, includes_dc=False, mode="zero"
         )
         return fourier_image * translation_operator
 

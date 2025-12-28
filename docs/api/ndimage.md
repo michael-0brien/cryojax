@@ -53,7 +53,7 @@ This documentation is a collection of functions used to work with coordinate sys
                 - __call__
 
 
-::: cryojax.ndimage.ImageScaling
+::: cryojax.ndimage.ScaleImage
         options:
             members:
                 - __init__
