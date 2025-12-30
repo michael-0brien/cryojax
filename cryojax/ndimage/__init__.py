@@ -79,12 +79,16 @@ from ._transforms import (
     Cylindrical2DCosineMask as Cylindrical2DCosineMask,
     HighpassFilter as HighpassFilter,
     LowpassFilter as LowpassFilter,
+    PhaseShiftFourierImage as PhaseShiftFourierImage,
     Rectangular2DCosineMask as Rectangular2DCosineMask,
     Rectangular3DCosineMask as Rectangular3DCosineMask,
+    RotateFourierImage as RotateFourierImage,
+    RotateImage as RotateImage,
     ScaleImage as ScaleImage,
     SincCorrectionMask as SincCorrectionMask,
     SphericalCosineMask as SphericalCosineMask,
     SquareCosineMask as SquareCosineMask,
+    TranslateImage as TranslateImage,
     WhiteningFilter as WhiteningFilter,
 )
 
