@@ -34,7 +34,7 @@ from ._fourier_statistics import (
 )
 from ._fourier_utils import (
     convert_fftn_to_rfftn as convert_fftn_to_rfftn,
-    enforce_self_conjugate_rfftn_components as enforce_self_conjugate_rfftn_components,
+    enforce_rfftn_self_conjugates as enforce_rfftn_self_conjugates,
 )
 from ._map_coordinates import (
     compute_spline_coefficients as compute_spline_coefficients,
@@ -44,7 +44,9 @@ from ._map_coordinates import (
 from ._normalize import (
     background_subtract_image as background_subtract_image,
     compute_edge_value as compute_edge_value,
+    rescale_fft as rescale_fft,
     rescale_image as rescale_image,
+    standardize_fft as standardize_fft,
     standardize_image as standardize_image,
 )
 from ._operators import (
@@ -76,10 +78,10 @@ from ._transforms import (
     CustomMask as CustomMask,
     Cylindrical2DCosineMask as Cylindrical2DCosineMask,
     HighpassFilter as HighpassFilter,
-    ImageScaling as ImageScaling,
     LowpassFilter as LowpassFilter,
     Rectangular2DCosineMask as Rectangular2DCosineMask,
     Rectangular3DCosineMask as Rectangular3DCosineMask,
+    ScaleImage as ScaleImage,
     SincCorrectionMask as SincCorrectionMask,
     SphericalCosineMask as SphericalCosineMask,
     SquareCosineMask as SquareCosineMask,
