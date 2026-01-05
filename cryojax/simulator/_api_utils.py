@@ -171,13 +171,28 @@ def make_image_model(
     """Construct an [`cryojax.simulator.AbstractImageModel`][] for
     most common use-cases.
 
+    !!! example "Simulate an image"
+
+        ```python
+        import cryojax.simulator as cxs
+
+        # Load modeling components
+        volume, image_config, pose, transfer_theory = ...
+        # Build image formation model
+        image_model = cxs.make_image_model(volume, image_config, pose, transfer_theory)
+        # Simulate!
+        image = image_model.simulate()
+        ```
+
     **Arguments:**
 
     - `volume_parametrization`:
-        The representation of the volume for imaging.
-        Common choices are the [`cryojax.simulator.FourierVoxelGridVolume`][]
-        for fourier-space voxel grids or [`cryojax.simulator.GaussianMixtureVolume`][]
-        for gaussian mixture models.
+        The volume for imaging. To get started building volumes, see the
+        [`cryojax.simulator.load_tabulated_volume`][] and
+        [`cryojax.simulator.render_voxel_volume`][] utilities, or explore
+        cryoJAX's [`cryojax.simulator.AbstractVolumeRepresentation`][] classes.
+        Advanced users may be interested in implementing
+        [`cryojax.simulator.AbstractVolumeParametrization`][] classes.
     - `image_config`:
         The configuration for the image and imaging instrument. Unless using
         a model that uses the electron dose as a parameter, choose the
@@ -190,49 +205,48 @@ def make_image_model(
         [`cryojax.simulator.AxisAnglePose`][].
     - `transfer_theory`:
         The contrast transfer function and its theory for how it is applied
-        to the image.
+        to the image. See [`cryojax.simulator.ContrastTransferTheory`][].
     - `volume_integrator`:
-        Optionally pass the method for integrating the electrostatic potential onto
+        Optionally, pass the method for integrating the electrostatic potential onto
         the plane (e.g. projection via fourier slice extraction). If not provided,
-        a default option is chosen.
+        a default option is chosen using the
+        [`cryojax.simulator.AutoVolumeProjection`][] class.
     - `detector`:
         If `quantity_mode = 'counts'` is chosen, then an
         [`cryojax.simulator.AbstractDetector`][] class must be chosen to
         simulate electron counts.
     - `transform`:
         A [`cryojax.ndimage.AbstractImageTransform`][] applied to the
-        image after simulation. If this is a real-space transform it
-        is applied before masking and after normalization, and
-        if it is a fourier-space transform it is applied
-        before filtering and before normalization.
+        the output of `image_model.simulate()` as a postprocessing step.
     - `normalizes_signal`:
         Whether or not to normalize the output of `image_model.simulate()`.
         If `True`, see `signal_centering` for options.
     - `signal_region`:
         A boolean array that is 1 where there is signal,
         and 0 otherwise used to normalize the image.
-        Must have shape equal to `AbstractImageConfig.shape`.
+        Must have shape equal to `image_config.shape`.
     - `signal_centering`:
         How to calculate the offset for normalization when
-        `normalizes_signal = True`. Options are
+        `normalizes_signal = True`
+        (and ignored if `normalizes_signal = False`).
+        Options are
         - 'mean':
             Normalize the image to be mean 0
-            within `signal_region`.
+            within `signal_region`. This normalizes the image
+            to be a z-score.
         - 'bg':
             Subtract mean value at the image edges.
             This makes the image fade to a background with values
             equal to zero. Requires that `image_config.padded_shape`
             is large enough so that the signal sufficiently decays.
-        Ignored if `normalizes_signal = False`.
     - `translate_mode`:
         How to apply in-plane translation to the volume. Options are
         - 'fft':
             Apply phase shifts in the Fourier domain.
         - 'atom':
             Apply translation to atom positions before
-            projection. For this method, the
-            [`cryojax.simulator.AbstractVolumeParametrization`][]
-            must be or return an [`cryojax.simulator.AbstractAtomVolume`][].
+            projection. For this method, the `volume_parametrization`
+            argument must be or yield a [`cryojax.simulator.AbstractAtomVolume`][].
         - 'none':
             Do not apply the translation.
     - `quantity_mode`:
@@ -255,27 +269,32 @@ def make_image_model(
         rotation of the *object*, not of the frame. Some volume
         projection methods (e.g. [`cryojax.simulator.FourierSliceExtraction`][])
         instead image
-        a rotation of the frame, so if `volume_parametrization` outputs
+        a rotation of the frame, so if `volume_parametrization` is
         such a representation, the pose is transposed under the hood.
 
         Rotations will still differ by a transpose if:
 
-        - The `volume_parametrization` outputs a custom volume that
-        implements a frame rotation
+        - The `volume_parametrization` is a custom subclass of
+        [`cryojax.simulator.AbstractVolumeRepresentation`][] that
+        implements a frame rotation.
         - The user instantiates an [`cryojax.simulator.AbstractImageModel`][]
         directly, rather than through `make_image_model`.
 
-        In these cases, it is necessary to manually invert the pose.
+        In these cases, it is necessary to manually transpose the pose by
+        calling `pose.to_inverse_rotation()`.
 
     **Returns:**
 
-    An [`cryojax.simulator.AbstractImageModel`][]. Simulate an image with
-    syntax
+    A [`cryojax.simulator.AbstractImageModel`][] with type
 
-    ```python
-    image_model = make_image_model(...)
-    image = image_model.simulate()
-    ```
+    - [`cryojax.simulator.ProjectionImageModel`][] if no `transfer_theory`
+    is specified.
+    - [`cryojax.simulator.LinearImageModel`][] if a `transfer_theory`
+    is specified and `quantity_mode = None`.
+    - [`cryojax.simulator.ContrastImageModel`][],
+    [`cryojax.simulator.IntensityImageModel`][], or
+    [`cryojax.simulator.ElectronCountsImageModel`][] depending on
+    the value of `quantity_mode`.
     """
     # Invert pose if volume expects frame rotation
     if _use_inverse_pose(volume_parametrization):
@@ -425,8 +444,8 @@ def load_tabulated_volume(
         The path to the PDB/PDBx file or a `pandas.DataFrame` loaded
         from [`mmdf.read`](https://github.com/teamtomo/mmdf).
     - `output_type`:
-        Either [`cryojax.simulator.GaussianMixtureVolume`][] or
-        [`cryojax.simulator.IndependentAtomVolume`][].
+        Either a [`cryojax.simulator.GaussianMixtureVolume`][] or
+        [`cryojax.simulator.IndependentAtomVolume`][] class.
     - `tabulation`:
         Specifies which electron scattering factor tabulation to use.
         Supported values are `tabulation = 'peng'` or `tabulation = 'lobato'`.
@@ -438,8 +457,8 @@ def load_tabulated_volume(
     - `b_factor_fn`:
         A function that modulates PDB B-factors before passing to the
         volume. Has signature
-        `modulated_b_factor = b_factor_fn(pdb_b_factor, atomic_number)`.
-        If `output_type = IndependentAtomVolume`, `pdb_b_factor` is
+        `new_b_factor = b_factor_fn(b_factor, atomic_number)`.
+        If `output_type = IndependentAtomVolume`, `b_factor` is
         the mean B-factor for a given atom type.
     - `selection_string`:
         A string for [`mdtraj` atom selection](https://mdtraj.org/1.9.4/examples/atom-selection.html#atom-selection).
@@ -450,9 +469,8 @@ def load_tabulated_volume(
 
     **Returns:**
 
-    Returns a [`cryojax.simulator.GaussianMixtureVolume`][] or
-    a [`cryojax.simulator.IndependentAtomVolume`][] depending on
-    `output_type`.
+    A [`cryojax.simulator.AbstractVoxelVolume`][] with exact type
+    equal to `output_type`.
     """  # noqa: E501
     if isinstance(path_or_mmdf, (str, pathlib.Path)):
         atom_data = mmdf.read(pathlib.Path(path_or_mmdf))
@@ -557,15 +575,16 @@ def render_voxel_volume(
 ) -> FourierVoxelGridVolume | FourierVoxelSplineVolume | RealVoxelGridVolume:
     """Render a voxel volume representation from an atomistic one.
 
-    !!! example
+    !!! example "Simulate an image with Fourier slice extraction"
 
         ```python
         import cryojax.simulator as cxs
 
-        # Simulate an image from a voxel grid
+        # Simulate an image with Fourier slice extraction
         voxel_volume = cxs.render_voxel_volume(
             atom_volume=cxs.load_tabulated_volume("example.pdb"),
             render_fn=cxs.AutoVolumeRenderFn(shape=(100, 100, 100), voxel_size=1.0),
+            output_type=cxs.FourierVoxelGridVolume,
         )
         image_model = cxs.make_image_model(voxel_volume, ...)
         image = image_model.simulate()
@@ -594,7 +613,7 @@ def render_voxel_volume(
 
     **Returns:**
 
-    A [`cryojax.simulator.AbstractVoxelVolume`][] with type
+    A [`cryojax.simulator.AbstractVoxelVolume`][] with exact type
     equal to `output_type`.
     """
     if len(set(render_fn.shape)) != 1:

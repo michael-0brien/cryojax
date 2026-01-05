@@ -102,6 +102,43 @@ class LobatoScatteringFactor(AbstractFourierOperator, strict=True):
 
 
 class IndependentAtomVolume(AbstractAtomVolume, strict=True):
+    """A representation of a volume that accepts an array of
+    atom positions and an electron scattering factor for these
+    atoms.
+
+    !!! example "A Gaussian at each atom"
+        ```python
+        import cryojax.simulator as cxs
+        import cryojax.ndimage as im
+
+        positions = ... # load atom positions
+        b_factor = ...  # ... and a B-factor
+        volume = cxs.IndependentAtomVolume(
+            positions=positions, scattering_factors=im.FourierGaussian(b_factor=b_factor)
+        )
+        ```
+
+    The arguments `positions` and `scattering_factors` may also be
+    pytrees of arrays and scattering factors, where each tree leaf represents
+    a different atom type.
+
+    !!! example "Multiple atom types"
+        ```python
+        import cryojax.simulator as cxs
+        import cryojax.ndimage as im
+
+        positions_1, positions_2 = ...
+        b_factor_1, b_factor_2 = ...
+        volume = cxs.IndependentAtomVolume(
+            positions=(positions_1, positions_2),
+            scattering_factors=(im.FourierGaussian(b_factor=b_factor_1), im.FourierGaussian(b_factor=b_factor_2))
+        )
+        ```
+
+    See [`cryojax.simulator.IndependentAtomVolume.from_tabulated_parameters`][] for
+    loading a volume from tabulated electron scattering factors.
+    """  # noqa: E501
+
     positions: PyTree[Float[Array, "_ 3"]]
     scattering_factors: PyTree[AbstractFourierOperator]
 
@@ -143,7 +180,7 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
 
     @override
     def translate_to_pose(self, pose: AbstractPose) -> Self:
-        """Return a new potential with rotated `positions`."""
+        """Return a new potential with translated `positions`."""
         offset_in_angstroms = pose.offset_in_angstroms
         if pose.offset_z_in_angstroms is None:
             offset_in_angstroms = jnp.concatenate(

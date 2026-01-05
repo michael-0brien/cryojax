@@ -57,7 +57,7 @@ plugins:
             options:
                 annotations_path: brief
                 force_inspection: true
-                heading_level: 3
+                heading_level: 4
                 inherited_members: true
                 members_order: source
                 show_bases: false
@@ -69,7 +69,7 @@ plugins:
                 show_symbol_type_heading: true
                 show_symbol_type_toc: true
                 separate_signature: true
-                line_length: 140
+                line_length: 85
 
 nav:
     - 'index.md'
@@ -107,3 +107,4 @@ nav:
             - 'api/rotations.md'
         - 'api/dataset.md'
         - 'api/jax_util.md'
+    - 'faq.md'
