@@ -1,8 +1,35 @@
 import cryojax.ndimage as im
+import cryojax.simulator as cxs
 import jax
 import jax.numpy as jnp
 import pytest
+from cryojax.io import read_array_from_mrc
 from cryojax.ndimage import make_coordinate_grid, make_frequency_grid
+
+
+@pytest.fixture
+def voxel_info(sample_mrc_path):
+    return read_array_from_mrc(sample_mrc_path, loads_grid_spacing=True)
+
+
+@pytest.fixture
+def voxel_volume(voxel_info):
+    return cxs.FourierVoxelGridVolume.from_real_voxel_grid(voxel_info[0], pad_scale=1.3)
+
+
+@pytest.fixture
+def voxel_size(voxel_info):
+    return voxel_info[1]
+
+
+@pytest.fixture
+def basic_config(voxel_volume, voxel_size):
+    shape = voxel_volume.shape[0:2]
+    return cxs.BasicImageConfig(
+        shape=shape,
+        pixel_size=voxel_size,
+        voltage_in_kilovolts=300.0,
+    )
 
 
 def test_mask_2d_running():
@@ -88,3 +115,71 @@ def test_whitening_filter(image_shape, filter_shape, mode, square):
         image, shape=filter_shape, interpolation_mode=mode, outputs_squared=square
     )
     _ = f.get()
+
+
+def test_rotation_op(basic_config, voxel_volume):
+    pose_norot = cxs.EulerAnglePose(phi_angle=20.0, theta_angle=80.0, psi_angle=0.0)
+    pose_ref = cxs.EulerAnglePose(phi_angle=20.0, theta_angle=80.0, psi_angle=38.0)
+
+    image_model_norot = cxs.make_image_model(
+        voxel_volume,
+        basic_config,
+        pose=pose_norot,
+    )
+
+    image_model_ref = cxs.make_image_model(
+        voxel_volume,
+        basic_config,
+        pose=pose_ref,
+    )
+
+    rotation_op = im.RotateFourierImage(
+        angle_degrees=38.0,
+        frequency_grid=basic_config.full_frequency_grid_in_pixels,
+        is_rfft=False,
+    )
+
+    image_norot = image_model_norot.simulate()
+    image_ref = image_model_ref.simulate()
+    image_rot = im.ifftn(rotation_op(im.fftn(image_norot))).real
+
+    num = jnp.abs(jnp.sum(image_rot * image_ref))
+    den = jnp.linalg.norm(image_rot) * jnp.linalg.norm(image_ref)
+    corr = num / den
+    assert corr > 0.98
+
+    return
+
+
+def test_translation_op(basic_config, voxel_volume):
+    pose_norot = cxs.EulerAnglePose()
+    pose_ref = cxs.EulerAnglePose(offset_x_in_angstroms=50.0, offset_y_in_angstroms=-30.0)
+
+    image_model_norot = cxs.make_image_model(
+        voxel_volume,
+        basic_config,
+        pose=pose_norot,
+    )
+
+    image_model_ref = cxs.make_image_model(
+        voxel_volume,
+        basic_config,
+        pose=pose_ref,
+    )
+
+    translation_op = im.PhaseShiftFourierImage(
+        offset=jnp.array([50.0, -30.0]),
+        frequency_grid=basic_config.full_frequency_grid_in_angstroms,
+        is_rfft=False,
+    )
+
+    image_norot = image_model_norot.simulate()
+    image_ref = image_model_ref.simulate()
+    image_trans = im.ifftn(translation_op(im.fftn(image_norot))).real
+
+    num = jnp.abs(jnp.sum(image_trans * image_ref))
+    den = jnp.linalg.norm(image_trans) * jnp.linalg.norm(image_ref)
+    corr = num / den
+    assert corr > 0.98
+
+    return
