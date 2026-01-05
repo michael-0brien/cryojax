@@ -1497,7 +1497,7 @@
 <span class="p">)</span>
 <span class="n">plot_image_stack</span><span class="p">(</span><span class="n">dataset_images</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">9</span><span class="p">])</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/7cdcebd4521349e7800d3103d2ddefbf.png" /></p>
+<p><img alt="img" src="../_data/ed7e1cbb8b684037afc3b555923f360f.png" /></p>
 <p>Next, define the loss function. We will naively do a gradient descent on the positions of the C-alpha atoms to see if we can capture the large-scale difference of the conformational change.</p>
 <div class="highlight"><pre><span></span><code><span class="nd">@eqx</span><span class="o">.</span><span class="n">filter_value_and_grad</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">compute_loss</span><span class="p">(</span><span class="n">atom_positions</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
@@ -1620,7 +1620,7 @@ step=99, loss=-117238.9296875
 </code></pre></div>
 <div class="highlight"><pre><span></span><code>[Text(0.5, 0, &#39;step number&#39;), Text(0, 0.5, &#39;cross-correlation loss&#39;)]
 </code></pre></div>
-<p><img alt="img" src="../_data/f748e6ac82f842f6b9360dea6695c258.png" /></p>
+<p><img alt="img" src="../_data/c4f1daae93f14b77a40aaa3317ab5e62.png" /></p>
 <p>Now let's check the results! Let's first look at FSC curves between the ground truth and structure before and after refinement.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">cryojax.ndimage</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">compute_fourier_shell_correlation</span><span class="p">,</span>
@@ -1666,7 +1666,7 @@ step=99, loss=-117238.9296875
 <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/db15c9d3fcf5465f8308021ad8236c4a.png" /></p>
+<p><img alt="img" src="../_data/588404bc91da45bf9259eae813df0860.png" /></p>
 <p>The above FSC curves quantifies the increase in correlation after gradient descent refinement. Indeed, visually the refinement is able to (roughly) recover the ground truth conformation!</p>
 <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_cross_sections</span><span class="p">(</span>
     <span class="n">pos1</span><span class="p">,</span> <span class="n">pos2</span><span class="p">,</span> <span class="n">axes</span><span class="p">,</span> <span class="n">label1</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">label2</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">color1</span><span class="o">=</span><span class="s2">&quot;b&quot;</span><span class="p">,</span> <span class="n">color2</span><span class="o">=</span><span class="s2">&quot;orange&quot;</span>
@@ -1705,7 +1705,7 @@ step=99, loss=-117238.9296875
 <span class="n">fig</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s2">&quot;Central cross sections of GMM positions&quot;</span><span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/68e3ace3f3cc4f7fbe66bd917c8be034.png" /></p>
+<p><img alt="img" src="../_data/5aa2f8e3d7634089b2c012dd6d6be5b0.png" /></p>
 <p>Interactive plots of the 3D point clouds can be generated locally using <code>plotly</code> with the following code block:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">plotly.graph_objects</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">go</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">plotly.subplots</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_subplots</span>
