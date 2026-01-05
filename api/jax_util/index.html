@@ -18,6 +18,8 @@
         <link rel="prev" href="../dataset/">
       
       
+        <link rel="next" href="../../faq/">
+      
       
       <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.7">
@@ -86,7 +88,7 @@
 
   
 
-<header class="md-header md-header--shadow" data-md-component="header">
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="../.." title="cryoJAX" class="md-header__button md-logo" aria-label="cryoJAX" data-md-component="logo">
       
@@ -135,13 +137,131 @@
     
   </nav>
   
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+    
+  
+  Welcome to cryoJAX!
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../overview/" class="md-tabs__link">
+        
+  
+    
+  
+  Overview
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../examples/simulate-image/" class="md-tabs__link">
+          
+  
+  Examples
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+        
+  
+  
+    
+  
+  
+    
+    
+      
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../simulator/entry-point/" class="md-tabs__link">
+          
+  
+  API
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../faq/" class="md-tabs__link">
+        
+  
+    
+  
+  FAQ
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
 </header>
     
     <div class="md-container" data-md-component="container">
       
       
-        
-          
         
       
       <main class="md-main" data-md-component="main">
@@ -155,10 +275,12 @@
                     
 
 
+  
+
 
   
 
-<nav class="md-nav md-nav--primary md-nav--integrated" aria-label="Navigation" data-md-level="0">
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
     <a href="../.." title="cryoJAX" class="md-nav__button md-logo" aria-label="cryoJAX" data-md-component="logo">
       
@@ -235,19 +357,17 @@
     
     
       
-        
-        
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
         
           
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
             
   
   <span class="md-ellipsis">
@@ -275,6 +395,7 @@
     
     
     
+      
       
     
     
@@ -432,6 +553,7 @@
     
     
       
+      
     
     
     <li class="md-nav__item md-nav__item--nested">
@@ -534,6 +656,7 @@
         
         
       
+      
     
     
     <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
@@ -571,6 +694,7 @@
     
     
     
+      
       
     
     
@@ -631,6 +755,7 @@
     
     
     
+      
       
     
     
@@ -721,6 +846,7 @@
     
     
     
+      
       
     
     
@@ -856,6 +982,7 @@
     
     
       
+      
     
     
     <li class="md-nav__item md-nav__item--nested">
@@ -975,6 +1102,7 @@
     
     
     
+      
       
     
     
@@ -1215,7 +1343,8 @@
     </span>
   </a>
   
-</li>
+    <nav class="md-nav" aria-label="Helpers for filtering">
+      <ul class="md-nav__list">
         
           <li class="md-nav__item">
   <a href="#cryojax.jax_util.make_filter_spec" class="md-nav__link">
@@ -1226,6 +1355,11 @@
   
 </li>
         
+      </ul>
+    </nav>
+  
+</li>
+        
           <li class="md-nav__item">
   <a href="#batched-loops" class="md-nav__link">
     <span class="md-ellipsis">
@@ -1233,7 +1367,8 @@
     </span>
   </a>
   
-</li>
+    <nav class="md-nav" aria-label="Batched loops">
+      <ul class="md-nav__list">
         
           <li class="md-nav__item">
   <a href="#cryojax.jax_util.filter_bmap" class="md-nav__link">
@@ -1250,6 +1385,11 @@
       <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;filter_bscan
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -1361,6 +1501,27 @@
   
 
     
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
   </ul>
 </nav>
                   </div>
@@ -1387,13 +1548,13 @@
 <div class="doc doc-object doc-function">
 
 
-<h3 id="cryojax.jax_util.make_filter_spec" class="doc doc-heading">
+<h4 id="cryojax.jax_util.make_filter_spec" class="doc doc-heading">
   <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">cryojax.jax_util.make_filter_spec</span>
 
-  <a href="https://github.com/michael-0brien/cryojax/blob/a47b0dab038a9983e4a1bea92683db28618833d3/cryojax/jax_util/_filter_specs.py#L13-L47"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/18da86bdf87d90ee240d6d7001ae6acc9ba92840/cryojax/jax_util/_filter_specs.py#L13-L47"><code class='hippogriffe-repo-url'></code></a>
 
 
-<a href="#cryojax.jax_util.make_filter_spec" class="headerlink" title="Permanent link">¤</a></h3>
+<a href="#cryojax.jax_util.make_filter_spec" class="headerlink" title="Permanent link">¤</a></h4>
 <div class="doc-signature highlight"><pre><span></span><code><span class="nf">make_filter_spec</span><span class="p">(</span><span class="n">pytree</span><span class="p">:</span> <span class="n">PyTree</span><span class="p">,</span> <span class="n">where</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">PyTree</span><span class="p">],</span> <span class="n">Any</span> <span class="o">|</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">]],</span> <span class="o">*</span><span class="p">,</span> <span class="n">inverse</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">is_leaf</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Any</span><span class="p">],</span> <span class="nb">bool</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PyTree</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span>
 </code></pre></div>
 
@@ -1423,13 +1584,13 @@ in the <code>equinox</code> documentation for an example.</p>
 <div class="doc doc-object doc-function">
 
 
-<h3 id="cryojax.jax_util.filter_bmap" class="doc doc-heading">
+<h4 id="cryojax.jax_util.filter_bmap" class="doc doc-heading">
   <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">cryojax.jax_util.filter_bmap</span>
 
-  <a href="https://github.com/michael-0brien/cryojax/blob/a47b0dab038a9983e4a1bea92683db28618833d3/cryojax/jax_util/_batched_loop.py#L16-L48"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/18da86bdf87d90ee240d6d7001ae6acc9ba92840/cryojax/jax_util/_batched_loop.py#L16-L48"><code class='hippogriffe-repo-url'></code></a>
 
 
-<a href="#cryojax.jax_util.filter_bmap" class="headerlink" title="Permanent link">¤</a></h3>
+<a href="#cryojax.jax_util.filter_bmap" class="headerlink" title="Permanent link">¤</a></h4>
 <div class="doc-signature highlight"><pre><span></span><code><span class="nf">filter_bmap</span><span class="p">(</span><span class="n">f</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">PyTree</span><span class="p">[</span><span class="n">Shaped</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;_ ...&#39;</span><span class="p">],</span> <span class="s1">&#39;X&#39;</span><span class="p">]],</span> <span class="n">PyTree</span><span class="p">[</span><span class="n">Shaped</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;_ ...&#39;</span><span class="p">],</span> <span class="s1">&#39;Y&#39;</span><span class="p">]],</span> <span class="n">xs</span><span class="p">:</span> <span class="n">PyTree</span><span class="p">[</span><span class="n">Shaped</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;_ ...&#39;</span><span class="p">],</span> <span class="s1">&#39;X&#39;</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PyTree</span><span class="p">[</span><span class="n">Shaped</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;_ ...&#39;</span><span class="p">],</span> <span class="s1">&#39;Y&#39;</span><span class="p">]</span>
 </code></pre></div>
 
@@ -1459,13 +1620,13 @@ with the same rank as <code>xs</code>. <code>xs</code> is filtered in the usual
 <div class="doc doc-object doc-function">
 
 
-<h3 id="cryojax.jax_util.filter_bscan" class="doc doc-heading">
+<h4 id="cryojax.jax_util.filter_bscan" class="doc doc-heading">
   <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">cryojax.jax_util.filter_bscan</span>
 
-  <a href="https://github.com/michael-0brien/cryojax/blob/a47b0dab038a9983e4a1bea92683db28618833d3/cryojax/jax_util/_batched_loop.py#L51-L146"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/18da86bdf87d90ee240d6d7001ae6acc9ba92840/cryojax/jax_util/_batched_loop.py#L51-L146"><code class='hippogriffe-repo-url'></code></a>
 
 
-<a href="#cryojax.jax_util.filter_bscan" class="headerlink" title="Permanent link">¤</a></h3>
+<a href="#cryojax.jax_util.filter_bscan" class="headerlink" title="Permanent link">¤</a></h4>
 <div class="doc-signature highlight"><pre><span></span><code><span class="nf">filter_bscan</span><span class="p">(</span><span class="n">f</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="o">~</span><span class="n">Carry</span><span class="p">,</span> <span class="o">~</span><span class="n">X</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">[</span><span class="o">~</span><span class="n">Carry</span><span class="p">,</span> <span class="o">~</span><span class="n">Y</span><span class="p">]],</span> <span class="n">init</span><span class="p">:</span> <span class="o">~</span><span class="n">Carry</span><span class="p">,</span> <span class="n">xs</span><span class="p">:</span> <span class="o">~</span><span class="n">X</span><span class="p">,</span> <span class="n">length</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">unroll</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">bool</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="o">~</span><span class="n">Carry</span><span class="p">,</span> <span class="o">~</span><span class="n">Y</span><span class="p">]</span>
 </code></pre></div>
 
@@ -1506,12 +1667,12 @@ rank as <code>xs</code> (e.g. perhaps it is vmapped over <code>x</code>).
 
 
 
-<h3 id="cryojax.jax_util.NDArrayLike" class="doc doc-heading">
+<h4 id="cryojax.jax_util.NDArrayLike" class="doc doc-heading">
     <span class="doc doc-object-name doc-class-name">cryojax.jax_util.NDArrayLike</span>
-  <a href="https://github.com/michael-0brien/cryojax/blob/a47b0dab038a9983e4a1bea92683db28618833d3/cryojax/jax_util/_typing.py#L10-L13"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/18da86bdf87d90ee240d6d7001ae6acc9ba92840/cryojax/jax_util/_typing.py#L10-L13"><code class='hippogriffe-repo-url'></code></a>
 
 
-<a href="#cryojax.jax_util.NDArrayLike" class="headerlink" title="Permanent link">¤</a></h3>
+<a href="#cryojax.jax_util.NDArrayLike" class="headerlink" title="Permanent link">¤</a></h4>
 
 
     <div class="doc doc-contents first">
@@ -1550,12 +1711,12 @@ rank as <code>xs</code> (e.g. perhaps it is vmapped over <code>x</code>).
 
 
 
-<h3 id="cryojax.jax_util.FloatLike" class="doc doc-heading">
+<h4 id="cryojax.jax_util.FloatLike" class="doc doc-heading">
     <span class="doc doc-object-name doc-class-name">cryojax.jax_util.FloatLike</span>
-  <a href="https://github.com/michael-0brien/cryojax/blob/a47b0dab038a9983e4a1bea92683db28618833d3/cryojax/jax_util/_typing.py#L29-L34"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/18da86bdf87d90ee240d6d7001ae6acc9ba92840/cryojax/jax_util/_typing.py#L29-L34"><code class='hippogriffe-repo-url'></code></a>
 
 
-<a href="#cryojax.jax_util.FloatLike" class="headerlink" title="Permanent link">¤</a></h3>
+<a href="#cryojax.jax_util.FloatLike" class="headerlink" title="Permanent link">¤</a></h4>
 
 
     <div class="doc doc-contents first">
@@ -1595,12 +1756,12 @@ JAX/numpy float scalar.</p>
 
 
 
-<h3 id="cryojax.jax_util.ComplexLike" class="doc doc-heading">
+<h4 id="cryojax.jax_util.ComplexLike" class="doc doc-heading">
     <span class="doc doc-object-name doc-class-name">cryojax.jax_util.ComplexLike</span>
-  <a href="https://github.com/michael-0brien/cryojax/blob/a47b0dab038a9983e4a1bea92683db28618833d3/cryojax/jax_util/_typing.py#L22-L27"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/18da86bdf87d90ee240d6d7001ae6acc9ba92840/cryojax/jax_util/_typing.py#L22-L27"><code class='hippogriffe-repo-url'></code></a>
 
 
-<a href="#cryojax.jax_util.ComplexLike" class="headerlink" title="Permanent link">¤</a></h3>
+<a href="#cryojax.jax_util.ComplexLike" class="headerlink" title="Permanent link">¤</a></h4>
 
 
     <div class="doc doc-contents first">
@@ -1640,12 +1801,12 @@ JAX/numpy complex scalar.</p>
 
 
 
-<h3 id="cryojax.jax_util.InexactLike" class="doc doc-heading">
+<h4 id="cryojax.jax_util.InexactLike" class="doc doc-heading">
     <span class="doc doc-object-name doc-class-name">cryojax.jax_util.InexactLike</span>
-  <a href="https://github.com/michael-0brien/cryojax/blob/a47b0dab038a9983e4a1bea92683db28618833d3/cryojax/jax_util/_typing.py#L36-L41"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/18da86bdf87d90ee240d6d7001ae6acc9ba92840/cryojax/jax_util/_typing.py#L36-L41"><code class='hippogriffe-repo-url'></code></a>
 
 
-<a href="#cryojax.jax_util.InexactLike" class="headerlink" title="Permanent link">¤</a></h3>
+<a href="#cryojax.jax_util.InexactLike" class="headerlink" title="Permanent link">¤</a></h4>
 
 
     <div class="doc doc-contents first">
@@ -1685,12 +1846,12 @@ JAX/numpy float / complex scalar.</p>
 
 
 
-<h3 id="cryojax.jax_util.IntLike" class="doc doc-heading">
+<h4 id="cryojax.jax_util.IntLike" class="doc doc-heading">
     <span class="doc doc-object-name doc-class-name">cryojax.jax_util.IntLike</span>
-  <a href="https://github.com/michael-0brien/cryojax/blob/a47b0dab038a9983e4a1bea92683db28618833d3/cryojax/jax_util/_typing.py#L43-L48"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/18da86bdf87d90ee240d6d7001ae6acc9ba92840/cryojax/jax_util/_typing.py#L43-L48"><code class='hippogriffe-repo-url'></code></a>
 
 
-<a href="#cryojax.jax_util.IntLike" class="headerlink" title="Permanent link">¤</a></h3>
+<a href="#cryojax.jax_util.IntLike" class="headerlink" title="Permanent link">¤</a></h4>
 
 
     <div class="doc doc-contents first">
@@ -1730,12 +1891,12 @@ JAX/numpy integer scalar.</p>
 
 
 
-<h3 id="cryojax.jax_util.BoolLike" class="doc doc-heading">
+<h4 id="cryojax.jax_util.BoolLike" class="doc doc-heading">
     <span class="doc doc-object-name doc-class-name">cryojax.jax_util.BoolLike</span>
-  <a href="https://github.com/michael-0brien/cryojax/blob/a47b0dab038a9983e4a1bea92683db28618833d3/cryojax/jax_util/_typing.py#L15-L20"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/18da86bdf87d90ee240d6d7001ae6acc9ba92840/cryojax/jax_util/_typing.py#L15-L20"><code class='hippogriffe-repo-url'></code></a>
 
 
-<a href="#cryojax.jax_util.BoolLike" class="headerlink" title="Permanent link">¤</a></h3>
+<a href="#cryojax.jax_util.BoolLike" class="headerlink" title="Permanent link">¤</a></h4>
 
 
     <div class="doc doc-contents first">
@@ -1816,7 +1977,7 @@ JAX/numpy boolean scalar.</p>
     </div>
     
     
-    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.sections", "toc.integrate"], "search": "../../assets/javascripts/workers/search.f8cc74c7.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "toc.integrate"], "search": "../../assets/javascripts/workers/search.f8cc74c7.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
       <script src="../../assets/javascripts/bundle.c8b220af.min.js"></script>
