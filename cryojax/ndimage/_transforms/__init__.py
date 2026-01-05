@@ -23,6 +23,4 @@ from ._masks import (
 from ._spatial_transform import (
     PhaseShiftFourierImage as PhaseShiftFourierImage,
     RotateFourierImage as RotateFourierImage,
-    RotateImage as RotateImage,
-    TranslateImage as TranslateImage,
 )
