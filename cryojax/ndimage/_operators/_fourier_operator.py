@@ -20,7 +20,8 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float, Inexact
 
-from ...jax_util import FloatLike, error_if_negative, error_if_not_positive
+from ..._misc import error_if_negative, error_if_not_positive
+from ...jax_util import FloatLike
 
 
 class AbstractFourierOperator(eqx.Module, strict=True):

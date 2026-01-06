@@ -10,8 +10,8 @@ import jax.numpy as jnp
 import jax.random as jr
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
+from .._misc import error_if_negative
 from ..constants import PARKHURST2024_POWER_CONSTANTS
-from ..jax_util import error_if_negative
 from ..ndimage import (
     AbstractFourierOperator,
     FourierGaussian,

@@ -7,8 +7,9 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float, PyTree
 
+from ..._misc import error_if_not_positive
 from ...constants import LobatoScatteringFactorParameters, PengScatteringFactorParameters
-from ...jax_util import FloatLike, NDArrayLike, error_if_not_positive
+from ...jax_util import FloatLike, NDArrayLike
 from ...ndimage import (
     AbstractFourierOperator,
     FourierSinc,

@@ -4,8 +4,9 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
+from ..._misc import error_if_negative
 from ...constants import wavelength_from_kilovolts
-from ...jax_util import FloatLike, error_if_negative
+from ...jax_util import FloatLike
 from .common_functions import (
     compute_phase_shift_from_amplitude_contrast_ratio,
     compute_phase_shifts_with_spherical_aberration,

@@ -9,12 +9,13 @@ import jax.numpy as jnp
 import jax.scipy as jsp
 from jaxtyping import Array, Float, PyTree
 
+from ..._misc import error_if_not_positive
 from ...constants import (
     PengScatteringFactorParameters,
     b_factor_to_variance,
     variance_to_b_factor,
 )
-from ...jax_util import FloatLike, NDArrayLike, error_if_not_positive
+from ...jax_util import FloatLike, NDArrayLike
 from ...ndimage import fftn, make_1d_coordinate_grid, resize_with_crop_or_pad, rfftn
 from .._image_config import AbstractImageConfig
 from .._pose import AbstractPose
@@ -131,8 +132,7 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
             jnp.asarray(amplitudes, dtype=float), (n_positions, n_gaussians)
         )
         self.variances = jnp.broadcast_to(
-            error_if_not_positive(jnp.asarray(variances, dtype=float)),
-            (n_positions, n_gaussians),
+            jnp.asarray(variances, dtype=float), (n_positions, n_gaussians)
         )
 
     def __check_init__(self):

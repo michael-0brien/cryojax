@@ -5,7 +5,8 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float, Inexact, PRNGKeyArray
 
-from ..jax_util import FloatLike, error_if_not_fractional
+from .._misc import error_if_not_fractional
+from ..jax_util import FloatLike
 from ..ndimage import fftn, ifftn, irfftn, rfftn
 from ._image_config import AbstractImageConfig
 from ._solvent_2d import AbstractRandomSolvent2D

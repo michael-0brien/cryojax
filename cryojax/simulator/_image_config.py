@@ -8,12 +8,13 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
+from .._misc import error_if_not_positive
 from ..constants import (
     interaction_constant_from_kilovolts,
     lorentz_factor_from_kilovolts,
     wavelength_from_kilovolts,
 )
-from ..jax_util import FloatLike, error_if_not_positive
+from ..jax_util import FloatLike
 from ..ndimage import make_coordinate_grid, make_frequency_grid
 
 

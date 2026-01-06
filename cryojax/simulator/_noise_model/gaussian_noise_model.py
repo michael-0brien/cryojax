@@ -10,7 +10,8 @@ import jax.numpy as jnp
 import jax.random as jr
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
-from ...jax_util import FloatLike, error_if_not_positive
+from ..._misc import error_if_not_positive
+from ...jax_util import FloatLike
 from ...ndimage import (
     AbstractFilter,
     AbstractFourierOperator,

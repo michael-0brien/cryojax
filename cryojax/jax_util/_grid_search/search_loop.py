@@ -11,7 +11,7 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 from jaxtyping import Array, PyTree
 
-from .._tqdm_decorator import fori_loop_tqdm_decorator
+from ..._misc import fori_loop_tqdm_decorator
 from .custom_types import PyTreeGrid, PyTreeGridPoint
 from .pytree_manipulation import (
     tree_grid_shape,

@@ -12,7 +12,8 @@ import numpy as np
 from equinox import AbstractVar, Module
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
-from ..jax_util import FloatLike, error_if_not_fractional
+from .._misc import error_if_not_fractional
+from ..jax_util import FloatLike
 from ..ndimage import irfftn, rfftn
 from ._image_config import DoseImageConfig
 

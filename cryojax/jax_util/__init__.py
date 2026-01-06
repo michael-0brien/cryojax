@@ -4,12 +4,6 @@ per-leaf behavior for pytrees.
 """
 
 from ._batched_loop import filter_bmap as filter_bmap, filter_bscan as filter_bscan
-from ._errors import (
-    error_if_negative as error_if_negative,
-    error_if_not_fractional as error_if_not_fractional,
-    error_if_not_positive as error_if_not_positive,
-    error_if_zero as error_if_zero,
-)
 from ._filter_specs import make_filter_spec as make_filter_spec
 from ._grid_search import (
     AbstractGridSearchMethod as AbstractGridSearchMethod,

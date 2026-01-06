@@ -2,7 +2,8 @@ from typing_extensions import override
 
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
-from ...jax_util import FloatLike, error_if_not_fractional
+from ..._misc import error_if_not_fractional
+from ...jax_util import FloatLike
 from .._image_config import AbstractImageConfig
 from .._multislice import AbstractMultisliceIntegrator
 from .._scattering_theory import AbstractWaveScatteringTheory

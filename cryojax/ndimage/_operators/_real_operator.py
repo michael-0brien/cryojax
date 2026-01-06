@@ -10,7 +10,8 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float, Inexact
 
-from ...jax_util import FloatLike, NDArrayLike, error_if_not_positive
+from ..._misc import error_if_not_positive
+from ...jax_util import FloatLike, NDArrayLike
 
 
 class AbstractRealOperator(eqx.Module, strict=True):
