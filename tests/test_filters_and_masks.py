@@ -151,7 +151,8 @@ def test_rotation_op(basic_config, voxel_volume):
     return
 
 
-def test_translation_op(basic_config, voxel_volume):
+@pytest.mark.parametrize("use_rfft", [True, False])
+def test_translation_op(basic_config, voxel_volume, use_rfft):
     pose_norot = cxs.EulerAnglePose()
     pose_ref = cxs.EulerAnglePose(offset_x_in_angstroms=50.0, offset_y_in_angstroms=-30.0)
 
@@ -166,16 +167,25 @@ def test_translation_op(basic_config, voxel_volume):
         basic_config,
         pose=pose_ref,
     )
+    if use_rfft:
+        grid = basic_config.frequency_grid_in_angstroms
+    else:
+        grid = basic_config.full_frequency_grid_in_angstroms
 
     translation_op = im.PhaseShiftFourierImage(
         offset=jnp.array([50.0, -30.0]),
-        frequency_grid=basic_config.full_frequency_grid_in_angstroms,
-        is_rfft=False,
+        frequency_grid=grid,
+        is_rfft=use_rfft,
     )
 
-    image_norot = image_model_norot.simulate()
+    image_notrans = image_model_norot.simulate()
     image_ref = image_model_ref.simulate()
-    image_trans = im.ifftn(translation_op(im.fftn(image_norot))).real
+    if use_rfft:
+        image_trans = im.irfftn(
+            translation_op(im.rfftn(image_notrans, s=image_ref.shape)), s=image_ref.shape
+        )
+    else:
+        image_trans = im.ifftn(translation_op(im.fftn(image_notrans))).real
 
     num = jnp.abs(jnp.sum(image_trans * image_ref))
     den = jnp.linalg.norm(image_trans) * jnp.linalg.norm(image_ref)

@@ -62,7 +62,7 @@ class PhaseShiftFourierImage(AbstractImageTransform, strict=True):
         )
         self.is_rfft = is_rfft
         if is_rfft:
-            self.shape = (frequency_grid.shape[0], (frequency_grid.shape[1] - 1) * 2)
+            self.shape = (frequency_grid.shape[0], frequency_grid.shape[0])
         else:
             self.shape = (frequency_grid.shape[0], frequency_grid.shape[1])
 
