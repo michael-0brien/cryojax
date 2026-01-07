@@ -23,8 +23,8 @@ The `AbstractImageConfig` is an object at the core of simulating images in `cryo
                 - wavelength_in_angstroms
                 - lorentz_factor
                 - interaction_constant
-                - get_coordinates
-                - get_frequencies
+                - get_coordinate_grid
+                - get_frequency_grid
                 - n_pixels
                 - y_dim
                 - x_dim
@@ -46,8 +46,8 @@ The `AbstractImageConfig` is an object at the core of simulating images in `cryo
                 - wavelength_in_angstroms
                 - lorentz_factor
                 - interaction_constant
-                - get_coordinates
-                - get_frequencies
+                - get_coordinate_grid
+                - get_frequency_grid
                 - n_pixels
                 - y_dim
                 - x_dim

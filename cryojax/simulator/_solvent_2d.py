@@ -230,16 +230,16 @@ class GRFSolvent2D(AbstractRandomSolvent2D, strict=True):
         """
         n_pixels = config.padded_n_pixels
         if outputs_real_space:
-            frequency_grid_in_angstroms = config.get_frequencies(
+            frequency_grid_in_angstroms = config.get_frequency_grid(
                 padding=True, physical=True
             )
         else:
             if outputs_rfft:
-                frequency_grid_in_angstroms = config.get_frequencies(
+                frequency_grid_in_angstroms = config.get_frequency_grid(
                     padding=True, physical=True
                 )
             else:
-                frequency_grid_in_angstroms = config.get_frequencies(
+                frequency_grid_in_angstroms = config.get_frequency_grid(
                     padding=True, physical=True, full=True
                 )
         # Compute standard deviation, scaling up by the variance by the number

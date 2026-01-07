@@ -190,7 +190,7 @@ class AbstractImageModel(eqx.Module, strict=True):
 
     def _phase_shift_translate(self, fourier_image: Array) -> Array:
         phase_shifts = self.pose.compute_translation_operator(
-            self.image_config.get_frequencies(physical=True, padding=True)
+            self.image_config.get_frequency_grid(physical=True, padding=True)
         )
         fourier_image = self.pose.translate_image(
             fourier_image,

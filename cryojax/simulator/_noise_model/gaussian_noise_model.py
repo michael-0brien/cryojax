@@ -189,7 +189,7 @@ class GaussianWhiteNoiseModel(AbstractGaussianNoiseModel, strict=True):
             A filter to apply to the final image.
         """
         n_pixels = self.image_model.image_config.padded_n_pixels
-        frequency_grid = self.image_model.image_config.get_frequencies(
+        frequency_grid = self.image_model.image_config.get_frequency_grid(
             padding=True, physical=True
         )
         # Compute the zero mean variance and scale up to be independent of the number of
@@ -318,7 +318,7 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
             A filter to apply to the final image.
         """
         n_pixels = self.image_model.image_config.padded_n_pixels
-        frequency_grid = self.image_model.image_config.get_frequencies(
+        frequency_grid = self.image_model.image_config.get_frequency_grid(
             padding=True, physical=True
         )
         # Compute the zero mean variance and scale up to be independent of the number of
@@ -371,7 +371,7 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
             A filter to apply to the final image.
         """
         n_pixels = self.image_config.n_pixels
-        frequency_grid = self.image_model.image_config.get_frequencies(
+        frequency_grid = self.image_model.image_config.get_frequency_grid(
             padding=False, physical=True
         )
         # Compute the variance and scale up to be independent of the number of pixels

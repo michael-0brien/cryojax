@@ -498,7 +498,7 @@ class FFTAtomProjection(
         else:
             shape_u, pixel_size_u = (u * shape[0], u * shape[1]), pixel_size / u
         if shape_u == image_config.padded_shape:
-            frequency_grid = image_config.get_frequencies(
+            frequency_grid = image_config.get_frequency_grid(
                 padding=True, physical=True, full=True
             )
         else:

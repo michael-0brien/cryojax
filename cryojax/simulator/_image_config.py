@@ -77,7 +77,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
         """The electron interaction constant at the given `voltage_in_kilovolts`."""
         return interaction_constant_from_kilovolts(self.voltage_in_kilovolts)
 
-    def get_coordinates(self, *, padding: bool = False, physical: bool = True):
+    def get_coordinate_grid(self, *, padding: bool = False, physical: bool = True):
         """Return the image coordinate system. See
         [`cryojax.ndimage.make_coordinate_grid`][] for more
         information.
@@ -107,7 +107,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
             else:
                 return self._coordinate_grid_in_pixels
 
-    def get_frequencies(
+    def get_frequency_grid(
         self, *, padding: bool = False, physical: bool = True, full: bool = False
     ):
         """Return a grid of FFT frequencies. See
