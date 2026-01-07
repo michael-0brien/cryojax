@@ -53,9 +53,9 @@ Args = TypeVar("Args")
 identity_fn = eqxi.doc_repr(lambda x, _: x, "identity_fn")
 
 
-def _use_inverse_pose(volume_parametrization: AbstractVolumeParametrization) -> bool:
+def _use_inverse_pose(volume: AbstractVolumeParametrization) -> bool:
     jaxpr_fn = eqx.filter_make_jaxpr(lambda vol: vol.to_representation())
-    _, out_dynamic, out_static = jaxpr_fn(volume_parametrization)
+    _, out_dynamic, out_static = jaxpr_fn(volume)
     out_struct = eqx.combine(out_dynamic, out_static)
     expects_frame_rotation = isinstance(
         out_struct, (FourierVoxelGridVolume, FourierVoxelSplineVolume)
@@ -65,7 +65,7 @@ def _use_inverse_pose(volume_parametrization: AbstractVolumeParametrization) -> 
 
 @overload
 def make_image_model(
-    volume_parametrization: AbstractVolumeParametrization,
+    volume: AbstractVolumeParametrization,
     image_config: AbstractImageConfig,
     pose: AbstractPose,
     transfer_theory: None = None,
@@ -83,7 +83,7 @@ def make_image_model(
 
 @overload
 def make_image_model(  # pyright: ignore[reportOverlappingOverload]
-    volume_parametrization: AbstractVolumeParametrization,
+    volume: AbstractVolumeParametrization,
     image_config: AbstractImageConfig,
     pose: AbstractPose,
     transfer_theory: ContrastTransferTheory,
@@ -101,7 +101,7 @@ def make_image_model(  # pyright: ignore[reportOverlappingOverload]
 
 @overload
 def make_image_model(
-    volume_parametrization: AbstractVolumeParametrization,
+    volume: AbstractVolumeParametrization,
     image_config: AbstractImageConfig,
     pose: AbstractPose,
     transfer_theory: ContrastTransferTheory,
@@ -119,7 +119,7 @@ def make_image_model(
 
 @overload
 def make_image_model(
-    volume_parametrization: AbstractVolumeParametrization,
+    volume: AbstractVolumeParametrization,
     image_config: AbstractImageConfig,
     pose: AbstractPose,
     transfer_theory: ContrastTransferTheory,
@@ -137,7 +137,7 @@ def make_image_model(
 
 @overload
 def make_image_model(
-    volume_parametrization: AbstractVolumeParametrization,
+    volume: AbstractVolumeParametrization,
     image_config: AbstractImageConfig,
     pose: AbstractPose,
     transfer_theory: ContrastTransferTheory,
@@ -154,7 +154,7 @@ def make_image_model(
 
 
 def make_image_model(
-    volume_parametrization: AbstractVolumeParametrization,
+    volume: AbstractVolumeParametrization,
     image_config: AbstractImageConfig,
     pose: AbstractPose,
     transfer_theory: ContrastTransferTheory | None = None,
@@ -186,7 +186,7 @@ def make_image_model(
 
     **Arguments:**
 
-    - `volume_parametrization`:
+    - `volume`:
         The volume for imaging. To get started building volumes, see the
         [`cryojax.simulator.load_tabulated_volume`][] and
         [`cryojax.simulator.render_voxel_volume`][] utilities, or explore
@@ -245,7 +245,7 @@ def make_image_model(
             Apply phase shifts in the Fourier domain.
         - 'atom':
             Apply translation to atom positions before
-            projection. For this method, the `volume_parametrization`
+            projection. For this method, the `volume`
             argument must be or yield a [`cryojax.simulator.AbstractAtomVolume`][].
         - 'none':
             Do not apply the translation.
@@ -269,12 +269,12 @@ def make_image_model(
         rotation of the *object*, not of the frame. Some volume
         projection methods (e.g. [`cryojax.simulator.FourierSliceExtraction`][])
         instead image
-        a rotation of the frame, so if `volume_parametrization` is
+        a rotation of the frame, so if `volume` is
         such a representation, the pose is transposed under the hood.
 
         Rotations will still differ by a transpose if:
 
-        - The `volume_parametrization` is a custom subclass of
+        - The `volume` is a custom subclass of
         [`cryojax.simulator.AbstractVolumeRepresentation`][] that
         implements a frame rotation.
         - The user instantiates an [`cryojax.simulator.AbstractImageModel`][]
@@ -297,7 +297,7 @@ def make_image_model(
     the value of `quantity_mode`.
     """
     # Invert pose if volume expects frame rotation
-    if _use_inverse_pose(volume_parametrization):
+    if _use_inverse_pose(volume):
         pose = pose.to_inverse_rotation()
     options = dict(
         normalizes_signal=normalizes_signal,
@@ -309,7 +309,7 @@ def make_image_model(
     if transfer_theory is None:
         # Image model for projections
         image_model = ProjectionImageModel(
-            volume_parametrization,
+            volume,
             pose,
             image_config,
             volume_integrator,
@@ -320,7 +320,7 @@ def make_image_model(
         if quantity_mode is None:
             # Linear image model
             image_model = LinearImageModel(
-                volume_parametrization,
+                volume,
                 pose,
                 image_config,
                 transfer_theory,
@@ -344,7 +344,7 @@ def make_image_model(
                         "counts, an `AbstractDetector` must be passed."
                     )
                 image_model = ElectronCountsImageModel(
-                    volume_parametrization,
+                    volume,
                     pose,
                     image_config,
                     scattering_theory,
@@ -353,7 +353,7 @@ def make_image_model(
                 )
             elif quantity_mode == "contrast":
                 image_model = ContrastImageModel(
-                    volume_parametrization,
+                    volume,
                     pose,
                     image_config,
                     scattering_theory,
@@ -361,7 +361,7 @@ def make_image_model(
                 )
             elif quantity_mode == "intensity":
                 image_model = IntensityImageModel(
-                    volume_parametrization,
+                    volume,
                     pose,
                     image_config,
                     scattering_theory,
@@ -672,7 +672,7 @@ def make_linear_operator(
         operator, vector = cxs.make_linear_operator(
             simulate_fn=lambda x: x.simulate(),
             args=image_model,
-            where_vector=lambda x: x.volume_parametrization.fourier_voxel_grid,
+            where_vector=lambda x: x.volume.fourier_voxel_grid,
         )
         # Simulate an image
         image = operator.mv(vector)

@@ -246,7 +246,7 @@ class AbstractImageModel(eqx.Module, strict=True):
 class LinearImageModel(AbstractImageModel, strict=True):
     """An simple image model in linear image formation theory."""
 
-    volume_parametrization: AbstractVolumeParametrization
+    volume: AbstractVolumeParametrization
     pose: AbstractPose
     volume_integrator: AbstractVolumeIntegrator
     transfer_theory: ContrastTransferTheory
@@ -260,7 +260,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
 
     def __init__(
         self,
-        volume_parametrization: AbstractVolumeParametrization,
+        volume: AbstractVolumeParametrization,
         pose: AbstractPose,
         image_config: AbstractImageConfig,
         transfer_theory: ContrastTransferTheory,
@@ -274,7 +274,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
     ):
         """**Arguments:**
 
-        - `volume_parametrization`:
+        - `volume`:
             The parametrization of an imaging volume.
         - `pose`:
             The pose of the volume.
@@ -318,7 +318,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
                 Do not apply the translation.
         """
         # Simulator components
-        self.volume_parametrization = volume_parametrization
+        self.volume = volume
         self.pose = pose
         self.image_config = image_config
         self.volume_integrator = volume_integrator
@@ -342,12 +342,10 @@ class LinearImageModel(AbstractImageModel, strict=True):
     ) -> PaddedFourierImageArray:
         # Get the representation of the volume
         if rng_key is None:
-            volume_representation = self.volume_parametrization.to_representation()
+            volume_representation = self.volume.to_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            volume_representation = self.volume_parametrization.to_representation(
-                rng_key=this_key
-            )
+            volume_representation = self.volume.to_representation(rng_key=this_key)
         # Rotate it to the lab frame
         volume_representation = volume_representation.rotate_to_pose(self.pose)
         # Translate if using atom translations
@@ -378,7 +376,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
 class ProjectionImageModel(AbstractImageModel, strict=True):
     """An simple image model for computing a projection."""
 
-    volume_parametrization: AbstractVolumeParametrization
+    volume: AbstractVolumeParametrization
     pose: AbstractPose
     volume_integrator: AbstractVolumeIntegrator
     image_config: AbstractImageConfig
@@ -391,7 +389,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
 
     def __init__(
         self,
-        volume_parametrization: AbstractVolumeParametrization,
+        volume: AbstractVolumeParametrization,
         pose: AbstractPose,
         image_config: AbstractImageConfig,
         volume_integrator: AbstractVolumeIntegrator = AutoVolumeProjection(),
@@ -404,7 +402,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
     ):
         """**Arguments:**
 
-        - `volume_parametrization`:
+        - `volume`:
             The parametrization of the imaging volume
         - `pose`:
             The pose of the volume.
@@ -447,7 +445,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
                 Do not apply the translation.
         """
         # Simulator components
-        self.volume_parametrization = volume_parametrization
+        self.volume = volume
         self.pose = pose
         self.image_config = image_config
         self.volume_integrator = volume_integrator
@@ -470,12 +468,10 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
     ) -> ImageArray | PaddedImageArray:
         # Get the representation of the volume
         if rng_key is None:
-            volume_representation = self.volume_parametrization.to_representation()
+            volume_representation = self.volume.to_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            volume_representation = self.volume_parametrization.to_representation(
-                rng_key=this_key
-            )
+            volume_representation = self.volume.to_representation(rng_key=this_key)
         # Rotate it to the lab frame
         volume_representation = volume_representation.rotate_to_pose(self.pose)
         # Translate if using atom translations
@@ -509,7 +505,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
     scattering theory.
     """
 
-    volume_parametrization: AbstractVolumeParametrization
+    volume: AbstractVolumeParametrization
     pose: AbstractPose
     image_config: AbstractImageConfig
     scattering_theory: AbstractScatteringTheory
@@ -522,7 +518,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
 
     def __init__(
         self,
-        volume_parametrization: AbstractVolumeParametrization,
+        volume: AbstractVolumeParametrization,
         pose: AbstractPose,
         image_config: AbstractImageConfig,
         scattering_theory: AbstractScatteringTheory,
@@ -533,7 +529,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
         signal_centering: Literal["bg", "mean"] = "mean",
         translate_mode: Literal["fft", "atom", "none"] = "fft",
     ):
-        self.volume_parametrization = volume_parametrization
+        self.volume = volume
         self.pose = pose
         self.image_config = image_config
         self.scattering_theory = scattering_theory
@@ -556,12 +552,10 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
         # Get the volume representation. Its data should be a scattering potential
         # to simulate in physical units
         if rng_key is None:
-            volume_representation = self.volume_parametrization.to_representation()
+            volume_representation = self.volume.to_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            volume_representation = self.volume_parametrization.to_representation(
-                rng_key=this_key
-            )
+            volume_representation = self.volume.to_representation(rng_key=this_key)
         # Rotate it to the lab frame
         volume_representation = volume_representation.rotate_to_pose(self.pose)
         # Translate if using atom translations
@@ -590,7 +584,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
     words a squared wavefunction.
     """
 
-    volume_parametrization: AbstractVolumeParametrization
+    volume: AbstractVolumeParametrization
     pose: AbstractPose
     image_config: AbstractImageConfig
     scattering_theory: AbstractScatteringTheory
@@ -603,7 +597,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
 
     def __init__(
         self,
-        volume_parametrization: AbstractVolumeParametrization,
+        volume: AbstractVolumeParametrization,
         pose: AbstractPose,
         image_config: AbstractImageConfig,
         scattering_theory: AbstractScatteringTheory,
@@ -614,7 +608,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
         signal_centering: Literal["bg", "mean"] = "mean",
         translate_mode: Literal["fft", "atom", "none"] = "fft",
     ):
-        self.volume_parametrization = volume_parametrization
+        self.volume = volume
         self.pose = pose
         self.image_config = image_config
         self.scattering_theory = scattering_theory
@@ -637,12 +631,10 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
         # Get the volume representation. Its data should be a scattering potential
         # to simulate in physical units
         if rng_key is None:
-            volume_representation = self.volume_parametrization.to_representation()
+            volume_representation = self.volume.to_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            volume_representation = self.volume_parametrization.to_representation(
-                rng_key=this_key
-            )
+            volume_representation = self.volume.to_representation(rng_key=this_key)
         # Rotate it to the lab frame
         volume_representation = volume_representation.rotate_to_pose(self.pose)
         # Translate if using atom translations
@@ -670,7 +662,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
     model for the detector.
     """
 
-    volume_parametrization: AbstractVolumeParametrization
+    volume: AbstractVolumeParametrization
     pose: AbstractPose
     image_config: DoseImageConfig
     scattering_theory: AbstractScatteringTheory
@@ -684,7 +676,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
 
     def __init__(
         self,
-        volume_parametrization: AbstractVolumeParametrization,
+        volume: AbstractVolumeParametrization,
         pose: AbstractPose,
         image_config: DoseImageConfig,
         scattering_theory: AbstractScatteringTheory,
@@ -696,7 +688,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
         signal_centering: Literal["bg", "mean"] = "mean",
         translate_mode: Literal["fft", "atom", "none"] = "fft",
     ):
-        self.volume_parametrization = volume_parametrization
+        self.volume = volume
         self.pose = pose
         self.image_config = image_config
         self.scattering_theory = scattering_theory
@@ -720,7 +712,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
         if rng_key is None:
             # Get the volume representation. Its data should be a scattering potential
             # to simulate in physical units
-            volume_representation = self.volume_parametrization.to_representation()
+            volume_representation = self.volume.to_representation()
             # Rotate it to the lab frame
             volume_representation = volume_representation.rotate_to_pose(self.pose)
             # Translate if using atom translations
@@ -750,7 +742,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
             keys = jr.split(rng_key, 3)
             # Get the volume representation. Its data should be a scattering potential
             # to simulate in physical units
-            volume_representation = self.volume_parametrization.to_representation(keys[0])
+            volume_representation = self.volume.to_representation(keys[0])
             # Rotate it to the lab frame
             volume_representation = volume_representation.rotate_to_pose(self.pose)
             # Translate if using atom translations
@@ -781,7 +773,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
 
 _init_doc = """**Arguments:**
 
-- `volume_parametrization`:
+- `volume`:
     The parametrization of the imaging volume.
 - `pose`:
     The pose of the volume.

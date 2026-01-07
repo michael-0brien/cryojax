@@ -41,7 +41,7 @@ import cryojax.simulator as cxs
 # Instantiate a cryoJAX `image_model`
 image_model = cxs.make_image_model(
     # ... load atoms as gaussians mixture from tabulated electron scattering factors
-    volume_parametrization=cxs.load_tabulated_volume(
+    volume=cxs.load_tabulated_volume(
         "example.pdb", output_type=cxs.GaussianMixtureVolume
     ),
     # ... configure the image
