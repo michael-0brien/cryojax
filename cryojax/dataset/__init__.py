@@ -1,11 +1,50 @@
+import warnings as _warnings
+from typing import Any as _Any
+
 from ._dataset import AbstractDataset as AbstractDataset
 from ._particle_data import (
+    AbstractParticleDataset as AbstractParticleDataset,
     AbstractParticleParameterFile as AbstractParticleParameterFile,
-    AbstractParticleStackDataset as AbstractParticleStackDataset,
     AbstractParticleStarFile as AbstractParticleStarFile,
-    ParticleParameterInfo as ParticleParameterInfo,
-    ParticleStackInfo as ParticleStackInfo,
+    RelionParticleDataset as RelionParticleDataset,
     RelionParticleParameterFile as RelionParticleParameterFile,
-    RelionParticleStackDataset as RelionParticleStackDataset,
     simulate_particle_stack as simulate_particle_stack,
 )
+
+
+def __getattr__(name: str) -> _Any:
+    # Future deprecations
+    if name == "RelionParticleStackDataset":
+        _warnings.warn(
+            "The 'RelionParticleStackDataset' alias is deprecated and will be removed in "
+            "cryoJAX 0.6.0. Use 'RelionParticleDataset' instead.",
+            category=FutureWarning,
+            stacklevel=2,
+        )
+        return RelionParticleDataset
+
+    if name == "ParticleParameterInfo":
+        _warnings.warn(
+            "The 'ParticleParameterInfo' TypedDict is deprecated and will be removed in "
+            "cryoJAX 0.6.0.",
+            category=FutureWarning,
+            stacklevel=2,
+        )
+        from ._particle_data.relion import (
+            RelionParticleParameterInfo as RelionParticleParameterInfo,
+        )
+
+        return RelionParticleParameterInfo
+
+    if name == "ParticleStackInfo":
+        _warnings.warn(
+            "The 'ParticleStackInfo' TypedDict is deprecated and will be removed in "
+            "cryoJAX 0.6.0.",
+            category=FutureWarning,
+            stacklevel=2,
+        )
+        from ._particle_data.relion import (
+            RelionParticleStackInfo as RelionParticleStackInfo,
+        )
+
+        return RelionParticleStackInfo
