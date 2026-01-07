@@ -86,7 +86,7 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
             An optional defocus offset to apply to the CTF defocus at
             runtime.
         """
-        frequency_grid = image_config.padded_frequency_grid_in_angstroms
+        frequency_grid = image_config.get_frequency_grid(padding=True, physical=True)
         if not input_is_ewald_sphere:
             # Compute the CTF, including additional phase shifts
             ctf_array = self.ctf(

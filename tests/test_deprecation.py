@@ -19,6 +19,72 @@ def test_future_deprecated(sample_pdb_path):
         removal_version = parse_version(match.group(1))
         return current_version >= removal_version
 
+    ic = cxs.BasicImageConfig((10, 10), 1.5, 300.0)
+
+    with pytest.warns(FutureWarning) as record:
+        assert ic.coordinate_grid_in_angstroms is ic.get_coordinate_grid()
+        assert not should_be_removed(record)
+
+    with pytest.warns(FutureWarning) as record:
+        assert ic.coordinate_grid_in_pixels is ic.get_coordinate_grid(physical=False)
+        assert not should_be_removed(record)
+
+    with pytest.warns(FutureWarning) as record:
+        assert ic.padded_coordinate_grid_in_pixels is ic.get_coordinate_grid(
+            padding=True, physical=False
+        )
+        assert not should_be_removed(record)
+
+    with pytest.warns(FutureWarning) as record:
+        assert ic.padded_coordinate_grid_in_angstroms is ic.get_coordinate_grid(
+            padding=True,
+        )
+        assert not should_be_removed(record)
+
+    with pytest.warns(FutureWarning) as record:
+        assert ic.frequency_grid_in_angstroms is ic.get_frequency_grid()
+        assert not should_be_removed(record)
+
+    with pytest.warns(FutureWarning) as record:
+        assert ic.frequency_grid_in_pixels is ic.get_frequency_grid(physical=False)
+        assert not should_be_removed(record)
+
+    with pytest.warns(FutureWarning) as record:
+        assert ic.padded_frequency_grid_in_angstroms is ic.get_frequency_grid(
+            padding=True
+        )
+        assert not should_be_removed(record)
+
+    with pytest.warns(FutureWarning) as record:
+        assert ic.padded_frequency_grid_in_pixels is ic.get_frequency_grid(
+            padding=True, physical=False
+        )
+        assert not should_be_removed(record)
+
+    with pytest.warns(FutureWarning) as record:
+        assert ic.full_frequency_grid_in_pixels is ic.get_frequency_grid(
+            physical=False, full=True
+        )
+        assert not should_be_removed(record)
+
+    with pytest.warns(FutureWarning) as record:
+        assert ic.full_frequency_grid_in_angstroms is ic.get_frequency_grid(
+            physical=True, full=True
+        )
+        assert not should_be_removed(record)
+
+    with pytest.warns(FutureWarning) as record:
+        assert ic.padded_full_frequency_grid_in_pixels is ic.get_frequency_grid(
+            padding=True, physical=False, full=True
+        )
+        assert not should_be_removed(record)
+
+    with pytest.warns(FutureWarning) as record:
+        assert ic.padded_full_frequency_grid_in_angstroms is ic.get_frequency_grid(
+            padding=True, physical=True, full=True
+        )
+        assert not should_be_removed(record)
+
     with pytest.warns(FutureWarning) as record:
         obj = cxs.AberratedAstigmaticCTF
         assert obj is cxs.AstigmaticCTF

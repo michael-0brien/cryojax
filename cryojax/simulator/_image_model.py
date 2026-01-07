@@ -156,7 +156,10 @@ class AbstractImageModel(eqx.Module, strict=True):
         else:
             # ... otherwise, apply filter, crop, and mask, again trying to
             # minimize moving back and forth between real and fourier space
-            padded_rfft_shape = image_config.padded_frequency_grid_in_pixels.shape[0:2]
+            padded_rfft_shape = (
+                image_config.padded_shape[0],
+                image_config.padded_shape[1] // 2 + 1,
+            )
             if filter_c is not None:
                 # ... apply the filter
                 if filter is not None:
@@ -187,7 +190,7 @@ class AbstractImageModel(eqx.Module, strict=True):
 
     def _phase_shift_translate(self, fourier_image: Array) -> Array:
         phase_shifts = self.pose.compute_translation_operator(
-            self.image_config.padded_frequency_grid_in_angstroms
+            self.image_config.get_frequency_grid(physical=True, padding=True)
         )
         fourier_image = self.pose.translate_image(
             fourier_image,
