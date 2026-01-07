@@ -10,7 +10,7 @@ However, the specific goal of the cryoJAX library is to be a flexible platform f
 
 **JAX function transformations are extremely flexible**
 
-JAX is capable of transforming *entire programs* with `jax.jit`, `jax.grad`, and `jax.vmap` across many accelerators. Cryo-EM is exploding with new exciting research applications, which are highly varied in how exactly to deploy and optimize a forward model. Deploying function transformations happens to be an extremely useful programming model towards this end: all we need to do is write the forward model, and users can take control of how to use it in practice.
+JAX is capable of transforming *entire programs* with `jax.jit`, `jax.grad`, and `jax.vmap` across many accelerators. Cryo-EM is exploding with new exciting research applications, which are highly varied in how exactly to deploy and optimize a forward model. Function transformations happen to be an extremely useful programming model towards this end: all we need to do is write the forward model, and users can take control of how to use it in practice.
 
 Inspired from JAX, PyTorch has recently implemented function transformations via [`torch.func`](https://docs.pytorch.org/docs/stable/func.html). To our knowledge, these cannot yet handle of the same complexity as in JAX (especially enabled by Equinox), and at this stage designing a package that fully relies on `torch.func` for its usability could be problematic. At some point, this would be very interesting.
 
