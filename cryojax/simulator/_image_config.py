@@ -1,6 +1,7 @@
 """The image configuration and utility manager."""
 
 import math
+import warnings
 from functools import cached_property
 from typing import Any, TypedDict
 
@@ -15,6 +16,13 @@ from ..constants import (
 )
 from ..jax_util import FloatLike, error_if_not_positive
 from ..ndimage import make_coordinate_grid, make_frequency_grid
+
+
+_get_deprecation_msg = lambda self, prop, func: (
+    f"`{self.__class__.__name__}.{prop}` has been deprecated and will be "
+    "removed in cryoJAX 0.6.0. Instead, make "
+    f"the appropriate call to `{self.__class__.__name__}.{func}`."
+)
 
 
 class GridHelper(eqx.Module, strict=True):
@@ -69,144 +77,89 @@ class AbstractImageConfig(eqx.Module, strict=True):
         """The electron interaction constant at the given `voltage_in_kilovolts`."""
         return interaction_constant_from_kilovolts(self.voltage_in_kilovolts)
 
-    @cached_property
-    def coordinate_grid_in_pixels(
-        self,
-    ) -> Float[Array, "{self.y_dim} {self.x_dim} 2"]:
-        """A spatial coordinate system for the `shape`."""
-        if self.grid_helper is None:
-            return make_coordinate_grid(self.shape)
-        else:
-            return self.grid_helper.coordinate_grid
+    def get_coordinates(self, *, padding: bool = False, physical: bool = True):
+        """Return the image coordinate system. See
+        [`cryojax.ndimage.make_coordinate_grid`][] for more
+        information.
 
-    @cached_property
-    def coordinate_grid_in_angstroms(
-        self,
-    ) -> Float[Array, "{self.y_dim} {self.x_dim} 2"]:
-        """Convenience property for `pixel_size * coordinate_grid_in_pixels`"""
-        return _safe_multiply_by_constant(self.coordinate_grid_in_pixels, self.pixel_size)
+        **Arguments:**
 
-    @cached_property
-    def frequency_grid_in_pixels(
-        self,
-    ) -> Float[Array, "{self.y_dim} {self.x_dim//2+1} 2"]:
-        """A spatial frequency coordinate system for the `shape`,
-        with hermitian symmetry.
+        - `padding`:
+            If `True`, return coordinates with shape
+            `image_config.padded_shape`. Otherwise, return with
+            shape `image_config.shape`.
+        - `physical`:
+            If `True`, return coordinates in units of angstroms.
+            Otherwise, return on the unit box.
+
+        **Returns:**
+
+        The coordinate grid.
         """
-        if self.grid_helper is None:
-            return make_frequency_grid(self.shape, outputs_rfftfreqs=True)
+        if padding:
+            if physical:
+                return self._padded_coordinate_grid_in_angstroms
+            else:
+                return self._padded_coordinate_grid_in_pixels
         else:
-            return self.grid_helper.frequency_grid
+            if physical:
+                return self._coordinate_grid_in_angstroms
+            else:
+                return self._coordinate_grid_in_pixels
 
-    @cached_property
-    def frequency_grid_in_angstroms(
-        self,
-    ) -> Float[Array, "{self.y_dim} {self.x_dim//2+1} 2"]:
-        """Convenience property for `frequency_grid_in_pixels / pixel_size`"""
-        return _safe_multiply_by_constant(
-            self.frequency_grid_in_pixels, 1 / self.pixel_size
-        )
+    def get_frequencies(
+        self, *, padding: bool = False, physical: bool = True, full: bool = False
+    ):
+        """Return a grid of FFT frequencies. See
+        [`cryojax.ndimage.make_frequency_grid`] for more
+        information.
 
-    @cached_property
-    def full_frequency_grid_in_pixels(
-        self,
-    ) -> Float[Array, "{self.y_dim} {self.x_dim} 2"]:
-        """A spatial frequency coordinate system for the `shape`,
-        without hermitian symmetry.
+        **Arguments:**
+
+        - `padding`:
+            If `True`, return frequencies corresponding to shape
+            `image_config.padded_shape`. Otherwise, use
+            `image_config.shape`.
+        - `physical`:
+            If `True`, return frequencies in units of inverse
+            angstroms. Otherwise, return unitless where Nyquist
+            is equal to 0.5.
+        - `full`:
+            If `True`, return the full plane of frequencies
+            for usage with `jax.numpy.fft.fftn`.
+            Otherwise, return the half plane for usage with
+            `jax.numpy.fft.rfftn`.
+
+        **Returns:**
+
+        The frequency grid.
         """
-        if self.grid_helper is None or self.grid_helper.full_frequency_grid is None:
-            return make_frequency_grid(shape=self.shape, outputs_rfftfreqs=False)
+        if padding:
+            if physical:
+                if full:
+                    return self._padded_full_frequency_grid_in_angstroms
+                else:
+                    return self._padded_frequency_grid_in_angstroms
+            else:
+                if full:
+                    return self._padded_full_frequency_grid_in_pixels
+                else:
+                    return self._padded_frequency_grid_in_pixels
         else:
-            return self.grid_helper.full_frequency_grid
-
-    @cached_property
-    def full_frequency_grid_in_angstroms(
-        self,
-    ) -> Float[Array, "{self.y_dim} {self.x_dim} 2"]:
-        """Convenience property for `full_frequency_grid_in_pixels / pixel_size`"""
-        return _safe_multiply_by_constant(
-            self.full_frequency_grid_in_pixels, 1 / self.pixel_size
-        )
+            if physical:
+                if full:
+                    return self._full_frequency_grid_in_angstroms
+                else:
+                    return self._frequency_grid_in_angstroms
+            else:
+                if full:
+                    return self._full_frequency_grid_in_pixels
+                else:
+                    return self._frequency_grid_in_pixels
 
     @property
     def padded_shape(self):
         return self.pad_options["shape"]
-
-    @cached_property
-    def padded_coordinate_grid_in_pixels(
-        self,
-    ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim} 2"]:
-        """A spatial coordinate system for the `padded_shape`."""
-        grid_helper = (
-            self.grid_helper
-            if self.shape == self.padded_shape
-            else self.pad_options["grid_helper"]
-        )
-        if grid_helper is None:
-            return make_coordinate_grid(shape=self.padded_shape)
-        else:
-            return grid_helper.coordinate_grid
-
-    @cached_property
-    def padded_coordinate_grid_in_angstroms(
-        self,
-    ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim} 2"]:
-        """Convenience property for `pixel_size * padded_coordinate_grid_in_pixels`"""
-        return _safe_multiply_by_constant(
-            self.padded_coordinate_grid_in_pixels, self.pixel_size
-        )
-
-    @cached_property
-    def padded_frequency_grid_in_pixels(
-        self,
-    ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim//2+1} 2"]:
-        """A spatial frequency coordinate system for the `padded_shape`,
-        with hermitian symmetry.
-        """
-        grid_helper = (
-            self.grid_helper
-            if self.shape == self.padded_shape
-            else self.pad_options["grid_helper"]
-        )
-        if grid_helper is None:
-            return make_frequency_grid(shape=self.padded_shape, outputs_rfftfreqs=True)
-        else:
-            return grid_helper.frequency_grid
-
-    @cached_property
-    def padded_frequency_grid_in_angstroms(
-        self,
-    ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim//2+1} 2"]:
-        """Convenience property for `padded_frequency_grid_in_pixels / pixel_size`"""
-        return _safe_multiply_by_constant(
-            self.padded_frequency_grid_in_pixels, 1 / self.pixel_size
-        )
-
-    @cached_property
-    def padded_full_frequency_grid_in_pixels(
-        self,
-    ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim} 2"]:
-        """A spatial frequency coordinate system for the `padded_shape`,
-        without hermitian symmetry.
-        """
-        grid_helper = (
-            self.grid_helper
-            if self.shape == self.padded_shape
-            else self.pad_options["grid_helper"]
-        )
-        if grid_helper is None or grid_helper.full_frequency_grid is None:
-            return make_frequency_grid(shape=self.padded_shape, outputs_rfftfreqs=False)
-        else:
-            return grid_helper.full_frequency_grid
-
-    @cached_property
-    def padded_full_frequency_grid_in_angstroms(
-        self,
-    ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim} 2"]:
-        """Convenience property for `padded_full_frequency_grid_in_pixels / pixel_size`"""
-        return _safe_multiply_by_constant(
-            self.padded_full_frequency_grid_in_pixels, 1 / self.pixel_size
-        )
 
     @property
     def n_pixels(self) -> int:
@@ -237,6 +190,289 @@ class AbstractImageConfig(eqx.Module, strict=True):
     def padded_n_pixels(self) -> int:
         """Convenience property for `math.prod(padded_shape)`"""
         return math.prod(self.padded_shape)
+
+    @cached_property
+    def _coordinate_grid_in_pixels(
+        self,
+    ) -> Float[Array, "{self.y_dim} {self.x_dim} 2"]:
+        """A spatial coordinate system for the `shape`."""
+        if self.grid_helper is None:
+            return make_coordinate_grid(self.shape)
+        else:
+            return self.grid_helper.coordinate_grid
+
+    @cached_property
+    def _coordinate_grid_in_angstroms(
+        self,
+    ) -> Float[Array, "{self.y_dim} {self.x_dim} 2"]:
+        """Property for `pixel_size * coordinate_grid_in_pixels`"""
+        return _safe_multiply_by_constant(
+            self._coordinate_grid_in_pixels, self.pixel_size
+        )
+
+    @cached_property
+    def _frequency_grid_in_pixels(
+        self,
+    ) -> Float[Array, "{self.y_dim} {self.x_dim//2+1} 2"]:
+        """A spatial frequency coordinate system for the `shape`,
+        with hermitian symmetry.
+        """
+        if self.grid_helper is None:
+            return make_frequency_grid(self.shape, outputs_rfftfreqs=True)
+        else:
+            return self.grid_helper.frequency_grid
+
+    @cached_property
+    def _frequency_grid_in_angstroms(
+        self,
+    ) -> Float[Array, "{self.y_dim} {self.x_dim//2+1} 2"]:
+        """Convenience property for `frequency_grid_in_pixels / pixel_size`"""
+        return _safe_multiply_by_constant(
+            self._frequency_grid_in_pixels, 1 / self.pixel_size
+        )
+
+    @cached_property
+    def _full_frequency_grid_in_pixels(
+        self,
+    ) -> Float[Array, "{self.y_dim} {self.x_dim} 2"]:
+        """A spatial frequency coordinate system for the `shape`,
+        without hermitian symmetry.
+        """
+        if self.grid_helper is None or self.grid_helper.full_frequency_grid is None:
+            return make_frequency_grid(shape=self.shape, outputs_rfftfreqs=False)
+        else:
+            return self.grid_helper.full_frequency_grid
+
+    @cached_property
+    def _full_frequency_grid_in_angstroms(
+        self,
+    ) -> Float[Array, "{self.y_dim} {self.x_dim} 2"]:
+        """Property for `full_frequency_grid_in_pixels / pixel_size`"""
+        return _safe_multiply_by_constant(
+            self.full_frequency_grid_in_pixels, 1 / self.pixel_size
+        )
+
+    @cached_property
+    def _padded_coordinate_grid_in_pixels(
+        self,
+    ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim} 2"]:
+        """A spatial coordinate system for the `padded_shape`."""
+        grid_helper = (
+            self.grid_helper
+            if self.shape == self.padded_shape
+            else self.pad_options["grid_helper"]
+        )
+        if grid_helper is None:
+            return make_coordinate_grid(shape=self.padded_shape)
+        else:
+            return grid_helper.coordinate_grid
+
+    @cached_property
+    def _padded_coordinate_grid_in_angstroms(
+        self,
+    ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim} 2"]:
+        """Property for `pixel_size * padded_coordinate_grid_in_pixels`"""
+        return _safe_multiply_by_constant(
+            self._padded_coordinate_grid_in_pixels, self.pixel_size
+        )
+
+    @cached_property
+    def _padded_frequency_grid_in_pixels(
+        self,
+    ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim//2+1} 2"]:
+        """A spatial frequency coordinate system for the `padded_shape`,
+        with hermitian symmetry.
+        """
+        grid_helper = (
+            self.grid_helper
+            if self.shape == self.padded_shape
+            else self.pad_options["grid_helper"]
+        )
+        if grid_helper is None:
+            return make_frequency_grid(shape=self.padded_shape, outputs_rfftfreqs=True)
+        else:
+            return grid_helper.frequency_grid
+
+    @cached_property
+    def _padded_frequency_grid_in_angstroms(
+        self,
+    ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim//2+1} 2"]:
+        """Property for `padded_frequency_grid_in_pixels / pixel_size`"""
+        return _safe_multiply_by_constant(
+            self._padded_frequency_grid_in_pixels, 1 / self.pixel_size
+        )
+
+    @cached_property
+    def _padded_full_frequency_grid_in_pixels(
+        self,
+    ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim} 2"]:
+        """A spatial frequency coordinate system for the `padded_shape`,
+        without hermitian symmetry.
+        """
+        grid_helper = (
+            self.grid_helper
+            if self.shape == self.padded_shape
+            else self.pad_options["grid_helper"]
+        )
+        if grid_helper is None or grid_helper.full_frequency_grid is None:
+            return make_frequency_grid(shape=self.padded_shape, outputs_rfftfreqs=False)
+        else:
+            return grid_helper.full_frequency_grid
+
+    @cached_property
+    def _padded_full_frequency_grid_in_angstroms(
+        self,
+    ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim} 2"]:
+        """Property for `padded_full_frequency_grid_in_pixels / pixel_size`"""
+        return _safe_multiply_by_constant(
+            self._padded_full_frequency_grid_in_pixels, 1 / self.pixel_size
+        )
+
+    @property
+    def coordinate_grid_in_pixels(
+        self,
+    ) -> Float[Array, "{self.y_dim} {self.x_dim} 2"]:
+        warnings.warn(
+            _get_deprecation_msg(self, "coordinate_grid_in_pixels", "get_coordinates"),
+            category=FutureWarning,
+            stacklevel=2,
+        )
+        return self._coordinate_grid_in_pixels
+
+    @property
+    def coordinate_grid_in_angstroms(
+        self,
+    ) -> Float[Array, "{self.y_dim} {self.x_dim} 2"]:
+        warnings.warn(
+            _get_deprecation_msg(self, "coordinate_grid_in_angstroms", "get_coordinates"),
+            category=FutureWarning,
+            stacklevel=2,
+        )
+        return self._coordinate_grid_in_angstroms
+
+    @property
+    def frequency_grid_in_pixels(
+        self,
+    ) -> Float[Array, "{self.y_dim} {self.x_dim//2+1} 2"]:
+        warnings.warn(
+            _get_deprecation_msg(self, "frequency_grid_in_pixels", "g"),
+            category=FutureWarning,
+            stacklevel=2,
+        )
+        return self._frequency_grid_in_pixels
+
+    @property
+    def frequency_grid_in_angstroms(
+        self,
+    ) -> Float[Array, "{self.y_dim} {self.x_dim//2+1} 2"]:
+        warnings.warn(
+            _get_deprecation_msg(self, "frequency_grid_in_angstroms", "get_frequencies"),
+            category=FutureWarning,
+            stacklevel=2,
+        )
+        return self._frequency_grid_in_angstroms
+
+    @property
+    def full_frequency_grid_in_pixels(
+        self,
+    ) -> Float[Array, "{self.y_dim} {self.x_dim} 2"]:
+        warnings.warn(
+            _get_deprecation_msg(
+                self, "full_frequency_grid_in_pixels", "get_frequencies"
+            ),
+            category=FutureWarning,
+            stacklevel=2,
+        )
+        return self._full_frequency_grid_in_pixels
+
+    @property
+    def full_frequency_grid_in_angstroms(
+        self,
+    ) -> Float[Array, "{self.y_dim} {self.x_dim} 2"]:
+        warnings.warn(
+            _get_deprecation_msg(
+                self, "full_frequency_grid_in_angstroms", "get_frequencies"
+            ),
+            category=FutureWarning,
+            stacklevel=2,
+        )
+        return self._full_frequency_grid_in_angstroms
+
+    @property
+    def padded_coordinate_grid_in_pixels(
+        self,
+    ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim} 2"]:
+        warnings.warn(
+            _get_deprecation_msg(
+                self, "padded_coordinate_grid_in_pixels", "get_coordinates"
+            ),
+            category=FutureWarning,
+            stacklevel=2,
+        )
+        return self._padded_coordinate_grid_in_pixels
+
+    @property
+    def padded_coordinate_grid_in_angstroms(
+        self,
+    ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim} 2"]:
+        warnings.warn(
+            _get_deprecation_msg(self, "coordinate_grid_in_angstroms", "get_coordinates"),
+            category=FutureWarning,
+            stacklevel=2,
+        )
+        return self._padded_coordinate_grid_in_angstroms
+
+    @property
+    def padded_frequency_grid_in_pixels(
+        self,
+    ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim//2+1} 2"]:
+        warnings.warn(
+            _get_deprecation_msg(
+                self, "padded_frequency_grid_in_pixels", "get_frequencies"
+            ),
+            category=FutureWarning,
+            stacklevel=2,
+        )
+        return self._padded_frequency_grid_in_pixels
+
+    @property
+    def padded_frequency_grid_in_angstroms(
+        self,
+    ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim//2+1} 2"]:
+        warnings.warn(
+            _get_deprecation_msg(
+                self, "padded_frequency_grid_in_angstroms", "get_frequencies"
+            ),
+            category=FutureWarning,
+            stacklevel=2,
+        )
+        return self._padded_frequency_grid_in_angstroms
+
+    @property
+    def padded_full_frequency_grid_in_pixels(
+        self,
+    ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim} 2"]:
+        warnings.warn(
+            _get_deprecation_msg(
+                self, "padded_full_frequency_grid_in_pixels", "get_frequencies"
+            ),
+            category=FutureWarning,
+            stacklevel=2,
+        )
+        return self._padded_full_frequency_grid_in_pixels
+
+    @property
+    def padded_full_frequency_grid_in_angstroms(
+        self,
+    ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim} 2"]:
+        warnings.warn(
+            _get_deprecation_msg(
+                self, "padded_full_frequency_grid_in_angstroms", "get_frequencies"
+            ),
+            category=FutureWarning,
+            stacklevel=2,
+        )
+        return self._padded_full_frequency_grid_in_angstroms
 
 
 class BasicImageConfig(AbstractImageConfig, strict=True):

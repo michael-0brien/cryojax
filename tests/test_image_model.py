@@ -70,10 +70,9 @@ def test_fourier_shape(model, request):
     model = request.getfixturevalue(model)
     image = model.simulate(outputs_real_space=False)
     padded_image = model.raw_simulate(outputs_real_space=False)
-    assert image.shape == model.image_config.frequency_grid_in_pixels.shape[0:2]
+    assert image.shape == model.image_config.get_frequencies(padding=False).shape[0:2]
     assert (
-        padded_image.shape
-        == model.image_config.padded_frequency_grid_in_pixels.shape[0:2]
+        padded_image.shape == model.image_config.get_frequencies(padding=True).shape[0:2]
     )
 
 
@@ -215,7 +214,7 @@ def test_mask_zeros_edges(use_transform, voxel_info, basic_config):
     )
     image = image_model.simulate(
         mask=CircularCosineMask(
-            basic_config.coordinate_grid_in_pixels, radius=10, rolloff_width=0
+            basic_config.get_coordinates(physical=False), radius=10, rolloff_width=0
         )
     )
     ny, nx = image.shape
@@ -235,14 +234,14 @@ def test_filter_padded_shape(voxel_info, basic_config):
     )
     _ = image_model.simulate(
         filter=LowpassFilter(
-            basic_config.padded_frequency_grid_in_pixels,
+            basic_config.get_frequencies(padding=True, physical=False),
             grid_spacing=basic_config.pixel_size,
         )
     )
     with pytest.raises(ValueError):
         _ = image_model.simulate(
             filter=LowpassFilter(
-                basic_config.frequency_grid_in_pixels,
+                basic_config.get_frequencies(physical=False),
                 grid_spacing=basic_config.pixel_size,
             )
         )
