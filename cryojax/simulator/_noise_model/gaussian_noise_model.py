@@ -194,7 +194,7 @@ class GaussianWhiteNoiseModel(AbstractGaussianNoiseModel, strict=True):
         # pixels
         std = jnp.sqrt(n_pixels * self.variance)
         model = eqx.tree_at(
-            lambda x: (x.transform, x.normalizes_signal),
+            lambda x: (x.image_transform, x.normalizes_signal),
             self.image_model,
             (None, False),
             is_leaf=lambda x: x is None,
@@ -321,7 +321,7 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
         # pixels
         std = jnp.sqrt(n_pixels * self.variance_fn(frequency_grid))
         model = eqx.tree_at(
-            lambda x: (x.transform, x.normalizes_signal),
+            lambda x: (x.image_transform, x.normalizes_signal),
             self.image_model,
             (None, False),
             is_leaf=lambda x: x is None,

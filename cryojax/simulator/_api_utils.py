@@ -72,7 +72,7 @@ def make_image_model(
     volume_integrator: AbstractVolumeIntegrator = AutoVolumeProjection(),
     detector: AbstractDetector | None = None,
     *,
-    transform: AbstractImageTransform | None = None,
+    image_transform: AbstractImageTransform | None = None,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
     signal_centering: Literal["bg", "mean"] = "mean",
@@ -90,7 +90,7 @@ def make_image_model(  # pyright: ignore[reportOverlappingOverload]
     volume_integrator: AbstractVolumeIntegrator = AutoVolumeProjection(),
     detector: AbstractDetector | None = None,
     *,
-    transform: AbstractImageTransform | None = None,
+    image_transform: AbstractImageTransform | None = None,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
     signal_centering: Literal["bg", "mean"] = "mean",
@@ -108,7 +108,7 @@ def make_image_model(
     volume_integrator: AbstractVolumeIntegrator = AutoVolumeProjection(),
     detector: AbstractDetector | None = None,
     *,
-    transform: AbstractImageTransform | None = None,
+    image_transform: AbstractImageTransform | None = None,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
     signal_centering: Literal["bg", "mean"] = "mean",
@@ -126,7 +126,7 @@ def make_image_model(
     volume_integrator: AbstractVolumeIntegrator = AutoVolumeProjection(),
     detector: AbstractDetector | None = None,
     *,
-    transform: AbstractImageTransform | None = None,
+    image_transform: AbstractImageTransform | None = None,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
     signal_centering: Literal["bg", "mean"] = "mean",
@@ -144,7 +144,7 @@ def make_image_model(
     volume_integrator: AbstractVolumeIntegrator = AutoVolumeProjection(),
     detector: AbstractDetector | None = None,
     *,
-    transform: AbstractImageTransform | None = None,
+    image_transform: AbstractImageTransform | None = None,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
     signal_centering: Literal["bg", "mean"] = "mean",
@@ -161,7 +161,7 @@ def make_image_model(
     volume_integrator: AbstractVolumeIntegrator = AutoVolumeProjection(),
     detector: AbstractDetector | None = None,
     *,
-    transform: AbstractImageTransform | None = None,
+    image_transform: AbstractImageTransform | None = None,
     normalizes_signal: bool = False,
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
     signal_centering: Literal["bg", "mean"] = "mean",
@@ -215,7 +215,7 @@ def make_image_model(
         If `quantity_mode = 'counts'` is chosen, then an
         [`cryojax.simulator.AbstractDetector`][] class must be chosen to
         simulate electron counts.
-    - `transform`:
+    - `image_transform`:
         A [`cryojax.ndimage.AbstractImageTransform`][] applied to the
         the output of `image_model.simulate()` as a postprocessing step.
     - `normalizes_signal`:
@@ -304,7 +304,7 @@ def make_image_model(
         signal_centering=signal_centering,
         signal_region=signal_region,
         translate_mode=translate_mode,
-        transform=transform,
+        image_transform=image_transform,
     )
     if transfer_theory is None:
         # Image model for projections

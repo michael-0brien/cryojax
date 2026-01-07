@@ -194,7 +194,7 @@ def test_normalize_and_transform(std, signal_centering, voxel_info, basic_config
         voxel_volume,
         basic_config,
         pose=cxs.EulerAnglePose(),
-        transform=ScaleImage(scale=std),
+        image_transform=ScaleImage(scale=std),
         normalizes_signal=True,
         signal_centering="bg",
     )
@@ -210,7 +210,7 @@ def test_mask_zeros_edges(use_transform, voxel_info, basic_config):
         voxel_volume,
         basic_config,
         pose=cxs.EulerAnglePose(),
-        transform=(ScaleImage(scale=1.0) if use_transform else None),
+        image_transform=(ScaleImage(scale=1.0) if use_transform else None),
         normalizes_signal=True,
     )
     image = image_model.simulate(
