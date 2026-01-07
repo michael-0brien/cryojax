@@ -61,7 +61,7 @@ class AbstractImageModel(eqx.Module, strict=True):
     image_config: eqx.AbstractVar[AbstractImageConfig]
     pose: eqx.AbstractVar[AbstractPose]
 
-    transform: eqx.AbstractVar[AbstractImageTransform | None]
+    image_transform: eqx.AbstractVar[AbstractImageTransform | None]
 
     signal_region: eqx.AbstractVar[Bool[Array, "_ _"] | None]
     normalizes_signal: eqx.AbstractVar[bool]
@@ -210,19 +210,19 @@ class AbstractImageModel(eqx.Module, strict=True):
     def _compose_transform(
         self, mask: AbstractMask | None, filter: AbstractFilter | None
     ) -> tuple[AbstractImageTransform | None, AbstractImageTransform | None]:
-        if self.transform is None:
+        if self.image_transform is None:
             return mask, filter
         else:
-            if self.transform.is_real_space:
+            if self.image_transform.is_real_space:
                 if mask is None:
-                    return self.transform, filter
+                    return self.image_transform, filter
                 else:
-                    return mask * self.transform, filter
+                    return mask * self.image_transform, filter
             else:
                 if filter is None:
-                    return mask, self.transform
+                    return mask, self.image_transform
                 else:
-                    return mask, filter * self.transform
+                    return mask, filter * self.image_transform
 
     def _mean_subtract_normalize(self, image: Array) -> Array:
         mean, std = (
@@ -252,7 +252,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
     transfer_theory: ContrastTransferTheory
     image_config: AbstractImageConfig
 
-    transform: AbstractImageTransform | None
+    image_transform: AbstractImageTransform | None
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
     signal_centering: Literal["bg", "mean"]
@@ -266,7 +266,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
         transfer_theory: ContrastTransferTheory,
         volume_integrator: AbstractVolumeIntegrator = AutoVolumeProjection(),
         *,
-        transform: AbstractImageTransform | None = None,
+        image_transform: AbstractImageTransform | None = None,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
         signal_centering: Literal["bg", "mean"] = "mean",
@@ -283,7 +283,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
             and the wavelength.
         - `volume_integrator`: The method for integrating the volume onto the plane.
         - `transfer_theory`: The contrast transfer theory.
-        - `transform`:
+        - `image_transform`:
             A [`cryojax.ndimage.AbstractImageTransform`][] applied to the
             image after simulation.
         - `normalizes_signal`:
@@ -324,7 +324,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
         self.volume_integrator = volume_integrator
         self.transfer_theory = transfer_theory
         # Options
-        self.transform = transform
+        self.image_transform = image_transform
         self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
         self.signal_centering = signal_centering
@@ -383,7 +383,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
     volume_integrator: AbstractVolumeIntegrator
     image_config: AbstractImageConfig
 
-    transform: AbstractImageTransform | None
+    image_transform: AbstractImageTransform | None
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
     signal_centering: Literal["bg", "mean"]
@@ -396,7 +396,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
         image_config: AbstractImageConfig,
         volume_integrator: AbstractVolumeIntegrator = AutoVolumeProjection(),
         *,
-        transform: AbstractImageTransform | None = None,
+        image_transform: AbstractImageTransform | None = None,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
         signal_centering: Literal["bg", "mean"] = "mean",
@@ -412,7 +412,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
             The configuration of the instrument, such as for the pixel size
             and the wavelength.
         - `volume_integrator`: The method for integrating the volume onto the plane.
-        - `transform`:
+        - `image_transform`:
             A [`cryojax.ndimage.AbstractImageTransform`][] applied to the
             image after simulation.
         - `normalizes_signal`:
@@ -452,7 +452,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
         self.image_config = image_config
         self.volume_integrator = volume_integrator
         # Options
-        self.transform = transform
+        self.image_transform = image_transform
         self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
         self.signal_centering = signal_centering
@@ -514,7 +514,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
     image_config: AbstractImageConfig
     scattering_theory: AbstractScatteringTheory
 
-    transform: AbstractImageTransform | None
+    image_transform: AbstractImageTransform | None
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
     signal_centering: Literal["bg", "mean"]
@@ -527,7 +527,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
         image_config: AbstractImageConfig,
         scattering_theory: AbstractScatteringTheory,
         *,
-        transform: AbstractImageTransform | None = None,
+        image_transform: AbstractImageTransform | None = None,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
         signal_centering: Literal["bg", "mean"] = "mean",
@@ -537,7 +537,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
         self.pose = pose
         self.image_config = image_config
         self.scattering_theory = scattering_theory
-        self.transform = transform
+        self.image_transform = image_transform
         self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
         self.signal_centering = signal_centering
@@ -595,7 +595,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
     image_config: AbstractImageConfig
     scattering_theory: AbstractScatteringTheory
 
-    transform: AbstractImageTransform | None
+    image_transform: AbstractImageTransform | None
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
     signal_centering: Literal["bg", "mean"]
@@ -608,7 +608,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
         image_config: AbstractImageConfig,
         scattering_theory: AbstractScatteringTheory,
         *,
-        transform: AbstractImageTransform | None = None,
+        image_transform: AbstractImageTransform | None = None,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
         signal_centering: Literal["bg", "mean"] = "mean",
@@ -618,7 +618,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
         self.pose = pose
         self.image_config = image_config
         self.scattering_theory = scattering_theory
-        self.transform = transform
+        self.image_transform = image_transform
         self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
         self.signal_centering = signal_centering
@@ -676,7 +676,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
     scattering_theory: AbstractScatteringTheory
     detector: AbstractDetector
 
-    transform: AbstractImageTransform | None
+    image_transform: AbstractImageTransform | None
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
     signal_centering: Literal["bg", "mean"]
@@ -690,7 +690,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
         scattering_theory: AbstractScatteringTheory,
         detector: AbstractDetector,
         *,
-        transform: AbstractImageTransform | None = None,
+        image_transform: AbstractImageTransform | None = None,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
         signal_centering: Literal["bg", "mean"] = "mean",
@@ -701,7 +701,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
         self.image_config = image_config
         self.scattering_theory = scattering_theory
         self.detector = detector
-        self.transform = transform
+        self.image_transform = image_transform
         self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
         self.signal_centering = signal_centering
@@ -790,7 +790,7 @@ _init_doc = """**Arguments:**
     and the wavelength.
 - `scattering_theory`:
     The scattering theory.
-- `transform`:
+- `image_transform`:
     A [`cryojax.ndimage.AbstractImageTransform`][] applied to the
     image after simulation.
 - `normalizes_signal`:
