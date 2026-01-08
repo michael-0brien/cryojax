@@ -1,5 +1,5 @@
 from ._lie_group import (
-    SE3 as SE3,
+    SO2 as SO2,
     SO3 as SO3,
     AbstractMatrixLieGroup as AbstractMatrixLieGroup,
 )
