@@ -416,7 +416,7 @@ class SO2(AbstractMatrixLieGroup, strict=True):
 
     @override
     def apply(self, target: Float[Array, "2"]) -> Float[Array, "2"]:
-        return self.as_matrix @ target
+        return self.as_matrix() @ target
 
     @override
     def compose(self, other: Self) -> Self:
