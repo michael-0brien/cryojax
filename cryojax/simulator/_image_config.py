@@ -625,7 +625,7 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
     electron_dose: Float[Array, ""]
 
     pad_options: PadOptions
-    grid_options: GridOptions
+    precomputed_grids: PrecomputedGrids | None
 
     def __init__(
         self,
