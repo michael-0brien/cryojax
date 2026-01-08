@@ -147,7 +147,7 @@ class WaveTransferTheory(AbstractTransferTheory, strict=True):
         defocus_offset: FloatLike | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]:
         """Apply the wave transfer function to the wavefunction in the exit plane."""
-        frequency_grid = image_config.padded_full_frequency_grid_in_angstroms
+        frequency_grid = image_config.get_frequency_grid(padding=True, full=True)
         # Compute the wave transfer function
         ctf_array = self.ctf(
             frequency_grid,
