@@ -8,7 +8,6 @@ The `AbstractImageConfig` is an object at the core of simulating images in `cryo
                 - shape
                 - pixel_size
                 - voltage_in_kilovolts
-                - grid_helper
                 - pad_options
 
 ---
@@ -55,8 +54,3 @@ The `AbstractImageConfig` is an object at the core of simulating images in `cryo
                 - padded_n_pixels
                 - padded_y_dim
                 - padded_x_dim
-
-::: cryojax.simulator.GridHelper
-        options:
-            members:
-                - __init__

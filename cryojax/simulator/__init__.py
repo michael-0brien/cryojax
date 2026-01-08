@@ -18,7 +18,6 @@ from ._image_config import (
     AbstractImageConfig as AbstractImageConfig,
     BasicImageConfig as BasicImageConfig,
     DoseImageConfig as DoseImageConfig,
-    GridHelper as GridHelper,
 )
 from ._image_model import (
     AbstractImageModel as AbstractImageModel,

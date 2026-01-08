@@ -25,39 +25,125 @@ _get_deprecation_msg = lambda self, prop, func: (
 )
 
 
-class GridHelper(eqx.Module, strict=True):
-    coordinate_grid: Float[Array, "y_dim x_dim 2"]
-    frequency_grid: Float[Array, "y_dim x_dim//2+1 2"]
-    full_frequency_grid: Float[Array, "y_dim x_dim 2"] | None
+# Not currently public API
+class PrecomputedGrids(eqx.Module, strict=True):
+    only_rfft: bool
 
-    def __init__(self, shape: tuple[int, int], only_rfft: bool = True):
-        self.coordinate_grid = make_coordinate_grid(shape)
-        self.frequency_grid = make_frequency_grid(shape, outputs_rfftfreqs=True)
+    _coordinate_grid: Float[Array, "_ _ 2"]
+    _frequency_grid: Float[Array, "_ _ 2"]
+    _full_frequency_grid: Float[Array, "_ _ 2"] | None
+
+    _padded_coordinate_grid: Float[Array, "_ _ 2"] | None
+    _padded_frequency_grid: Float[Array, "_ _ 2"] | None
+    _padded_full_frequency_grid: Float[Array, "_ _ 2"] | None
+
+    def __init__(
+        self,
+        shape: tuple[int, int],
+        padded_shape: tuple[int, int] | None = None,
+        only_rfft: bool = True,
+    ):
+        self._coordinate_grid = make_coordinate_grid(shape)
+        self._frequency_grid = make_frequency_grid(shape, outputs_rfftfreqs=True)
         if only_rfft:
-            self.full_frequency_grid = None
+            self._full_frequency_grid = None
         else:
-            self.full_frequency_grid = make_frequency_grid(shape, outputs_rfftfreqs=False)
+            self._full_frequency_grid = make_frequency_grid(
+                shape, outputs_rfftfreqs=False
+            )
+        if padded_shape is None or padded_shape == shape:
+            self._padded_coordinate_grid = None
+            self._padded_frequency_grid = None
+            self._padded_full_frequency_grid = None
+        else:
+            self._padded_coordinate_grid = make_coordinate_grid(padded_shape)
+            self._padded_frequency_grid = make_frequency_grid(
+                padded_shape, outputs_rfftfreqs=True
+            )
+            if only_rfft:
+                self._padded_full_frequency_grid = None
+            else:
+                self._padded_full_frequency_grid = make_frequency_grid(
+                    padded_shape, outputs_rfftfreqs=False
+                )
+        self.only_rfft = only_rfft
+
+    def get(
+        self, *, real_space: bool, full: bool = False, padding: bool = False
+    ) -> Array:
+        if padding:
+            if real_space:
+                return (
+                    self._coordinate_grid
+                    if self._padded_coordinate_grid is None
+                    else self._padded_coordinate_grid
+                )
+            else:
+                if full:
+                    _full_frequency_grid = (
+                        self._full_frequency_grid
+                        if self._padded_full_frequency_grid is None
+                        else self._padded_full_frequency_grid
+                    )
+                    if _full_frequency_grid is None:
+                        raise Exception(
+                            "Internal cryoJAX error when fetching "
+                            "precomputed grids in the `image_config`. "
+                            "Please report this issue."
+                        )
+                    return _full_frequency_grid
+                else:
+                    return (
+                        self._frequency_grid
+                        if self._padded_frequency_grid is None
+                        else self._padded_frequency_grid
+                    )
+        else:
+            if real_space:
+                return self._coordinate_grid
+            else:
+                if full:
+                    assert self._full_frequency_grid is not None
+                    return self._full_frequency_grid
+                else:
+                    return self._frequency_grid
 
 
 class PadOptions(TypedDict):
     shape: tuple[int, int]
-    grid_helper: GridHelper | None
+
+
+class GridOptions(TypedDict):
+    precompute: bool
+    only_rfft: bool
 
 
 class AbstractImageConfig(eqx.Module, strict=True):
-    """Configuration and utilities for an electron microscopy image."""
+    """Configuration and utilities for an electron microscopy image.
+
+    Custom implementations of this class are not yet supported, but could be
+    in the future.
+    """
 
     shape: eqx.AbstractVar[tuple[int, int]]
     pixel_size: eqx.AbstractVar[Float[Array, ""]]
     voltage_in_kilovolts: eqx.AbstractVar[Float[Array, ""]]
 
-    grid_helper: eqx.AbstractVar[GridHelper | None]
-    pad_options: eqx.AbstractVar[PadOptions]
+    pad_options: eqx.AbstractVar[dict[str, Any]]
+    precomputed_grids: eqx.AbstractVar[PrecomputedGrids | None]
 
     def __check_init__(self):
+        cls = self.__class__.__name__
         if self.padded_shape[0] < self.shape[0] or self.padded_shape[1] < self.shape[1]:
             raise AttributeError(
-                "`padded_shape` is less than `shape` in one or more dimensions."
+                f"`{cls}.padded_shape` is less than `{cls}.shape` in one or "
+                " more dimensions."
+            )
+        if set(self.pad_options.keys()) != {"shape"}:
+            raise AttributeError(
+                f"Found that `{cls}.pad_options` was not a dictionary with "
+                "key 'shape'. "
+                f"Instead, had keys {set(self.grid_options.keys())}."
             )
 
     @property
@@ -196,10 +282,10 @@ class AbstractImageConfig(eqx.Module, strict=True):
         self,
     ) -> Float[Array, "{self.y_dim} {self.x_dim} 2"]:
         """A spatial coordinate system for the `shape`."""
-        if self.grid_helper is None:
+        if self.precomputed_grids is None:
             return make_coordinate_grid(self.shape)
         else:
-            return self.grid_helper.coordinate_grid
+            return self.precomputed_grids.get(real_space=True)
 
     @cached_property
     def _coordinate_grid_in_angstroms(
@@ -217,10 +303,10 @@ class AbstractImageConfig(eqx.Module, strict=True):
         """A spatial frequency coordinate system for the `shape`,
         with hermitian symmetry.
         """
-        if self.grid_helper is None:
+        if self.precomputed_grids is None:
             return make_frequency_grid(self.shape, outputs_rfftfreqs=True)
         else:
-            return self.grid_helper.frequency_grid
+            return self.precomputed_grids.get(real_space=False)
 
     @cached_property
     def _frequency_grid_in_angstroms(
@@ -238,10 +324,10 @@ class AbstractImageConfig(eqx.Module, strict=True):
         """A spatial frequency coordinate system for the `shape`,
         without hermitian symmetry.
         """
-        if self.grid_helper is None or self.grid_helper.full_frequency_grid is None:
+        if self.precomputed_grids is None or self.precomputed_grids.only_rfft:
             return make_frequency_grid(shape=self.shape, outputs_rfftfreqs=False)
         else:
-            return self.grid_helper.full_frequency_grid
+            return self.precomputed_grids.get(real_space=False, full=True)
 
     @cached_property
     def _full_frequency_grid_in_angstroms(
@@ -249,7 +335,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
     ) -> Float[Array, "{self.y_dim} {self.x_dim} 2"]:
         """Property for `full_frequency_grid_in_pixels / pixel_size`"""
         return _safe_multiply_by_constant(
-            self.full_frequency_grid_in_pixels, 1 / self.pixel_size
+            self._full_frequency_grid_in_pixels, 1 / self.pixel_size
         )
 
     @cached_property
@@ -257,15 +343,10 @@ class AbstractImageConfig(eqx.Module, strict=True):
         self,
     ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim} 2"]:
         """A spatial coordinate system for the `padded_shape`."""
-        grid_helper = (
-            self.grid_helper
-            if self.shape == self.padded_shape
-            else self.pad_options["grid_helper"]
-        )
-        if grid_helper is None:
+        if self.precomputed_grids is None:
             return make_coordinate_grid(shape=self.padded_shape)
         else:
-            return grid_helper.coordinate_grid
+            return self.precomputed_grids.get(real_space=True, padding=True)
 
     @cached_property
     def _padded_coordinate_grid_in_angstroms(
@@ -283,15 +364,10 @@ class AbstractImageConfig(eqx.Module, strict=True):
         """A spatial frequency coordinate system for the `padded_shape`,
         with hermitian symmetry.
         """
-        grid_helper = (
-            self.grid_helper
-            if self.shape == self.padded_shape
-            else self.pad_options["grid_helper"]
-        )
-        if grid_helper is None:
+        if self.precomputed_grids is None:
             return make_frequency_grid(shape=self.padded_shape, outputs_rfftfreqs=True)
         else:
-            return grid_helper.frequency_grid
+            return self.precomputed_grids.get(real_space=False, padding=True)
 
     @cached_property
     def _padded_frequency_grid_in_angstroms(
@@ -309,15 +385,10 @@ class AbstractImageConfig(eqx.Module, strict=True):
         """A spatial frequency coordinate system for the `padded_shape`,
         without hermitian symmetry.
         """
-        grid_helper = (
-            self.grid_helper
-            if self.shape == self.padded_shape
-            else self.pad_options["grid_helper"]
-        )
-        if grid_helper is None or grid_helper.full_frequency_grid is None:
+        if self.precomputed_grids is None or self.precomputed_grids.only_rfft:
             return make_frequency_grid(shape=self.padded_shape, outputs_rfftfreqs=False)
         else:
-            return grid_helper.full_frequency_grid
+            return self.precomputed_grids.get(real_space=False, full=True, padding=True)
 
     @cached_property
     def _padded_full_frequency_grid_in_angstroms(
@@ -484,8 +555,8 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
     pixel_size: Float[Array, ""]
     voltage_in_kilovolts: Float[Array, ""]
 
-    grid_helper: GridHelper | None
     pad_options: PadOptions
+    precomputed_grids: PrecomputedGrids | None
 
     def __init__(
         self,
@@ -493,8 +564,8 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
         pixel_size: FloatLike,
         voltage_in_kilovolts: FloatLike,
         *,
-        grid_helper: GridHelper | None = None,
         pad_options: dict[str, Any] = {},
+        grid_options: dict[str, Any] = {},
     ):
         """**Arguments:**
 
@@ -504,19 +575,26 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
             The pixel size of the image in angstroms.
         - `voltage_in_kilovolts`:
             The incident energy of the electron beam.
-        - `grid_helper`:
-            The `GridHelper` object, which stores the coordinate grids
-            for image shape `shape`.
-            If not passed, grid are computed at run-time.
         - `pad_options`:
             Options that control image padding.
-            - `shape`:
+            - 'shape':
                 The shape of the image after padding. By default, equal
                 to `shape`.
-            - `grid_helper`:
-                The `GridHelper` object, which stores coordinate grids
-                for the padded shape. If not passed, grid are computed
-                at run-time. By default, equal to `None`.
+        - `grid_options`:
+            A dictionary with keys for optimizing performance related to
+            coordinate and frequency grid generation.
+            - 'precompute':
+                If `True`, precompute grids when `BasicImageConfig` is
+                instantiated. If this option is chosen, then
+                `BasicImageConfig.shape` or `BasicImageConfig.padded_shape`
+                cannot be mutated with `equinox.tree_at`, nor can the
+                'precompute' key itself after instantiation.
+                By default, `False`.
+            - 'only_rfft':
+                If `True`, do not precompute the full grid of frequencies
+                in the Fourier domain. Relevant for use with Ewald sphere
+                extraction and does nothing if `precompute = False`.
+                By default, `False`.
         """
         # Set parameters
         self.pixel_size = error_if_not_positive(jnp.asarray(pixel_size, dtype=float))
@@ -527,8 +605,14 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
         self.shape = shape
         # Set pad options
         self.pad_options = _dict_to_pad_options(pad_options, shape)
-        # Finally, grid helper
-        self.grid_helper = grid_helper
+        # Finally, grid options
+        temp = _dict_to_grid_options(grid_options)
+        if temp["precompute"]:
+            self.precomputed_grids = PrecomputedGrids(
+                self.shape, self.padded_shape, temp["only_rfft"]
+            )
+        else:
+            self.precomputed_grids = None
 
 
 class DoseImageConfig(AbstractImageConfig, strict=True):
@@ -540,8 +624,8 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
     voltage_in_kilovolts: Float[Array, ""]
     electron_dose: Float[Array, ""]
 
-    grid_helper: GridHelper | None
     pad_options: PadOptions
+    precomputed_grids: PrecomputedGrids | None
 
     def __init__(
         self,
@@ -550,8 +634,8 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
         voltage_in_kilovolts: FloatLike,
         electron_dose: FloatLike,
         *,
-        grid_helper: GridHelper | None = None,
         pad_options: dict[str, Any] = {},
+        grid_options: dict[str, Any] = {},
     ):
         """**Arguments:**
 
@@ -564,19 +648,24 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
         - `electron_dose`:
             The integrated dose rate of the electron beam in
             $e^-/A^2$
-        - `grid_helper`:
-            The `GridHelper` object, which stores the coordinate grids
-            for image shape `shape`.
-            If not passed, grid are computed at run-time.
         - `pad_options`:
             Options that control image padding.
             - `shape`:
                 The shape of the image after padding. By default, equal
                 to `shape`.
-            - `grid_helper`:
-                The `GridHelper` object, which stores coordinate grids
-                for the padded shape. If not passed, grid are computed
-                at run-time. By default, equal to `None`.
+        - `grid_options`:
+            A dictionary with keys for optimizing performance related to
+            coordinate and frequency grid generation.
+            - 'precompute':
+                If `True`, precompute grids when `BasicImageConfig` is
+                instantiated. If this option is chosen, then
+                `BasicImageConfig.shape` or `BasicImageConfig.padded_shape`
+                cannot be mutated with `equinox.tree_at`, nor can the
+                'precompute' key itself after instantiation.
+            - 'only_rfft':
+                If `True`, do not precompute the full grid of frequencies
+                in the Fourier domain. Relevant for use with Ewald sphere
+                extraction and does nothing if `precompute = False`.
         """
         # Set parameters
         self.pixel_size = error_if_not_positive(jnp.asarray(pixel_size, dtype=float))
@@ -588,8 +677,14 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
         self.shape = shape
         # Set pad options
         self.pad_options = _dict_to_pad_options(pad_options, shape)
-        # Finally, grid helper
-        self.grid_helper = grid_helper
+        # Finally, grid precompute
+        temp = _dict_to_grid_options(grid_options)
+        if temp["precompute"]:
+            self.precomputed_grids = PrecomputedGrids(
+                self.shape, self.padded_shape, temp["only_rfft"]
+            )
+        else:
+            self.precomputed_grids = None
 
 
 def _safe_multiply_by_constant(
@@ -603,6 +698,12 @@ def _safe_multiply_by_constant(
 
 def _dict_to_pad_options(d: dict[str, Any], default_shape: tuple[int, int]) -> PadOptions:
     shape = d["shape"] if "shape" in d else default_shape
-    grid_helper = d["grid_helper"] if "grid_helper" in d else None
 
-    return PadOptions(shape=shape, grid_helper=grid_helper)
+    return PadOptions(shape=shape)
+
+
+def _dict_to_grid_options(d: dict[str, Any]) -> GridOptions:
+    precompute = d["precompute"] if "precompute" in d else False
+    only_rfft = d["only_rfft"] if "only_rfft" in d else False
+
+    return GridOptions(precompute=precompute, only_rfft=only_rfft)
