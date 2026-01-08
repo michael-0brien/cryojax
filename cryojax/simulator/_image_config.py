@@ -155,7 +155,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
             raise AttributeError(
                 f"Found that `{cls}.pad_options` was not a dictionary with "
                 "key 'shape'. "
-                f"Instead, had keys {set(self.grid_options.keys())}."
+                f"Instead, had keys {set(self.pad_options.keys())}."
             )
 
     @property
@@ -197,21 +197,20 @@ class AbstractImageConfig(eqx.Module, strict=True):
 
         def _get_grid_impl(_self):
             if padding:
-                if physical:
-                    return _self._padded_coordinate_grid_in_angstroms
-                else:
-                    return _self._padded_coordinate_grid_in_pixels
+                return _self._padded_coordinate_grid
             else:
-                if physical:
-                    return _self._coordinate_grid_in_angstroms
-                else:
-                    return _self._coordinate_grid_in_pixels
+                return _self._coordinate_grid
 
         if self.precompute_mode == "compile_time_eval":
             with jax.ensure_compile_time_eval():
-                return _get_grid_impl(self)
+                coordinate_grid = _get_grid_impl(self)
         else:
-            return _get_grid_impl(self)
+            coordinate_grid = _get_grid_impl(self)
+
+        if physical:
+            coordinate_grid = _safe_multiply_by_constant(coordinate_grid, self.pixel_size)
+
+        return coordinate_grid
 
     def get_frequency_grid(
         self, *, padding: bool = False, physical: bool = True, full: bool = False
@@ -243,33 +242,28 @@ class AbstractImageConfig(eqx.Module, strict=True):
 
         def _get_grid_impl(_self):
             if padding:
-                if physical:
-                    if full:
-                        return _self._padded_full_frequency_grid_in_angstroms
-                    else:
-                        return _self._padded_frequency_grid_in_angstroms
+                if full:
+                    return _self._padded_full_frequency_grid
                 else:
-                    if full:
-                        return _self._padded_full_frequency_grid_in_pixels
-                    else:
-                        return _self._padded_frequency_grid_in_pixels
+                    return _self._padded_frequency_grid
             else:
-                if physical:
-                    if full:
-                        return _self._full_frequency_grid_in_angstroms
-                    else:
-                        return _self._frequency_grid_in_angstroms
+                if full:
+                    return _self._full_frequency_grid
                 else:
-                    if full:
-                        return _self._full_frequency_grid_in_pixels
-                    else:
-                        return _self._frequency_grid_in_pixels
+                    return _self._frequency_grid
 
         if self.precompute_mode == "compile_time_eval":
             with jax.ensure_compile_time_eval():
-                return _get_grid_impl(self)
+                frequency_grid = _get_grid_impl(self)
         else:
-            return _get_grid_impl(self)
+            frequency_grid = _get_grid_impl(self)
+
+        if physical:
+            frequency_grid = _safe_multiply_by_constant(
+                frequency_grid, 1 / self.pixel_size
+            )
+
+        return frequency_grid
 
     @property
     def padded_shape(self):
@@ -306,7 +300,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
         return math.prod(self.padded_shape)
 
     @cached_property
-    def _coordinate_grid_in_pixels(
+    def _coordinate_grid(
         self,
     ) -> Float[Array, "{self.y_dim} {self.x_dim} 2"]:
         """A spatial coordinate system for the `shape`."""
@@ -316,16 +310,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
             return self.precomputed_grids.get(real_space=True)
 
     @cached_property
-    def _coordinate_grid_in_angstroms(
-        self,
-    ) -> Float[Array, "{self.y_dim} {self.x_dim} 2"]:
-        """Property for `pixel_size * coordinate_grid_in_pixels`"""
-        return _safe_multiply_by_constant(
-            self._coordinate_grid_in_pixels, self.pixel_size
-        )
-
-    @cached_property
-    def _frequency_grid_in_pixels(
+    def _frequency_grid(
         self,
     ) -> Float[Array, "{self.y_dim} {self.x_dim//2+1} 2"]:
         """A spatial frequency coordinate system for the `shape`,
@@ -337,16 +322,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
             return self.precomputed_grids.get(real_space=False)
 
     @cached_property
-    def _frequency_grid_in_angstroms(
-        self,
-    ) -> Float[Array, "{self.y_dim} {self.x_dim//2+1} 2"]:
-        """Convenience property for `frequency_grid_in_pixels / pixel_size`"""
-        return _safe_multiply_by_constant(
-            self._frequency_grid_in_pixels, 1 / self.pixel_size
-        )
-
-    @cached_property
-    def _full_frequency_grid_in_pixels(
+    def _full_frequency_grid(
         self,
     ) -> Float[Array, "{self.y_dim} {self.x_dim} 2"]:
         """A spatial frequency coordinate system for the `shape`,
@@ -358,16 +334,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
             return self.precomputed_grids.get(real_space=False, full=True)
 
     @cached_property
-    def _full_frequency_grid_in_angstroms(
-        self,
-    ) -> Float[Array, "{self.y_dim} {self.x_dim} 2"]:
-        """Property for `full_frequency_grid_in_pixels / pixel_size`"""
-        return _safe_multiply_by_constant(
-            self._full_frequency_grid_in_pixels, 1 / self.pixel_size
-        )
-
-    @cached_property
-    def _padded_coordinate_grid_in_pixels(
+    def _padded_coordinate_grid(
         self,
     ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim} 2"]:
         """A spatial coordinate system for the `padded_shape`."""
@@ -377,16 +344,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
             return self.precomputed_grids.get(real_space=True, padding=True)
 
     @cached_property
-    def _padded_coordinate_grid_in_angstroms(
-        self,
-    ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim} 2"]:
-        """Property for `pixel_size * padded_coordinate_grid_in_pixels`"""
-        return _safe_multiply_by_constant(
-            self._padded_coordinate_grid_in_pixels, self.pixel_size
-        )
-
-    @cached_property
-    def _padded_frequency_grid_in_pixels(
+    def _padded_frequency_grid(
         self,
     ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim//2+1} 2"]:
         """A spatial frequency coordinate system for the `padded_shape`,
@@ -398,16 +356,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
             return self.precomputed_grids.get(real_space=False, padding=True)
 
     @cached_property
-    def _padded_frequency_grid_in_angstroms(
-        self,
-    ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim//2+1} 2"]:
-        """Property for `padded_frequency_grid_in_pixels / pixel_size`"""
-        return _safe_multiply_by_constant(
-            self._padded_frequency_grid_in_pixels, 1 / self.pixel_size
-        )
-
-    @cached_property
-    def _padded_full_frequency_grid_in_pixels(
+    def _padded_full_frequency_grid(
         self,
     ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim} 2"]:
         """A spatial frequency coordinate system for the `padded_shape`,
@@ -417,15 +366,6 @@ class AbstractImageConfig(eqx.Module, strict=True):
             return make_frequency_grid(shape=self.padded_shape, outputs_rfftfreqs=False)
         else:
             return self.precomputed_grids.get(real_space=False, full=True, padding=True)
-
-    @cached_property
-    def _padded_full_frequency_grid_in_angstroms(
-        self,
-    ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim} 2"]:
-        """Property for `padded_full_frequency_grid_in_pixels / pixel_size`"""
-        return _safe_multiply_by_constant(
-            self._padded_full_frequency_grid_in_pixels, 1 / self.pixel_size
-        )
 
     @property
     def coordinate_grid_in_pixels(
@@ -438,7 +378,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
             category=FutureWarning,
             stacklevel=2,
         )
-        return self._coordinate_grid_in_pixels
+        return self._coordinate_grid
 
     @property
     def coordinate_grid_in_angstroms(
@@ -451,18 +391,18 @@ class AbstractImageConfig(eqx.Module, strict=True):
             category=FutureWarning,
             stacklevel=2,
         )
-        return self._coordinate_grid_in_angstroms
+        return self.get_coordinate_grid()
 
     @property
     def frequency_grid_in_pixels(
         self,
     ) -> Float[Array, "{self.y_dim} {self.x_dim//2+1} 2"]:
         warnings.warn(
-            _get_deprecation_msg(self, "frequency_grid_in_pixels", "g"),
+            _get_deprecation_msg(self, "frequency_grid_in_pixels", "get_frequency_grid"),
             category=FutureWarning,
             stacklevel=2,
         )
-        return self._frequency_grid_in_pixels
+        return self._frequency_grid
 
     @property
     def frequency_grid_in_angstroms(
@@ -475,7 +415,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
             category=FutureWarning,
             stacklevel=2,
         )
-        return self._frequency_grid_in_angstroms
+        return self.get_frequency_grid()
 
     @property
     def full_frequency_grid_in_pixels(
@@ -488,7 +428,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
             category=FutureWarning,
             stacklevel=2,
         )
-        return self._full_frequency_grid_in_pixels
+        return self._full_frequency_grid
 
     @property
     def full_frequency_grid_in_angstroms(
@@ -501,7 +441,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
             category=FutureWarning,
             stacklevel=2,
         )
-        return self._full_frequency_grid_in_angstroms
+        return self.get_frequency_grid(full=True)
 
     @property
     def padded_coordinate_grid_in_pixels(
@@ -514,7 +454,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
             category=FutureWarning,
             stacklevel=2,
         )
-        return self._padded_coordinate_grid_in_pixels
+        return self._padded_coordinate_grid
 
     @property
     def padded_coordinate_grid_in_angstroms(
@@ -527,7 +467,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
             category=FutureWarning,
             stacklevel=2,
         )
-        return self._padded_coordinate_grid_in_angstroms
+        return self.get_coordinate_grid(padding=True)
 
     @property
     def padded_frequency_grid_in_pixels(
@@ -540,7 +480,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
             category=FutureWarning,
             stacklevel=2,
         )
-        return self._padded_frequency_grid_in_pixels
+        return self._padded_frequency_grid
 
     @property
     def padded_frequency_grid_in_angstroms(
@@ -553,7 +493,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
             category=FutureWarning,
             stacklevel=2,
         )
-        return self._padded_frequency_grid_in_angstroms
+        return self.get_frequency_grid(padding=True)
 
     @property
     def padded_full_frequency_grid_in_pixels(
@@ -566,7 +506,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
             category=FutureWarning,
             stacklevel=2,
         )
-        return self._padded_full_frequency_grid_in_pixels
+        return self._padded_full_frequency_grid
 
     @property
     def padded_full_frequency_grid_in_angstroms(
@@ -579,7 +519,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
             category=FutureWarning,
             stacklevel=2,
         )
-        return self._padded_full_frequency_grid_in_angstroms
+        return self.get_frequency_grid(full=True, padding=True)
 
 
 class BasicImageConfig(AbstractImageConfig, strict=True):
