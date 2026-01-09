@@ -187,11 +187,10 @@ def _rotate_fourier_image(
 
     rotated_grid = frequency_grid @ rotation_matrix
     N = rotated_grid.shape[1]
-    logical_frequency_coordinates = (rotated_grid * N) + N // 2
+    logical_frequency_coordinates = rotated_grid * N
     k_y, k_x = jnp.transpose(logical_frequency_coordinates, axes=[2, 0, 1])
 
-    image_fft = jnp.fft.fftshift(fourier_image)
     rotated_image = map_coordinates(
-        image_fft, (k_x, k_y), order=order, mode=mode, cval=cval
+        fourier_image, (k_x, k_y), order=order, mode=mode, cval=cval
     )
     return rotated_image
