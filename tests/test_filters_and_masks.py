@@ -133,8 +133,8 @@ def test_rotation_op(basic_config, voxel_volume):
         pose=pose_ref,
     )
 
-    rotation_op = im.RotateFourierImage(
-        angle_degrees=38.0,
+    rotation_op = im.RotateFFT(
+        rotation_angle=38.0,
         frequency_grid=basic_config.full_frequency_grid_in_pixels,
         is_rfft=False,
     )
@@ -172,7 +172,7 @@ def test_translation_op(basic_config, voxel_volume, use_rfft):
     else:
         grid = basic_config.full_frequency_grid_in_angstroms
 
-    translation_op = im.PhaseShiftFourierImage(
+    translation_op = im.PhaseShiftFFT(
         offset=jnp.array([50.0, -30.0]),
         frequency_grid=grid,
         is_rfft=use_rfft,

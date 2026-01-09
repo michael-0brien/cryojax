@@ -4,67 +4,59 @@ from typing_extensions import override
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
+from ...jax_util import FloatLike, NDArrayLike
 from .. import enforce_rfftn_self_conjugates
 from .._map_coordinates import map_coordinates
 from ._base_transform import AbstractImageTransform
 
 
-class PhaseShiftFourierImage(AbstractImageTransform, strict=True):
-    """Apply a phase shift to an image in Fourier space.
+class PhaseShiftFFT(AbstractImageTransform, strict=True):
+    """Apply a phase shift to an image in Fourier space, effectively
+    applying an in-plane shift to the image in real space.
 
-    This class implements a phase shift of an image in Fourier space.
-    The shift is specified in pixels or angstroms along each axis.
+    **Example:**
+    ```python
 
-    Attributes:
-        translation_operator: The precomputed translation operator.
-        is_rfft: Whether the input image is in RFFT format.
+    from cryojax.ndimage import PhaseShiftFFT, fftn, ifftn
+
+    offset_in_angstrom = jnp.array([50.0, -30.0])
+    frequency_grid = ... # in angstroms
+    image = ... # e.g., a real 2D image
+
+    shift_op = PhaseShiftFFT(
+        offset=offset_in_angstrom,
+        frequency_grid=frequency_grid,
+        is_rfft=True, # set to True if using rfft format
+    )
+
+    shifted_image_fft = shift_op(fftn(image))
+    shifted_image = ifftn(shifted_image_fft).real
+    ```
     """
 
     translation_operator: Complex[Array, "y_dim x_dim"]
     is_rfft: bool
-    shape: tuple[int, int]
     is_real_space: ClassVar[bool] = False
 
     def __init__(
         self,
-        offset: Float[Array, "2"],
-        frequency_grid: Float[Array, "y_dim x_dim 2"],
+        offset: Float[NDArrayLike, "2"],
+        frequency_grid: Float[NDArrayLike, "y_dim x_dim 2"],
         is_rfft: bool,
     ):
         """
         **Arguments:**
 
-            - `offset`: The offset by which to shift the image, in pixels or angstroms.
-            - `frequency_grid`: The frequency grid in pixels or angstroms.
-            - `is_rfft`: Whether the frequency grid is in full or rfft format.
-                Right now only full format is supported for image rotation.
-
-        **Example:**
-            ```python
-
-            from cryojax.ndimage import PhaseShiftFourierImage, fftn, ifftn
-
-            frequency_grid = ... # in angstroms
-            image = ... # e.g., a real 2D image
-
-            shift_op = PhaseShiftFourierImage(
-                offset=jnp.array([50.0, -30.0]),
-                frequency_grid=frequency_grid,
-            )
-
-            shifted_image_fft = shift_op(fftn(image))
-            shifted_image = ifftn(shifted_image_fft).real
-            ```
-
+        - `offset`: The offset by which to shift the image, in pixels or angstroms.
+        - `frequency_grid`: The frequency grid in pixels or angstroms.
+        - `is_rfft`: If `True`, the frequency grid is in `jnp.fft.rfftfreq` format.
+            Otherwise, it is in `jnp.fft.fftfreq` format.
         """
         self.translation_operator = jnp.exp(
-            -1.0j * (2 * jnp.pi * jnp.matmul(frequency_grid, offset))
+            -1.0j
+            * (2 * jnp.pi * jnp.matmul(jnp.asarray(frequency_grid), jnp.asarray(offset)))
         )
         self.is_rfft = is_rfft
-        if is_rfft:
-            self.shape = (frequency_grid.shape[0], frequency_grid.shape[0])
-        else:
-            self.shape = (frequency_grid.shape[0], frequency_grid.shape[1])
 
     @override
     def __call__(
@@ -72,46 +64,58 @@ class PhaseShiftFourierImage(AbstractImageTransform, strict=True):
     ) -> Complex[Array, "y_dim x_dim"]:
         """Apply the phase shift to the input image in Fourier space.
 
-        Args:
+        **Arguments:**
             image: The input image in Fourier space.
             shape: The shape of the Fourier Image in real space.
 
-        Returns:
+        **Returns:**
             The phase-shifted image in Fourier space.
         """
         if self.is_rfft:
+            y_dim = self.translation_operator.shape[0]
             image = enforce_rfftn_self_conjugates(
-                image, self.shape, includes_dc=False, mode="zero"
+                image, (y_dim, y_dim), includes_dc=False, mode="zero"
             )
 
         return image * self.translation_operator
 
 
-class RotateFourierImage(AbstractImageTransform, strict=True):
-    """Rotate an image in Fourier space.
+class RotateFFT(AbstractImageTransform, strict=True):
+    """Rotate an image in Fourier space. This corresponds to a rotation
+    in real space as well.
 
-    This class implements rotation of an image in Fourier space using
-    interpolation. The rotation is specified by an angle in degrees.
+    **Example:**
+    ```python
 
-    Attributes:
-        angle_degrees: The angle by which to rotate the image, in degrees.
-        frequency_grid: The full frequency grid in pixels or angstroms.
+    from cryojax.ndimage import RotateFFT, fftn, ifftn
+
+    frequency_grid = ... # in pixels
+    image = ... # e.g., a real 2D image
+
+    rotation_op = RotateFFT(
+        rotation_angle=45.0,
+        frequency_grid=frequency_grid,
+    )
+
+    rotated_image_fft = rotation_op(fftn(image))
+    rotated_image = ifftn(rotated_image_fft).real
+    ```
     """
 
-    angle_degrees: float
+    rotation_angle: Float[Array, ""]
     frequency_grid: Float[Array, "y_dim x_dim 2"]
-    order: int
+    order: Literal[0, 1]
     mode: str
     cval: float | complex
     is_real_space: ClassVar[bool] = False
 
     def __init__(
         self,
-        angle_degrees: float,
-        frequency_grid: Float[Array, "y_dim x_dim 2"],
+        rotation_angle: FloatLike,
+        frequency_grid: Float[NDArrayLike, "y_dim x_dim 2"],
         is_rfft: bool,
         *,
-        pixel_size: float = 1.0,
+        pixel_size: FloatLike = 1.0,
         order: Literal[0, 1] = 1,
         mode: str = "fill",
         cval: float | complex = 0.0,
@@ -119,39 +123,28 @@ class RotateFourierImage(AbstractImageTransform, strict=True):
         """
         **Arguments:**
 
-            - `angle_degrees`: The angle by which to rotate the image, in degrees.
-            - `frequency_grid`: The frequency grid in pixels or angstroms.
-            - `is_rfft`: Whether the frequency grid is in full or rfft format.
-                Right now only full format is supported for image rotation.
-            - `pixel_size`: The pixel size in angstroms or the unit of choice.
-            - `order`: The order of the spline interpolation. Only 0 and 1 are supported.
-            - `mode`: The mode to use for points outside the boundaries.
-            - `cval`: The constant value to use when `mode` is 'fill'.
+        - `rotation_angle`: The angle by which to rotate the image, in degrees.
+        - `frequency_grid`: The frequency grid in pixels or angstroms.
+        - `is_rfft`: If `True`, the frequency grid is in `jnp.fft.rfftfreq` format.
+            Otherwise, it is in `jnp.fft.fftfreq` format.
+        - `pixel_size`: The pixel size in angstroms. Should match `frequency_grid`.
+        - `order`: The interpolation order.
+            See [`cryojax.ndimage.map_coordinates`] for details.
+        - `mode`: The mode to use for points outside the boundaries.
+            See [`cryojax.ndimage.map_coordinates`] for details.
+        - `cval`: The constant value to use when `mode` is 'fill'.
+            See [`cryojax.ndimage.map_coordinates`] for details.
 
-        **Example:**
-            ```python
-
-            from cryojax.ndimage import RotateFourierImage, fftn, ifftn
-
-            frequency_grid = ... # in pixels
-            image = ... # e.g., a real 2D image
-
-            rotation_op = RotateFourierImage(
-                angle_degrees=45.0,
-                frequency_grid=frequency_grid,
-            )
-
-            rotated_image_fft = rotation_op(fftn(image))
-            rotated_image = ifftn(rotated_image_fft).real
-            ```
+        !!! Warning
+            Only `is_rfft = False` is currently supported.
 
         """
         assert order in (0, 1), "Only order 0 and 1 are supported."
 
         if is_rfft:
-            raise NotImplementedError("RotateFourierImage does not support rfft arrays.")
-        self.angle_degrees = angle_degrees
-        self.frequency_grid = frequency_grid * pixel_size
+            raise NotImplementedError("RotateFFT does not support rfft arrays.")
+        self.rotation_angle = jnp.asarray(rotation_angle)
+        self.frequency_grid = jnp.asarray(frequency_grid * pixel_size)
         self.order = order
         self.mode = mode
         self.cval = cval
@@ -162,15 +155,15 @@ class RotateFourierImage(AbstractImageTransform, strict=True):
     ) -> Complex[Array, "y_dim x_dim"]:
         """Rotate the input image in Fourier space.
 
-        Args:
+        **Arguments:**
             image: The input image in Fourier space.
 
-        Returns:
+        **Returns:**
             The rotated image in Fourier space.
         """
         rotated_image = _rotate_fourier_image(
             image,
-            angle_degrees=self.angle_degrees,
+            rotation_angle=self.rotation_angle,
             frequency_grid=self.frequency_grid,
             order=self.order,
             mode=self.mode,
@@ -181,13 +174,13 @@ class RotateFourierImage(AbstractImageTransform, strict=True):
 
 def _rotate_fourier_image(
     fourier_image: Complex[Array, "y_dim x_dim"],
-    angle_degrees: float,
+    rotation_angle: FloatLike,
     frequency_grid: Float[Array, "y_dim x_dim 2"],
-    order: int = 1,
+    order: Literal[0, 1] = 1,
     mode: str = "fill",
     cval: float | complex = 0.0,
 ) -> Complex[Array, "y_dim x_dim"]:
-    angle = jnp.deg2rad(angle_degrees)
+    angle = jnp.deg2rad(rotation_angle)
     c = jnp.cos(angle)
     s = jnp.sin(angle)
     rotation_matrix = jnp.array([[c, -s], [s, c]])

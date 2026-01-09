@@ -21,6 +21,6 @@ from ._masks import (
     SquareCosineMask as SquareCosineMask,
 )
 from ._spatial_transform import (
-    PhaseShiftFourierImage as PhaseShiftFourierImage,
-    RotateFourierImage as RotateFourierImage,
+    PhaseShiftFFT as PhaseShiftFFT,
+    RotateFFT as RotateFFT,
 )
