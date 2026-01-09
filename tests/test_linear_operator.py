@@ -42,7 +42,7 @@ def test_simulate_equality(image_model):
     linear_operator, vector = cxe.make_linear_operator(
         simulate_fn=lambda x: x.simulate(),
         args=image_model,
-        where_vector=lambda x: x.volume_parametrization.fourier_voxel_grid,
+        where_vector=lambda x: x.volume.fourier_voxel_grid,
     )
     image_cxs = image_model.simulate()
     image_lx = linear_operator.mv(vector)
@@ -50,7 +50,7 @@ def test_simulate_equality(image_model):
 
 
 def test_linear_transpose(image_model):
-    where_vector = lambda x: x.volume_parametrization.fourier_voxel_grid
+    where_vector = lambda x: x.volume.fourier_voxel_grid
     linear_operator, _ = cxe.make_linear_operator(
         simulate_fn=lambda x: x.simulate(),
         args=image_model,
@@ -69,7 +69,7 @@ def test_bad_linear_transpose(sample_pdb_path, image_config):
         image_config,
         pose=cxs.EulerAnglePose(),
     )
-    where_vector = lambda x: x.volume_parametrization.positions
+    where_vector = lambda x: x.volume.positions
     linear_operator, _ = cxe.make_linear_operator(
         simulate_fn=lambda x: x.simulate(),
         args=image_model,

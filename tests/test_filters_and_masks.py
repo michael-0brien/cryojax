@@ -44,8 +44,8 @@ def test_mask_2d_running():
         dict(),
         dict(side_length=5, rolloff_width=2),
         dict(radius=5, rolloff_width=2),
-        dict(radius=5, rolloff_width=2, length=5, in_plane_rotation_angle=2.0),
-        dict(x_width=5, y_width=5, rolloff_width=2, in_plane_rotation_angle=2.0),
+        dict(radius=5, rolloff_width=2, length=5, rotation_angle=2.0),
+        dict(x_width=5, y_width=5, rolloff_width=2, rotation_angle=2.0),
     ]
     coordinate_grid = make_coordinate_grid((10, 10))
     image = jnp.zeros((10, 10))

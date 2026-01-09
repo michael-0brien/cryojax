@@ -1,7 +1,6 @@
 from typing import Any, ClassVar
 from typing_extensions import override
 
-import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
@@ -59,21 +58,19 @@ class AutoVolumeProjection(
         for installing `jax-finufft`.
     """  # noqa: E501
 
-    options: dict[str, Any] = eqx.field(default_factory=dict)
-
     outputs_ewald_sphere: ClassVar[bool] = False
 
     def _select_projection_method(
         self, volume: AbstractVolumeRepresentation
     ) -> AbstractVolumeIntegrator:
         if isinstance(volume, (FourierVoxelGridVolume, FourierVoxelSplineVolume)):
-            integrator = FourierSliceExtraction(**self.options)
+            integrator = FourierSliceExtraction()
         elif isinstance(volume, GaussianMixtureVolume):
-            integrator = GaussianMixtureProjection(**self.options)
+            integrator = GaussianMixtureProjection()
         elif isinstance(volume, RealVoxelGridVolume):
-            integrator = RealVoxelProjection(**self.options)
+            integrator = RealVoxelProjection()
         elif isinstance(volume, IndependentAtomVolume):
-            integrator = FFTAtomProjection(**self.options)
+            integrator = FFTAtomProjection()
         else:
             raise ValueError(
                 "Could not use `AutoVolumeProjection` for volume of "

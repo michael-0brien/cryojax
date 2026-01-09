@@ -41,7 +41,7 @@ class AbstractParticleParameterFile(AbstractDataset[T1], Generic[T1, T2]):
         raise NotImplementedError
 
 
-class AbstractParticleStackDataset(AbstractDataset[T1], Generic[T1, T2]):
+class AbstractParticleDataset(AbstractDataset[T1], Generic[T1, T2]):
     @property
     @abc.abstractmethod
     def parameter_file(self) -> AbstractParticleParameterFile:

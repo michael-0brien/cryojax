@@ -189,12 +189,14 @@ class GaussianWhiteNoiseModel(AbstractGaussianNoiseModel, strict=True):
             A filter to apply to the final image.
         """
         n_pixels = self.image_model.image_config.padded_n_pixels
-        frequency_grid = self.image_model.image_config.padded_frequency_grid_in_angstroms
+        frequency_grid = self.image_model.image_config.get_frequency_grid(
+            padding=True, physical=True
+        )
         # Compute the zero mean variance and scale up to be independent of the number of
         # pixels
         std = jnp.sqrt(n_pixels * self.variance)
         model = eqx.tree_at(
-            lambda x: (x.transform, x.normalizes_signal),
+            lambda x: (x.image_transform, x.normalizes_signal),
             self.image_model,
             (None, False),
             is_leaf=lambda x: x is None,
@@ -316,12 +318,14 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
             A filter to apply to the final image.
         """
         n_pixels = self.image_model.image_config.padded_n_pixels
-        frequency_grid = self.image_model.image_config.padded_frequency_grid_in_angstroms
+        frequency_grid = self.image_model.image_config.get_frequency_grid(
+            padding=True, physical=True
+        )
         # Compute the zero mean variance and scale up to be independent of the number of
         # pixels
         std = jnp.sqrt(n_pixels * self.variance_fn(frequency_grid))
         model = eqx.tree_at(
-            lambda x: (x.transform, x.normalizes_signal),
+            lambda x: (x.image_transform, x.normalizes_signal),
             self.image_model,
             (None, False),
             is_leaf=lambda x: x is None,
@@ -367,7 +371,9 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
             A filter to apply to the final image.
         """
         n_pixels = self.image_config.n_pixels
-        frequency_grid = self.image_config.frequency_grid_in_angstroms
+        frequency_grid = self.image_model.image_config.get_frequency_grid(
+            padding=False, physical=True
+        )
         # Compute the variance and scale up to be independent of the number of pixels
         variance = n_pixels * self.variance_fn(frequency_grid)
         # Create simulated data
