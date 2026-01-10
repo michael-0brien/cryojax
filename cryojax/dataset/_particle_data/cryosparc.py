@@ -719,22 +719,16 @@ def _make_pytrees_from_csparc_metadata(
         pose_shift = csparc_pose_shift * pixel_size
 
     # Now, flip the sign of the translations and transpose rotations.
-    maybe_make_full = lambda param, ndim: (
+    maybe_make_full = lambda param: (
         np.full(batch_shape, param)
-        if len(batch_shape) > 0 and param.ndim == ndim
+        if len(batch_shape) > 0 and param.shape == ()
         else param
     )
-
-    # def _tranpose_rot_matrix(rot_matrix):
-    #     if rot_matrix.ndim == 2:
-    #         return rot_matrix.T
-    #     elif rot_matrix.ndim == 3:
-    #         return np.transpose(rot_matrix, (0, 2, 1))
-
+    # AxisAngle inversion is not as simple as negating the angles, so
+    # we do not do it here.
     pose_params = (
-        -maybe_make_full(pose_shift, 1),
-        # _tranpose_rot_matrix(maybe_make_full(pose_rotation_matrix, 2)),
-        -maybe_make_full(csparc_pose_angles, 1),
+        -maybe_make_full(pose_shift),
+        maybe_make_full(csparc_pose_angles),  # don't invert here, do it later
     )
 
     # Now, create cryojax objects. Do this on the CPU
@@ -756,7 +750,7 @@ def _make_pytrees_from_csparc_metadata(
 
         # ... finally the `AxisAnglePose`
         pose = _make_pose(*pose_params)
-        if inverts_rotation:
+        if not inverts_rotation:  # To match relion we need to always invert
             pose = _invert_rotation(pose)
     # Now, convert arrays to numpy in case the user wishes to do preprocessing
     pytree_dynamic, pytree_static = eqx.partition(
@@ -834,12 +828,10 @@ def _make_transfer_theory(defocus, astig, angle, sph, ac, ps, env=None):
 
 
 def _invert_rotation(pose: AxisAnglePose) -> AxisAnglePose:
-    negate_euler_vector = lambda angle: -angle
-    return eqx.tree_at(
-        lambda x: (x.euler_vector),
-        pose,
-        (negate_euler_vector(pose.euler_vector),),
-    )
+    if pose.offset_in_angstroms.ndim == 1:
+        return pose.to_inverse_rotation()
+    else:
+        return eqx.filter_vmap(lambda p: p.to_inverse_rotation())(pose)
 
 
 def _load_image_stack_from_mrc(

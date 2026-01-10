@@ -1,4 +1,7 @@
 from ._dataset import AbstractDataset as AbstractDataset
+from ._dataset_conversion import (
+    convert_csparc_to_relion as convert_csparc_to_relion,
+)
 from ._particle_data import (
     AbstractParticleParameterFile as AbstractParticleParameterFile,
     AbstractParticleStackDataset as AbstractParticleStackDataset,
