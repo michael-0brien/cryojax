@@ -31,10 +31,10 @@ def __getattr__(name: str) -> _Any:
             stacklevel=2,
         )
         from ._particle_data.relion import (
-            RelionParticleParameterInfo as RelionParticleParameterInfo,
+            _ParticleParameterInfo as ParticleParameterInfo,
         )
 
-        return RelionParticleParameterInfo
+        return ParticleParameterInfo
 
     if name == "ParticleStackInfo":
         _warnings.warn(
@@ -44,7 +44,7 @@ def __getattr__(name: str) -> _Any:
             stacklevel=2,
         )
         from ._particle_data.relion import (
-            RelionParticleStackInfo as RelionParticleStackInfo,
+            _ParticleStackInfo as ParticleStackInfo,
         )
 
-        return RelionParticleStackInfo
+        return ParticleStackInfo
