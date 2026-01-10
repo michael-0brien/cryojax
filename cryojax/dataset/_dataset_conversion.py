@@ -4,8 +4,12 @@ from typing import cast
 import equinox as eqx
 
 from ..simulator import AxisAnglePose, EulerAnglePose
-from . import CryoSparcParticleParameterFile, RelionParticleParameterFile
-from ._particle_data.relion import ParticleParameterLike, _format_number_for_filename
+from ._particle_data.cryosparc import CryoSparcParticleParameterFile
+from ._particle_data.relion import (
+    ParticleParameterLike,
+    RelionParticleParameterFile,
+    _format_number_for_filename,
+)
 
 
 def convert_csparc_to_relion(
