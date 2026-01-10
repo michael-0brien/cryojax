@@ -185,6 +185,32 @@ class CryoSparcParticleParameterFile(AbstractParticleCryoSparcFile):
     """A dataset that wraps a CSPARC particle stack in
     [CryoSPARC  ](https://guide.cryosparc.com/setup-configuration-and-management/software-system-guides/manipulating-.cs-files-created-by-cryosparc)
     format.
+
+
+    **Example:**
+    ```python
+    from cryojax.dataset import CryoSparcParticleParameterFile
+    from cryojax.io import read_csparc_data
+
+    # For knowing how to set a filter it is useful to see how we
+    # we read the cryosparc metadata
+
+    csparc_metadata = read_csparc_data(
+        "path/to/cryosparc/particles.cs"
+    )
+    print(csparc_metadata.head())
+
+    # For example, to select only particles from class 0 from a 3D classification job:
+
+    csparc_parameter_file = CryoSparcParticleParameterFile(
+        path_to_metadata="path/to/cryosparc/particles.cs",
+        selection_filter={
+            "alignments3D/class": lambda x: x == 0
+        },
+    )
+
+
+    ```
     """
 
     def __init__(
@@ -536,8 +562,8 @@ def _load_csparc_metadata(
     if path_to_csparc_metadata.exists():
         csparc_metadata = read_csparc_data(path_to_csparc_metadata)
         _validate_csparc_metadata(csparc_metadata)
-        # if selection_filter is not None:
-        #    starfile_data = _select_particles(starfile_data, selection_filter)
+        if selection_filter is not None:
+            csparc_metadata = _select_particles(csparc_metadata, selection_filter)
     else:
         raise FileNotFoundError(
             f"CryoSparc metadata file {str(path_to_csparc_metadata)} does not exist."
@@ -546,53 +572,52 @@ def _load_csparc_metadata(
     return csparc_metadata
 
 
-# def _select_particles(
-#     csparc_metadata: dict[str, pd.DataFrame], selection_filter: dict[str, Callable]
-# ) -> dict[str, pd.DataFrame]:
-#     particle_data = csparc_metadata
-#     boolean_mask = pd.Series(True, index=particle_data.index)
-#     for key in selection_filter:
-#         if key in particle_data.columns:
-#             fn = selection_filter[key]
-#             column = particle_data[key]
-#             base_error_message = (
-#                 f"Error filtering key '{key}' in the `selection_filter`. "
-#                 f"To filter the STAR file entries, `selection_filter['{key}']`"
-#                 "must be a function that takes in an array and returns a "
-#                 "boolean mask."
-#             )
-#             if isinstance(selection_filter[key], Callable):
-#                 try:
-#                     mask_at_column = fn(column)
-#                 except Exception as err:
-#                     raise ValueError(
-#                         f"{base_error_message} "
-#                         "When calling the function, caught an error:\n"
-#                         f"{err}"
-#                     )
-#                 if not pd.api.types.is_bool_dtype(mask_at_column):
-#                     raise ValueError(
-#                         f"{base_error_message} "
-#                         "Found that the function did not return "
-#                         "a boolean dtype."
-#                     )
-#             else:
-#                 raise ValueError(base_error_message)
-#             # Update mask
-#             boolean_mask = mask_at_column & boolean_mask
-#         else:
-#             raise ValueError(
-#                 f"Included key '{key}' in the `selection_filter`, "
-#                 "but this entry could not be found in the STAR file. "
-#                 "The `selection_filter` must be a dictionary whose "
-#                 "keys are strings in the STAR file and whose values "
-#                 "are functions that take in columns and return boolean "
-#                 "masks."
-#             )
-#     # Select particles using mask
-#     csparc_metadata = particle_data[boolean_mask]
+def _select_particles(
+    csparc_metadata: pd.DataFrame, selection_filter: dict[str, Callable]
+) -> pd.DataFrame:
+    boolean_mask = pd.Series(True, index=csparc_metadata.index)
+    for key in selection_filter:
+        if key in csparc_metadata.columns:
+            fn = selection_filter[key]
+            column = csparc_metadata[key]
+            base_error_message = (
+                f"Error filtering key '{key}' in the `selection_filter`. "
+                f"To filter the STAR file entries, `selection_filter['{key}']`"
+                "must be a function that takes in an array and returns a "
+                "boolean mask."
+            )
+            if isinstance(selection_filter[key], Callable):
+                try:
+                    mask_at_column = fn(column)
+                except Exception as err:
+                    raise ValueError(
+                        f"{base_error_message} "
+                        "When calling the function, caught an error:\n"
+                        f"{err}"
+                    )
+                if not pd.api.types.is_bool_dtype(mask_at_column):
+                    raise ValueError(
+                        f"{base_error_message} "
+                        "Found that the function did not return "
+                        "a boolean dtype."
+                    )
+            else:
+                raise ValueError(base_error_message)
+            # Update mask
+            boolean_mask = mask_at_column & boolean_mask
+        else:
+            raise ValueError(
+                f"Included key '{key}' in the `selection_filter`, "
+                "but this entry could not be found in the CryoSparc metadata file. "
+                "The `selection_filter` must be a dictionary whose "
+                "keys are strings in the STAR file and whose values "
+                "are functions that take in columns and return boolean "
+                "masks."
+            )
+    # Select particles using mask
+    csparc_metadata = csparc_metadata[boolean_mask]
 
-#     return csparc_metadata
+    return csparc_metadata
 
 
 #
