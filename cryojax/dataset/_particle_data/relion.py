@@ -243,9 +243,9 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
             filter by class using
             `selection_filter["rlnClassNumber"] = lambda x: x == 0`.
         - `loads_metadata`:
-            If `True`, the resulting `_ParticleParameterInfo` dict loads
+            If `True`, the resulting dict loads
             the raw metadata from the STAR file that is not otherwise included
-            in the `_ParticleParameterInfo` as a `pandas.DataFrame`.
+            into a `pandas.DataFrame`.
             If this is set to `True`, note that dictionaries cannot pass through
             JIT boundaries without removing the metadata.
         - `broadcasts_image_config`:
