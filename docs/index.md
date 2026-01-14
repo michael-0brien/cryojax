@@ -6,16 +6,19 @@ This documentation is currently a work-in-progress. Your patience while we get t
 
 ## Installation
 
-Installing `cryojax` is simple. To start, I recommend creating a new virtual environment. For example, you could do this with `conda`.
+## Installation
+
+Installing `cryojax` is simple. To start, I recommend creating a new virtual environment. For example, you could do this with [`uv`](https://docs.astral.sh/uv/pip/environments/#creating-a-virtual-environment).
 
 ```bash
-conda create -n cryojax-env -c conda-forge python=3.11
+uv venv --python=3.11 ~/path/to/venv/
+source ~/path/to/venv/bin/activate
 ```
 
 Note that `python>=3.10` is required. After creating and activating the new environment, [install JAX](https://github.com/google/jax#installation) with either CPU or GPU support. Then, install `cryojax`. For the latest stable release, install using `pip`.
 
 ```bash
-python -m pip install cryojax
+uv pip install cryojax
 ```
 
 To install the latest commit, you can build the repository directly.
@@ -24,7 +27,7 @@ To install the latest commit, you can build the repository directly.
 git clone https://github.com/michael-0brien/cryojax
 cd cryojax
 git checkout dev
-python -m pip install .
+uv pip install .
 ```
 
 The [`jax-finufft`](https://github.com/dfm/jax-finufft) package is an optional dependency used for non-uniform fast fourier transforms. This is used in select methods for computing image projections from atoms and voxels. If you would like to use these methods, we recommend first following the `jax_finufft` installation instructions and then installing `cryojax`.
