@@ -42,7 +42,6 @@ class PhaseShiftFFT(AbstractImageTransform, strict=True):
         self,
         offset: Float[NDArrayLike, "2"],
         frequency_grid: Float[NDArrayLike, "y_dim x_dim 2"],
-        is_rfft: bool,
     ):
         """
         **Arguments:**
@@ -52,11 +51,19 @@ class PhaseShiftFFT(AbstractImageTransform, strict=True):
         - `is_rfft`: If `True`, the frequency grid is in `jnp.fft.rfftfreq` format.
             Otherwise, it is in `jnp.fft.fftfreq` format.
         """
+
+        if frequency_grid.shape[0] == frequency_grid.shape[1]:
+            self.is_rfft = False
+        elif frequency_grid.shape[1] == frequency_grid.shape[0] // 2 + 1:
+            self.is_rfft = True
+        else:
+            raise ValueError(
+                "The frequency grid must either be square, or be in rfft format."
+            )
         self.translation_operator = jnp.exp(
             -1.0j
             * (2 * jnp.pi * jnp.matmul(jnp.asarray(frequency_grid), jnp.asarray(offset)))
         )
-        self.is_rfft = is_rfft
 
     @override
     def __call__(
@@ -113,7 +120,6 @@ class RotateFFT(AbstractImageTransform, strict=True):
         self,
         rotation_angle: FloatLike,
         frequency_grid: Float[NDArrayLike, "y_dim x_dim 2"],
-        is_rfft: bool,
         *,
         pixel_size: FloatLike = 1.0,
         order: Literal[0, 1] = 1,
@@ -125,15 +131,13 @@ class RotateFFT(AbstractImageTransform, strict=True):
 
         - `rotation_angle`: The angle by which to rotate the image, in degrees.
         - `frequency_grid`: The frequency grid in pixels or angstroms.
-        - `is_rfft`: If `True`, the frequency grid is in `jnp.fft.rfftfreq` format.
-            Otherwise, it is in `jnp.fft.fftfreq` format.
         - `pixel_size`: The pixel size in angstroms. Should match `frequency_grid`.
         - `order`: The interpolation order.
-            See [`cryojax.ndimage.map_coordinates`] for details.
+            See [`cryojax.ndimage.map_coordinates`][] for details.
         - `mode`: The mode to use for points outside the boundaries.
-            See [`cryojax.ndimage.map_coordinates`] for details.
+            See [`cryojax.ndimage.map_coordinates`][] for details.
         - `cval`: The constant value to use when `mode` is 'fill'.
-            See [`cryojax.ndimage.map_coordinates`] for details.
+            See [`cryojax.ndimage.map_coordinates`][] for details.
 
         !!! Warning
             Only `is_rfft = False` is currently supported.
@@ -141,8 +145,11 @@ class RotateFFT(AbstractImageTransform, strict=True):
         """
         assert order in (0, 1), "Only order 0 and 1 are supported."
 
-        if is_rfft:
-            raise NotImplementedError("RotateFFT does not support rfft arrays.")
+        if not (frequency_grid.shape[0] == frequency_grid.shape[1]):
+            raise NotImplementedError(
+                "Only square frequency grids are currently supported."
+            )
+
         self.rotation_angle = jnp.asarray(rotation_angle)
         self.frequency_grid = jnp.asarray(frequency_grid * pixel_size)
         self.order = order
@@ -183,14 +190,20 @@ def _rotate_fourier_image(
     angle = jnp.deg2rad(rotation_angle)
     c = jnp.cos(angle)
     s = jnp.sin(angle)
+
+    # shift images and grid to center
+    fourier_image = jnp.fft.fftshift(fourier_image, axes=(0, 1))
+    frequency_grid = jnp.fft.fftshift(frequency_grid, axes=(0, 1))
     rotation_matrix = jnp.array([[c, -s], [s, c]])
 
     rotated_grid = frequency_grid @ rotation_matrix
     N = rotated_grid.shape[1]
-    logical_frequency_coordinates = rotated_grid * N
+    logical_frequency_coordinates = rotated_grid.at[...].set(rotated_grid * N + N // 2)
     k_y, k_x = jnp.transpose(logical_frequency_coordinates, axes=[2, 0, 1])
 
     rotated_image = map_coordinates(
         fourier_image, (k_x, k_y), order=order, mode=mode, cval=cval
     )
+
+    rotated_image = jnp.fft.fftshift(rotated_image, axes=(0, 1))
     return rotated_image
