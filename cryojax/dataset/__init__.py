@@ -12,12 +12,22 @@ from ._particle_data import (
 )
 
 
+_warnings.warn(
+    "Submodule `cryojax.dataset` is deprecated and "
+    "has been moved to the library `cryospax` "
+    "(https://github.com/michael-0brien/cryospax). "
+    "`cryojax.dataset` will be removed in cryoJAX 0.6.0.",
+    category=FutureWarning,
+    stacklevel=2,
+)
+
+
 def __getattr__(name: str) -> _Any:
     # Future deprecations
     if name == "RelionParticleStackDataset":
         _warnings.warn(
             "The 'RelionParticleStackDataset' alias is deprecated and will be removed in "
-            "cryoJAX 0.6.0. Use 'RelionParticleDataset' instead.",
+            "`cryospax`. Use 'RelionParticleDataset' instead.",
             category=FutureWarning,
             stacklevel=2,
         )
@@ -26,7 +36,7 @@ def __getattr__(name: str) -> _Any:
     if name == "ParticleParameterInfo":
         _warnings.warn(
             "The 'ParticleParameterInfo' TypedDict is deprecated and will be removed in "
-            "cryoJAX 0.6.0.",
+            "`cryospax`.",
             category=FutureWarning,
             stacklevel=2,
         )
@@ -39,7 +49,7 @@ def __getattr__(name: str) -> _Any:
     if name == "ParticleStackInfo":
         _warnings.warn(
             "The 'ParticleStackInfo' TypedDict is deprecated and will be removed in "
-            "cryoJAX 0.6.0.",
+            "`cryospax`.",
             category=FutureWarning,
             stacklevel=2,
         )

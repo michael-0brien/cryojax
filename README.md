@@ -148,6 +148,10 @@ model_vmap, model_novmap = make_model_vmap(wxyz, volume, image_config, transfer_
 images = simulate_fn_vmap(model_vmap, model_novmap)
 ```
 
+## Projects using cryoJAX
+
+- `cryospax`: A small library to support cryo-EM single particle analysis applications using cryoJAX
+
 ## Acknowledgements
 
 - `cryojax` implementations of several models and algorithms, such as the CTF, fourier slice extraction, and electrostatic potential computations has been informed by the open-source cryo-EM software [`cisTEM`](https://github.com/timothygrant80/cisTEM).
