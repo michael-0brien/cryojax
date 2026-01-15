@@ -26,7 +26,6 @@ class PhaseShiftFFT(AbstractImageTransform, strict=True):
     shift_op = PhaseShiftFFT(
         offset=offset_in_angstrom,
         frequency_grid=frequency_grid,
-        is_rfft=True, # set to True if using rfft format
     )
 
     shifted_image_fft = shift_op(fftn(image))
@@ -48,8 +47,6 @@ class PhaseShiftFFT(AbstractImageTransform, strict=True):
 
         - `offset`: The offset by which to shift the image, in pixels or angstroms.
         - `frequency_grid`: The frequency grid in pixels or angstroms.
-        - `is_rfft`: If `True`, the frequency grid is in `jnp.fft.rfftfreq` format.
-            Otherwise, it is in `jnp.fft.fftfreq` format.
         """
 
         if frequency_grid.shape[0] == frequency_grid.shape[1]:
@@ -140,7 +137,7 @@ class RotateFFT(AbstractImageTransform, strict=True):
             See [`cryojax.ndimage.map_coordinates`][] for details.
 
         !!! Warning
-            Only `is_rfft = False` is currently supported.
+            Only square frequency grids are currently supported.
 
         """
         assert order in (0, 1), "Only order 0 and 1 are supported."
