@@ -27,13 +27,14 @@ Note that `python>=3.10` is required. After creating and activating the new envi
 uv pip install cryojax
 ```
 
-To install the latest commit, you can build the repository directly.
+To install the latest commit in development mode, run
 
 ```bash
 git clone https://github.com/michael-0brien/cryojax
 cd cryojax
 git checkout dev
-uv pip install .
+uv pip install -e `.[dev,tests]`
+uv run pre-commit install
 ```
 
 The [`jax-finufft`](https://github.com/dfm/jax-finufft) package is an optional dependency used for non-uniform fast fourier transforms. This is used in select methods for computing image projections from atoms and voxels. If you would like to use these methods, we recommend first following the `jax_finufft` installation instructions and then installing `cryojax`.
