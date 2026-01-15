@@ -156,5 +156,5 @@ CryoJAX is meant to support an ecosystem of libraries for the development of eme
 
 ## Acknowledgements
 
-- `cryojax` implementations of several models and algorithms, such as the CTF, fourier slice extraction, and electrostatic potential computations has been informed by the open-source cryo-EM software [`cisTEM`](https://github.com/timothygrant80/cisTEM).
-- `cryojax` is built using `equinox`, a popular JAX library for PyTorch-like classes that smoothly integrate with JAX functional programming. We highly recommend learning about `equinox` to fully make use of the power of `jax`.
+- Implementations of several models and algorithms, such as the CTF, fourier slice extraction, and electrostatic potential computations has been informed by the open-source cryo-EM software [`cisTEM`](https://github.com/timothygrant80/cisTEM).
+- `cryojax` is built using [`equinox`](https://github.com/patrick-kidger/equinox), a popular JAX library for PyTorch-like classes that smoothly integrate with JAX functional programming. We highly recommend learning about `equinox` to fully make use of the power of `jax`.

@@ -9,7 +9,6 @@ CryoJAX is a cryo-EM image simulation library for building downstream data analy
 | [`cryojax.simulator`](./api/simulator/entry-point.md) |  Image simulation models and algorithms |
 | [`cryojax.io`](./api/io.md) |  Basic I/O for cryo-EM file formats |
 | [`cryojax.ndimage`](./api/ndimage.md) | Image and volume manipulation |
-| [`cryojax.dataset`](./api/dataset.md) |  Read/write cryo-EM datasets (e.g. RELION) |
 | [`cryojax.jax_util`](./api/jax_util.md) | Functions improving JAX/Equinox user experience |
 | [`cryojax.atom_util`](./api/atom_util.md)  | Operate on atoms and their coordinates |
 | [`cryojax.rotations`](./api/rotations.md) | Backend for coordinate rotations |
@@ -26,7 +25,3 @@ For example, read/write MRC files and PDB/PDBx files.
 ### [`cryojax.ndimage`](./api/ndimage.md)
 
 This includes cropping / padding, masks / filters, and downsampling.
-
-### [`cryojax.dataset`](./api/dataset.md)
-
-A framework for convenient reading/writing STAR files over entire cryo-EM datasets, and easy integration with dataloaders used in machine learning.

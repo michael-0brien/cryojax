@@ -104,6 +104,5 @@ nav:
             - 'api/atom_util.md'
             - 'api/constants.md'
             - 'api/rotations.md'
-        - 'api/dataset.md'
         - 'api/jax_util.md'
     - 'faq.md'
