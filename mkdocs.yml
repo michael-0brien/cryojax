@@ -69,7 +69,7 @@ plugins:
                 show_source: false
                 show_symbol_type_heading: true
                 show_symbol_type_toc: true
-                separate_signature: true
+                separate_signature: false
                 line_length: 85
 
 nav:
