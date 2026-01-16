@@ -3,9 +3,6 @@ from collections.abc import Callable
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-import tqdm.auto
-import tqdm.notebook
-import tqdm.std
 from jax.debug import callback
 from jaxtyping import Array, ArrayLike
 
@@ -62,17 +59,9 @@ def fori_loop_tqdm_decorator(
 
 
 def _build_tqdm(
-    n: int,
-    print_rate: int | None = None,
-    tqdm_type: str = "auto",
-    **kwargs,
+    n: int, print_rate: int | None = None, **kwargs
 ) -> tuple[Callable, Callable]:
-    if tqdm_type not in ("auto", "std", "notebook"):
-        raise ValueError(
-            'tqdm_type should be one of "auto", "std", or "notebook" '
-            f'but got "{tqdm_type}"'
-        )
-    pbar = getattr(tqdm, tqdm_type).tqdm
+    from tqdm.auto import tqdm as pbar
 
     desc = kwargs.pop("desc", f"Running for {n:,} iterations")
     message = kwargs.pop("message", desc)
