@@ -1,6 +1,6 @@
 # Extra JAX/Equinox
 
-`cryojax.jax_util` supports downstream applications with helpers for common patterns using cryoJAX for cryo-EM data analysis.
+`cryojax.jax_util` provides a collection of useful functions not found in JAX that tend to be important for using cryoJAX in practice. Depending on developments with core JAX/Equinox and other factors, these functions could be deprecated in future releases of `cryojax`. Use with caution!
 
 ## Equinox extensions
 
@@ -12,17 +12,13 @@ To make use of the full power of JAX, it is highly recommended to learn about [e
 
 ### Batched loops
 
-`cryojax` provides a collection of useful functions not found in JAX that tend to be important for tasks in cryo-EM. Depending on developments with core JAX/Equinox and other factors, these functions could be removed in future releases of `cryojax`. Use with caution!
-
 ::: cryojax.jax_util.filter_bmap
 
 ::: cryojax.jax_util.filter_bscan
 
-## Grid search interface
+## Interoperability with `lineax`
 
-
-## Reparameterizing pytrees
-
+::: cryojax.jax_util.make_linear_operator
 
 ## Extra type hints using `jaxtyping`
 

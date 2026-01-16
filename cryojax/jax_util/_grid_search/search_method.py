@@ -134,20 +134,20 @@ class AbstractGridSearchMethod(
         raise NotImplementedError
 
 
-class MinimumState(eqx.Module, strict=True):
+class _MinimumState(eqx.Module, strict=True):
     current_minimum_eval: Array
     current_best_raveled_index: Array
     current_eval: Array | None = None
 
 
-class MinimumSolution(eqx.Module, strict=True):
+class _MinimumSolution(eqx.Module, strict=True):
     value: PyTreeGridPoint | None
     stats: dict[str, Any]
-    state: MinimumState
+    state: _MinimumState
 
 
 class MinimumSearchMethod(
-    AbstractGridSearchMethod[MinimumState, MinimumSolution], strict=True
+    AbstractGridSearchMethod[_MinimumState, _MinimumSolution], strict=True
 ):
     """Simply find the minimum value returned by `fn` over all grid points.
 
@@ -176,7 +176,7 @@ class MinimumSearchMethod(
                                 actual grid points. Setting this to `False` may be
                                 necessary if the grid contains large arrays.
         - `stores_current_eval`: If `True`, carry over the last function evaluation in
-                                the `MinimumState`. This is useful when wrapping this
+                                the `_MinimumState`. This is useful when wrapping this
                                 class into new `AbstractGridSearchMethod`s.
         - `batch_size`: The stride of grid points over which to evaluate in parallel.
         """
@@ -190,10 +190,10 @@ class MinimumSearchMethod(
         f_struct: PyTree[jax.ShapeDtypeStruct],
         *,
         is_leaf: Callable[[Any], bool] | None = None,
-    ) -> MinimumState:
+    ) -> _MinimumState:
         # Initialize the state, just keeping track of the best function values
         # and their respective grid index
-        return MinimumState(
+        return _MinimumState(
             current_minimum_eval=jnp.full(f_struct.shape, jnp.inf, dtype=float),
             current_best_raveled_index=jnp.full(f_struct.shape, 0, dtype=int),
             current_eval=(
@@ -212,9 +212,9 @@ class MinimumSearchMethod(
         fn: Callable[[PyTreeGridPoint, Any], Array],
         tree_grid_point: PyTreeGridPoint,
         args: Any,
-        state: MinimumState,
+        state: _MinimumState,
         raveled_grid_index: Int[Array, ""],
-    ) -> MinimumState:
+    ) -> _MinimumState:
         # Evaluate the function
         value = fn(tree_grid_point, args)
         # Unpack the current state
@@ -228,7 +228,7 @@ class MinimumSearchMethod(
         current_best_raveled_index = jnp.where(
             is_less_than_last_minimum, raveled_grid_index, last_best_raveled_index
         )
-        return MinimumState(
+        return _MinimumState(
             current_minimum_eval,
             current_best_raveled_index,
             current_eval=value if self.stores_current_eval else None,
@@ -239,9 +239,9 @@ class MinimumSearchMethod(
         fn: Callable[[PyTreeGridPoint, Any], Array],
         tree_grid_point_batch: PyTreeGridPoint,
         args: Any,
-        state: MinimumState,
+        state: _MinimumState,
         raveled_grid_index_batch: Int[Array, " _"],
-    ) -> MinimumState:
+    ) -> _MinimumState:
         # Evaluate the batch of grid points and extract the best one
         value_batch = jax.vmap(fn, in_axes=[0, None])(tree_grid_point_batch, args)
         best_batch_index = jnp.argmin(value_batch, axis=0)
@@ -258,7 +258,7 @@ class MinimumSearchMethod(
         current_best_raveled_index = jnp.where(
             is_less_than_last_minimum, raveled_grid_index, last_best_raveled_index
         )
-        return MinimumState(
+        return _MinimumState(
             current_minimum_eval,
             current_best_raveled_index,
             current_eval=value_batch if self.stores_current_eval else None,
@@ -267,11 +267,11 @@ class MinimumSearchMethod(
     def postprocess(
         self,
         tree_grid: PyTreeGrid,
-        final_state: MinimumState,
+        final_state: _MinimumState,
         f_struct: PyTree[jax.ShapeDtypeStruct],
         *,
         is_leaf: Callable[[Any], bool] | None = None,
-    ) -> MinimumSolution:
+    ) -> _MinimumSolution:
         # Make sure that shapes did not get modified during loop
         if final_state.current_best_raveled_index.shape != f_struct.shape:
             raise ValueError(
@@ -303,7 +303,7 @@ class MinimumSearchMethod(
         else:
             value = None
         # ... build and return the solution
-        return MinimumSolution(
+        return _MinimumSolution(
             value,
             {"grid_size": math.prod(tree_grid_shape(tree_grid, is_leaf=is_leaf))},
             final_state,
