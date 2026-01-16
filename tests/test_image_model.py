@@ -70,10 +70,10 @@ def test_fourier_shape(model, request):
     model = request.getfixturevalue(model)
     image = model.simulate(outputs_real_space=False)
     padded_image = model.raw_simulate(outputs_real_space=False)
-    assert image.shape == model.image_config.frequency_grid_in_pixels.shape[0:2]
+    assert image.shape == model.image_config.get_frequency_grid(padding=False).shape[0:2]
     assert (
         padded_image.shape
-        == model.image_config.padded_frequency_grid_in_pixels.shape[0:2]
+        == model.image_config.get_frequency_grid(padding=True).shape[0:2]
     )
 
 
@@ -194,7 +194,7 @@ def test_normalize_and_transform(std, signal_centering, voxel_info, basic_config
         voxel_volume,
         basic_config,
         pose=cxs.EulerAnglePose(),
-        transform=ScaleImage(scale=std),
+        image_transform=ScaleImage(scale=std),
         normalizes_signal=True,
         signal_centering="bg",
     )
@@ -210,12 +210,12 @@ def test_mask_zeros_edges(use_transform, voxel_info, basic_config):
         voxel_volume,
         basic_config,
         pose=cxs.EulerAnglePose(),
-        transform=(ScaleImage(scale=1.0) if use_transform else None),
+        image_transform=(ScaleImage(scale=1.0) if use_transform else None),
         normalizes_signal=True,
     )
     image = image_model.simulate(
         mask=CircularCosineMask(
-            basic_config.coordinate_grid_in_pixels, radius=10, rolloff_width=0
+            basic_config.get_coordinate_grid(physical=False), radius=10, rolloff_width=0
         )
     )
     ny, nx = image.shape
@@ -235,14 +235,14 @@ def test_filter_padded_shape(voxel_info, basic_config):
     )
     _ = image_model.simulate(
         filter=LowpassFilter(
-            basic_config.padded_frequency_grid_in_pixels,
+            basic_config.get_frequency_grid(padding=True, physical=False),
             grid_spacing=basic_config.pixel_size,
         )
     )
     with pytest.raises(ValueError):
         _ = image_model.simulate(
             filter=LowpassFilter(
-                basic_config.frequency_grid_in_pixels,
+                basic_config.get_frequency_grid(physical=False),
                 grid_spacing=basic_config.pixel_size,
             )
         )

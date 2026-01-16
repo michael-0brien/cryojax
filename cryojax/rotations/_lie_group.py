@@ -3,7 +3,8 @@ Abstraction of rotations represented by matrix lie groups.
 """
 
 from abc import abstractmethod
-from typing import ClassVar, cast
+from collections.abc import Sequence
+from typing import ClassVar
 from typing_extensions import Self, override
 
 import equinox as eqx
@@ -12,7 +13,7 @@ import jax.numpy as jnp
 from equinox import AbstractClassVar
 from jaxtyping import Array, Float, PRNGKeyArray
 
-from ..jax_util import NDArrayLike
+from ..jax_util import FloatLike, NDArrayLike
 from ._rotation import AbstractRotation
 
 
@@ -29,6 +30,21 @@ class AbstractMatrixLieGroup(AbstractRotation, strict=True):
     parameter_dimension: AbstractClassVar[int]
     tangent_dimension: AbstractClassVar[int]
     matrix_dimension: AbstractClassVar[int]
+
+    def __check_init__(self):
+        if self.parameter_dimension != self.parameters.size:
+            cls = self.__class__.__name__
+            raise AttributeError(
+                "Found incorrect array size in "
+                f"in class {cls}. Expected "
+                f"an array with size {self.parameter_dimension} as input, "
+                f"but got an array of size {self.parameters.size}."
+            )
+
+    @property
+    @abstractmethod
+    def parameters(self) -> Array:
+        raise NotImplementedError
 
     @classmethod
     @abstractmethod
@@ -59,20 +75,12 @@ class AbstractMatrixLieGroup(AbstractRotation, strict=True):
         """Projects onto a group element."""
         raise NotImplementedError
 
-    @abstractmethod
-    def adjoint(self) -> Array:
-        """Computes the adjoint, which transforms tangent vectors
-        between tangent spaces.
-        """
-        raise NotImplementedError
-
 
 class SO3(AbstractMatrixLieGroup, strict=True):
     """A rotation in 3D space, represented by the
     SO3 matrix lie group.
 
-    The class is almost exactly derived from the `jaxlie.SO3`
-    object.
+    The class is almost exactly derived from `jaxlie.SO3`.
 
     `jaxlie` was written for [Yi, Brent, et al. 2021](https://ieeexplore.ieee.org/abstract/document/9636300).
     """
@@ -84,13 +92,18 @@ class SO3(AbstractMatrixLieGroup, strict=True):
 
     wxyz: Float[Array, "4"]
 
-    def __init__(self, wxyz: Float[NDArrayLike, "4"]):
+    def __init__(self, wxyz: Float[NDArrayLike, "4"] | Sequence[float]):
         """**Arguments:**
 
         - `wxyz`:
             A quaternion represented as $(q_w, q_x, q_y, q_z)$.
         """
         self.wxyz = jnp.asarray(wxyz, dtype=float)
+
+    @property
+    @override
+    def parameters(self) -> Float[Array, "4"]:
+        return self.wxyz
 
     @override
     def apply(self, target: Float[Array, "3"]) -> Float[Array, "3"]:
@@ -102,7 +115,8 @@ class SO3(AbstractMatrixLieGroup, strict=True):
     def compose(self, other: Self) -> Self:
         w0, x0, y0, z0 = self.wxyz
         w1, x1, y1, z1 = other.wxyz
-        return type(self)(
+        cls = type(self)
+        return cls(
             wxyz=jnp.array(
                 [
                     -x0 * x1 - y0 * y1 - z0 * z1 + w0 * w1,
@@ -113,22 +127,23 @@ class SO3(AbstractMatrixLieGroup, strict=True):
             )
         )
 
+    @override
     def inverse(self) -> Self:
         # Negate complex terms.
         return eqx.tree_at(lambda R: R.wxyz, self, self.wxyz * jnp.array([1, -1, -1, -1]))
 
     @classmethod
-    def from_x_radians(cls, angle: Float[Array, ""]) -> Self:
+    def from_x_radians(cls, angle: FloatLike) -> Self:
         """Generates a x-axis rotation."""
         return cls.exp(jnp.asarray([angle, 0.0, 0.0]))
 
     @classmethod
-    def from_y_radians(cls, angle: Float[Array, ""]) -> Self:
+    def from_y_radians(cls, angle: FloatLike) -> Self:
         """Generates a x-axis rotation."""
         return cls.exp(jnp.asarray([0.0, angle, 0.0]))
 
     @classmethod
-    def from_z_radians(cls, angle: Float[Array, ""]) -> Self:
+    def from_z_radians(cls, angle: FloatLike) -> Self:
         """Generates a x-axis rotation."""
         return cls.exp(jnp.asarray([0.0, 0.0, angle]))
 
@@ -305,13 +320,6 @@ class SO3(AbstractMatrixLieGroup, strict=True):
         return atan_factor * self.wxyz[1:]
 
     @override
-    def adjoint(self) -> Float[Array, "3 3"]:
-        """Computes the adjoint, which transforms tangent vectors
-        between tangent spaces.
-        """
-        return self.as_matrix()
-
-    @override
     def normalize(self) -> Self:
         return eqx.tree_at(lambda R: R.wxyz, self, self.wxyz / jnp.linalg.norm(self.wxyz))
 
@@ -340,179 +348,110 @@ class SO3(AbstractMatrixLieGroup, strict=True):
         )
 
 
-class SE3(AbstractMatrixLieGroup, strict=True):
-    """Rigid-body transformations in 3D space, represented by the
-    SE3 matrix lie group.
+class SO2(AbstractMatrixLieGroup, strict=True):
+    """A rotation in 2D space, represented by the
+    SO2 matrix lie group.
 
-    The class is almost exactly derived from the `jaxlie.SE3`
-    object.
+    The class is almost exactly derived from `jaxlie.SO2`.
 
     `jaxlie` was written for [Yi, Brent, et al. 2021](https://ieeexplore.ieee.org/abstract/document/9636300).
     """
 
-    space_dimension: ClassVar[int] = 3
-    parameter_dimension: ClassVar[int] = 7
-    tangent_dimension: ClassVar[int] = 6
-    matrix_dimension: ClassVar[int] = 4
+    space_dimension: ClassVar[int] = 2
+    parameter_dimension: ClassVar[int] = 2
+    tangent_dimension: ClassVar[int] = 1
+    matrix_dimension: ClassVar[int] = 2
 
-    rotation: SO3
-    xyz: Float[Array, "3"]
+    unit_complex: Float[Array, "2"]
 
+    def __init__(self, unit_complex: Float[NDArrayLike, "2"] | Sequence[float]):
+        r"""**Arguments:**
+
+        - `unit_complex`:
+            A complex number represented as a 2-vector
+            $(cos \theta, sin \theta)$.
+        """
+        self.unit_complex = jnp.asarray(unit_complex, dtype=float)
+
+    @property
     @override
-    def apply(self, target: Float[Array, "3"]) -> Float[Array, "3"]:
-        return self.rotation @ target + self.xyz
+    def parameters(self) -> Float[Array, "4"]:
+        return self.unit_complex
 
-    @override
-    def compose(self, other: Self) -> Self:
-        cls = type(self)
-        return cls(
-            rotation=self.rotation @ other.rotation,
-            xyz=(self.rotation @ other.xyz) + self.xyz,
-        )
+    @classmethod
+    def from_radians(cls, theta: FloatLike) -> Self:
+        """Construct a rotation object from a scalar angle."""
+        cos = jnp.cos(theta)
+        sin = jnp.sin(theta)
+        return cls(unit_complex=jnp.stack([cos, sin], axis=-1))
+
+    def as_radians(self) -> Float[Array, ""]:
+        """Compute a scalar angle from a rotation object."""
+        radians = self.log()
+        return radians
 
     @override
     @classmethod
     def identity(cls) -> Self:
-        return cls(rotation=SO3.identity(), xyz=jnp.zeros(3, dtype=float))
+        return cls(jnp.asarray([1.0, 0.0]))
 
     @override
     @classmethod
-    def from_matrix(cls, matrix: Float[Array, "4 4"]) -> Self:
-        # Currently assumes bottom row is [0, 0, 0, 1].
-        return cls(
-            rotation=SO3.from_matrix(matrix[:3, :3]),
-            xyz=matrix[:3, 3],
-        )
+    def from_matrix(cls, matrix: Float[NDArrayLike, "2 2"]) -> Self:
+        return cls(unit_complex=jnp.asarray(matrix[:, 0]))
 
     @override
-    def as_matrix(self) -> Float[Array, "4 4"]:
-        return (
-            jnp.eye(4).at[:3, :3].set(self.rotation.as_matrix()).at[:3, 3].set(self.xyz)
-        )
-
-    @override
-    @classmethod
-    def exp(cls, tangent: Float[Array, "6"]) -> Self:
-        # Reference:
-        # > https://github.com/strasdat/Sophus/blob/a0fe89a323e20c42d3cecb590937eb7a06b8343a/sophus/se3.hpp#L761
-        # assumes tangent is ordered as (x, y, z, w_x, w_y, w_z)
-        rotation = SO3.exp(tangent[3:])
-        theta_squared = tangent[3:] @ tangent[3:]
-        use_taylor = theta_squared < _get_epsilon(theta_squared.dtype)
-        # Shim to avoid NaNs in jnp.where branches, which cause failures for
-        # reverse-mode AD.
-        theta_squared_safe = cast(
-            jax.Array,
-            jnp.where(
-                use_taylor,
-                1.0,  # Any non-zero value should do here.
-                theta_squared,
-            ),
-        )
-        del theta_squared
-        theta_safe = jnp.sqrt(theta_squared_safe)
-        skew_omega = _skew(tangent[3:])
-        V = jnp.where(
-            use_taylor,
-            rotation.as_matrix(),
-            (
-                jnp.eye(3)
-                + (1.0 - jnp.cos(theta_safe)) / (theta_squared_safe) * skew_omega
-                + (theta_safe - jnp.sin(theta_safe))
-                / (theta_squared_safe * theta_safe)
-                * (skew_omega @ skew_omega)
-            ),
-        )
-
-        return cls(rotation=rotation, xyz=V @ tangent[:3])
-
-    @override
-    def log(self) -> Float[Array, "6"]:
-        # Reference:
-        # > https://github.com/strasdat/Sophus/blob/a0fe89a323e20c42d3cecb590937eb7a06b8343a/sophus/se3.hpp#L223
-        omega = self.rotation.log()
-        theta_squared = omega @ omega
-        use_taylor = theta_squared < _get_epsilon(theta_squared.dtype)
-
-        skew_omega = _skew(omega)
-
-        # Shim to avoid NaNs in jnp.where branches, which cause failures for
-        # reverse-mode AD.
-        theta_squared_safe = jnp.where(
-            use_taylor,
-            1.0,  # Any non-zero value should do here.
-            theta_squared,
-        )
-        del theta_squared
-        theta_safe = jnp.sqrt(theta_squared_safe)
-        half_theta_safe = theta_safe / 2.0
-
-        V_inv = jnp.where(
-            use_taylor,
-            jnp.eye(3) - 0.5 * skew_omega + (skew_omega @ skew_omega) / 12.0,
-            (
-                jnp.eye(3)
-                - 0.5 * skew_omega
-                + (
-                    1.0
-                    - theta_safe
-                    * jnp.cos(half_theta_safe)
-                    / (2.0 * jnp.sin(half_theta_safe))
-                )
-                / theta_squared_safe
-                * (skew_omega @ skew_omega)
-            ),
-        )
-        return jnp.concatenate([V_inv @ self.xyz, omega])
-
-    @override
-    def adjoint(self) -> Float[Array, "6 6"]:
-        R = self.rotation.as_matrix()
-        return jnp.block(
+    def as_matrix(self) -> Float[Array, "2 2"]:
+        cos_sin = self.unit_complex
+        out = jnp.stack(
             [
-                [R, _skew(self.xyz) @ R],
-                [jnp.zeros((3, 3)), R],
-            ]
+                # [cos, -sin],
+                cos_sin * jnp.array([1, -1]),
+                # [sin, cos],
+                cos_sin[::-1],
+            ],
+            axis=-1,
         )
+        return out
 
     @override
-    def normalize(self) -> Self:
+    def apply(self, target: Float[Array, "2"]) -> Float[Array, "2"]:
+        return self.as_matrix() @ target
+
+    @override
+    def compose(self, other: Self) -> Self:
         cls = type(self)
-        return cls(rotation=self.rotation.normalize(), xyz=self.xyz)
+        return cls(unit_complex=self.as_matrix() @ other.unit_complex)
+
+    @classmethod
+    @override
+    def exp(cls, tangent: FloatLike) -> Self:
+        cos = jnp.cos(tangent)
+        sin = jnp.sin(tangent)
+        return cls(unit_complex=jnp.concatenate([cos, sin], axis=-1))
+
+    @override
+    def log(self) -> Float[Array, ""]:
+        return jnp.arctan2(self.unit_complex[1], self.unit_complex[0])
 
     @override
     def inverse(self) -> Self:
         cls = type(self)
-        inverse_rotation = self.rotation.inverse()
-        return cls(rotation=inverse_rotation, xyz=-(inverse_rotation @ self.xyz))
+        return cls(unit_complex=self.unit_complex * jnp.array([1, -1]))
+
+    @override
+    def normalize(self) -> Self:
+        cls = type(self)
+        return cls(
+            unit_complex=self.unit_complex / jnp.linalg.norm(self.unit_complex, axis=-1)
+        )
 
     @override
     @classmethod
     def sample_uniform(cls, key: PRNGKeyArray) -> Self:
-        key0, key1 = jax.random.split(key)
-        return cls(
-            rotation=SO3.sample_uniform(key0),
-            xyz=jax.random.uniform(key=key1, shape=(3,), minval=-1.0, maxval=1.0),
+        return cls.from_radians(
+            jax.random.uniform(key=key, shape=(), minval=0.0, maxval=2.0 * jnp.pi)
         )
-
-
-SE3.__init__.__doc__ = """**Arguments:**
-
-- `rotation`: An SO3 group element, represented by an `SO3` object.
-- `xyz`: A 3D translation vector.
-"""
-
-
-def _skew(omega: Float[Array, "3"]) -> Float[Array, "3 3"]:
-    """Returns the skew-symmetric form of a length-3 vector."""
-    wx, wy, wz = omega
-    return jnp.array(
-        [
-            [0.0, wz, -wy],
-            [-wz, 0.0, wx],
-            [wy, -wx, 0.0],
-        ]
-    )
 
 
 def _get_epsilon(dtype: jnp.dtype) -> float:
