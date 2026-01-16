@@ -7,11 +7,7 @@ import numpy as np
 from jaxtyping import Array, Float, Int, PyTree
 
 from ...jax_util import NDArrayLike, filter_bscan
-from .base_particle_dataset import (
-    AbstractParticleParameterFile,
-    AbstractParticleStackDataset,
-)
-from .relion import ParticleParameterInfo
+from .base_particle_dataset import AbstractParticleDataset, AbstractParticleParameterFile
 
 
 PerParticleT = TypeVar("PerParticleT")
@@ -20,8 +16,8 @@ T = TypeVar("T")
 
 
 def simulate_particle_stack(
-    dataset: AbstractParticleStackDataset,
-    compute_image_fn: Callable[
+    dataset: AbstractParticleDataset,
+    simulate_fn: Callable[
         [PyTree, ConstantT, PerParticleT],
         Float[Array, "_ _"],
     ],
@@ -32,52 +28,52 @@ def simulate_particle_stack(
     **kwargs: Any,
 ):
     """Write a stack of images from parameters contained in an
-    `AbstractParticleStackDataset`.
+    `AbstractParticleDataset`.
 
     !!! note
-        This function works generally for a `compute_image_fn`
+        This function works generally for a `simulate_fn`
         of the form
 
         ```python
-        image = compute_image_fn(
-            parameters, constant_args, per_particle_args
+        image = simulate_fn(
+            parameter_info, constant_args, per_particle_args
         )
         ```
 
-        where `parameters` is the pytree read from the
-        `AbstractParticleStackDataset.parameter_file`,
+        where `parameter_info` is the pytree read from the
+        `AbstractParticleDataset.parameter_file`,
         `constant_args` is a parameter that does not change
         between images, and `per_particle_args` is a pytree whose
         leaves have a batch dimension equal to the number of particles
         to be simulated.
 
     *Example 1*: Basic usage such as instantiating an
-    `AbstractParticleStackDataset` and writing a
-    `compute_image_fn`
+    `AbstractParticleDataset` and writing a
+    `simulate_fn`
 
     ```python
     import cryojax.simulator as cxs
     import jax
-    from cryojax.data import RelionParticleStackDataset
+    from cryojax.data import RelionParticleDataset
     from jaxtyping import PyTree
 
-    # Load a `RelionParticleStackDataset` object. This loads
+    # Load a `RelionParticleDataset` object. This loads
     # parameters and writes images
-    dataset = RelionParticleStackDataset(..., mode='w')
+    dataset = RelionParticleDataset(..., mode='w')
 
-    # Write your `compute_image_fn` function, building an
+    # Write your `simulate_fn` function, building an
     # `AbstractImageModel` (see tutorials for details)
 
-    def compute_image_fn(
-        parameters: RelionParticleParameters,
+    def simulate_fn(
+        parameter_info: PyTree, # loaded from `dataset.parameter_file`
         constant_args: PyTree,
         _,
     ) -> jax.Array:
         # `constant_args` do not change between images. For
         # example, include the method of taking projections
-        integrator, ... = constant_args
+        ... = constant_args
         # Using the pose, CTF, and image config from the
-        # `parameters`, build image simulation model
+        # `parameter_info`, build image simulation model
         image_model = cxs.make_image_model(...)
         # ... and compute
         return image_model.simulate()
@@ -85,26 +81,26 @@ def simulate_particle_stack(
     # Simulate images and write to disk
     simulate_particle_stack(
         dataset,
-        compute_image_fn,
-        constant_args=(integrator, ...)
+        simulate_fn,
+        constant_args=(...)
         per_particle_args=None, # default
         batch_size=10,
     )
     ```
 
     *Example 2*: More-advanced usage, writing a
-    `compute_image_fn` that simulates images with noise.
+    `simulate_fn` that simulates images with noise.
     Uses `per_particle_args` as well as `constant_args`.
 
     ```python
     import cryojax.simulator as cxs
     import jax
-    from cryojax.data import RelionParticleStackDataset
+    from cryojax.data import RelionParticleDataset
     from jaxtyping import Array, PyTree, Shaped
 
-    # Load a `RelionParticleStackDataset` object. This loads
+    # Load a `RelionParticleDataset` object. This loads
     # parameters and writes images
-    dataset = RelionParticleStackDataset(..., mode='w')
+    dataset = RelionParticleDataset(..., mode='w')
 
     # Instantiate per-particle arguments. First, the RNG keys used
     # to generate the noise
@@ -116,12 +112,12 @@ def simulate_particle_stack(
     key, subkey = jax.random.split(key)
     scaling_params = jax.random.uniform(subkey, shape=(n_images,))
 
-    # Now write your `compute_image_fn` function, building a
-    # `cryojax.simulator.UncorrelationGaussianNoiseModel` to
+    # Now write your `simulate_fn` function, building a
+    # `cryojax.simulator.GaussianWhiteNoiseModel` to
     # simulate images with white noise (see tutorials for details)
 
-    def compute_image_fn(
-        particle_parameters: RelionParticleParameters,
+    def simulate_fn(
+        parameter_info: PyTree,
         constant_args: PyTree,
         per_particle_args: PyTree[Shaped[Array, "_ ..."]],
     ) -> jax.Array:
@@ -130,13 +126,13 @@ def simulate_particle_stack(
 
         # Combine two previously split PyTrees
         image_model = cxs.make_image_model(...)
-        distribution = cxs.UncorrelatedGaussianNoiseModel(image_model, ...)
+        distribution = cxs.GaussianWhiteNoiseModel(image_model, ...)
 
         return scale * distribution.sample(key)
 
     simulate_particle_stack(
         dataset,
-        compute_image_fn,
+        simulate_fn,
         constant_args=(...)
         per_particle_args=(keys_noise, scaling_params)
         batch_size=10,
@@ -146,16 +142,16 @@ def simulate_particle_stack(
     **Arguments:**
 
     - `dataset`:
-        The `AbstractParticleStackDataset` dataset. Note that this must be
+        The `AbstractParticleDataset` dataset. Note that this must be
         passed in *writing mode*, i.e. `mode = 'w'`.
-    - `compute_image_fn`:
+    - `simulate_fn`:
         A callable that computes the image stack from the parameters contained
         in the STAR file.
     - `constant_args`:
-        The constant arguments to pass to the `compute_image_fn` function.
+        The constant arguments to pass to the `simulate_fn` function.
         These must be the same for all images.
     - `per_particle_args`:
-        Arguments to pass to the `compute_image_fn` function.
+        Arguments to pass to the `simulate_fn` function.
         This is a pytree with leaves having a batch size with equal dimension
         to the number of images.
     - `batch_size`:
@@ -168,7 +164,7 @@ def simulate_particle_stack(
         set this as the number of particles in the dataset.
     - `kwargs`:
         Keyword arguments passed to
-        `AbstractParticleStackDataset.parameter_dataset.save`.
+        `AbstractParticleDataset.parameter_file.save`.
     """
     if dataset.mode == "r":
         raise ValueError(
@@ -179,8 +175,8 @@ def simulate_particle_stack(
     n_particles = len(dataset)
     images_per_file = n_particles if images_per_file is None else images_per_file
     # Get function that simulates batch of images
-    compute_image_stack_fn = _configure_simulation_fn(
-        compute_image_fn,
+    simulate_batch_fn = _configure_simulation_fn(
+        simulate_fn,
         batch_size,
         images_per_file,
     )
@@ -194,28 +190,26 @@ def simulate_particle_stack(
         dataset_index = np.arange(
             file_index * images_per_file, (file_index + 1) * images_per_file, dtype=int
         )
-        images, parameters = _simulate_images(
+        images, parameter_info = _simulate_images(
             dataset_index,
             parameter_file,
-            compute_image_stack_fn,
+            simulate_batch_fn,
             constant_args,
             per_particle_args,
         )
-        dataset.write_images(dataset_index, images, parameters)
+        dataset.write_images(dataset_index, images, parameter_info)
     # ... handle remainder
     if remainder > 0:
-        compute_image_stack_fn = _configure_simulation_fn(
-            compute_image_fn, batch_size, remainder
-        )
+        simulate_batch_fn = _configure_simulation_fn(simulate_fn, batch_size, remainder)
         index_array = np.arange(n_particles - remainder, n_particles, dtype=int)
-        images, parameters = _simulate_images(
+        images, parameter_info = _simulate_images(
             index_array,
             parameter_file,
-            compute_image_stack_fn,
+            simulate_batch_fn,
             constant_args,
             per_particle_args,
         )
-        dataset.write_images(index_array, images, parameters)
+        dataset.write_images(index_array, images, parameter_info)
     # Finally, save metadata file
     parameter_file.save(**kwargs)
 
@@ -223,22 +217,22 @@ def simulate_particle_stack(
 def _simulate_images(
     index: Int[np.ndarray, " _"],
     parameter_file: AbstractParticleParameterFile,
-    compute_image_stack_fn: Callable[
+    simulate_batch_fn: Callable[
         [PyTree, ConstantT, PerParticleT],
         Float[NDArrayLike, "_ _ _"],
     ],
     constant_args: ConstantT,
     per_particle_args: PerParticleT,
-) -> tuple[Float[NDArrayLike, "_ _ _"], ParticleParameterInfo]:
-    parameters = parameter_file[index]
+) -> tuple[Float[NDArrayLike, "_ _ _"], PyTree]:
+    parameter_info = parameter_file[index]
     args = (constant_args, _index_pytree(index, per_particle_args))
-    image_stack = compute_image_stack_fn(parameters, *args)
+    image_stack = simulate_batch_fn(parameter_info, *args)
 
-    return image_stack, parameters
+    return image_stack, parameter_info
 
 
 def _configure_simulation_fn(
-    compute_image_fn: Callable[
+    simulate_fn: Callable[
         [PyTree, ConstantT, PerParticleT],
         Float[Array, "_ _"],
     ],
@@ -250,14 +244,20 @@ def _configure_simulation_fn(
 ]:
     if batch_size is None:
 
-        def compute_image_stack_fn(parameters, constant_args, per_particle_args):  # type: ignore
-            shape = parameters["image_config"].shape
+        def simulate_batch_fn(parameter_info, constant_args, per_particle_args):  # type: ignore
+            parameter_info_at_0, per_particle_args_at_0 = (
+                _index_pytree(0, parameter_info),
+                _index_pytree(0, per_particle_args),
+            )
+            shape = _determine_output_shape(
+                simulate_fn, parameter_info_at_0, constant_args, per_particle_args_at_0
+            )
             image_stack = np.empty((images_per_file, *shape))
             for i in range(images_per_file):
-                parameters_at_i = _index_pytree(i, parameters)
+                parameter_info_at_i = _index_pytree(i, parameter_info)
                 per_particle_args_at_i = _index_pytree(i, per_particle_args)
-                image = compute_image_fn(
-                    parameters_at_i, constant_args, per_particle_args_at_i
+                image = simulate_fn(
+                    parameter_info_at_i, constant_args, per_particle_args_at_i
                 )
                 image_stack[i] = np.asarray(image)
             return image_stack
@@ -265,23 +265,23 @@ def _configure_simulation_fn(
     else:
         batch_size = min(images_per_file, batch_size)
         compute_vmap = eqx.filter_vmap(
-            compute_image_fn, in_axes=(eqx.if_array(0), None, eqx.if_array(0))
+            simulate_fn, in_axes=(eqx.if_array(0), None, eqx.if_array(0))
         )
         if batch_size == images_per_file:
-            compute_image_stack_fn = eqx.filter_jit(compute_vmap)
+            simulate_batch_fn = eqx.filter_jit(compute_vmap)
         else:
 
             @eqx.filter_jit
-            def compute_image_stack_fn(parameters, constant_args, per_particle_args):
+            def simulate_batch_fn(parameter_info, constant_args, per_particle_args):
                 # Compute with `jax.lax.scan` via `cryojax.jax_util.filter_bscan`
                 init = constant_args
-                xs = (parameters, per_particle_args)
+                xs = (parameter_info, per_particle_args)
 
                 def f_scan(carry, xs):
                     _constant_args = carry
-                    _parameters, _per_particle_args = xs
+                    _parameter_info, _per_particle_args = xs
                     image_stack = compute_vmap(
-                        _parameters, _constant_args, _per_particle_args
+                        _parameter_info, _constant_args, _per_particle_args
                     )
                     return carry, image_stack
 
@@ -289,7 +289,7 @@ def _configure_simulation_fn(
 
                 return image_stack
 
-    return compute_image_stack_fn  # type: ignore
+    return simulate_batch_fn  # type: ignore
 
 
 def _index_pytree(
@@ -298,3 +298,10 @@ def _index_pytree(
     dynamic, static = eqx.partition(pytree, eqx.is_array)
     dynamic_at_index = jax.tree.map(lambda x: x[index], dynamic)
     return eqx.combine(dynamic_at_index, static)
+
+
+def _determine_output_shape(_fn, *_args):
+    jaxpr_fn = eqx.filter_make_jaxpr(_fn)
+    _, out_dynamic, out_static = jaxpr_fn(*_args)
+    out_struct = eqx.combine(out_dynamic, out_static)
+    return out_struct.shape

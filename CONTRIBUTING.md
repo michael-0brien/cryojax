@@ -46,7 +46,7 @@ This uses `ruff` to format and lint the code. Now, you can push changes to your 
 After making changes, make sure that the tests pass. In the `cryojax` base directory, install testing dependencies and run
 
 ```
-python -m pytest
+python -m pytest tests/
 ```
 
 **If you are using a non-linux OS, the [`pycistem`](https://github.com/jojoelfe/pycistem) testing dependency cannot be installed**. In this case, in order to run the tests against [`cisTEM`](https://github.com/timothygrant80/cisTEM), run the testing [workflow](https://github.com/michael-0brien/cryojax/actions/workflows/ci_build.yml). This can be done manually or will happen automatically when a PR is opened.

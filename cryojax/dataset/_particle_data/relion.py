@@ -26,10 +26,7 @@ from ...simulator import (
     ContrastTransferTheory,
     EulerAnglePose,
 )
-from .._particle_data import (
-    AbstractParticleParameterFile,
-    AbstractParticleStackDataset,
-)
+from .base_particle_dataset import AbstractParticleDataset, AbstractParticleParameterFile
 
 
 # RELION column entries
@@ -80,7 +77,7 @@ RELION_SUPPORTED_PARTICLE_ENTRIES = [
 ]
 
 
-class ParticleParameterInfo(TypedDict):
+class _ParticleParameterInfo(TypedDict):
     """Parameters for a particle stack from RELION."""
 
     image_config: BasicImageConfig
@@ -90,23 +87,23 @@ class ParticleParameterInfo(TypedDict):
     metadata: pd.DataFrame | None
 
 
-class ParticleStackInfo(TypedDict):
+class _ParticleStackInfo(TypedDict):
     """Particle stack info from RELION."""
 
-    parameters: ParticleParameterInfo | None
+    parameters: _ParticleParameterInfo | None
     images: Float[np.ndarray, "... y_dim x_dim"]
 
 
-ParticleParameterLike = dict[str, Any] | ParticleParameterInfo
-ParticleStackLike = dict[str, Any] | ParticleStackInfo
+_ParticleParameterLike = dict[str, Any] | _ParticleParameterInfo
+_ParticleStackLike = dict[str, Any] | _ParticleStackInfo
 
 
-class StarfileData(TypedDict):
+class _StarfileData(TypedDict):
     optics: pd.DataFrame
     particles: pd.DataFrame
 
 
-class MrcfileSettings(TypedDict):
+class _MrcfileSettings(TypedDict):
     prefix: str
     output_folder: str | pathlib.Path
     n_characters: int
@@ -116,7 +113,7 @@ class MrcfileSettings(TypedDict):
 
 
 class AbstractParticleStarFile(
-    AbstractParticleParameterFile[ParticleParameterInfo, ParticleParameterLike]
+    AbstractParticleParameterFile[_ParticleParameterInfo, _ParticleParameterLike]
 ):
     @property
     @override
@@ -140,7 +137,7 @@ class AbstractParticleStarFile(
 
     @property
     @abc.abstractmethod
-    def starfile_data(self) -> StarfileData:
+    def starfile_data(self) -> _StarfileData:
         raise NotImplementedError
 
     @starfile_data.setter
@@ -246,9 +243,9 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
             filter by class using
             `selection_filter["rlnClassNumber"] = lambda x: x == 0`.
         - `loads_metadata`:
-            If `True`, the resulting `ParticleParameterInfo` dict loads
+            If `True`, the resulting dict loads
             the raw metadata from the STAR file that is not otherwise included
-            in the `ParticleParameterInfo` as a `pandas.DataFrame`.
+            into a `pandas.DataFrame`.
             If this is set to `True`, note that dictionaries cannot pass through
             JIT boundaries without removing the metadata.
         - `broadcasts_image_config`:
@@ -293,7 +290,7 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
     @override
     def __getitem__(
         self, index: int | slice | Int[np.ndarray, ""] | Int[np.ndarray, " _"]
-    ) -> ParticleParameterInfo:
+    ) -> _ParticleParameterInfo:
         # Validate index
         n_rows = self.starfile_data["particles"].shape[0]
         _validate_dataset_index(type(self), index, n_rows)
@@ -328,7 +325,7 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
         else:
             metadata = None
 
-        return ParticleParameterInfo(
+        return _ParticleParameterInfo(
             image_config=image_config,
             pose=pose,
             transfer_theory=transfer_theory,
@@ -343,7 +340,7 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
     def __setitem__(
         self,
         index: int | slice | Int[np.ndarray, ""] | Int[np.ndarray, " _"],
-        value: ParticleParameterLike,
+        value: _ParticleParameterLike,
     ):
         # Make sure index is valid
         n_rows = self.starfile_data["particles"].shape[0]
@@ -381,10 +378,10 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
         particle_data.loc[
             particle_data.index[index], particle_data_for_update.columns
         ] = particle_data_for_update.values
-        self._starfile_data = StarfileData(optics=optics_data, particles=particle_data)
+        self._starfile_data = _StarfileData(optics=optics_data, particles=particle_data)
 
     @override
-    def append(self, value: ParticleParameterLike):
+    def append(self, value: _ParticleParameterLike):
         """Add an entry or entries to the dataset.
 
         **Arguments:**
@@ -420,7 +417,7 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
             if len(particle_data) > 0
             else particle_data_to_append
         )
-        self._starfile_data = StarfileData(optics=optics_data, particles=particle_data)
+        self._starfile_data = _StarfileData(optics=optics_data, particles=particle_data)
 
     @override
     def save(
@@ -458,7 +455,7 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
 
     @property
     @override
-    def starfile_data(self) -> StarfileData:
+    def starfile_data(self) -> _StarfileData:
         return self._starfile_data
 
     @starfile_data.setter
@@ -469,7 +466,7 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
             if isinstance(particle_data, pd.DataFrame) and isinstance(
                 optics_data, pd.DataFrame
             ):
-                self._starfile_data = StarfileData(
+                self._starfile_data = _StarfileData(
                     optics=optics_data, particles=particle_data
                 )
             else:
@@ -538,8 +535,8 @@ class RelionParticleParameterFile(AbstractParticleStarFile):
         self._rotation_convention = _validate_rotation_convention(value)
 
 
-class RelionParticleStackDataset(
-    AbstractParticleStackDataset[ParticleStackInfo, ParticleStackLike]
+class RelionParticleDataset(
+    AbstractParticleDataset[_ParticleStackInfo, _ParticleStackLike]
 ):
     """A dataset that wraps a RELION particle stack in
     [STAR](https://relion.readthedocs.io/en/latest/Reference/Conventions.html) format.
@@ -635,7 +632,7 @@ class RelionParticleStackDataset(
                 )
             if not project_exists:
                 raise FileNotFoundError(
-                    "`RelionParticleStackDataset` opened in "
+                    "`RelionParticleDataset` opened in "
                     "'mode = `r`', but the RELION project directory "
                     "`path_to_relion_project` does not exist. "
                     "To write images in a STAR file in a new RELION project, "
@@ -645,7 +642,7 @@ class RelionParticleStackDataset(
     @override
     def __getitem__(
         self, index: int | slice | Int[np.ndarray, ""] | Int[np.ndarray, " N"]
-    ) -> ParticleStackInfo:
+    ) -> _ParticleStackInfo:
         if self.loads_parameters:
             # Load images and parameters. First, read parameters
             # and metadata from the STAR file
@@ -670,7 +667,7 @@ class RelionParticleStackDataset(
             if parameters["pose"].offset_x_in_angstroms.ndim == 0:
                 images = np.squeeze(images)
 
-            return ParticleStackInfo(parameters=parameters, images=images)
+            return _ParticleStackInfo(parameters=parameters, images=images)
         else:
             # Otherwise, do not read parameters to more efficiently read images. First,
             # validate the dataset index.
@@ -699,7 +696,7 @@ class RelionParticleStackDataset(
             ):
                 images = np.squeeze(images)
 
-            return ParticleStackInfo(parameters=None, images=images)
+            return _ParticleStackInfo(parameters=None, images=images)
 
     @override
     def __len__(self) -> int:
@@ -707,7 +704,7 @@ class RelionParticleStackDataset(
 
     @override
     def __setitem__(
-        self, index: int | slice | Int[np.ndarray, ""], value: ParticleStackLike
+        self, index: int | slice | Int[np.ndarray, ""], value: _ParticleStackLike
     ):
         if isinstance(index, Int[np.ndarray, "_"]):  # type: ignore
             raise ValueError(
@@ -728,7 +725,7 @@ class RelionParticleStackDataset(
         self.write_images(index_array, images, parameters=parameters)
 
     @override
-    def append(self, value: ParticleStackLike):
+    def append(self, value: _ParticleStackLike):
         """Add an entry or entries to the dataset.
 
         **Arguments:**
@@ -762,7 +759,7 @@ class RelionParticleStackDataset(
         self,
         index_array: Int[np.ndarray, " _"],
         images: Float[NDArrayLike, "... _ _"],
-        parameters: ParticleParameterLike | None = None,
+        parameters: _ParticleParameterLike | None = None,
     ):
         # Get relevant metadata
         particle_data = self.parameter_file.starfile_data["particles"]
@@ -832,7 +829,7 @@ class RelionParticleStackDataset(
                 "file. Most likely, the filename the writer "
                 f"chose ({str(path_to_filename)}) already "
                 "exists. Try changing the "
-                "`RelionParticleStackDataset.mrcfile_settings`. "
+                "`RelionParticleDataset.mrcfile_settings`. "
                 f"The error message was:\n{err}"
             )
 
@@ -851,7 +848,7 @@ class RelionParticleStackDataset(
         return self._path_to_relion_project
 
     @property
-    def mrcfile_settings(self) -> MrcfileSettings:
+    def mrcfile_settings(self) -> _MrcfileSettings:
         return self._mrcfile_settings
 
     @mrcfile_settings.setter
@@ -872,7 +869,7 @@ def _load_starfile_data(
     selection_filter: dict[str, Callable] | None,
     mode: Literal["r", "w"],
     exists_ok: bool,
-) -> StarfileData:
+) -> _StarfileData:
     if mode == "r":
         if path_to_starfile.exists():
             starfile_data = read_starfile(path_to_starfile)
@@ -915,7 +912,7 @@ def _load_starfile_data(
                     "in `mode = 'r'`."
                 )
 
-    return StarfileData(
+    return _StarfileData(
         optics=starfile_data["optics"], particles=starfile_data["particles"]
     )
 
@@ -1333,7 +1330,7 @@ def _validate_rln_image_name_exists(particle_data, index):
     if "rlnImageName" not in particle_data.columns:
         raise OSError(
             "Tried to read STAR file for "
-            f"`RelionParticleStackDataset` index = {index}, "
+            f"`RelionParticleDataset` index = {index}, "
             "but no entry found for 'rlnImageName'."
         )
 
@@ -1342,8 +1339,8 @@ def _validate_rln_image_name_exists(particle_data, index):
 # Working with pytrees for I/O
 #
 def _unpack_particle_stack_dict(
-    value: ParticleStackLike,
-) -> tuple[Float[NDArrayLike, "... y_dim x_dim"], ParticleParameterLike | None]:
+    value: _ParticleStackLike,
+) -> tuple[Float[NDArrayLike, "... y_dim x_dim"], _ParticleParameterLike | None]:
     if "images" in value:
         images = value["images"]
     else:
@@ -1362,7 +1359,7 @@ def _unpack_particle_stack_dict(
 #
 # STAR file writing. First, functions for writing parameters
 #
-def _validate_parameters(parameters: ParticleParameterLike, force_keys: bool = False):
+def _validate_parameters(parameters: _ParticleParameterLike, force_keys: bool = False):
     if force_keys:
         if not {"image_config", "transfer_theory", "pose"}.issubset(parameters):
             raise ValueError(
@@ -1396,7 +1393,7 @@ def _validate_parameters(parameters: ParticleParameterLike, force_keys: bool = F
 
 
 def _parameters_to_optics_data(
-    parameters: ParticleParameterLike, optics_group_index: int
+    parameters: _ParticleParameterLike, optics_group_index: int
 ) -> pd.DataFrame:
     if {"image_config", "transfer_theory"}.issubset(parameters):
         shape = parameters["image_config"].shape
@@ -1459,7 +1456,7 @@ def _parameters_to_optics_data(
 
 
 def _parameters_to_particle_data(
-    parameters: ParticleParameterLike,
+    parameters: _ParticleParameterLike,
     optics_group_index: int | None = None,
 ) -> pd.DataFrame:
     particles_dict = {}
@@ -1624,14 +1621,14 @@ def _get_optics_group_from_particle_data(
 #
 # Now, functions for writing image files
 #
-def _dict_to_mrcfile_settings(d: dict[str, Any]) -> MrcfileSettings:
+def _dict_to_mrcfile_settings(d: dict[str, Any]) -> _MrcfileSettings:
     prefix = d["prefix"] if "prefix" in d else ""
     output_folder = d["output_folder"] if "output_folder" in d else ""
     delimiter = d["delimiter"] if "delimiter" in d else "_"
     n_characters = d["n_characters"] if "n_characters" in d else 6
     overwrite = d["overwrite"] if "overwrite" in d else False
     compression = d["compression"] if "compression" in d else None
-    return MrcfileSettings(
+    return _MrcfileSettings(
         prefix=prefix,
         output_folder=output_folder,
         delimiter=delimiter,
@@ -1652,7 +1649,7 @@ def _make_image_filename(
     index: Int[np.ndarray, " _"],
     particle_data: pd.DataFrame,
     n_particles: int,
-    mrcfile_settings: MrcfileSettings,
+    mrcfile_settings: _MrcfileSettings,
     path_to_relion_project: pathlib.Path,
 ) -> tuple[pathlib.Path, list[str]]:
     # Get the file number for this MRC file

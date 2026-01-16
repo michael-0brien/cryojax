@@ -48,7 +48,9 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
 
         self.ctf = ctf
         self.envelope = envelope
-        self.amplitude_contrast_ratio = error_if_not_fractional(amplitude_contrast_ratio)
+        self.amplitude_contrast_ratio = error_if_not_fractional(
+            jnp.asarray(amplitude_contrast_ratio, dtype=float)
+        )
         self.phase_shift = jnp.asarray(phase_shift, dtype=float)
 
     def propagate_object(
@@ -87,7 +89,7 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
             An optional defocus offset to apply to the CTF defocus at
             runtime.
         """
-        frequency_grid = image_config.padded_frequency_grid_in_angstroms
+        frequency_grid = image_config.get_frequency_grid(padding=True, physical=True)
         if not input_is_ewald_sphere:
             # Compute the CTF, including additional phase shifts
             ctf_array = self.ctf(
@@ -148,7 +150,7 @@ class WaveTransferTheory(AbstractTransferTheory, strict=True):
         defocus_offset: FloatLike | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]:
         """Apply the wave transfer function to the wavefunction in the exit plane."""
-        frequency_grid = image_config.padded_full_frequency_grid_in_angstroms
+        frequency_grid = image_config.get_frequency_grid(padding=True, full=True)
         # Compute the wave transfer function
         ctf_array = self.ctf(
             frequency_grid,
