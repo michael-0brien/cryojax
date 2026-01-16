@@ -240,7 +240,7 @@
   
     
   
-  FAQ
+  FAQs
 
       </a>
     </li>
@@ -508,28 +508,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../read-dataset/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Load cryo-EM images
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../extending-cryojax/" class="md-nav__link">
         
   
@@ -591,28 +569,6 @@
             Your first program
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../simulate-relion-dataset/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Write a STAR file of simulated data
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
             
               
                 
@@ -1262,28 +1218,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/dataset/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Cryo-EM datasets and software compatibility
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../api/jax_util/" class="md-nav__link">
         
   
@@ -1317,7 +1251,7 @@
         
   
   <span class="md-ellipsis">
-    FAQ
+    FAQs
     
   </span>
   
@@ -1479,7 +1413,7 @@ simulating an image, such as the pose, the volume, and the CTF and 2) Images are
 <span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/4ec41b21a1ff4f33835de4b0a42f45ed.png" /></p>
+<p><img alt="img" src="../_data/969a44dd56274b11aae8cf8350240a27.png" /></p>
 <p>Alternatively, the user can simulate an image with noise from a particular statistical distribution. In this example, we use the <code>GaussianWhiteNoiseModel</code>.</p>
 <p>Here, we will directly control image SNR by transforming the final image output using a <code>cryojax.ndimage.ImageScaling</code>.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">cryojax.ndimage</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">im</span>
@@ -1503,7 +1437,7 @@ simulating an image, such as the pose, the volume, and the CTF and 2) Images are
     <span class="n">pose</span><span class="p">,</span>
     <span class="n">transfer_theory</span><span class="p">,</span>
     <span class="n">normalizes_signal</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-    <span class="n">transform</span><span class="o">=</span><span class="n">im</span><span class="o">.</span><span class="n">ScaleImage</span><span class="p">(</span><span class="n">scale</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">snr</span><span class="p">)),</span>
+    <span class="n">image_transform</span><span class="o">=</span><span class="n">im</span><span class="o">.</span><span class="n">ScaleImage</span><span class="p">(</span><span class="n">scale</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">snr</span><span class="p">)),</span>
 <span class="p">)</span>
 <span class="n">noise_model</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">GaussianWhiteNoiseModel</span><span class="p">(</span><span class="n">image_model</span><span class="p">,</span> <span class="n">variance</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
 <span class="c1"># ... then, either simulate an image from this `noise_model``</span>
@@ -1524,7 +1458,7 @@ simulating an image, such as the pose, the volume, and the CTF and 2) Images are
 <span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/d8ec77914bba43bb80613d5afb7a4365.png" /></p>
+<p><img alt="img" src="../_data/30276b0b51ce40b29339fa6b7f09a121.png" /></p>
 <div class="highlight"><pre><span></span><code>
 </code></pre></div>
 

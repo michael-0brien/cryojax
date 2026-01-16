@@ -15,10 +15,10 @@
         <link rel="canonical" href="https://michael-0brien.github.io/cryojax/examples/extending-cryojax/">
       
       
-        <link rel="prev" href="../read-dataset/">
+        <link rel="prev" href="../compute-potential/">
       
       
-        <link rel="next" href="../simulate-relion-dataset/">
+        <link rel="next" href="../structure-refinement/">
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
@@ -240,7 +240,7 @@
   
     
   
-  FAQ
+  FAQs
 
       </a>
     </li>
@@ -497,28 +497,6 @@
                 
   
   
-  
-  
-    <li class="md-nav__item">
-      <a href="../read-dataset/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Load cryo-EM images
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
     
   
   
@@ -591,28 +569,6 @@
             Your first program
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../simulate-relion-dataset/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Write a STAR file of simulated data
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
             
               
                 
@@ -1262,28 +1218,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/dataset/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Cryo-EM datasets and software compatibility
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../api/jax_util/" class="md-nav__link">
         
   
@@ -1317,7 +1251,7 @@
         
   
   <span class="md-ellipsis">
-    FAQ
+    FAQs
     
   </span>
   
@@ -1498,7 +1432,7 @@
 </code></pre></div>
 <div class="highlight"><pre><span></span><code>(&lt;Figure size 300x300 with 2 Axes&gt;, &lt;Axes: &gt;)
 </code></pre></div>
-<p><img alt="img" src="../_data/17795cd4a1ee44298e0fdee1ccdf77a1.png" /></p>
+<p><img alt="img" src="../_data/c2e61fdbd8114466a22dbb6b16f04cc3.png" /></p>
 <div class="highlight"><pre><span></span><code><span class="c1"># This image should be identical to cryoJAX&#39;s built-in CTF at zero</span>
 <span class="c1"># astigmatism and spherical aberration!</span>
 <span class="n">builtin_ctf</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">AstigmaticCTF</span><span class="p">(</span>
@@ -1538,7 +1472,7 @@
 </code></pre></div>
 <div class="highlight"><pre><span></span><code>(&lt;Figure size 300x300 with 2 Axes&gt;, &lt;Axes: &gt;)
 </code></pre></div>
-<p><img alt="img" src="../_data/19401ce6597b4a7bad4a89c68e5b1db9.png" /></p>
+<p><img alt="img" src="../_data/e7d75069d759492cae818f26bc8b6c23.png" /></p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Again, confirm that this is the same as the native cryoJAX implementation</span>
 <span class="n">builtin_ctf</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">AstigmaticCTF</span><span class="p">(</span>
     <span class="n">defocus_in_angstroms</span><span class="o">=</span><span class="mi">10_000</span><span class="p">,</span>

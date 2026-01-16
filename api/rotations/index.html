@@ -18,7 +18,7 @@
         <link rel="prev" href="../constants/">
       
       
-        <link rel="next" href="../dataset/">
+        <link rel="next" href="../jax_util/">
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
@@ -245,7 +245,7 @@
   
     
   
-  FAQ
+  FAQs
 
       </a>
     </li>
@@ -498,28 +498,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/read-dataset/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Load cryo-EM images
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../examples/extending-cryojax/" class="md-nav__link">
         
   
@@ -581,28 +559,6 @@
             Your first program
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../examples/simulate-relion-dataset/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Write a STAR file of simulated data
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
             
               
                 
@@ -1295,6 +1251,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#cryojax.rotations.SO2" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;SO2
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1321,28 +1286,6 @@
           </ul>
         </nav>
       
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../dataset/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Cryo-EM datasets and software compatibility
-    
-  </span>
-  
-
-      </a>
     </li>
   
 
@@ -1388,7 +1331,7 @@
         
   
   <span class="md-ellipsis">
-    FAQ
+    FAQs
     
   </span>
   
@@ -1425,8 +1368,8 @@
 
 
 <h4 id="cryojax.rotations.SO3" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <span class="doc doc-object-name doc-class-name">cryojax.rotations.SO3</span>
-  <a href="https://github.com/michael-0brien/cryojax/blob/3d3cc768c78c3edcdcba8410c0532089981f5ee7/cryojax/rotations/_lie_group.py#L70-L340"><code class='hippogriffe-repo-url'></code></a>
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.rotations.SO3</code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/087671d33ff30213bda848bfeefc286f669318a3/cryojax/rotations/_lie_group.py#L79-L348"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.rotations.SO3" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1437,8 +1380,7 @@
 
         <p>A rotation in 3D space, represented by the
 SO3 matrix lie group.</p>
-<p>The class is almost exactly derived from the <code>jaxlie.SO3</code>
-object.</p>
+<p>The class is almost exactly derived from <code>jaxlie.SO3</code>.</p>
 <p><code>jaxlie</code> was written for <a href="https://ieeexplore.ieee.org/abstract/document/9636300">Yi, Brent, et al. 2021</a>.</p>
 
 
@@ -1464,14 +1406,12 @@ object.</p>
 
 
 <h5 id="cryojax.rotations.SO3.__init__" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">__init__</span>
-
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">wxyz</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;4&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">float</span><span class="p">])</span></code>
   
 
 
 <a href="#cryojax.rotations.SO3.__init__" class="headerlink" title="Permanent link">¤</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="fm">__init__</span><span class="p">(</span><span class="nf">wxyz</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;4&#39;</span><span class="p">])</span>
-</code></pre></div>
+
 
     <div class="doc doc-contents ">
 
@@ -1490,14 +1430,12 @@ object.</p>
 
 
 <h5 id="cryojax.rotations.SO3.apply" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">apply</span>
-
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">apply</span><span class="p">(</span><span class="n">target</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;3&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;3&#39;</span><span class="p">]</span></code>
   
 
 
 <a href="#cryojax.rotations.SO3.apply" class="headerlink" title="Permanent link">¤</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">apply</span><span class="p">(</span><span class="n">target</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;3&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;3&#39;</span><span class="p">]</span>
-</code></pre></div>
+
 
     <div class="doc doc-contents ">
 
@@ -1510,14 +1448,12 @@ object.</p>
 
 
 <h5 id="cryojax.rotations.SO3.compose" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">compose</span>
-
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">compose</span><span class="p">(</span><span class="n">other</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
   
 
 
 <a href="#cryojax.rotations.SO3.compose" class="headerlink" title="Permanent link">¤</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">compose</span><span class="p">(</span><span class="n">other</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span>
-</code></pre></div>
+
 
     <div class="doc doc-contents ">
 
@@ -1530,14 +1466,12 @@ object.</p>
 
 
 <h5 id="cryojax.rotations.SO3.inverse" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">inverse</span>
-
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">inverse</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
   
 
 
 <a href="#cryojax.rotations.SO3.inverse" class="headerlink" title="Permanent link">¤</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">inverse</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span>
-</code></pre></div>
+
 
     <div class="doc doc-contents ">
 
@@ -1550,8 +1484,7 @@ object.</p>
 
 
 <h5 id="cryojax.rotations.SO3.from_x_radians" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">from_x_radians</span>
-
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">from_x_radians</span><span class="p">(</span><span class="n">angle</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
   
 
 
@@ -1560,8 +1493,7 @@ object.</p>
   </span>
 
 <a href="#cryojax.rotations.SO3.from_x_radians" class="headerlink" title="Permanent link">¤</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">from_x_radians</span><span class="p">(</span><span class="n">angle</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span>
-</code></pre></div>
+
 
     <div class="doc doc-contents ">
 
@@ -1576,8 +1508,7 @@ object.</p>
 
 
 <h5 id="cryojax.rotations.SO3.from_y_radians" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">from_y_radians</span>
-
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">from_y_radians</span><span class="p">(</span><span class="n">angle</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
   
 
 
@@ -1586,8 +1517,7 @@ object.</p>
   </span>
 
 <a href="#cryojax.rotations.SO3.from_y_radians" class="headerlink" title="Permanent link">¤</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">from_y_radians</span><span class="p">(</span><span class="n">angle</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span>
-</code></pre></div>
+
 
     <div class="doc doc-contents ">
 
@@ -1602,8 +1532,7 @@ object.</p>
 
 
 <h5 id="cryojax.rotations.SO3.from_z_radians" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">from_z_radians</span>
-
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">from_z_radians</span><span class="p">(</span><span class="n">angle</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
   
 
 
@@ -1612,8 +1541,7 @@ object.</p>
   </span>
 
 <a href="#cryojax.rotations.SO3.from_z_radians" class="headerlink" title="Permanent link">¤</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">from_z_radians</span><span class="p">(</span><span class="n">angle</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span>
-</code></pre></div>
+
 
     <div class="doc doc-contents ">
 
@@ -1628,8 +1556,7 @@ object.</p>
 
 
 <h5 id="cryojax.rotations.SO3.identity" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">identity</span>
-
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">identity</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
   
 
 
@@ -1638,8 +1565,7 @@ object.</p>
   </span>
 
 <a href="#cryojax.rotations.SO3.identity" class="headerlink" title="Permanent link">¤</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">identity</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span>
-</code></pre></div>
+
 
     <div class="doc doc-contents ">
 
@@ -1652,8 +1578,7 @@ object.</p>
 
 
 <h5 id="cryojax.rotations.SO3.from_matrix" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">from_matrix</span>
-
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">from_matrix</span><span class="p">(</span><span class="n">matrix</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;3 3&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
   
 
 
@@ -1662,8 +1587,7 @@ object.</p>
   </span>
 
 <a href="#cryojax.rotations.SO3.from_matrix" class="headerlink" title="Permanent link">¤</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">from_matrix</span><span class="p">(</span><span class="n">matrix</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;3 3&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span>
-</code></pre></div>
+
 
     <div class="doc doc-contents ">
 
@@ -1676,14 +1600,12 @@ object.</p>
 
 
 <h5 id="cryojax.rotations.SO3.as_matrix" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">as_matrix</span>
-
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">as_matrix</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;3 3&#39;</span><span class="p">]</span></code>
   
 
 
 <a href="#cryojax.rotations.SO3.as_matrix" class="headerlink" title="Permanent link">¤</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">as_matrix</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;3 3&#39;</span><span class="p">]</span>
-</code></pre></div>
+
 
     <div class="doc doc-contents ">
 
@@ -1696,8 +1618,7 @@ object.</p>
 
 
 <h5 id="cryojax.rotations.SO3.exp" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">exp</span>
-
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">exp</span><span class="p">(</span><span class="n">tangent</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;3&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
   
 
 
@@ -1706,8 +1627,7 @@ object.</p>
   </span>
 
 <a href="#cryojax.rotations.SO3.exp" class="headerlink" title="Permanent link">¤</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">exp</span><span class="p">(</span><span class="n">tangent</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;3&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span>
-</code></pre></div>
+
 
     <div class="doc doc-contents ">
 
@@ -1720,39 +1640,14 @@ object.</p>
 
 
 <h5 id="cryojax.rotations.SO3.log" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">log</span>
-
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">log</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;3&#39;</span><span class="p">]</span></code>
   
 
 
 <a href="#cryojax.rotations.SO3.log" class="headerlink" title="Permanent link">¤</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">log</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;3&#39;</span><span class="p">]</span>
-</code></pre></div>
+
 
     <div class="doc doc-contents ">
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h5 id="cryojax.rotations.SO3.adjoint" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">adjoint</span>
-
-  
-
-
-<a href="#cryojax.rotations.SO3.adjoint" class="headerlink" title="Permanent link">¤</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">adjoint</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;3 3&#39;</span><span class="p">]</span>
-</code></pre></div>
-
-    <div class="doc doc-contents ">
-
-        <p>Computes the adjoint, which transforms tangent vectors
-between tangent spaces.</p>
 
 
     </div>
@@ -1763,14 +1658,12 @@ between tangent spaces.</p>
 
 
 <h5 id="cryojax.rotations.SO3.normalize" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">normalize</span>
-
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">normalize</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
   
 
 
 <a href="#cryojax.rotations.SO3.normalize" class="headerlink" title="Permanent link">¤</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">normalize</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span>
-</code></pre></div>
+
 
     <div class="doc doc-contents ">
 
@@ -1783,8 +1676,7 @@ between tangent spaces.</p>
 
 
 <h5 id="cryojax.rotations.SO3.sample_uniform" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">sample_uniform</span>
-
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">sample_uniform</span><span class="p">(</span><span class="n">key</span><span class="p">:</span> <span class="n">PRNGKeyArray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
   
 
 
@@ -1793,8 +1685,319 @@ between tangent spaces.</p>
   </span>
 
 <a href="#cryojax.rotations.SO3.sample_uniform" class="headerlink" title="Permanent link">¤</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">sample_uniform</span><span class="p">(</span><span class="n">key</span><span class="p">:</span> <span class="n">PRNGKeyArray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span>
-</code></pre></div>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="cryojax.rotations.SO2" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.rotations.SO2</code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/087671d33ff30213bda848bfeefc286f669318a3/cryojax/rotations/_lie_group.py#L351-L454"><code class='hippogriffe-repo-url'></code></a>
+
+
+<a href="#cryojax.rotations.SO2" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+
+        <p>A rotation in 2D space, represented by the
+SO2 matrix lie group.</p>
+<p>The class is almost exactly derived from <code>jaxlie.SO2</code>.</p>
+<p><code>jaxlie</code> was written for <a href="https://ieeexplore.ieee.org/abstract/document/9636300">Yi, Brent, et al. 2021</a>.</p>
+
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.rotations.SO2.__init__" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">unit_complex</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;2&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">float</span><span class="p">])</span></code>
+  
+
+
+<a href="#cryojax.rotations.SO2.__init__" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p><strong>Arguments:</strong></p>
+<ul>
+<li><code>unit_complex</code>:
+    A complex number represented as a 2-vector
+    <span class="arithmatex">\((cos \theta, sin \theta)\)</span>.</li>
+</ul>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.rotations.SO2.apply" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">apply</span><span class="p">(</span><span class="n">target</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;2&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;2&#39;</span><span class="p">]</span></code>
+  
+
+
+<a href="#cryojax.rotations.SO2.apply" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.rotations.SO2.compose" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">compose</span><span class="p">(</span><span class="n">other</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
+  
+
+
+<a href="#cryojax.rotations.SO2.compose" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.rotations.SO2.inverse" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">inverse</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
+  
+
+
+<a href="#cryojax.rotations.SO2.inverse" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.rotations.SO2.from_radians" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">from_radians</span><span class="p">(</span><span class="n">theta</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
+  
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#cryojax.rotations.SO2.from_radians" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Construct a rotation object from a scalar angle.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.rotations.SO2.as_radians" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">as_radians</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span></code>
+  
+
+
+<a href="#cryojax.rotations.SO2.as_radians" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Compute a scalar angle from a rotation object.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.rotations.SO2.identity" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">identity</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
+  
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#cryojax.rotations.SO2.identity" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.rotations.SO2.from_matrix" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">from_matrix</span><span class="p">(</span><span class="n">matrix</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;2 2&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
+  
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#cryojax.rotations.SO2.from_matrix" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.rotations.SO2.as_matrix" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">as_matrix</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;2 2&#39;</span><span class="p">]</span></code>
+  
+
+
+<a href="#cryojax.rotations.SO2.as_matrix" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.rotations.SO2.exp" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">exp</span><span class="p">(</span><span class="n">tangent</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
+  
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#cryojax.rotations.SO2.exp" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.rotations.SO2.log" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">log</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span></code>
+  
+
+
+<a href="#cryojax.rotations.SO2.log" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.rotations.SO2.normalize" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">normalize</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
+  
+
+
+<a href="#cryojax.rotations.SO2.normalize" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.rotations.SO2.sample_uniform" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">sample_uniform</span><span class="p">(</span><span class="n">key</span><span class="p">:</span> <span class="n">PRNGKeyArray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
+  
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#cryojax.rotations.SO2.sample_uniform" class="headerlink" title="Permanent link">¤</a></h5>
+
 
     <div class="doc doc-contents ">
 

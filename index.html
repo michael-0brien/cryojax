@@ -241,7 +241,7 @@
   
     
   
-  FAQ
+  FAQs
 
       </a>
     </li>
@@ -365,6 +365,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#installation_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Installation
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#simulating-an-image" class="md-nav__link">
     <span class="md-ellipsis">
       Simulating an image
@@ -412,6 +421,15 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#projects-using-cryojax" class="md-nav__link">
+    <span class="md-ellipsis">
+      Projects using cryoJAX
+    </span>
+  </a>
   
 </li>
       
@@ -604,28 +622,6 @@
   
   
     <li class="md-nav__item">
-      <a href="examples/read-dataset/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Load cryo-EM images
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="examples/extending-cryojax/" class="md-nav__link">
         
   
@@ -687,28 +683,6 @@
             Your first program
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="examples/simulate-relion-dataset/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Write a STAR file of simulated data
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
             
               
                 
@@ -1358,28 +1332,6 @@
   
   
     <li class="md-nav__item">
-      <a href="api/dataset/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Cryo-EM datasets and software compatibility
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="api/jax_util/" class="md-nav__link">
         
   
@@ -1413,7 +1365,7 @@
         
   
   <span class="md-ellipsis">
-    FAQ
+    FAQs
     
   </span>
   
@@ -1443,17 +1395,19 @@
 <p>CryoJAX is a library that simulates cryo-electron microscopy (cryo-EM) images in <a href="https://jax.readthedocs.io/en/latest/">JAX</a>. Its purpose is to provide the tools for building downstream data analysis in external workflows and libraries that leverage the statistical inference and machine learning resources of the JAX scientific computing ecosystem. To achieve this, image simulation in cryoJAX is built for reliability and flexibility: it implements a variety of established models and algorithms as well as a framework for implementing new models and algorithms downstream. If your application uses cryo-EM image simulation and it cannot be built downstream, open a <a href="https://github.com/michael-0brien/cryojax/pulls">pull request</a>.</p>
 <p>This documentation is currently a work-in-progress. Your patience while we get this project properly documented is much appreciated! Feel free to get in touch on github <a href="https://github.com/michael-0brien/cryojax/issues">issues</a> if you have any questions, bug reports, or feature requests.</p>
 <h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">¤</a></h2>
-<p>Installing <code>cryojax</code> is simple. To start, I recommend creating a new virtual environment. For example, you could do this with <code>conda</code>.</p>
-<div class="highlight"><pre><span></span><code>conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>cryojax-env<span class="w"> </span>-c<span class="w"> </span>conda-forge<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.11
+<h2 id="installation_1">Installation<a class="headerlink" href="#installation_1" title="Permanent link">¤</a></h2>
+<p>Installing <code>cryojax</code> is simple. To start, I recommend creating a new virtual environment. For example, you could do this with <a href="https://docs.astral.sh/uv/pip/environments/#creating-a-virtual-environment"><code>uv</code></a>.</p>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>venv<span class="w"> </span>--python<span class="o">=</span><span class="m">3</span>.11<span class="w"> </span>~/path/to/venv/
+<span class="nb">source</span><span class="w"> </span>~/path/to/venv/bin/activate
 </code></pre></div>
 <p>Note that <code>python&gt;=3.10</code> is required. After creating and activating the new environment, <a href="https://github.com/google/jax#installation">install JAX</a> with either CPU or GPU support. Then, install <code>cryojax</code>. For the latest stable release, install using <code>pip</code>.</p>
-<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>cryojax
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>cryojax
 </code></pre></div>
 <p>To install the latest commit, you can build the repository directly.</p>
 <div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/michael-0brien/cryojax
 <span class="nb">cd</span><span class="w"> </span>cryojax
 git<span class="w"> </span>checkout<span class="w"> </span>dev
-python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>.
+uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>.
 </code></pre></div>
 <p>The <a href="https://github.com/dfm/jax-finufft"><code>jax-finufft</code></a> package is an optional dependency used for non-uniform fast fourier transforms. This is used in select methods for computing image projections from atoms and voxels. If you would like to use these methods, we recommend first following the <code>jax_finufft</code> installation instructions and then installing <code>cryojax</code>.</p>
 <h2 id="simulating-an-image">Simulating an image<a class="headerlink" href="#simulating-an-image" title="Permanent link">¤</a></h2>
@@ -1465,7 +1419,7 @@ python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </sp
 <span class="c1"># Instantiate a cryoJAX `image_model`</span>
 <span class="n">image_model</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">make_image_model</span><span class="p">(</span>
     <span class="c1"># ... load atoms as gaussians mixture from tabulated electron scattering factors</span>
-    <span class="n">volume_parametrization</span><span class="o">=</span><span class="n">cxs</span><span class="o">.</span><span class="n">load_tabulated_volume</span><span class="p">(</span>
+    <span class="n">volume</span><span class="o">=</span><span class="n">cxs</span><span class="o">.</span><span class="n">load_tabulated_volume</span><span class="p">(</span>
         <span class="s2">&quot;example.pdb&quot;</span><span class="p">,</span> <span class="n">output_type</span><span class="o">=</span><span class="n">cxs</span><span class="o">.</span><span class="n">GaussianMixtureVolume</span>
     <span class="p">),</span>
     <span class="c1"># ... configure the image</span>
@@ -1548,10 +1502,15 @@ python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </sp
 <span class="n">model_vmap</span><span class="p">,</span> <span class="n">model_novmap</span> <span class="o">=</span> <span class="n">make_model_vmap</span><span class="p">(</span><span class="n">wxyz</span><span class="p">,</span> <span class="n">volume</span><span class="p">,</span> <span class="n">image_config</span><span class="p">,</span> <span class="n">transfer_theory</span><span class="p">)</span>
 <span class="n">images</span> <span class="o">=</span> <span class="n">simulate_fn_vmap</span><span class="p">(</span><span class="n">model_vmap</span><span class="p">,</span> <span class="n">model_novmap</span><span class="p">)</span>
 </code></pre></div>
+<h2 id="projects-using-cryojax">Projects using cryoJAX<a class="headerlink" href="#projects-using-cryojax" title="Permanent link">¤</a></h2>
+<p>CryoJAX is meant to support an ecosystem of libraries for the development of emerging data analysis techniques in cryo-EM. If your package uses cryoJAX, <a href="https://github.com/michael-0brien/cryojax/pulls">open a PR</a> to get it added to this list!</p>
+<ul>
+<li><a href="https://github.com/michael-0brien/cryospax"><code>cryospax</code></a>: A small library to support cryo-EM single particle analysis applications using cryoJAX</li>
+</ul>
 <h2 id="acknowledgements">Acknowledgements<a class="headerlink" href="#acknowledgements" title="Permanent link">¤</a></h2>
 <ul>
-<li><code>cryojax</code> implementations of several models and algorithms, such as the CTF, fourier slice extraction, and electrostatic potential computations has been informed by the open-source cryo-EM software <a href="https://github.com/timothygrant80/cisTEM"><code>cisTEM</code></a>.</li>
-<li><code>cryojax</code> is built using <code>equinox</code>, a popular JAX library for PyTorch-like classes that smoothly integrate with JAX functional programming. We highly recommend learning about <code>equinox</code> to fully make use of the power of <code>jax</code>.</li>
+<li>Implementations of several models and algorithms, such as the CTF, fourier slice extraction, and electrostatic potential computations has been informed by the open-source cryo-EM software <a href="https://github.com/timothygrant80/cisTEM"><code>cisTEM</code></a>.</li>
+<li><code>cryojax</code> is built using <a href="https://github.com/patrick-kidger/equinox"><code>equinox</code></a>, a popular JAX library for PyTorch-like classes that smoothly integrate with JAX functional programming. We highly recommend learning about <code>equinox</code> to fully make use of the power of <code>jax</code>.</li>
 </ul>
 
 

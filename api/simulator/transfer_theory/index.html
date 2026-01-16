@@ -245,7 +245,7 @@
   
     
   
-  FAQ
+  FAQs
 
       </a>
     </li>
@@ -498,28 +498,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../examples/read-dataset/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Load cryo-EM images
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../../examples/extending-cryojax/" class="md-nav__link">
         
   
@@ -581,28 +559,6 @@
             Your first program
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../examples/simulate-relion-dataset/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Write a STAR file of simulated data
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
             
               
                 
@@ -1359,28 +1315,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dataset/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Cryo-EM datasets and software compatibility
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../jax_util/" class="md-nav__link">
         
   
@@ -1414,7 +1348,7 @@
         
   
   <span class="md-ellipsis">
-    FAQ
+    FAQs
     
   </span>
   
@@ -1478,8 +1412,8 @@
 
 
 <h4 id="cryojax.simulator.AbstractCTF" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <span class="doc doc-object-name doc-class-name">cryojax.simulator.AbstractCTF</span>
-  <a href="https://github.com/michael-0brien/cryojax/blob/3d3cc768c78c3edcdcba8410c0532089981f5ee7/cryojax/simulator/_transfer_theory/transfer_function.py#L15-L81"><code class='hippogriffe-repo-url'></code></a>
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.AbstractCTF</code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/087671d33ff30213bda848bfeefc286f669318a3/cryojax/simulator/_transfer_theory/transfer_function.py#L15-L81"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.AbstractCTF" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1513,14 +1447,12 @@
 
 
 <h5 id="cryojax.simulator.AbstractCTF.compute_aberration_phase_shifts" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">compute_aberration_phase_shifts</span>
-
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">compute_aberration_phase_shifts</span><span class="p">(</span><span class="n">frequency_grid_in_angstroms</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim 2&#39;</span><span class="p">],</span> <span class="n">wavelength_in_angstroms</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span><span class="p">,</span> <span class="n">defocus_offset</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim&#39;</span><span class="p">]</span></code>
   
 
 
 <a href="#cryojax.simulator.AbstractCTF.compute_aberration_phase_shifts" class="headerlink" title="Permanent link">¤</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">compute_aberration_phase_shifts</span><span class="p">(</span><span class="n">frequency_grid_in_angstroms</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim 2&#39;</span><span class="p">],</span> <span class="n">wavelength_in_angstroms</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span><span class="p">,</span> <span class="n">defocus_offset</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim&#39;</span><span class="p">]</span>
-</code></pre></div>
+
 
     <div class="doc doc-contents ">
 
@@ -1543,8 +1475,8 @@
 
 
 <h4 id="cryojax.simulator.AstigmaticCTF" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <span class="doc doc-object-name doc-class-name">cryojax.simulator.AstigmaticCTF(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractCTF">cryojax.simulator.AbstractCTF</a>)</span>
-  <a href="https://github.com/michael-0brien/cryojax/blob/3d3cc768c78c3edcdcba8410c0532089981f5ee7/cryojax/simulator/_transfer_theory/transfer_function.py#L84-L169"><code class='hippogriffe-repo-url'></code></a>
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.AstigmaticCTF(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractCTF">cryojax.simulator.AbstractCTF</a>)</code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/087671d33ff30213bda848bfeefc286f669318a3/cryojax/simulator/_transfer_theory/transfer_function.py#L84-L169"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.AstigmaticCTF" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1593,14 +1525,12 @@ from CTFFIND to <code>cryojax</code>,</p>
 
 
 <h5 id="cryojax.simulator.AstigmaticCTF.__init__" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">__init__</span>
-
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">defocus_in_angstroms</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">=</span> <span class="mf">10000.0</span><span class="p">,</span> <span class="n">astigmatism_in_angstroms</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">astigmatism_angle</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">spherical_aberration_in_mm</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">=</span> <span class="mf">2.7</span><span class="p">)</span></code>
   
 
 
 <a href="#cryojax.simulator.AstigmaticCTF.__init__" class="headerlink" title="Permanent link">¤</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="fm">__init__</span><span class="p">(</span><span class="nf">defocus_in_angstroms</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">=</span> <span class="mf">10000.0</span><span class="p">,</span> <span class="n">astigmatism_in_angstroms</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">astigmatism_angle</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">spherical_aberration_in_mm</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">=</span> <span class="mf">2.7</span><span class="p">)</span>
-</code></pre></div>
+
 
     <div class="doc doc-contents ">
 
@@ -1621,14 +1551,12 @@ from CTFFIND to <code>cryojax</code>,</p>
 
 
 <h5 id="cryojax.simulator.AstigmaticCTF.compute_aberration_phase_shifts" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">compute_aberration_phase_shifts</span>
-
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">compute_aberration_phase_shifts</span><span class="p">(</span><span class="n">frequency_grid_in_angstroms</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim 2&#39;</span><span class="p">],</span> <span class="n">wavelength_in_angstroms</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span><span class="p">,</span> <span class="n">defocus_offset</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim&#39;</span><span class="p">]</span></code>
   
 
 
 <a href="#cryojax.simulator.AstigmaticCTF.compute_aberration_phase_shifts" class="headerlink" title="Permanent link">¤</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">compute_aberration_phase_shifts</span><span class="p">(</span><span class="n">frequency_grid_in_angstroms</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim 2&#39;</span><span class="p">],</span> <span class="n">wavelength_in_angstroms</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span><span class="p">,</span> <span class="n">defocus_offset</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim&#39;</span><span class="p">]</span>
-</code></pre></div>
+
 
     <div class="doc doc-contents ">
 
@@ -1657,14 +1585,12 @@ spatial frequency <span class="arithmatex">\(\boldsymbol{q}\)</span>.</p>
 
 
 <h5 id="cryojax.simulator.AstigmaticCTF.__call__" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">__call__</span>
-
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__call__</span><span class="p">(</span><span class="n">frequency_grid_in_angstroms</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim 2&#39;</span><span class="p">],</span> <span class="n">voltage_in_kilovolts</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span><span class="p">,</span> <span class="n">amplitude_contrast_ratio</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span> <span class="n">phase_shift</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">outputs_exp</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">defocus_offset</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim&#39;</span><span class="p">]</span></code>
   
 
 
 <a href="#cryojax.simulator.AstigmaticCTF.__call__" class="headerlink" title="Permanent link">¤</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="fm">__call__</span><span class="p">(</span><span class="nf">frequency_grid_in_angstroms</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim 2&#39;</span><span class="p">],</span> <span class="n">voltage_in_kilovolts</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span><span class="p">,</span> <span class="n">amplitude_contrast_ratio</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span> <span class="n">phase_shift</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">outputs_exp</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">defocus_offset</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim&#39;</span><span class="p">]</span>
-</code></pre></div>
+
 
     <div class="doc doc-contents ">
 
@@ -1707,8 +1633,8 @@ spatial frequency <span class="arithmatex">\(\boldsymbol{q}\)</span>.</p>
 
 
 <h4 id="cryojax.simulator.ContrastTransferTheory" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <span class="doc doc-object-name doc-class-name">cryojax.simulator.ContrastTransferTheory</span>
-  <a href="https://github.com/michael-0brien/cryojax/blob/3d3cc768c78c3edcdcba8410c0532089981f5ee7/cryojax/simulator/_transfer_theory/transfer_theory.py#L21-L120"><code class='hippogriffe-repo-url'></code></a>
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.ContrastTransferTheory</code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/087671d33ff30213bda848bfeefc286f669318a3/cryojax/simulator/_transfer_theory/transfer_theory.py#L21-L122"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.ContrastTransferTheory" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1745,14 +1671,12 @@ image from a 2D projection.</p>
 
 
 <h5 id="cryojax.simulator.ContrastTransferTheory.__init__" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">__init__</span>
-
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">ctf</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractCTF</span><span class="p">,</span> <span class="n">envelope</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">ndimage</span><span class="o">.</span><span class="n">AbstractFourierOperator</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">amplitude_contrast_ratio</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span> <span class="n">phase_shift</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">)</span></code>
   
 
 
 <a href="#cryojax.simulator.ContrastTransferTheory.__init__" class="headerlink" title="Permanent link">¤</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="fm">__init__</span><span class="p">(</span><span class="nf">ctf</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractCTF</span><span class="p">,</span> <span class="n">envelope</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">ndimage</span><span class="o">.</span><span class="n">AbstractFourierOperator</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">amplitude_contrast_ratio</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span> <span class="n">phase_shift</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">)</span>
-</code></pre></div>
+
 
     <div class="doc doc-contents ">
 
@@ -1773,14 +1697,12 @@ image from a 2D projection.</p>
 
 
 <h5 id="cryojax.simulator.ContrastTransferTheory.propagate_object" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">propagate_object</span>
-
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">propagate_object</span><span class="p">(</span><span class="n">object_spectrum</span><span class="p">:</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> {image_config.padded_x_dim//2+1}&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> </span><span class="si">{image_config.padded_x_dim}</span><span class="s1">&#39;</span><span class="p">],</span> <span class="n">image_config</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractImageConfig</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">defocus_offset</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">input_is_ewald_sphere</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> {image_config.padded_x_dim//2+1}&#39;</span><span class="p">]</span></code>
   
 
 
 <a href="#cryojax.simulator.ContrastTransferTheory.propagate_object" class="headerlink" title="Permanent link">¤</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">propagate_object</span><span class="p">(</span><span class="n">object_spectrum</span><span class="p">:</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> {image_config.padded_x_dim//2+1}&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> </span><span class="si">{image_config.padded_x_dim}</span><span class="s1">&#39;</span><span class="p">],</span> <span class="n">image_config</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractImageConfig</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">defocus_offset</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">input_is_ewald_sphere</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> {image_config.padded_x_dim//2+1}&#39;</span><span class="p">]</span>
-</code></pre></div>
+
 
     <div class="doc doc-contents ">
 

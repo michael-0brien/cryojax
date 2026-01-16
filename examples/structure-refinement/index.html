@@ -15,7 +15,7 @@
         <link rel="canonical" href="https://michael-0brien.github.io/cryojax/examples/structure-refinement/">
       
       
-        <link rel="prev" href="../simulate-relion-dataset/">
+        <link rel="prev" href="../extending-cryojax/">
       
       
         <link rel="next" href="../../api/simulator/entry-point/">
@@ -240,7 +240,7 @@
   
     
   
-  FAQ
+  FAQs
 
       </a>
     </li>
@@ -498,28 +498,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../read-dataset/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Load cryo-EM images
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../extending-cryojax/" class="md-nav__link">
         
   
@@ -583,28 +561,6 @@
             Your first program
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../simulate-relion-dataset/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Write a STAR file of simulated data
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
             
               
                 
@@ -1262,28 +1218,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/dataset/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Cryo-EM datasets and software compatibility
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../api/jax_util/" class="md-nav__link">
         
   
@@ -1317,7 +1251,7 @@
         
   
   <span class="md-ellipsis">
-    FAQ
+    FAQs
     
   </span>
   
@@ -1456,7 +1390,7 @@
         <span class="n">normalizes_signal</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
         <span class="n">signal_region</span><span class="o">=</span><span class="n">circular_mask</span><span class="o">.</span><span class="n">get</span><span class="p">()</span> <span class="o">==</span> <span class="mf">1.0</span><span class="p">,</span>
         <span class="n">signal_centering</span><span class="o">=</span><span class="s2">&quot;bg&quot;</span><span class="p">,</span>
-        <span class="n">transform</span><span class="o">=</span><span class="n">im</span><span class="o">.</span><span class="n">ScaleImage</span><span class="p">(</span><span class="n">scale</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">SNR</span><span class="p">)),</span>
+        <span class="n">image_transform</span><span class="o">=</span><span class="n">im</span><span class="o">.</span><span class="n">ScaleImage</span><span class="p">(</span><span class="n">scale</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">SNR</span><span class="p">)),</span>
     <span class="p">)</span>
     <span class="n">noise_model</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">GaussianWhiteNoiseModel</span><span class="p">(</span><span class="n">image_model</span><span class="p">,</span> <span class="n">variance</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
     <span class="n">parameters</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
@@ -1497,7 +1431,7 @@
 <span class="p">)</span>
 <span class="n">plot_image_stack</span><span class="p">(</span><span class="n">dataset_images</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">9</span><span class="p">])</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/ed7e1cbb8b684037afc3b555923f360f.png" /></p>
+<p><img alt="img" src="../_data/ed8ca3f8282c41bf9b275304c8e1c6a1.png" /></p>
 <p>Next, define the loss function. We will naively do a gradient descent on the positions of the C-alpha atoms to see if we can capture the large-scale difference of the conformational change.</p>
 <div class="highlight"><pre><span></span><code><span class="nd">@eqx</span><span class="o">.</span><span class="n">filter_value_and_grad</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">compute_loss</span><span class="p">(</span><span class="n">atom_positions</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
@@ -1620,7 +1554,7 @@ step=99, loss=-117238.9296875
 </code></pre></div>
 <div class="highlight"><pre><span></span><code>[Text(0.5, 0, &#39;step number&#39;), Text(0, 0.5, &#39;cross-correlation loss&#39;)]
 </code></pre></div>
-<p><img alt="img" src="../_data/c4f1daae93f14b77a40aaa3317ab5e62.png" /></p>
+<p><img alt="img" src="../_data/39cfb89358d84c719150d5c8473d073c.png" /></p>
 <p>Now let's check the results! Let's first look at FSC curves between the ground truth and structure before and after refinement.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">cryojax.ndimage</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">compute_fourier_shell_correlation</span><span class="p">,</span>
@@ -1666,7 +1600,7 @@ step=99, loss=-117238.9296875
 <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/588404bc91da45bf9259eae813df0860.png" /></p>
+<p><img alt="img" src="../_data/d55d8a3e851848e787fec34b647946af.png" /></p>
 <p>The above FSC curves quantifies the increase in correlation after gradient descent refinement. Indeed, visually the refinement is able to (roughly) recover the ground truth conformation!</p>
 <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_cross_sections</span><span class="p">(</span>
     <span class="n">pos1</span><span class="p">,</span> <span class="n">pos2</span><span class="p">,</span> <span class="n">axes</span><span class="p">,</span> <span class="n">label1</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">label2</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">color1</span><span class="o">=</span><span class="s2">&quot;b&quot;</span><span class="p">,</span> <span class="n">color2</span><span class="o">=</span><span class="s2">&quot;orange&quot;</span>
@@ -1705,7 +1639,7 @@ step=99, loss=-117238.9296875
 <span class="n">fig</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s2">&quot;Central cross sections of GMM positions&quot;</span><span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/5aa2f8e3d7634089b2c012dd6d6be5b0.png" /></p>
+<p><img alt="img" src="../_data/61ab488425b1453ab17cd3502e0a465f.png" /></p>
 <p>Interactive plots of the 3D point clouds can be generated locally using <code>plotly</code> with the following code block:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">plotly.graph_objects</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">go</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">plotly.subplots</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_subplots</span>
