@@ -6,8 +6,6 @@ This documentation is currently a work-in-progress. Your patience while we get t
 
 ## Installation
 
-## Installation
-
 Installing `cryojax` is simple. To start, I recommend creating a new virtual environment. For example, you could do this with [`uv`](https://docs.astral.sh/uv/pip/environments/#creating-a-virtual-environment).
 
 ```bash
