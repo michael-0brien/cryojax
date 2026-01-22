@@ -8,7 +8,7 @@ import pathlib
 import typing
 import warnings
 from copy import copy
-from typing import Literal, TypedDict, overload
+from typing import Any, Literal, TypedDict, overload
 from xml.etree import ElementTree
 
 import jax
@@ -97,7 +97,7 @@ def read_atoms_from_pdb(
     | tuple[
         Float[np.ndarray, "... n_atoms 3"],
         Int[np.ndarray, " n_atoms"],
-        AtomProperties | np.ndarray,  # Included for `loads_b_factors=True`
+        dict[str, Any],
     ]
 ):
     """Load relevant atomic information for simulating cryo-EM
@@ -238,7 +238,7 @@ def mmdf_to_atoms(
     | tuple[
         Float[np.ndarray, "... n_atoms 3"],
         Int[np.ndarray, "... n_atoms"],
-        AtomProperties | np.ndarray,
+        dict[str, Any],
     ]
 ):
     """Load relevant atomic information for simulating cryo-EM
