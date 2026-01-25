@@ -26,7 +26,6 @@ dependencies = [
     "starfile",
     "pandas",
     "typing_extensions>=4.5.0",
-    "tqdm",
     "mmdf",
     "mdtraj",
 ]
