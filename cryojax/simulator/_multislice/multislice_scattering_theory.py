@@ -1,10 +1,8 @@
 from typing_extensions import override
 
-import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
-from ..._internal import error_if_not_fractional
-from ...jax_util import FloatLike
+from ...jax_util import FloatLike, error_if_not_fractional
 from .._image_config import AbstractImageConfig
 from .._multislice import AbstractMultisliceIntegrator
 from .._scattering_theory import AbstractWaveScatteringTheory
@@ -33,7 +31,7 @@ class MultisliceScatteringTheory(AbstractWaveScatteringTheory, strict=True):
         """
         self.volume_integrator = volume_integrator
         self.transfer_theory = transfer_theory
-        self.amplitude_contrast_ratio = jnp.asarray(amplitude_contrast_ratio, dtype=float)
+        self.amplitude_contrast_ratio = error_if_not_fractional(amplitude_contrast_ratio)
 
     @override
     def compute_exit_wave(
@@ -44,9 +42,7 @@ class MultisliceScatteringTheory(AbstractWaveScatteringTheory, strict=True):
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]:
         # Compute the wavefunction in the exit plane
         wavefunction = self.volume_integrator.integrate(
-            volume_representation,
-            image_config,
-            error_if_not_fractional(self.amplitude_contrast_ratio),
+            volume_representation, image_config, self.amplitude_contrast_ratio
         )
 
         return wavefunction

@@ -2,11 +2,9 @@ import jax.numpy as jnp
 import numpy as np
 from jaxtyping import Array, Float
 
-from ..jax_util import NDArrayLike
-
 
 def b_factor_to_variance(
-    b_factor: Float[NDArrayLike, "..."] | float,
+    b_factor: Float[Array | np.ndarray, "..."] | float,
 ) -> Float[Array, "..."]:
     """From the B-factor of a gaussian, return the corresponding
     value of the variance of the gaussian. This simply does the
@@ -30,7 +28,7 @@ def b_factor_to_variance(
 
 
 def variance_to_b_factor(
-    variance: Float[NDArrayLike, "..."] | float,
+    variance: Float[Array | np.ndarray, "..."] | float,
 ) -> Float[Array, "..."]:
     """From the variance of a gaussian, return the corresponding
     value of the B-factor of the gaussian. This simply does the

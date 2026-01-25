@@ -5,8 +5,7 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float, Inexact, PRNGKeyArray
 
-from .._internal import error_if_not_fractional
-from ..jax_util import FloatLike
+from ..jax_util import FloatLike, error_if_not_fractional
 from ..ndimage import fftn, ifftn, irfftn, rfftn
 from ._image_config import AbstractImageConfig
 from ._solvent_2d import AbstractRandomSolvent2D
@@ -244,7 +243,7 @@ class StrongPhaseScatteringTheory(AbstractWaveScatteringTheory, strict=True):
         self.volume_integrator = volume_integrator
         self.transfer_theory = transfer_theory
         self.solvent = solvent
-        self.amplitude_contrast_ratio = jnp.asarray(amplitude_contrast_ratio, dtype=float)
+        self.amplitude_contrast_ratio = error_if_not_fractional(amplitude_contrast_ratio)
 
     @override
     def compute_exit_wave(
@@ -277,8 +276,7 @@ class StrongPhaseScatteringTheory(AbstractWaveScatteringTheory, strict=True):
             else ifftn(ft, s=image_config.padded_shape)
         )
         integrated_potential = _compute_complex_potential(
-            do_ifft(fourier_in_plane_potential),
-            error_if_not_fractional(self.amplitude_contrast_ratio),
+            do_ifft(fourier_in_plane_potential), self.amplitude_contrast_ratio
         )
         object = image_config.interaction_constant * integrated_potential
         # Compute wavefunction, with amplitude and phase contrast

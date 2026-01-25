@@ -10,13 +10,12 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
-from .._internal import error_if_not_positive
 from ..constants import (
     interaction_constant_from_kilovolts,
     lorentz_factor_from_kilovolts,
     wavelength_from_kilovolts,
 )
-from ..jax_util import FloatLike
+from ..jax_util import FloatLike, error_if_not_positive
 from ..ndimage import make_coordinate_grid, make_frequency_grid
 
 
@@ -164,21 +163,17 @@ class AbstractImageConfig(eqx.Module, strict=True):
         """The incident electron wavelength corresponding to the beam
         energy `voltage_in_kilovolts`.
         """
-        return wavelength_from_kilovolts(error_if_not_positive(self.voltage_in_kilovolts))
+        return wavelength_from_kilovolts(self.voltage_in_kilovolts)
 
     @property
     def lorentz_factor(self) -> Float[Array, ""]:
         """The lorenz factor at the given `voltage_in_kilovolts`."""
-        return lorentz_factor_from_kilovolts(
-            error_if_not_positive(self.voltage_in_kilovolts)
-        )
+        return lorentz_factor_from_kilovolts(self.voltage_in_kilovolts)
 
     @property
     def interaction_constant(self) -> Float[Array, ""]:
         """The electron interaction constant at the given `voltage_in_kilovolts`."""
-        return interaction_constant_from_kilovolts(
-            error_if_not_positive(self.voltage_in_kilovolts)
-        )
+        return interaction_constant_from_kilovolts(self.voltage_in_kilovolts)
 
     def get_coordinate_grid(self, *, padding: bool = False, physical: bool = True):
         """Return the image coordinate system. See
@@ -213,8 +208,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
             coordinate_grid = _get_grid_impl(self)
 
         if physical:
-            pixel_size = error_if_not_positive(self.pixel_size)
-            coordinate_grid = _safe_multiply_by_constant(coordinate_grid, pixel_size)
+            coordinate_grid = _safe_multiply_by_constant(coordinate_grid, self.pixel_size)
 
         return coordinate_grid
 
@@ -265,8 +259,9 @@ class AbstractImageConfig(eqx.Module, strict=True):
             frequency_grid = _get_grid_impl(self)
 
         if physical:
-            pixel_size = error_if_not_positive(self.pixel_size)
-            frequency_grid = _safe_multiply_by_constant(frequency_grid, 1 / pixel_size)
+            frequency_grid = _safe_multiply_by_constant(
+                frequency_grid, 1 / self.pixel_size
+            )
 
         return frequency_grid
 
@@ -587,8 +582,10 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
                 `jax.ensure_compile_time_eval`.
         """
         # Set parameters
-        self.pixel_size = jnp.asarray(pixel_size, dtype=float)
-        self.voltage_in_kilovolts = jnp.asarray(voltage_in_kilovolts, dtype=float)
+        self.pixel_size = error_if_not_positive(jnp.asarray(pixel_size, dtype=float))
+        self.voltage_in_kilovolts = error_if_not_positive(
+            jnp.asarray(voltage_in_kilovolts, dtype=float)
+        )
         # Set shape
         self.shape = shape
         # Set pad options
@@ -649,9 +646,8 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
             The integrated dose rate of the electron beam in
             $e^-/A^2$
         - `pad_options`:
-            Options that control image padding. This is a dictionary
-            with keys:
-            - 'shape':
+            Options that control image padding.
+            - `shape`:
                 The shape of the image after padding. By default, equal
                 to `shape`.
         - `precompute_mode`:
@@ -676,8 +672,10 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
                 `jax.ensure_compile_time_eval`.
         """
         # Set parameters
-        self.pixel_size = jnp.asarray(pixel_size, dtype=float)
-        self.voltage_in_kilovolts = jnp.asarray(voltage_in_kilovolts, dtype=float)
+        self.pixel_size = error_if_not_positive(jnp.asarray(pixel_size, dtype=float))
+        self.voltage_in_kilovolts = error_if_not_positive(
+            jnp.asarray(voltage_in_kilovolts, dtype=float)
+        )
         self.electron_dose = jnp.asarray(electron_dose, dtype=float)
         # Set shape
         self.shape = shape
@@ -699,11 +697,6 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
         else:
             self.precomputed_grids = None
         self.precompute_mode = precompute_mode
-
-    @property
-    def electrons_per_pixel(self) -> Float[Array, ""]:
-        """The `electron_dose` in a given pixel area."""
-        return error_if_not_positive(self.electron_dose) * self.pixel_size**2
 
 
 def _safe_multiply_by_constant(

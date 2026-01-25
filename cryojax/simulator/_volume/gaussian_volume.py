@@ -9,13 +9,12 @@ import jax.numpy as jnp
 import jax.scipy as jsp
 from jaxtyping import Array, Float, PyTree
 
-from ..._internal import error_if_not_positive
 from ...constants import (
     PengScatteringFactorParameters,
     b_factor_to_variance,
     variance_to_b_factor,
 )
-from ...jax_util import FloatLike, NDArrayLike
+from ...jax_util import FloatLike, NDArrayLike, error_if_not_positive
 from ...ndimage import fftn, make_1d_coordinate_grid, resize_with_crop_or_pad, rfftn
 from .._image_config import AbstractImageConfig
 from .._pose import AbstractPose
@@ -132,7 +131,8 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
             jnp.asarray(amplitudes, dtype=float), (n_positions, n_gaussians)
         )
         self.variances = jnp.broadcast_to(
-            jnp.asarray(variances, dtype=float), (n_positions, n_gaussians)
+            error_if_not_positive(jnp.asarray(variances, dtype=float)),
+            (n_positions, n_gaussians),
         )
 
     def __check_init__(self):
@@ -330,9 +330,7 @@ class GaussianMixtureProjection(
         # Grab the gaussian amplitudes and widths
         positions = volume_representation.positions
         amplitudes = volume_representation.amplitudes
-        b_factors = variance_to_b_factor(
-            error_if_not_positive(volume_representation.variances)
-        )
+        b_factors = variance_to_b_factor(volume_representation.variances)
         # Compute the projection
         use_erf = True if self.sampling_mode == "average" else False
         projection_integral = _gaussians_to_projection(
@@ -430,7 +428,7 @@ class GaussianMixtureRenderFn(AbstractVolumeRenderFn[GaussianMixtureVolume], str
                 and GPU memory is exhausted. By default, `1`.
         """
         self.shape = shape
-        self.voxel_size = jnp.asarray(voxel_size, dtype=float)
+        self.voxel_size = error_if_not_positive(jnp.asarray(voxel_size, dtype=float))
         self.batch_options = _dict_to_batch_options(batch_options)
 
     @override
@@ -461,10 +459,10 @@ class GaussianMixtureRenderFn(AbstractVolumeRenderFn[GaussianMixtureVolume], str
         """
         real_voxel_grid = _gaussians_to_real_voxels(
             self.shape,
-            error_if_not_positive(self.voxel_size),
+            self.voxel_size,
             volume_representation.positions,
             volume_representation.amplitudes,
-            variance_to_b_factor(error_if_not_positive(volume_representation.variances)),
+            variance_to_b_factor(volume_representation.variances),
             **self.batch_options,
         )
         if outputs_real_space:

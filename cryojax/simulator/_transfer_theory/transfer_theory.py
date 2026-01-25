@@ -2,8 +2,7 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
-from ..._internal import error_if_not_fractional
-from ...jax_util import FloatLike
+from ...jax_util import FloatLike, error_if_not_fractional
 from ...ndimage import AbstractFourierOperator
 from .._image_config import AbstractImageConfig
 from .transfer_function import AbstractCTF
@@ -48,7 +47,9 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
 
         self.ctf = ctf
         self.envelope = envelope
-        self.amplitude_contrast_ratio = jnp.asarray(amplitude_contrast_ratio, dtype=float)
+        self.amplitude_contrast_ratio = error_if_not_fractional(
+            jnp.asarray(amplitude_contrast_ratio, dtype=float)
+        )
         self.phase_shift = jnp.asarray(phase_shift, dtype=float)
 
     def propagate_object(
@@ -87,7 +88,6 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
             An optional defocus offset to apply to the CTF defocus at
             runtime.
         """
-        amplitude_contrast_ratio = error_if_not_fractional(self.amplitude_contrast_ratio)
         frequency_grid = image_config.get_frequency_grid(padding=True, physical=True)
         if not input_is_ewald_sphere:
             # Compute the CTF, including additional phase shifts
@@ -95,7 +95,7 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
                 frequency_grid,
                 voltage_in_kilovolts=image_config.voltage_in_kilovolts,
                 phase_shift=self.phase_shift,
-                amplitude_contrast_ratio=amplitude_contrast_ratio,
+                amplitude_contrast_ratio=self.amplitude_contrast_ratio,
                 outputs_exp=False,
                 defocus_offset=defocus_offset,
             )
@@ -113,7 +113,7 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
             contrast_spectrum = _compute_contrast_from_ewald_sphere(
                 object_spectrum,
                 aberration_phase_shifts,
-                amplitude_contrast_ratio,
+                self.amplitude_contrast_ratio,
                 image_config,
             )
         if self.envelope is not None:
