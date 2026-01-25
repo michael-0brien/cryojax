@@ -1,6 +1,7 @@
 """The main search loop for the grid search."""
 
 import math
+import warnings
 from collections.abc import Callable
 from typing import Any
 
@@ -11,7 +12,7 @@ import jax.numpy as jnp
 import jax.tree_util as jtu
 from jaxtyping import Array, PyTree
 
-from .._tqdm_decorator import fori_loop_tqdm_decorator
+from ..._internal import fori_loop_tqdm_decorator
 from .custom_types import PyTreeGrid, PyTreeGridPoint
 from .pytree_manipulation import (
     tree_grid_shape,
@@ -30,7 +31,7 @@ def run_grid_search(
     *,
     is_leaf: Callable[[Any], bool] | None = None,
     progress_bar: bool = False,
-    total_progress_bar_updates: int = 20,
+    total_updates: int = 20,
 ) -> PyTree[Any]:
     """Run a grid search to minimize the function `fn`.
 
@@ -67,7 +68,7 @@ def run_grid_search(
                  This specifies what is to be treated as a leaf in `tree_grid`.
     - `progress_bar`: Add a [`tqdm`](https://github.com/tqdm/tqdm) progress bar to the
                       search loop.
-    - `total_progress_bar_updates`:
+    - `total_updates`:
         An interval for the number of iterations at which toupdate the
         tqdm progress bar. By default, this is `20`. Ignored if `progress_bar = False`.
 
@@ -75,6 +76,11 @@ def run_grid_search(
 
     Any pytree, as specified by the method `AbstractGridSearchMethod.postprocess`.
     """
+    warnings.warn(
+        "The `cryojax.jax_util` grid search API is deprecated "
+        "and will be removed in cryoJAX 0.6.0. Instead, use the "
+        "library `brutax` (https://github.com/michael-0brien/brutax)."
+    )
     # Evaluate the shape and dtype of the output of `fn` using
     # eqx.filter_closure_convert.
     test_tree_grid_point = tree_grid_take(
@@ -135,14 +141,19 @@ def run_grid_search(
         body_fun = batched_body_fun
     # Run and unpack results
     if progress_bar:
-        print_every = n_iterations // total_progress_bar_updates
+        print_every = n_iterations // total_updates
         if print_every == 0:
             raise ValueError(
                 "The number of progress bar updates is greater than the "
-                "number of iterations. Try decreasing `total_progress_bar_updates` "
+                "number of iterations. Try decreasing `total_updates` "
                 "or setting it to `None`."
             )
-        body_fun = fori_loop_tqdm_decorator(n_iterations, print_every)(body_fun)
+        try:
+            body_fun = fori_loop_tqdm_decorator(n_iterations, print_every)(body_fun)
+        except ModuleNotFoundError as err:
+            raise ModuleNotFoundError(
+                "Could not use `progress_bar = True` because `tqdm` was not installed."
+            ) from err
     final_carry = jax.lax.fori_loop(0, n_iterations, body_fun, init_carry)
     if method.batch_size is not None and grid_size % method.batch_size != 0:
         final_carry = jax.lax.fori_loop(
