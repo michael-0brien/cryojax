@@ -4,9 +4,8 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
-from ..._internal import error_if_negative
 from ...constants import wavelength_from_kilovolts
-from ...jax_util import FloatLike
+from ...jax_util import FloatLike, error_if_negative
 from .common_functions import (
     compute_phase_shift_from_amplitude_contrast_ratio,
     compute_phase_shifts_with_spherical_aberration,
@@ -124,8 +123,8 @@ class AstigmaticCTF(AbstractCTF, strict=True):
         self.defocus_in_angstroms = jnp.asarray(defocus_in_angstroms, dtype=float)
         self.astigmatism_in_angstroms = jnp.asarray(astigmatism_in_angstroms, dtype=float)
         self.astigmatism_angle = jnp.asarray(astigmatism_angle, dtype=float)
-        self.spherical_aberration_in_mm = jnp.asarray(
-            spherical_aberration_in_mm, dtype=float
+        self.spherical_aberration_in_mm = error_if_negative(
+            jnp.asarray(spherical_aberration_in_mm, dtype=float)
         )
 
     def compute_aberration_phase_shifts(
@@ -153,9 +152,7 @@ class AstigmaticCTF(AbstractCTF, strict=True):
         """
         astigmatism_angle = jnp.deg2rad(self.astigmatism_angle)
         # Convert spherical abberation coefficient to angstroms
-        spherical_aberration_in_angstroms = (
-            error_if_negative(self.spherical_aberration_in_mm) * 1e7
-        )
+        spherical_aberration_in_angstroms = self.spherical_aberration_in_mm * 1e7
         # Compute phase shifts for CTF
         phase_shifts = compute_phase_shifts_with_spherical_aberration(
             frequency_grid_in_angstroms,

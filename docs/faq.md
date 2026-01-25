@@ -27,13 +27,3 @@ JAX has a growing ecosystem for scientific computing in the physical sciences, s
 Additionally, cryoJAX is a part of a growing number of libraries for physical modeling, and some of these could be used with cryoJAX for cryo-EM. For example, see [`diffrax`](https://github.com/patrick-kidger/diffrax) for differential equation solvers and [`jax-md`](https://github.com/jax-md/jax-md) for molecular dynamics.
 
 See the Equinox [awesome list](https://docs.kidger.site/equinox/awesome-list/#awesome-list) for more libraries in the JAX ecosystem.
-
-## I need help with debugging!
-
-It can be challenging to debug JAX JIT-compiled code. To start learning about this, I recommend learning about [`jax.debug`](https://docs.jax.dev/en/latest/debugging/index.html#debugging-runtime-values) and [`equinox.error_if`](https://docs.kidger.site/equinox/api/errors/#equinox.error_if).
-
-CryoJAX implements internal runtime checks for things such as if positive quantities (e.g. pixel size) have somehow become negative, such as during gradient descent. By default, cryoJAX will not perform these checks, but enable them by setting the environmental variable `CRYOJAX_ENABLE_CHECKS=true`.
-
-These checks are performed using the function [`cryojax.jax_util.maybe_error_if`][], which wraps [`equinox.error_if`](https://docs.kidger.site/equinox/api/errors/#equinox.error_if). To change the behavior of run-time error checks, see the `error_if` documentation to learn about the `EQX_ON_ERROR` environmental variable.
-
-Also, note that [`cryojax.jax_util.maybe_error_if`][] is public API so that developers of downstream cryoJAX libraries may also use `CRYOJAX_ENABLE_CHECKS`!

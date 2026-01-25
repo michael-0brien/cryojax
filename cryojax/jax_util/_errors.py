@@ -1,28 +1,35 @@
+"""
+Utilities for runtime errors, wrapping `equinox.error_if`.
+"""
+
 import equinox as eqx
-from jaxtyping import ArrayLike, Bool, PyTree
+import jax.numpy as jnp
+from jaxtyping import Array, ArrayLike
 
-from .._config import CRYOJAX_ENABLE_CHECKS
+
+def error_if_negative(x: ArrayLike) -> Array:
+    x = jnp.asarray(x)
+    return eqx.error_if(x, x < 0, "A non-negative quantity was found to be negative!")
 
 
-def maybe_error_if(x: PyTree, pred: Bool[ArrayLike, "..."], msg: str) -> PyTree:
-    """Applies [`equinox.error_if`](https://docs.kidger.site/equinox/api/errors/#equinox.error_if)
-    depending on the value of the environmental variable `CRYOJAX_ENABLE_CHECKS`.
+def error_if_not_positive(x: ArrayLike) -> Array:
+    x = jnp.asarray(x)
+    return eqx.error_if(
+        x, x <= 0, "A positive quantity was found to be negative or zero!"
+    )
 
-    - If `CRYOJAX_ENABLE_CHECKS=true`:
-        This function is equivalent to `equinox.error_if`.
-    - If `CRYOJAX_ENABLE_CHECKS=false`:
-        This function is the identity, i.e. `lambda x: x`.
 
-    By default, `CRYOJAX_ENABLE_CHECKS=false` because checks may cause slowdowns, particularly
-    on GPU.
+def error_if_zero(x: ArrayLike) -> Array:
+    x = jnp.asarray(x)
+    return eqx.error_if(
+        x, jnp.isclose(x, 0.0), "A non-zero quantity was found to be zero!"
+    )
 
-    This function is used to achieve a similar idea as
-    ['JAX_ENABLE_CHECKS'](https://docs.jax.dev/en/latest/config_options.html#jax_enable_checks)
-    in `cryojax` and is exposed as public API for development downstream.
-    """  # noqa: E501
-    # `enable_checks` keyword is included for unit testing; it is not a public
-    # argument.
-    if CRYOJAX_ENABLE_CHECKS:
-        return eqx.error_if(x, pred, msg)
-    else:
-        return x
+
+def error_if_not_fractional(x: ArrayLike) -> Array:
+    x = jnp.asarray(x)
+    return eqx.error_if(
+        x,
+        ~jnp.logical_and(x >= 0.0, x <= 1.0),
+        "A fractional quantity was found to not be between 0 and 1!",
+    )

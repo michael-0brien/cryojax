@@ -9,15 +9,18 @@ import equinox as eqx
 import jax.numpy as jnp
 import jax.random as jr
 import numpy as np
-from equinox import Module
+from equinox import AbstractVar, Module
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
+from ..jax_util import FloatLike, error_if_not_fractional
 from ..ndimage import irfftn, rfftn
 from ._image_config import DoseImageConfig
 
 
 class AbstractDQE(eqx.Module, strict=True):
     r"""Base class for a detector DQE."""
+
+    fraction_detected_electrons: AbstractVar[Float[Array, ""]]
 
     @abstractmethod
     def __call__(self, image_config: DoseImageConfig) -> Float[Array, "_ _"]:
@@ -27,16 +30,25 @@ class AbstractDQE(eqx.Module, strict=True):
 class NullDQE(AbstractDQE, strict=True):
     r"""A DQE that is perfect across all spatial frequencies."""
 
+    fraction_detected_electrons: Float[Array, ""]
+
+    def __init__(self, fraction_detected_electrons: FloatLike = 1.0):
+        self.fraction_detected_electrons = error_if_not_fractional(
+            jnp.asarray(fraction_detected_electrons, dtype=float)
+        )
+
     @override
     def __call__(
         self, image_config: DoseImageConfig
     ) -> Float[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         """**Arguments:**
 
-        - `image_config`: The image config.
+        - `shape`: The image shape.
+        - `pixel_size`: The pixel size.
         """
         return jnp.full(
-            (image_config.padded_y_dim, image_config.padded_x_dim // 2 + 1), 1.0
+            (image_config.padded_y_dim, image_config.padded_x_dim // 2 + 1),
+            self.fraction_detected_electrons,
         )
 
 
@@ -57,7 +69,7 @@ class AbstractDetector(Module, strict=True):
 
     def compute_expected_electron_events(
         self,
-        fourier_intensity: Complex[
+        fourier_squared_wavefunction_at_detector_plane: Complex[
             Array,
             "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}",
         ],
@@ -66,7 +78,9 @@ class AbstractDetector(Module, strict=True):
         """Compute the expected electron events from the detector."""
         fourier_expected_electron_events = (
             self._compute_expected_events_or_detector_readout(
-                fourier_intensity, image_config, key=None
+                fourier_squared_wavefunction_at_detector_plane,
+                image_config,
+                key=None,
             )
         )
 
@@ -75,7 +89,7 @@ class AbstractDetector(Module, strict=True):
     def compute_detector_readout(
         self,
         key: PRNGKeyArray,
-        fourier_intensity: Complex[
+        fourier_squared_wavefunction_at_detector_plane: Complex[
             Array,
             "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}",
         ],
@@ -83,14 +97,16 @@ class AbstractDetector(Module, strict=True):
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         """Measure the readout from the detector."""
         fourier_detector_readout = self._compute_expected_events_or_detector_readout(
-            fourier_intensity, image_config, key
+            fourier_squared_wavefunction_at_detector_plane,
+            image_config,
+            key,
         )
 
         return fourier_detector_readout
 
     def _compute_expected_events_or_detector_readout(
         self,
-        fourier_intensity: Complex[
+        fourier_squared_wavefunction_at_detector_plane: Complex[
             Array,
             "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}",
         ],
@@ -98,13 +114,19 @@ class AbstractDetector(Module, strict=True):
         key: PRNGKeyArray | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         """Pass the image through the detector model."""
-        # The total number of electrons over the entire image
         n_pixels = np.prod(image_config.padded_shape)
-        electrons_per_image = n_pixels * image_config.electrons_per_pixel
+        # Compute the time-integrated electron flux in pixels
+        electrons_per_pixel = image_config.electron_dose * image_config.pixel_size**2
+        # ... now the total number of electrons over the entire image
+        electrons_per_image = n_pixels * electrons_per_pixel
         # Normalize the squared wavefunction to a set of probabilities
-        fourier_intensity /= fourier_intensity[0, 0]
+        fourier_squared_wavefunction_at_detector_plane /= (
+            fourier_squared_wavefunction_at_detector_plane[0, 0]
+        )
         # Compute the noiseless signal by applying the DQE to the squared wavefunction
-        fourier_signal = fourier_intensity * jnp.sqrt(self.dqe(image_config))
+        fourier_signal = fourier_squared_wavefunction_at_detector_plane * jnp.sqrt(
+            self.dqe(image_config)
+        )
         # Apply the integrated dose rate
         fourier_expected_electron_events = electrons_per_image * fourier_signal
         if key is None:

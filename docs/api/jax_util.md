@@ -51,7 +51,3 @@ To make use of the full power of JAX, it is highly recommended to learn about [e
     options:
         members: false
         show_symbol_type_heading: false
-
-## Debugging and runtime errors
-
-::: cryojax.jax_util.maybe_error_if
