@@ -1,6 +1,7 @@
 """The main search loop for the grid search."""
 
 import math
+import warnings
 from collections.abc import Callable
 from typing import Any
 
@@ -75,6 +76,11 @@ def run_grid_search(
 
     Any pytree, as specified by the method `AbstractGridSearchMethod.postprocess`.
     """
+    warnings.warn(
+        "The `cryojax.jax_util` grid search API is deprecated "
+        "and will be removed in cryoJAX 0.6.0. Instead, use the "
+        "library `brutax` (https://github.com/michael-0brien/brutax)."
+    )
     # Evaluate the shape and dtype of the output of `fn` using
     # eqx.filter_closure_convert.
     test_tree_grid_point = tree_grid_take(
