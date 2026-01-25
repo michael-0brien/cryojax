@@ -20,7 +20,8 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float, Inexact
 
-from ...jax_util import FloatLike, error_if_negative, error_if_not_positive
+from ..._internal import error_if_negative, error_if_not_positive
+from ...jax_util import FloatLike
 
 
 class AbstractFourierOperator(eqx.Module, strict=True):
@@ -256,14 +257,18 @@ class FourierExp2D(AbstractFourierOperator, strict=True):
                     in the above equation.
         """
         self.amplitude = jnp.asarray(amplitude, dtype=float)
-        self.length_scale = error_if_not_positive(jnp.asarray(length_scale, dtype=float))
+        self.length_scale = jnp.asarray(length_scale, dtype=float)
 
     @override
     def __call__(
         self, frequency_grid: Float[Array, "y_dim x_dim 2"]
     ) -> Float[Array, "y_dim x_dim"]:
         k_sqr = jnp.sum(frequency_grid**2, axis=-1)
-        scaling = 1.0 / (k_sqr + jnp.divide(1, (self.length_scale) ** 2)) ** 1.5
+        scaling = (
+            1.0
+            / (k_sqr + jnp.divide(1, (error_if_not_positive(self.length_scale)) ** 2))
+            ** 1.5
+        )
         scaling *= jnp.divide(self.amplitude, 2 * jnp.pi * self.length_scale**3)
         return scaling
 
@@ -294,7 +299,7 @@ class FourierGaussian(AbstractFourierOperator, strict=True):
             in the above equation.
         """
         self.amplitude = jnp.asarray(amplitude, dtype=float)
-        self.b_factor = error_if_not_positive(jnp.asarray(b_factor, dtype=float))
+        self.b_factor = jnp.asarray(b_factor, dtype=float)
 
     @override
     def __call__(
@@ -304,7 +309,9 @@ class FourierGaussian(AbstractFourierOperator, strict=True):
         ),
     ) -> Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]:
         k_sqr = jnp.sum(frequency_grid**2, axis=-1)
-        gaussian = self.amplitude * jnp.exp(-0.25 * self.b_factor * k_sqr)
+        gaussian = self.amplitude * jnp.exp(
+            -0.25 * error_if_not_positive(self.b_factor) * k_sqr
+        )
 
         return gaussian
 
@@ -336,8 +343,8 @@ class PeakedFourierGaussian(AbstractFourierOperator, strict=True):
             The frequency shell of the gaussian peak.
         """
         self.amplitude = jnp.asarray(amplitude, dtype=float)
-        self.b_factor = error_if_not_positive(jnp.asarray(b_factor, dtype=float))
-        self.radial_peak = error_if_negative(jnp.asarray(radial_peak, dtype=float))
+        self.b_factor = jnp.asarray(b_factor, dtype=float)
+        self.radial_peak = jnp.asarray(radial_peak, dtype=float)
 
     @override
     def __call__(
@@ -348,7 +355,9 @@ class PeakedFourierGaussian(AbstractFourierOperator, strict=True):
     ) -> Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]:
         k = jnp.linalg.norm(frequency_grid, axis=-1)
         gaussian = self.amplitude * jnp.exp(
-            -0.25 * self.b_factor * (k - self.radial_peak) ** 2
+            -0.25
+            * error_if_not_positive(self.b_factor)
+            * (k - error_if_negative(self.radial_peak)) ** 2
         )
         return gaussian
 
