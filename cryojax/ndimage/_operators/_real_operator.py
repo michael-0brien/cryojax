@@ -10,7 +10,7 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float, Inexact
 
-from ..._misc import error_if_not_positive
+from ..._internal import error_if_not_positive
 from ...jax_util import FloatLike, NDArrayLike
 
 
@@ -156,7 +156,7 @@ class RealGaussian(AbstractRealOperator, strict=True):
             in the above equation.
         """
         self.amplitude = jnp.asarray(amplitude, dtype=float)
-        self.variance = error_if_not_positive(jnp.asarray(variance, dtype=float))
+        self.variance = jnp.asarray(variance, dtype=float)
         if offset is not None:
             self.offset = jnp.asarray(offset, dtype=float)
         else:
@@ -170,7 +170,8 @@ class RealGaussian(AbstractRealOperator, strict=True):
         offset = jnp.zeros((ndim,), dtype=float) if self.offset is None else self.offset
         r_squared = jnp.sum((coordinate_grid - offset) ** 2, axis=-1)
         scaling = (
-            self.amplitude / jnp.sqrt(2 * jnp.pi * self.variance) ** ndim
+            self.amplitude
+            / jnp.sqrt(2 * jnp.pi * error_if_not_positive(self.variance)) ** ndim
         ) * jnp.exp(-0.5 * r_squared / self.variance)
         return scaling
 

@@ -1,40 +1,65 @@
+"""The contents here are not public API, but are used internally throughout
+cryoJAX.
+"""
+
 from collections.abc import Callable
 
-import equinox as eqx
 import jax
 import jax.numpy as jnp
 from jax.debug import callback
-from jaxtyping import Array, ArrayLike
+from jaxtyping import Array
+
+from .jax_util import maybe_error_if
 
 
-def error_if_negative(x: ArrayLike) -> Array:
-    x = jnp.asarray(x)
-    return eqx.error_if(x, x < 0, "A non-negative quantity was found to be negative!")
+#
+# Helpers for performing internal error checks
+#
+_make_msg = (
+    lambda _s: "While inspecting run-time errors with `CRYOJAX_ENABLE_CHECKS`, "
+    + _s
+    + (
+        " Inspect the `EquinoxRuntimeError` traceback to determine the issue, or set "
+        "`EQX_ON_ERROR=breakpoint` in your environment to enter a debugger."
+    )
+)
 
 
-def error_if_not_positive(x: ArrayLike) -> Array:
-    x = jnp.asarray(x)
-    return eqx.error_if(
-        x, x <= 0, "A positive quantity was found to be negative or zero!"
+def error_if_negative(x: Array) -> Array:
+    return maybe_error_if(
+        x,
+        x < 0,
+        _make_msg("a non-negative quantity was found to be negative."),
     )
 
 
-def error_if_zero(x: ArrayLike) -> Array:
-    x = jnp.asarray(x)
-    return eqx.error_if(
-        x, jnp.isclose(x, 0.0), "A non-zero quantity was found to be zero!"
+def error_if_not_positive(x: Array) -> Array:
+    return maybe_error_if(
+        x,
+        x <= 0,
+        _make_msg("a positive quantity was found to be negative or zero."),
     )
 
 
-def error_if_not_fractional(x: ArrayLike) -> Array:
-    x = jnp.asarray(x)
-    return eqx.error_if(
+def error_if_zero(x: Array) -> Array:
+    return maybe_error_if(
+        x,
+        jnp.isclose(x, 0.0),
+        _make_msg("a non-zero quantity was found to be zero."),
+    )
+
+
+def error_if_not_fractional(x: Array) -> Array:
+    return maybe_error_if(
         x,
         ~jnp.logical_and(x >= 0.0, x <= 1.0),
-        "A fractional quantity was found to not be between 0 and 1!",
+        _make_msg("a fractional quantity was found to not be between 0 and 1."),
     )
 
 
+#
+# Miscellaneous
+#
 def fori_loop_tqdm_decorator(
     n_iterations: int,
     print_every: int | None = None,
