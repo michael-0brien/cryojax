@@ -1,5 +1,5 @@
 import abc
-from typing import Generic, TypeVar
+from typing import Generic, Literal, TypeVar
 from typing_extensions import Self, override
 
 import equinox as eqx
@@ -117,6 +117,8 @@ class AbstractVolumeRepresentation(AbstractVolumeParametrization, strict=True):
     passed to [`cryojax.simulator.AbstractVolumeIntegrator`][]
     classes for imaging.
     """
+
+    rotation_convention: eqx.AbstractClassVar[Literal["object", "frame"]]
 
     @abc.abstractmethod
     def rotate_to_pose(self, pose: AbstractPose, inverse: bool = False) -> Self:
