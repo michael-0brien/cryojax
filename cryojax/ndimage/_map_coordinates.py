@@ -19,7 +19,7 @@ from jaxtyping import Array, ArrayLike
 def map_coordinates(
     input: Array,
     coordinates: Sequence[Array],
-    order: int,
+    order: int = 1,
     mode: str = "fill",
     cval: float | complex = 0.0,
 ):
@@ -29,13 +29,12 @@ def map_coordinates(
     Adapted from Louis Desdoigts's [version of `jax.scipy.map_coordinates`](https://github.com/LouisDesdoigts/jax/blob/cubic-spline-updated/jax/_src/scipy/ndimage.py),
     which was developed for the project [`dLux`](https://louisdesdoigts.github.io/dLux/).
 
-    Arguments
-    ---------
-    mode :
-        Uses built-in JAX out-of-bounds indexing to determine how to
-        extrapolate beyond boundaries.
-        See https://jax.readthedocs.io/en/latest/_autosummary/jax.numpy.ndarray.at.html.
-    """
+    **Arguments:**
+
+    - `mode` :
+        Uses built-in [JAX out-of-bounds indexing](https://jax.readthedocs.io/en/latest/_autosummary/jax.numpy.ndarray.at.html)
+        to determine how to extrapolate beyond boundaries.
+    """  # noqa: E501
     if order in [0, 1]:
         return _map_coordinates_nn_or_linear(input, coordinates, order, mode, cval)
     elif order == 3:
@@ -52,18 +51,8 @@ def map_coordinates_spline(
     cval: float | complex = 0.0,
 ):
     """
-    Similar to scipy.map_coordinates, but takes cubic spline coefficients as input.
-
-    Adapted from https://github.com/LouisDesdoigts/jax/blob/cubic-spline-updated/jax/_src/scipy/ndimage.py,
-    which was developed for the project [dLux](https://louisdesdoigts.github.io/dLux/).
-
-    Arguments
-    ---------
-    mode :
-        Uses built-in JAX out-of-bounds indexing to determine how to
-        extrapolate beyond boundaries.
-        See https://jax.readthedocs.io/en/latest/_autosummary/jax.numpy.ndarray.at.html.
-
+    Similar to `scipy.map_coordinates`, but takes coefficients computed from
+    [`cryojax.ndimage.compute_spline_coefficients`][] as input.
     """
     return _map_coordinates_with_cubic_spline(coefficients, coordinates, mode, cval)
 

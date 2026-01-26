@@ -364,7 +364,9 @@ class SO2(AbstractMatrixLieGroup, strict=True):
 
     unit_complex: Float[Array, "2"]
 
-    def __init__(self, unit_complex: Float[NDArrayLike, "2"] | Sequence[float]):
+    def __init__(
+        self, unit_complex: Float[NDArrayLike, "2"] | Sequence[float | NDArrayLike]
+    ):
         r"""**Arguments:**
 
         - `unit_complex`:

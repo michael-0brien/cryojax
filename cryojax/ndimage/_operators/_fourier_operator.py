@@ -18,10 +18,10 @@ from typing_extensions import override
 
 import equinox as eqx
 import jax.numpy as jnp
-from jaxtyping import Array, Float, Inexact
+from jaxtyping import Array, Complex, Float, Inexact
 
 from ..._internal import error_if_negative, error_if_not_positive
-from ...jax_util import FloatLike
+from ...jax_util import FloatLike, NDArrayLike
 
 
 class AbstractFourierOperator(eqx.Module, strict=True):
@@ -403,3 +403,35 @@ class FourierSinc(AbstractFourierOperator, strict=True):
             operator.mul,
             [jnp.sinc(frequency_grid[..., i] * self.box_width) for i in range(ndim)],
         )
+
+
+class FourierPhaseShifts(AbstractFourierOperator):
+    """Apply a phase shift the Fourier domain."""
+
+    shift: Float[Array, " _"]
+
+    def __init__(self, shift: Float[NDArrayLike, "2"] | Float[NDArrayLike, "3"]):
+        """**Arguments:**
+
+        - `shift`:
+            The shift to apply in the Fourier domain. The units of this should
+            be the inverse of the units of the `frequency_grid` passed at runtime.
+        """
+        self.shift = jnp.asarray(shift, dtype=float)
+
+    @override
+    def __call__(
+        self,
+        frequency_grid: (
+            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
+        ),
+    ) -> Complex[Array, "y_dim x_dim"] | Complex[Array, "z_dim y_dim x_dim"]:
+        ndim = frequency_grid.ndim - 1
+        if ndim != self.shift.size:
+            raise ValueError(
+                "The `frequency_grid` passed to `FourierPhaseShift` had "
+                "dimensionality that does not seem to match `FourierPhaseShift.shift`. "
+                f"Got that the dimensionality of the grid was `{ndim}`, but the "
+                f"shift was an array of size {self.shift.size}"
+            )
+        return jnp.exp(-1.0j * (2 * jnp.pi * jnp.matmul(frequency_grid, self.shift)))
