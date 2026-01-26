@@ -79,7 +79,9 @@ def run_grid_search(
     warnings.warn(
         "The `cryojax.jax_util` grid search API is deprecated "
         "and will be removed in cryoJAX 0.6.0. Instead, use the "
-        "library `brutax` (https://github.com/michael-0brien/brutax)."
+        "library `brutax` (https://github.com/michael-0brien/brutax).",
+        category=FutureWarning,
+        stacklevel=2,
     )
     # Evaluate the shape and dtype of the output of `fn` using
     # eqx.filter_closure_convert.
