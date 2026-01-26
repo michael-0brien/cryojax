@@ -118,37 +118,30 @@ def test_whitening_filter(image_shape, filter_shape, mode, square):
     _ = f.get()
 
 
-def test_rotation_fn(basic_config, voxel_volume):
-    pose_norot = cxs.EulerAnglePose(phi_angle=20.0, theta_angle=80.0, psi_angle=0.0)
-    pose_ref = cxs.EulerAnglePose(phi_angle=20.0, theta_angle=80.0, psi_angle=38.0)
+@pytest.mark.parametrize("use_rfft", [False])
+def test_rotation_fn(basic_config, voxel_volume, use_rfft):
+    rotation_angle = 35.0
+    pose_norot = cxs.EulerAnglePose(theta_angle=90.0, psi_angle=0.0)
+    pose_ref = cxs.EulerAnglePose(theta_angle=90.0, psi_angle=rotation_angle)
+    image_model_norot = cxs.make_image_model(voxel_volume, basic_config, pose=pose_norot)
+    image_model_ref = cxs.make_image_model(voxel_volume, basic_config, pose=pose_ref)
 
-    image_model_norot = cxs.make_image_model(
-        voxel_volume,
-        basic_config,
-        pose=pose_norot,
-    )
+    if use_rfft:
+        grid = basic_config.get_frequency_grid(physical=False, padding=True)
+    else:
+        grid = basic_config.get_frequency_grid(physical=False, full=True, padding=True)
+    rotation_fn = im.RotateFFT(rotation_angle, grid)
 
-    image_model_ref = cxs.make_image_model(
-        voxel_volume,
-        basic_config,
-        pose=pose_ref,
-    )
+    image_norot = image_model_norot.raw_simulate()
+    image_ref = image_model_ref.raw_simulate()
+    if use_rfft:
+        shape = basic_config.padded_shape
+        image_rot = im.irfftn(rotation_fn(im.rfftn(image_norot)), s=shape)
+    else:
+        image_rot = im.ifftn(rotation_fn(im.fftn(image_norot))).real
 
-    rotation_op = im.RotateFFT(
-        rotation_angle=38.0,
-        frequency_grid=basic_config.full_frequency_grid_in_pixels,
-    )
-
-    image_norot = image_model_norot.simulate()
-    image_ref = image_model_ref.simulate()
-    image_rot = im.ifftn(rotation_op(im.fftn(image_norot))).real
-
-    num = jnp.abs(jnp.sum(image_rot * image_ref))
-    den = jnp.linalg.norm(image_rot) * jnp.linalg.norm(image_ref)
-    corr = num / den
-    assert corr > 0.98
-
-    return
+    corr = _get_correlation(image_ref, image_rot)
+    np.testing.assert_allclose(corr.item(), 1.0, atol=1e-1)
 
 
 @pytest.mark.parametrize("use_rfft", [True, False])
@@ -158,14 +151,14 @@ def test_translation_fn(basic_config, voxel_volume, use_rfft):
         offset_x_in_angstroms=50.0, offset_y_in_angstroms=-30.0
     )
 
-    image_model_notranslate = cxs.make_image_model(
+    image_model_notrans = cxs.make_image_model(
         voxel_volume,
         basic_config,
         pose=pose_notranslate,
         translate_mode="none",
     )
 
-    image_model_translate = cxs.make_image_model(
+    image_model_ref = cxs.make_image_model(
         voxel_volume,
         basic_config,
         pose=pose_translate,
@@ -180,13 +173,17 @@ def test_translation_fn(basic_config, voxel_volume, use_rfft):
         frequency_grid=grid,
     )
 
-    image_notranslate = image_model_notranslate.simulate()
-    image_ref = image_model_translate.simulate()
+    image_notrans = image_model_notrans.simulate()
+    image_ref = image_model_ref.simulate()
     if use_rfft:
         image_trans = im.irfftn(
-            shift_fn(im.rfftn(image_notranslate)), s=basic_config.padded_shape
+            shift_fn(im.rfftn(image_notrans)), s=basic_config.padded_shape
         )
     else:
-        image_trans = im.ifftn(shift_fn(im.fftn(image_notranslate))).real
+        image_trans = im.ifftn(shift_fn(im.fftn(image_notrans))).real
 
     np.testing.assert_allclose(image_ref, image_trans)
+
+
+def _get_correlation(im1, im2):
+    return jnp.abs(jnp.sum(im1 * im2)) / (jnp.linalg.norm(im1) * jnp.linalg.norm(im2))

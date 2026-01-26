@@ -146,9 +146,17 @@ class AbstractImageConfig(eqx.Module, strict=True):
 
     def __check_init__(self):
         cls = self.__class__.__name__
+        if not all(type(s) == int for s in self.padded_shape):
+            raise AttributeError(
+                f"Found that `{cls}.padded_shape` was not a tuple of Python integers. "
+            )
+        if not all(type(s) == int for s in self.shape):
+            raise AttributeError(
+                f"Found that `{cls}.shape` was not a tuple of Python integers. "
+            )
         if self.padded_shape[0] < self.shape[0] or self.padded_shape[1] < self.shape[1]:
             raise AttributeError(
-                f"`{cls}.padded_shape` is less than `{cls}.shape` in one or "
+                f"Found that `{cls}.padded_shape` is less than `{cls}.shape` in one or "
                 " more dimensions."
             )
         if set(self.pad_options.keys()) != {"shape"}:

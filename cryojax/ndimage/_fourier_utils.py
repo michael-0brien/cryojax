@@ -50,9 +50,9 @@ def convert_fftn_to_rfftn(
     if mode is not None:
         rfftn_array = enforce_rfftn_self_conjugates(
             rfftn_array,
-            shape,
+            shape,  # type: ignore
             includes_dc=False,
-            mode=mode,  # type: ignore
+            mode=mode,
         )
     return rfftn_array
 
