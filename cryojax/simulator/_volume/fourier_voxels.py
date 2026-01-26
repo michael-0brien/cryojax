@@ -2,7 +2,7 @@
 Fourier voxel-based representations of a volume.
 """
 
-from typing import ClassVar, cast
+from typing import ClassVar, Literal, cast
 from typing_extensions import Self, override
 
 import equinox as eqx
@@ -55,6 +55,8 @@ class FourierVoxelGridVolume(AbstractFourierVoxelVolume, strict=True):
 
     fourier_voxel_grid: Complex[Array, "dim dim dim"]
     frequency_slice_in_pixels: Float[Array, "1 dim dim 3"]
+
+    rotation_convention: ClassVar[Literal["frame"]] = "frame"
 
     def __init__(
         self,
@@ -143,6 +145,8 @@ class FourierVoxelSplineVolume(AbstractFourierVoxelVolume, strict=True):
 
     spline_coefficients: Complex[Array, "coeff_dim coeff_dim coeff_dim"]
     frequency_slice_in_pixels: Float[Array, "1 dim dim 3"]
+
+    rotation_convention: ClassVar[Literal["frame"]] = "frame"
 
     def __init__(
         self,

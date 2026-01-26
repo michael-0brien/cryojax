@@ -1,12 +1,65 @@
+"""The contents here are not public API, but are used internally throughout
+cryoJAX.
+"""
+
 from collections.abc import Callable
 
 import jax
-import tqdm.auto
-import tqdm.notebook
-import tqdm.std
+import jax.numpy as jnp
 from jax.debug import callback
+from jaxtyping import Array
+
+from .jax_util import maybe_error_if
 
 
+#
+# Helpers for performing internal error checks
+#
+_make_msg = (
+    lambda _s: "While inspecting runtime errors with `CRYOJAX_ENABLE_CHECKS=true`, "
+    + _s
+    + (
+        " Inspect the traceback to determine where this occurred, or "
+        "set `EQX_ON_ERROR=breakpoint` and use a debugger."
+    )
+)
+
+
+def error_if_negative(x: Array) -> Array:
+    return maybe_error_if(
+        x,
+        lambda _x: _x < 0,
+        _make_msg("a non-negative quantity was found to be negative."),
+    )
+
+
+def error_if_not_positive(x: Array) -> Array:
+    return maybe_error_if(
+        x,
+        lambda _x: _x <= 0,
+        _make_msg("a positive quantity was found to be negative or zero."),
+    )
+
+
+def error_if_zero(x: Array) -> Array:
+    return maybe_error_if(
+        x,
+        lambda _x: jnp.isclose(_x, 0.0),
+        _make_msg("a non-zero quantity was found to be zero."),
+    )
+
+
+def error_if_not_fractional(x: Array) -> Array:
+    return maybe_error_if(
+        x,
+        lambda _x: ~jnp.logical_and(_x >= 0.0, _x <= 1.0),
+        _make_msg("a fractional quantity was found to not be between 0 and 1."),
+    )
+
+
+#
+# Miscellaneous
+#
 def fori_loop_tqdm_decorator(
     n_iterations: int,
     print_every: int | None = None,
@@ -31,17 +84,9 @@ def fori_loop_tqdm_decorator(
 
 
 def _build_tqdm(
-    n: int,
-    print_rate: int | None = None,
-    tqdm_type: str = "auto",
-    **kwargs,
+    n: int, print_rate: int | None = None, **kwargs
 ) -> tuple[Callable, Callable]:
-    if tqdm_type not in ("auto", "std", "notebook"):
-        raise ValueError(
-            'tqdm_type should be one of "auto", "std", or "notebook" '
-            f'but got "{tqdm_type}"'
-        )
-    pbar = getattr(tqdm, tqdm_type).tqdm
+    from tqdm.auto import tqdm as pbar
 
     desc = kwargs.pop("desc", f"Running for {n:,} iterations")
     message = kwargs.pop("message", desc)

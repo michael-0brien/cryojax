@@ -1,5 +1,7 @@
+import cryojax.ndimage as im
 import cryojax.simulator as cxs
 import equinox as eqx
+import jax.numpy as jnp
 import numpy as np
 import pytest
 from cryojax.io import read_array_from_mrc, read_atoms_from_pdb
@@ -196,7 +198,7 @@ def test_normalize_and_transform(std, signal_centering, voxel_info, basic_config
         pose=cxs.EulerAnglePose(),
         image_transform=ScaleImage(scale=std),
         normalizes_signal=True,
-        signal_centering="bg",
+        signal_centering=signal_centering,
     )
     image = compute_image(image_model)
     np.testing.assert_approx_equal(np.std(image), std)
@@ -271,6 +273,36 @@ def test_bg_subtract(voxel_info):
     )
     image = compute_image(image_model)
     np.testing.assert_allclose(image[:, 0], 0.0, atol=5e-2)
+
+
+@pytest.mark.parametrize("rotation_convention", ("object", "frame", "asfsdkl"))
+def test_rotation_convention(rotation_convention):
+    pose = cxs.EulerAnglePose(phi_angle=45.0, theta_angle=80.0, psi_angle=-30.0)
+    volumes = [
+        cxs.RealVoxelGridVolume.from_real_voxel_grid(jnp.zeros((10, 10, 10))),
+        cxs.FourierVoxelGridVolume.from_real_voxel_grid(jnp.zeros((10, 10, 10))),
+        cxs.FourierVoxelSplineVolume.from_real_voxel_grid(jnp.zeros((10, 10, 10))),
+        cxs.GaussianMixtureVolume(jnp.zeros((10, 3)), 1.0, 1.0),
+        cxs.IndependentAtomVolume(jnp.zeros((10, 3)), im.FourierGaussian()),
+    ]
+    config = cxs.BasicImageConfig((10, 10), 1.0, 300.0)
+    make_wrapper = lambda _v: cxs.make_image_model(
+        _v, config, pose, rotation_convention=rotation_convention
+    )
+    for volume in volumes:
+        if rotation_convention in ["object", "frame"]:
+            image_model = make_wrapper(volume)
+            if volume.rotation_convention == rotation_convention:
+                quat1, quat2 = pose.rotation.wxyz, image_model.pose.rotation.wxyz
+            else:
+                quat1, quat2 = (
+                    pose.to_inverse_rotation().rotation.wxyz,
+                    image_model.pose.rotation.wxyz,
+                )
+            np.testing.assert_allclose(quat1, quat2)
+        else:
+            with pytest.raises(ValueError):
+                _ = make_wrapper(volume)
 
 
 @eqx.filter_jit

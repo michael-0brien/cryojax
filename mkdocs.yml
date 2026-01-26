@@ -43,7 +43,6 @@ plugins:
             - "examples/.ipynb_checkpoints/"
             - "examples/old"
             - "examples/data"
-            - "examples/scripts"
     - ipynb
     - hippogriffe:
         extra_public_objects:
@@ -51,7 +50,7 @@ plugins:
             - equinox.Module
             - mdtraj.Topology
             - pandas.DataFrame
-            # - lineax.FunctionLinearOperator
+            - lineax.FunctionLinearOperator
     - mkdocstrings:
         handlers:
           python:
@@ -69,7 +68,7 @@ plugins:
                 show_source: false
                 show_symbol_type_heading: true
                 show_symbol_type_toc: true
-                separate_signature: true
+                separate_signature: false
                 line_length: 85
 
 nav:
@@ -80,10 +79,8 @@ nav:
             - Simulate an image: 'examples/simulate-image.ipynb'
             - JAX transformations: 'examples/jax-transformations.ipynb'
             - Render a volume: 'examples/compute-potential.ipynb'
-            - Load cryo-EM images: 'examples/read-dataset.ipynb'
             - Create custom image simulation methods: 'examples/extending-cryojax.ipynb'
         - Your first program:
-            - Write a STAR file of simulated data: 'examples/simulate-relion-dataset.ipynb'
             - Structural refinement using gradient descent: 'examples/structure-refinement.ipynb'
     - API:
         - The simulator:
@@ -106,6 +103,5 @@ nav:
             - 'api/atom_util.md'
             - 'api/constants.md'
             - 'api/rotations.md'
-        - 'api/dataset.md'
         - 'api/jax_util.md'
     - 'faq.md'

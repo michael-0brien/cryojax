@@ -48,7 +48,6 @@ from ._scattering_theory import (
     StrongPhaseScatteringTheory as StrongPhaseScatteringTheory,
     WeakPhaseScatteringTheory as WeakPhaseScatteringTheory,
 )
-from ._solvent_2d import AbstractRandomSolvent2D as AbstractRandomSolvent2D
 from ._transfer_theory import (
     AbstractCTF as AbstractCTF,
     AbstractTransferTheory as AbstractTransferTheory,

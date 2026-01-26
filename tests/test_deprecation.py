@@ -181,6 +181,19 @@ def test_future_deprecated(sample_pdb_path):
         assert AbstractFilter is tf.AbstractFilter
         assert not should_be_removed(record)
 
+    with pytest.warns(FutureWarning) as record:
+        import jax.numpy as jnp
+        from cryojax.jax_util import MinimumSearchMethod, run_grid_search
+
+        def fn(tree_grid_point, _):
+            x, y = tree_grid_point
+            return (x - 1.0) ** 2 + (y - 2.0) ** 2
+
+        tree_grid = (jnp.arange(-5.0, 5.0, 1), jnp.arange(-5.0, 5.0, 0.1))
+        _ = run_grid_search(
+            fn, method=MinimumSearchMethod(), tree_grid=tree_grid, args=None
+        )
+
 
 def test_deprecated():
     DEPRECATED = [

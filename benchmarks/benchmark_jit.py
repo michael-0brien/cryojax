@@ -1,18 +1,17 @@
 from time import time
 
+import cryojax.ndimage as im
 import cryojax.simulator as cxs
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 from cryojax.constants import PengScatteringFactorParameters
-from cryojax.dataset import RelionParticleParameterFile
 from cryojax.io import read_atoms_from_pdb
-from cryojax.ndimage import operators as op
 from cryojax.rotations import SO3
 from jaxtyping import PRNGKeyArray
 
 
-def setup(num_images, path_to_pdb, path_to_starfile):
+def setup(num_images, path_to_pdb):
     @eqx.filter_vmap(in_axes=(0, None))
     def make_particle_parameters(key: PRNGKeyArray, config: cxs.BasicImageConfig):
         """Generate random parameters."""
@@ -81,15 +80,6 @@ def setup(num_images, path_to_pdb, path_to_starfile):
     # ... make parameters
     particle_parameters = make_particle_parameters(keys, config)
 
-    parameter_file = RelionParticleParameterFile(
-        path_to_starfile=path_to_starfile,
-        mode="w",  # writing mode!
-        exists_ok=True,  # in case the file already exists
-        broadcasts_image_config=True,
-        pad_options=pad_options,
-    )
-    parameter_file.append(particle_parameters)
-
     atom_positions, atom_types, atom_properties = read_atoms_from_pdb(
         path_to_pdb,
         center=True,
@@ -102,133 +92,15 @@ def setup(num_images, path_to_pdb, path_to_starfile):
         scattering_parameters,
         extra_b_factors=atom_properties["b_factors"],
     )
-
-    real_voxel_grid = volume_gmm.to_real_voxel_grid(shape=(150, 150, 150), voxel_size=1.0)
+    render_fn = cxs.GaussianMixtureRenderFn(shape=(200, 200, 200), voxel_size=1.0)
     volume_fourier_grid = cxs.FourierVoxelGridVolume.from_real_voxel_grid(
-        real_voxel_grid, pad_scale=2
+        render_fn(volume_gmm), pad_scale=2
     )
-    # print(atom_properties["b_factors"].mean() * 8 * jnp.pi**2)
     atom_volume = cxs.IndependentAtomVolume(
-        position_pytree=atom_positions,
-        scattering_factor_pytree=op.FourierGaussian(amplitude=1.0, b_factor=10.0),
+        positions=atom_positions,
+        scattering_factors=im.FourierGaussian(amplitude=1.0, b_factor=10.0),
     )
-    return (
-        particle_parameters,
-        parameter_file,
-        volume_gmm,
-        atom_volume,
-        volume_fourier_grid,
-    )
-
-
-# def compute_image(particle_parameters, volume, volume_integrator, rng_key):
-#     # Build image model, including normalization within a circular mask
-#     # around each particle
-#     image_config, pose, transfer_theory = (
-#         particle_parameters["image_config"],
-#         particle_parameters["pose"],
-#         particle_parameters["transfer_theory"],
-#     )
-#     mask = tf.CircularCosineMask(
-#         coordinate_grid=image_config.coordinate_grid_in_angstroms,
-#         radius=150.0,
-#         rolloff_width=0.0,
-#         xy_offset=pose.offset_in_angstroms,
-#     )
-#     image_model = cxs.make_image_model(
-#         volume_parametrisation=volume,
-#         pose=pose,
-#         image_config=image_config,
-#         transfer_theory=transfer_theory,
-#         volume_integrator=volume_integrator,
-#         normalizes_signal=True,
-#         signal_region=mask.get() == 1.0,
-#     )
-#     # Build noise model at a randomly sampled SNR within a
-#     # uniform range, then simulate
-#     simulator_rng_key, snr_rng_key = jax.random.split(rng_key, 2)
-#     snr = jax.random.uniform(snr_rng_key, minval=0.01, maxval=0.1)
-#     noise_model = cxs.UncorrelatedGaussianNoiseModel(
-#         image_model,
-#         variance=1.0,
-#         signal_scale_factor=jnp.sqrt(snr),
-#     )
-
-#     return noise_model.sample(rng_key=simulator_rng_key)
-
-
-# def benchmark_projection_microscope_noise_no_vmap(
-#     n_iterations, path_to_pdb, path_to_starfile
-# ):
-#     _, parameter_file, volume_gmm, volume_fourier_grid = setup(
-#         path_to_pdb, path_to_starfile
-#     )
-
-#     time_list = []
-#     for _ in range(n_iterations + 1):
-#         start_time = time()
-#         gmm_image = compute_image(
-#             parameter_file[0],
-#             volume_gmm,
-#             cxs.GaussianMixtureProjection(),
-#             jax.random.key(1234),
-#         )
-#         gmm_image.block_until_ready()
-#         end_time = time()
-#         time_list.append(end_time - start_time)
-#     gmm_avg_time = jnp.mean(jnp.array(time_list[1:]))
-#     gmm_std_time = jnp.std(jnp.array(time_list[1:]))
-#     print(f"GMM: {gmm_avg_time:.4f} +/- {gmm_std_time:.4f} s")
-
-#     time_list = []
-#     for _ in range(n_iterations + 1):
-#         start_time = time()
-#         gmm_image = eqx.filter_jit(compute_image)(
-#             parameter_file[0],
-#             volume_gmm,
-#             cxs.GaussianMixtureProjection(),
-#             jax.random.key(1234),
-#         )
-#         gmm_image.block_until_ready()
-#         end_time = time()
-#         time_list.append(end_time - start_time)
-#     jit_gmm_avg_time = jnp.mean(jnp.array(time_list[1:]))
-#     jit_gmm_std_time = jnp.std(jnp.array(time_list[1:]))
-#     print(
-#         f"JIT, GMM: {jit_gmm_avg_time:.4f} +/- {jit_gmm_std_time:.4f} s"
-#     )
-
-#     time_list = []
-#     for _ in range(n_iterations + 1):
-#         start_time = time()
-#         fs_image = compute_image(
-#             parameter_file[0],
-#             volume_fourier_grid,
-#             cxs.FourierSliceExtraction(),
-#             jax.random.key(1234),
-#         )
-#         fs_image.block_until_ready()
-#         end_time = time()
-#         time_list.append(end_time - start_time)
-#     fs_avg_time = jnp.mean(jnp.array(time_list[1:]))
-#     fs_std_time = jnp.std(jnp.array(time_list[1:]))
-#     print(f"Fourier Slice: {fs_avg_time:.4f} +/- {fs_std_time:.4f} s")
-
-#     time_list = []
-#     for _ in range(n_iterations + 1):
-#         start_time = time()
-#         fs_image = eqx.filter_jit(compute_image)(
-#             parameter_file[0],
-#             volume_fourier_grid,
-#             cxs.FourierSliceExtraction(),
-#             jax.random.key(1234),
-#         )
-#         fs_image.block_until_ready()
-#         end_time = time()
-#         time_list.append(end_time - start_time)
-#     fs_avg_time = jnp.mean(jnp.array(time_list[1:]))
-#     fs_std_time = jnp.std(jnp.array(time_list[1:]))
-#     print(f"JIT, Fourier Slice: {fs_avg_time:.4f} +/- {fs_std_time:.4f} s")
+    return (particle_parameters, volume_gmm, atom_volume, volume_fourier_grid)
 
 
 @eqx.filter_vmap(in_axes=(eqx.if_array(0), eqx.if_array(0), eqx.if_array(0), None, None))
@@ -236,7 +108,7 @@ def simulate_image_nojit(
     image_config, pose, transfer_theory, potential, volume_integrator
 ):
     image_model = cxs.make_image_model(
-        volume_parametrization=potential,
+        volume=potential,
         image_config=image_config,
         pose=pose,
         transfer_theory=transfer_theory,
@@ -248,11 +120,9 @@ def simulate_image_nojit(
 simulate_image_jit = eqx.filter_jit(simulate_image_nojit)
 
 
-def benchmark_fourier_slice_vs_gmm(
-    n_iterations, num_images, path_to_pdb, path_to_starfile
-):
-    particle_parameters, _, volume_gmm, atom_volume, volume_fourier_grid = setup(
-        num_images, path_to_pdb, path_to_starfile
+def run(n_iterations, num_images, path_to_pdb):
+    particle_parameters, volume_gmm, atom_volume, volume_fourier_grid = setup(
+        num_images, path_to_pdb
     )
 
     image_config, pose, transfer_theory = (
@@ -260,23 +130,29 @@ def benchmark_fourier_slice_vs_gmm(
         particle_parameters["pose"],
         particle_parameters["transfer_theory"],
     )
+    dim, num_atoms = image_config.padded_y_dim, atom_volume.positions.shape[0]
+    print(
+        f"Benchmarking simulation of {n_images} {dim}x{dim} images of "
+        f"a structure with {num_atoms} atoms..."
+    )
 
     time_list = []
     for _ in range(n_iterations + 1):
         start_time = time()
-        fft_image = simulate_image_nojit(
-            image_config,
-            pose,
-            transfer_theory,
-            atom_volume,
-            cxs.FFTAtomProjection(eps=1e-16),
-        )
-        fft_image.block_until_ready()
+        with jax.disable_jit():
+            fft_image = simulate_image_nojit(
+                image_config,
+                pose,
+                transfer_theory,
+                atom_volume,
+                cxs.FFTAtomProjection(eps=1e-16),
+            )
+            fft_image.block_until_ready()
         end_time = time()
         time_list.append(end_time - start_time)
     fft_avg_time = jnp.mean(jnp.array(time_list[1:]))
     fft_std_time = jnp.std(jnp.array(time_list[1:]))
-    print(f"FFTproj (no JIT): {1000 * fft_avg_time:.2f} +/- {1000 * fft_std_time:.2f} ms")
+    print(f"NUFFT (no JIT): {1000 * fft_avg_time:.2f} +/- {1000 * fft_std_time:.2f} ms")
 
     time_list = []
     for _ in range(n_iterations + 1):
@@ -293,19 +169,20 @@ def benchmark_fourier_slice_vs_gmm(
         time_list.append(end_time - start_time)
     fft_avg_time = jnp.mean(jnp.array(time_list[1:]))
     fft_std_time = jnp.std(jnp.array(time_list[1:]))
-    print(f"FFTproj (JIT): {1000 * fft_avg_time:.2f} +/- {1000 * fft_std_time:.2f} ms")
+    print(f"NUFFT (JIT): {1000 * fft_avg_time:.2f} +/- {1000 * fft_std_time:.2f} ms")
 
     time_list = []
     for _ in range(n_iterations + 1):
         start_time = time()
-        gmm_image = simulate_image_nojit(
-            image_config,
-            pose,
-            transfer_theory,
-            volume_gmm,
-            cxs.GaussianMixtureProjection(),
-        )
-        gmm_image.block_until_ready()
+        with jax.disable_jit():
+            gmm_image = simulate_image_nojit(
+                image_config,
+                pose,
+                transfer_theory,
+                volume_gmm,
+                cxs.GaussianMixtureProjection(),
+            )
+            gmm_image.block_until_ready()
         end_time = time()
         time_list.append(end_time - start_time)
     gmm_avg_time = jnp.mean(jnp.array(time_list[1:]))
@@ -334,14 +211,15 @@ def benchmark_fourier_slice_vs_gmm(
     time_list = []
     for _ in range(n_iterations + 1):
         start_time = time()
-        fs_image = simulate_image_nojit(
-            image_config,
-            pose,
-            transfer_theory,
-            volume_fourier_grid,
-            cxs.FourierSliceExtraction(),
-        )
-        fs_image.block_until_ready()
+        with jax.disable_jit():
+            fs_image = simulate_image_nojit(
+                image_config,
+                pose,
+                transfer_theory,
+                volume_fourier_grid,
+                cxs.FourierSliceExtraction(),
+            )
+            fs_image.block_until_ready()
         end_time = time()
         time_list.append(end_time - start_time)
     fs_avg_time = jnp.mean(jnp.array(time_list[1:]))
@@ -372,11 +250,7 @@ def benchmark_fourier_slice_vs_gmm(
 
 
 if __name__ == "__main__":
-    n_iterations, n_images = 10, 100
-    print(
-        f"Benchmarking image simulation of {n_images} images "
-        f"averaged over {n_iterations} iterations"
-    )
-    path_to_pdb = "../data/thyroglobulin_initial.pdb"
-    path_to_starfile = "../outputs/particles.star"
-    benchmark_fourier_slice_vs_gmm(n_iterations, n_images, path_to_pdb, path_to_starfile)
+    n_iterations, n_images = 25, 10
+    # Necessary to pull from git LFS
+    path_to_pdb = "../docs/examples/data/thyroglobulin_initial.pdb"
+    run(n_iterations, n_images, path_to_pdb)
