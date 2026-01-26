@@ -292,10 +292,6 @@ def test_rotation_convention(rotation_convention):
     for volume in volumes:
         if rotation_convention in ["object", "frame"]:
             image_model = make_wrapper(volume)
-            from matplotlib import pyplot as plt
-
-            plt.imshow(image_model.simulate())
-            plt.show()
             if volume.rotation_convention == rotation_convention:
                 quat1, quat2 = pose.rotation.wxyz, image_model.pose.rotation.wxyz
             else:
