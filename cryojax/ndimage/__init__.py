@@ -57,6 +57,7 @@ from ._operators import (
     FourierDC as FourierDC,
     FourierExp2D as FourierExp2D,
     FourierGaussian as FourierGaussian,
+    FourierPhaseShifts as FourierPhaseShifts,
     FourierSinc as FourierSinc,
     PeakedFourierGaussian as PeakedFourierGaussian,
     RealConstant as RealConstant,

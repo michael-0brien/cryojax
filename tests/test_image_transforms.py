@@ -2,6 +2,7 @@ import cryojax.ndimage as im
 import cryojax.simulator as cxs
 import jax
 import jax.numpy as jnp
+import numpy as np
 import pytest
 from cryojax.io import read_array_from_mrc
 from cryojax.ndimage import make_coordinate_grid, make_frequency_grid
@@ -117,7 +118,7 @@ def test_whitening_filter(image_shape, filter_shape, mode, square):
     _ = f.get()
 
 
-def test_rotation_op(basic_config, voxel_volume):
+def test_rotation_fn(basic_config, voxel_volume):
     pose_norot = cxs.EulerAnglePose(phi_angle=20.0, theta_angle=80.0, psi_angle=0.0)
     pose_ref = cxs.EulerAnglePose(phi_angle=20.0, theta_angle=80.0, psi_angle=38.0)
 
@@ -151,43 +152,41 @@ def test_rotation_op(basic_config, voxel_volume):
 
 
 @pytest.mark.parametrize("use_rfft", [True, False])
-def test_translation_op(basic_config, voxel_volume, use_rfft):
-    pose_norot = cxs.EulerAnglePose()
-    pose_ref = cxs.EulerAnglePose(offset_x_in_angstroms=50.0, offset_y_in_angstroms=-30.0)
-
-    image_model_norot = cxs.make_image_model(
-        voxel_volume,
-        basic_config,
-        pose=pose_norot,
+def test_translation_fn(basic_config, voxel_volume, use_rfft):
+    pose_notranslate = cxs.EulerAnglePose()
+    pose_translate = cxs.EulerAnglePose(
+        offset_x_in_angstroms=50.0, offset_y_in_angstroms=-30.0
     )
 
-    image_model_ref = cxs.make_image_model(
+    image_model_notranslate = cxs.make_image_model(
         voxel_volume,
         basic_config,
-        pose=pose_ref,
+        pose=pose_notranslate,
+        translate_mode="none",
+    )
+
+    image_model_translate = cxs.make_image_model(
+        voxel_volume,
+        basic_config,
+        pose=pose_translate,
     )
     if use_rfft:
-        grid = basic_config.frequency_grid_in_angstroms
+        grid = basic_config.get_frequency_grid(physical=True)
     else:
-        grid = basic_config.full_frequency_grid_in_angstroms
+        grid = basic_config.get_frequency_grid(physical=True, full=True)
 
-    translation_op = im.PhaseShiftFFT(
+    shift_fn = im.PhaseShiftFFT(
         offset=jnp.array([50.0, -30.0]),
         frequency_grid=grid,
     )
 
-    image_notrans = image_model_norot.simulate()
-    image_ref = image_model_ref.simulate()
+    image_notranslate = image_model_notranslate.simulate()
+    image_ref = image_model_translate.simulate()
     if use_rfft:
         image_trans = im.irfftn(
-            translation_op(im.rfftn(image_notrans, s=image_ref.shape)), s=image_ref.shape
+            shift_fn(im.rfftn(image_notranslate)), s=basic_config.padded_shape
         )
     else:
-        image_trans = im.ifftn(translation_op(im.fftn(image_notrans))).real
+        image_trans = im.ifftn(shift_fn(im.fftn(image_notranslate))).real
 
-    num = jnp.abs(jnp.sum(image_trans * image_ref))
-    den = jnp.linalg.norm(image_trans) * jnp.linalg.norm(image_ref)
-    corr = num / den
-    assert corr > 0.98
-
-    return
+    np.testing.assert_allclose(image_ref, image_trans)

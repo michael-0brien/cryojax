@@ -14,7 +14,7 @@ from equinox import AbstractVar, Module
 from jaxtyping import Array, Complex, Float
 
 from ..jax_util import FloatLike, NDArrayLike
-from ..ndimage import enforce_rfftn_self_conjugates
+from ..ndimage import FourierPhaseShifts, enforce_rfftn_self_conjugates
 from ..rotations import SO3, convert_quaternion_to_euler_angles
 
 
@@ -111,7 +111,8 @@ class AbstractPose(Module, strict=True):
         grid of in-plane phase shifts $\\exp{(- 2 \\pi i (t_x q_x + t_y q_y))}$.
         """
         xy = self.offset_in_angstroms[0:2]
-        return jnp.exp(-1.0j * (2 * jnp.pi * jnp.matmul(frequency_grid_in_angstroms, xy)))
+        compute_fn = FourierPhaseShifts(xy)
+        return compute_fn(frequency_grid_in_angstroms)
 
     @cached_property
     def offset_x_in_angstroms(self) -> Float[Array, "..."]:
