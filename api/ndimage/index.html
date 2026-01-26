@@ -1303,15 +1303,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#cryojax.ndimage.ScaleImage" class="md-nav__link">
-    <span class="md-ellipsis">
-      <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;ScaleImage
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#filters" class="md-nav__link">
     <span class="md-ellipsis">
       Filters
@@ -1361,6 +1352,24 @@
   <a href="#cryojax.ndimage.CustomFilter" class="md-nav__link">
     <span class="md-ellipsis">
       <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;CustomFilter
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cryojax.ndimage.PhaseShiftFFT" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;PhaseShiftFFT
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cryojax.ndimage.RotateFFT" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;RotateFFT
     </span>
   </a>
   
@@ -1462,6 +1471,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#cryojax.ndimage.ScaleImage" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;ScaleImage
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1532,6 +1550,15 @@
   <a href="#cryojax.ndimage.FourierSinc" class="md-nav__link">
     <span class="md-ellipsis">
       <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;FourierSinc
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cryojax.ndimage.FourierPhaseShifts" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;FourierPhaseShifts
     </span>
   </a>
   
@@ -1622,6 +1649,54 @@
       Utility functions
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Utility functions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#interpolation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Interpolation
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Interpolation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cryojax.ndimage.map_coordinates" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;map_coordinates
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cryojax.ndimage.map_coordinates_spline" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;map_coordinates_spline
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cryojax.ndimage.compute_spline_coefficients" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;compute_spline_coefficients
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1786,7 +1861,7 @@
 
 <h4 id="cryojax.ndimage.make_coordinate_grid" class="doc doc-heading">
   <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">ndimage</span><span class="o">.</span><span class="n">make_coordinate_grid</span><span class="p">(</span><span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">grid_spacing</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;*shape ndim&#39;</span><span class="p">]</span></code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_coordinates/_make_coordinate_grids.py#L10-L32"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_coordinates/_make_coordinate_grids.py#L10-L32"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.make_coordinate_grid" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1817,7 +1892,7 @@
 
 <h4 id="cryojax.ndimage.make_frequency_grid" class="doc doc-heading">
   <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">ndimage</span><span class="o">.</span><span class="n">make_frequency_grid</span><span class="p">(</span><span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">grid_spacing</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">outputs_rfftfreqs</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;*shape ndim&#39;</span><span class="p">]</span></code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_coordinates/_make_coordinate_grids.py#L67-L97"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_coordinates/_make_coordinate_grids.py#L67-L97"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.make_frequency_grid" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1853,7 +1928,7 @@ The zero-frequency component is in the corner.</p>
 
 <h4 id="cryojax.ndimage.make_radial_coordinate_grid" class="doc doc-heading">
   <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">ndimage</span><span class="o">.</span><span class="n">make_radial_coordinate_grid</span><span class="p">(</span><span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">grid_spacing</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;*shape&#39;</span><span class="p">]</span></code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_coordinates/_make_coordinate_grids.py#L35-L64"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_coordinates/_make_coordinate_grids.py#L35-L64"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.make_radial_coordinate_grid" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1886,7 +1961,7 @@ the coordinate vector magnitude.</p>
 
 <h4 id="cryojax.ndimage.make_radial_frequency_grid" class="doc doc-heading">
   <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">ndimage</span><span class="o">.</span><span class="n">make_radial_frequency_grid</span><span class="p">(</span><span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">grid_spacing</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">outputs_rfftfreqs</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;*shape&#39;</span><span class="p">]</span></code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_coordinates/_make_coordinate_grids.py#L100-L136"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_coordinates/_make_coordinate_grids.py#L100-L136"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.make_radial_frequency_grid" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1925,7 +2000,7 @@ things like computing fourier shell correlations and power spectrums.</p>
 
 <h4 id="cryojax.ndimage.make_frequency_slice" class="doc doc-heading">
   <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">ndimage</span><span class="o">.</span><span class="n">make_frequency_slice</span><span class="p">(</span><span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">grid_spacing</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">outputs_rfftfreqs</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;1 </span><span class="si">{shape[0]}</span><span class="s1"> </span><span class="si">{shape[1]}</span><span class="s1"> 3&#39;</span><span class="p">]</span></code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_coordinates/_make_coordinate_grids.py#L139-L198"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_coordinates/_make_coordinate_grids.py#L139-L198"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.make_frequency_slice" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1978,7 +2053,7 @@ zero-frequency component is in the <em>center</em> of the grid.</p>
 
 <h4 id="cryojax.ndimage.make_1d_coordinate_grid" class="doc doc-heading">
   <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">ndimage</span><span class="o">.</span><span class="n">make_1d_coordinate_grid</span><span class="p">(</span><span class="n">size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">grid_spacing</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;*shape ndim&#39;</span><span class="p">]</span></code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_coordinates/_make_coordinate_grids.py#L201-L223"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_coordinates/_make_coordinate_grids.py#L201-L223"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.make_1d_coordinate_grid" class="headerlink" title="Permanent link">¤</a></h4>
@@ -2009,7 +2084,7 @@ zero-frequency component is in the <em>center</em> of the grid.</p>
 
 <h4 id="cryojax.ndimage.make_1d_frequency_grid" class="doc doc-heading">
   <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">ndimage</span><span class="o">.</span><span class="n">make_1d_frequency_grid</span><span class="p">(</span><span class="n">size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">grid_spacing</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">ndarray</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">outputs_rfftfreqs</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;*shape ndim&#39;</span><span class="p">]</span></code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_coordinates/_make_coordinate_grids.py#L226-L256"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_coordinates/_make_coordinate_grids.py#L226-L256"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.make_1d_frequency_grid" class="headerlink" title="Permanent link">¤</a></h4>
@@ -2046,7 +2121,7 @@ If <code>outputs_rfftfreqs = False</code>, the zero-frequency component is in th
 
 <h4 id="cryojax.ndimage.cartesian_to_polar" class="doc doc-heading">
   <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">ndimage</span><span class="o">.</span><span class="n">cartesian_to_polar</span><span class="p">(</span><span class="n">coordinate_or_frequency_grid</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim 2&#39;</span><span class="p">],</span> <span class="n">square</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Inexact</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim&#39;</span><span class="p">],</span> <span class="n">Inexact</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim&#39;</span><span class="p">]]</span></code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_coordinates/_geometry.py#L5-L32"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_coordinates/_geometry.py#L5-L32"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.cartesian_to_polar" class="headerlink" title="Permanent link">¤</a></h4>
@@ -2082,7 +2157,7 @@ tuple <code>(r_squared, theta)</code>.</p>
 
 <h4 id="cryojax.ndimage.AbstractImageTransform" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.ndimage.AbstractImageTransform</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_transforms/_base_transform.py#L16-L37"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_transforms/_base_transform.py#L16-L37"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.AbstractImageTransform" class="headerlink" title="Permanent link">¤</a></h4>
@@ -2157,87 +2232,7 @@ tuple <code>(r_squared, theta)</code>.</p>
     </div>
 
 </div></details>
-
-
-<div class="doc doc-object doc-class">
-
-
-
-<h4 id="cryojax.ndimage.ScaleImage" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.ndimage.ScaleImage(<a class="autorefs autorefs-internal" href="#cryojax.ndimage.AbstractImageTransform">cryojax.ndimage.AbstractImageTransform</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_transforms/_base_transform.py#L75-L89"><code class='hippogriffe-repo-url'></code></a>
-
-
-<a href="#cryojax.ndimage.ScaleImage" class="headerlink" title="Permanent link">¤</a></h4>
-
-
-    <div class="doc doc-contents first">
-
-
-        <p>ScaleImage(scale: cryojax.jax_util._typing.FloatLike = 1.0, offset: cryojax.jax_util._typing.FloatLike = 0.0)</p>
-
-
-
-
-
-
-
-
-
-
-  <div class="doc doc-children">
-
-
-
-
-
-
-
-
-
-<div class="doc doc-object doc-function">
-
-
-<h5 id="cryojax.ndimage.ScaleImage.__init__" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">scale</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">offset</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">)</span></code>
-  
-
-
-<a href="#cryojax.ndimage.ScaleImage.__init__" class="headerlink" title="Permanent link">¤</a></h5>
-
-
-    <div class="doc doc-contents ">
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h5 id="cryojax.ndimage.ScaleImage.__call__" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__call__</span><span class="p">(</span><span class="n">image</span><span class="p">:</span> <span class="n">Inexact</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Inexact</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;z_dim y_dim x_dim&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Inexact</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Inexact</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;z_dim y_dim x_dim&#39;</span><span class="p">]</span></code>
-  
-
-
-<a href="#cryojax.ndimage.ScaleImage.__call__" class="headerlink" title="Permanent link">¤</a></h5>
-
-
-    <div class="doc doc-contents ">
-
-
-    </div>
-
-</div>
-
-
-
-  </div>
-
-    </div>
-
-</div><h3 id="filters">Filters<a class="headerlink" href="#filters" title="Permanent link">¤</a></h3>
+<h3 id="filters">Filters<a class="headerlink" href="#filters" title="Permanent link">¤</a></h3>
 <details class="abstract">
 <summary><code>cryojax.ndimage.AbstractFilter</code></summary>
 
@@ -2248,7 +2243,7 @@ tuple <code>(r_squared, theta)</code>.</p>
 
 <h4 id="cryojax.ndimage.AbstractFilter" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.ndimage.AbstractFilter(<a class="autorefs autorefs-internal" href="#cryojax.ndimage.AbstractImageTransform">cryojax.ndimage.AbstractImageTransform</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_transforms/_filters.py#L23-L36"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_transforms/_filters.py#L23-L36"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.AbstractFilter" class="headerlink" title="Permanent link">¤</a></h4>
@@ -2311,7 +2306,7 @@ tuple <code>(r_squared, theta)</code>.</p>
 
 <h4 id="cryojax.ndimage.LowpassFilter" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.ndimage.LowpassFilter(<a class="autorefs autorefs-internal" href="#cryojax.ndimage.AbstractFilter">cryojax.ndimage.AbstractFilter</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_transforms/_filters.py#L58-L96"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_transforms/_filters.py#L58-L96"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.LowpassFilter" class="headerlink" title="Permanent link">¤</a></h4>
@@ -2425,7 +2420,7 @@ a cosine soft-edge.</p>
 
 <h4 id="cryojax.ndimage.HighpassFilter" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.ndimage.HighpassFilter(<a class="autorefs autorefs-internal" href="#cryojax.ndimage.AbstractFilter">cryojax.ndimage.AbstractFilter</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_transforms/_filters.py#L99-L137"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_transforms/_filters.py#L99-L137"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.HighpassFilter" class="headerlink" title="Permanent link">¤</a></h4>
@@ -2539,7 +2534,7 @@ a cosine soft-edge.</p>
 
 <h4 id="cryojax.ndimage.WhiteningFilter" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.ndimage.WhiteningFilter(<a class="autorefs autorefs-internal" href="#cryojax.ndimage.AbstractFilter">cryojax.ndimage.AbstractFilter</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_transforms/_filters.py#L140-L183"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_transforms/_filters.py#L140-L183"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.WhiteningFilter" class="headerlink" title="Permanent link">¤</a></h4>
@@ -2657,7 +2652,7 @@ algorithm.</p>
 
 <h4 id="cryojax.ndimage.CustomFilter" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.ndimage.CustomFilter(<a class="autorefs autorefs-internal" href="#cryojax.ndimage.AbstractFilter">cryojax.ndimage.AbstractFilter</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_transforms/_filters.py#L39-L55"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_transforms/_filters.py#L39-L55"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.CustomFilter" class="headerlink" title="Permanent link">¤</a></h4>
@@ -2747,6 +2742,235 @@ algorithm.</p>
 
     </div>
 
+</div><p><strong>Other Fourier space operations:</strong></p>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="cryojax.ndimage.PhaseShiftFFT" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.ndimage.PhaseShiftFFT(<a class="autorefs autorefs-internal" href="#cryojax.ndimage.AbstractImageTransform">cryojax.ndimage.AbstractImageTransform</a>)</code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_transforms/_spatial_transform.py#L16-L106"><code class='hippogriffe-repo-url'></code></a>
+
+
+<a href="#cryojax.ndimage.PhaseShiftFFT" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+
+        <p>Apply a phase shift to an image in Fourier space, effectively
+applying an in-plane shift to the image in real space. Only square
+images are supported.</p>
+<div class="admonition example">
+<p class="admonition-title">Apply a translation in real-space</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">cryojax.ndimage</span><span class="w"> </span><span class="kn">import</span> <span class="n">PhaseShiftFFT</span><span class="p">,</span> <span class="n">rfftn</span><span class="p">,</span> <span class="n">irfftn</span>
+
+<span class="n">offset_in_angstroms</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">50.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">30.0</span><span class="p">])</span>
+<span class="n">frequency_grid</span> <span class="o">=</span> <span class="o">...</span> <span class="c1"># in angstroms</span>
+<span class="n">fft</span> <span class="o">=</span> <span class="n">rfftn</span><span class="p">(</span><span class="o">...</span><span class="p">)</span> <span class="c1"># e.g., fft of a real 2D image</span>
+
+<span class="n">shift_fn</span> <span class="o">=</span> <span class="n">PhaseShiftFFT</span><span class="p">(</span>
+    <span class="n">offset</span><span class="o">=</span><span class="n">offset_in_angstroms</span><span class="p">,</span> <span class="n">frequency_grid</span><span class="o">=</span><span class="n">frequency_grid</span>
+<span class="p">)</span>
+
+<span class="n">shifted_fft</span> <span class="o">=</span> <span class="n">shift_fn</span><span class="p">(</span><span class="n">fft</span><span class="p">)</span>
+<span class="n">shifted_image</span> <span class="o">=</span> <span class="n">irfftn</span><span class="p">(</span><span class="n">shifted_image_fft</span><span class="p">)</span>
+</code></pre></div>
+</div>
+
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.ndimage.PhaseShiftFFT.__init__" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">offset</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;2&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;3&#39;</span><span class="p">],</span> <span class="n">frequency_grid</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;_ _ 2&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;_ _ _ 3&#39;</span><span class="p">])</span></code>
+  
+
+
+<a href="#cryojax.ndimage.PhaseShiftFFT.__init__" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p><strong>Arguments:</strong></p>
+<ul>
+<li><code>offset</code>: The offset by which to shift the image, in pixels or angstroms.</li>
+<li><code>frequency_grid</code>: The frequency grid in pixels or angstroms.</li>
+</ul>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.ndimage.PhaseShiftFFT.__call__" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__call__</span><span class="p">(</span><span class="n">image</span><span class="p">:</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;z_dim y_dim x_dim&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;z_dim y_dim x_dim&#39;</span><span class="p">]</span></code>
+  
+
+
+<a href="#cryojax.ndimage.PhaseShiftFFT.__call__" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Apply the phase shift to the input image in Fourier space.</p>
+<p><strong>Arguments:</strong></p>
+<ul>
+<li><code>image</code>:
+    The input image in Fourier space.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p>The phase shifted image in Fourier space.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="cryojax.ndimage.RotateFFT" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.ndimage.RotateFFT(<a class="autorefs autorefs-internal" href="#cryojax.ndimage.AbstractImageTransform">cryojax.ndimage.AbstractImageTransform</a>)</code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_transforms/_spatial_transform.py#L109-L232"><code class='hippogriffe-repo-url'></code></a>
+
+
+<a href="#cryojax.ndimage.RotateFFT" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+
+        <p>Rotate an image in Fourier space using interpolation.
+Only square images are supported.</p>
+<div class="admonition example">
+<p class="admonition-title">Example</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">cryojax.ndimage</span><span class="w"> </span><span class="kn">import</span> <span class="n">RotateFFT</span><span class="p">,</span> <span class="n">fftn</span><span class="p">,</span> <span class="n">ifftn</span>
+
+<span class="n">frequency_grid</span> <span class="o">=</span> <span class="o">...</span> <span class="c1"># in pixels</span>
+<span class="n">image</span> <span class="o">=</span> <span class="o">...</span> <span class="c1"># e.g., a real 2D image</span>
+
+<span class="n">rotation_fn</span> <span class="o">=</span> <span class="n">RotateFFT</span><span class="p">(</span>
+    <span class="n">rotation_angle</span><span class="o">=</span><span class="mf">45.0</span><span class="p">,</span> <span class="n">frequency_grid</span><span class="o">=</span><span class="n">frequency_grid</span>
+<span class="p">)</span>
+
+<span class="n">rotated_image_fft</span> <span class="o">=</span> <span class="n">rotation_fn</span><span class="p">(</span><span class="n">fftn</span><span class="p">(</span><span class="n">image</span><span class="p">))</span>
+<span class="n">rotated_image</span> <span class="o">=</span> <span class="n">ifftn</span><span class="p">(</span><span class="n">rotated_image_fft</span><span class="p">)</span><span class="o">.</span><span class="n">real</span>
+</code></pre></div>
+</div>
+
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.ndimage.RotateFFT.__init__" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">rotation_angle</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span><span class="p">,</span> <span class="n">frequency_grid</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim 2&#39;</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">pixel_size</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">rotation_convention</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s1">&#39;frame&#39;</span><span class="p">,</span> <span class="s1">&#39;object&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;object&#39;</span><span class="p">,</span> <span class="n">map_coordinates_options</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{})</span></code>
+  
+
+
+<a href="#cryojax.ndimage.RotateFFT.__init__" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p><strong>Arguments:</strong></p>
+<ul>
+<li><code>rotation_angle</code>: The angle by which to rotate the image, in degrees.</li>
+<li><code>frequency_grid</code>: The frequency grid.</li>
+<li><code>pixel_size</code>: The pixel size of the <code>frequency_grid</code>.</li>
+<li><code>rotation_convention</code>:
+    If <code>'object'</code>, the rotation is with respect to the object in the image.
+    If <code>'frame'</code>, it is with respect to the frame. These are related by transpose.</li>
+<li><code>map_coordinates_options</code>:
+    A dictionary of options passed to <a class="autorefs autorefs-internal" href="#cryojax.ndimage.map_coordinates"><code>cryojax.ndimage.map_coordinates</code></a>.</li>
+</ul>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.ndimage.RotateFFT.__call__" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__call__</span><span class="p">(</span><span class="n">image</span><span class="p">:</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim&#39;</span><span class="p">]</span></code>
+  
+
+
+<a href="#cryojax.ndimage.RotateFFT.__call__" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Rotate the input image in Fourier space.</p>
+<p><strong>Arguments:</strong></p>
+<p><code>image</code>:
+    The image in Fourier space.</p>
+<p><strong>Returns:</strong></p>
+<p>The rotated image in Fourier space.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
 </div><h3 id="masks">Masks<a class="headerlink" href="#masks" title="Permanent link">¤</a></h3>
 <details class="abstract">
 <summary><code>cryojax.ndimage.AbstractMask</code></summary>
@@ -2758,7 +2982,7 @@ algorithm.</p>
 
 <h4 id="cryojax.ndimage.AbstractMask" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.ndimage.AbstractMask(<a class="autorefs autorefs-internal" href="#cryojax.ndimage.AbstractImageTransform">cryojax.ndimage.AbstractImageTransform</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_transforms/_masks.py#L19-L31"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_transforms/_masks.py#L19-L31"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.AbstractMask" class="headerlink" title="Permanent link">¤</a></h4>
@@ -2821,7 +3045,7 @@ algorithm.</p>
 
 <h4 id="cryojax.ndimage.CircularCosineMask" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.ndimage.CircularCosineMask(<a class="autorefs autorefs-internal" href="#cryojax.ndimage.AbstractMask">cryojax.ndimage.AbstractMask</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_transforms/_masks.py#L49-L81"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_transforms/_masks.py#L49-L81"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.CircularCosineMask" class="headerlink" title="Permanent link">¤</a></h4>
@@ -2931,7 +3155,7 @@ soft-edge.</p>
 
 <h4 id="cryojax.ndimage.SphericalCosineMask" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.ndimage.SphericalCosineMask(<a class="autorefs autorefs-internal" href="#cryojax.ndimage.AbstractMask">cryojax.ndimage.AbstractMask</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_transforms/_masks.py#L84-L115"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_transforms/_masks.py#L84-L115"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.SphericalCosineMask" class="headerlink" title="Permanent link">¤</a></h4>
@@ -3041,7 +3265,7 @@ soft-edge.</p>
 
 <h4 id="cryojax.ndimage.SquareCosineMask" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.ndimage.SquareCosineMask(<a class="autorefs autorefs-internal" href="#cryojax.ndimage.AbstractMask">cryojax.ndimage.AbstractMask</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_transforms/_masks.py#L118-L146"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_transforms/_masks.py#L118-L146"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.SquareCosineMask" class="headerlink" title="Permanent link">¤</a></h4>
@@ -3151,7 +3375,7 @@ soft-edge.</p>
 
 <h4 id="cryojax.ndimage.Rectangular2DCosineMask" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.ndimage.Rectangular2DCosineMask(<a class="autorefs autorefs-internal" href="#cryojax.ndimage.AbstractMask">cryojax.ndimage.AbstractMask</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_transforms/_masks.py#L201-L240"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_transforms/_masks.py#L201-L240"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.Rectangular2DCosineMask" class="headerlink" title="Permanent link">¤</a></h4>
@@ -3266,7 +3490,7 @@ soft-edge. Optionally, rotate the rectangle by an angle.</p>
 
 <h4 id="cryojax.ndimage.Rectangular3DCosineMask" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.ndimage.Rectangular3DCosineMask(<a class="autorefs autorefs-internal" href="#cryojax.ndimage.AbstractMask">cryojax.ndimage.AbstractMask</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_transforms/_masks.py#L243-L281"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_transforms/_masks.py#L243-L281"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.Rectangular3DCosineMask" class="headerlink" title="Permanent link">¤</a></h4>
@@ -3380,7 +3604,7 @@ soft-edge.</p>
 
 <h4 id="cryojax.ndimage.Cylindrical2DCosineMask" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.ndimage.Cylindrical2DCosineMask(<a class="autorefs autorefs-internal" href="#cryojax.ndimage.AbstractMask">cryojax.ndimage.AbstractMask</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_transforms/_masks.py#L149-L198"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_transforms/_masks.py#L149-L198"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.Cylindrical2DCosineMask" class="headerlink" title="Permanent link">¤</a></h4>
@@ -3496,7 +3720,7 @@ rotated at a given angle.</p>
 
 <h4 id="cryojax.ndimage.CustomMask" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.ndimage.CustomMask(<a class="autorefs autorefs-internal" href="#cryojax.ndimage.AbstractMask">cryojax.ndimage.AbstractMask</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_transforms/_masks.py#L34-L46"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_transforms/_masks.py#L34-L46"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.CustomMask" class="headerlink" title="Permanent link">¤</a></h4>
@@ -3594,7 +3818,7 @@ rotated at a given angle.</p>
 
 <h4 id="cryojax.ndimage.SincCorrectionMask" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.ndimage.SincCorrectionMask(<a class="autorefs autorefs-internal" href="#cryojax.ndimage.AbstractMask">cryojax.ndimage.AbstractMask</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_transforms/_masks.py#L284-L327"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_transforms/_masks.py#L284-L327"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.SincCorrectionMask" class="headerlink" title="Permanent link">¤</a></h4>
@@ -3698,6 +3922,87 @@ acts to deconvolve this function with a division in real-space.</p>
 
     </div>
 
+</div><p><strong>Other real-space operations</strong></p>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="cryojax.ndimage.ScaleImage" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.ndimage.ScaleImage(<a class="autorefs autorefs-internal" href="#cryojax.ndimage.AbstractImageTransform">cryojax.ndimage.AbstractImageTransform</a>)</code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_transforms/_base_transform.py#L75-L89"><code class='hippogriffe-repo-url'></code></a>
+
+
+<a href="#cryojax.ndimage.ScaleImage" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+
+        <p>ScaleImage(scale: cryojax.jax_util._typing.FloatLike = 1.0, offset: cryojax.jax_util._typing.FloatLike = 0.0)</p>
+
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.ndimage.ScaleImage.__init__" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">scale</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">offset</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">)</span></code>
+  
+
+
+<a href="#cryojax.ndimage.ScaleImage.__init__" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.ndimage.ScaleImage.__call__" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__call__</span><span class="p">(</span><span class="n">image</span><span class="p">:</span> <span class="n">Inexact</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Inexact</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;z_dim y_dim x_dim&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Inexact</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Inexact</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;z_dim y_dim x_dim&#39;</span><span class="p">]</span></code>
+  
+
+
+<a href="#cryojax.ndimage.ScaleImage.__call__" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
 </div><h2 id="operators">Operators<a class="headerlink" href="#operators" title="Permanent link">¤</a></h2>
 <h3 id="fourier-space">Fourier-space<a class="headerlink" href="#fourier-space" title="Permanent link">¤</a></h3>
 <details class="abstract" open="open">
@@ -3710,7 +4015,7 @@ acts to deconvolve this function with a division in real-space.</p>
 
 <h4 id="cryojax.ndimage.AbstractFourierOperator" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.ndimage.AbstractFourierOperator</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_operators/_fourier_operator.py#L26-L77"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_operators/_fourier_operator.py#L27-L78"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.AbstractFourierOperator" class="headerlink" title="Permanent link">¤</a></h4>
@@ -3780,7 +4085,7 @@ be dimensionless (up to a scale factor).</p>
 
 <h4 id="cryojax.ndimage.FourierGaussian" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.ndimage.FourierGaussian(<a class="autorefs autorefs-internal" href="#cryojax.ndimage.AbstractFourierOperator">cryojax.ndimage.AbstractFourierOperator</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_operators/_fourier_operator.py#L271-L309"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_operators/_fourier_operator.py#L276-L316"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.FourierGaussian" class="headerlink" title="Permanent link">¤</a></h4>
@@ -3877,7 +4182,7 @@ squared.</p>
 
 <h4 id="cryojax.ndimage.PeakedFourierGaussian" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.ndimage.PeakedFourierGaussian(<a class="autorefs autorefs-internal" href="#cryojax.ndimage.AbstractFourierOperator">cryojax.ndimage.AbstractFourierOperator</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_operators/_fourier_operator.py#L312-L353"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_operators/_fourier_operator.py#L319-L362"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.PeakedFourierGaussian" class="headerlink" title="Permanent link">¤</a></h4>
@@ -3971,7 +4276,7 @@ at a given frequency shell.</p>
 
 <h4 id="cryojax.ndimage.FourierConstant" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.ndimage.FourierConstant(<a class="autorefs autorefs-internal" href="#cryojax.ndimage.AbstractFourierOperator">cryojax.ndimage.AbstractFourierOperator</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_operators/_fourier_operator.py#L200-L220"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_operators/_fourier_operator.py#L201-L221"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.FourierConstant" class="headerlink" title="Permanent link">¤</a></h4>
@@ -4057,7 +4362,7 @@ at a given frequency shell.</p>
 
 <h4 id="cryojax.ndimage.FourierSinc" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.ndimage.FourierSinc(<a class="autorefs autorefs-internal" href="#cryojax.ndimage.AbstractFourierOperator">cryojax.ndimage.AbstractFourierOperator</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_operators/_fourier_operator.py#L356-L396"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_operators/_fourier_operator.py#L365-L405"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.FourierSinc" class="headerlink" title="Permanent link">¤</a></h4>
@@ -4153,9 +4458,97 @@ and <span class="arithmatex">\(w\)</span> is width of the real-space box functio
 
 
 
+<h4 id="cryojax.ndimage.FourierPhaseShifts" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.ndimage.FourierPhaseShifts(<a class="autorefs autorefs-internal" href="#cryojax.ndimage.AbstractFourierOperator">cryojax.ndimage.AbstractFourierOperator</a>)</code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_operators/_fourier_operator.py#L408-L437"><code class='hippogriffe-repo-url'></code></a>
+
+
+<a href="#cryojax.ndimage.FourierPhaseShifts" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+
+        <p>Apply a phase shift the Fourier domain.</p>
+
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.ndimage.FourierPhaseShifts.__init__" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">shift</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;2&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;3&#39;</span><span class="p">])</span></code>
+  
+
+
+<a href="#cryojax.ndimage.FourierPhaseShifts.__init__" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p><strong>Arguments:</strong></p>
+<ul>
+<li><code>shift</code>:
+    The shift to apply in the Fourier domain. The units of this should
+    be the inverse of the units of the <code>frequency_grid</code> passed at runtime.</li>
+</ul>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.ndimage.FourierPhaseShifts.__call__" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__call__</span><span class="p">(</span><span class="n">frequency_grid</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim 2&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;z_dim y_dim x_dim 3&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;z_dim y_dim x_dim&#39;</span><span class="p">]</span></code>
+  
+
+
+<a href="#cryojax.ndimage.FourierPhaseShifts.__call__" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div><hr />
+
+
+<div class="doc doc-object doc-class">
+
+
+
 <h4 id="cryojax.ndimage.FourierExp2D" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.ndimage.FourierExp2D(<a class="autorefs autorefs-internal" href="#cryojax.ndimage.AbstractFourierOperator">cryojax.ndimage.AbstractFourierOperator</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_operators/_fourier_operator.py#L223-L268"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_operators/_fourier_operator.py#L224-L273"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.FourierExp2D" class="headerlink" title="Permanent link">¤</a></h4>
@@ -4256,7 +4649,7 @@ scale.</p>
 
 <h4 id="cryojax.ndimage.FourierDC" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.ndimage.FourierDC(<a class="autorefs autorefs-internal" href="#cryojax.ndimage.AbstractFourierOperator">cryojax.ndimage.AbstractFourierOperator</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_operators/_fourier_operator.py#L178-L197"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_operators/_fourier_operator.py#L179-L198"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.FourierDC" class="headerlink" title="Permanent link">¤</a></h4>
@@ -4342,7 +4735,7 @@ scale.</p>
 
 <h4 id="cryojax.ndimage.CustomFourierOperator" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.ndimage.CustomFourierOperator(<a class="autorefs autorefs-internal" href="#cryojax.ndimage.AbstractFourierOperator">cryojax.ndimage.AbstractFourierOperator</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_operators/_fourier_operator.py#L137-L163"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_operators/_fourier_operator.py#L138-L164"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.CustomFourierOperator" class="headerlink" title="Permanent link">¤</a></h4>
@@ -4436,7 +4829,7 @@ scale.</p>
 
 <h4 id="cryojax.ndimage.AbstractRealOperator" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.ndimage.AbstractRealOperator</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_operators/_real_operator.py#L16-L67"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_operators/_real_operator.py#L17-L68"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.AbstractRealOperator" class="headerlink" title="Permanent link">¤</a></h4>
@@ -4506,7 +4899,7 @@ have units of inverse area (up to a scale factor).</p>
 
 <h4 id="cryojax.ndimage.RealGaussian" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.ndimage.RealGaussian(<a class="autorefs autorefs-internal" href="#cryojax.ndimage.AbstractRealOperator">cryojax.ndimage.AbstractRealOperator</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_operators/_real_operator.py#L127-L174"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_operators/_real_operator.py#L128-L176"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.RealGaussian" class="headerlink" title="Permanent link">¤</a></h4>
@@ -4602,7 +4995,7 @@ have units of inverse area (up to a scale factor).</p>
 
 <h4 id="cryojax.ndimage.RealConstant" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.ndimage.RealConstant(<a class="autorefs autorefs-internal" href="#cryojax.ndimage.AbstractRealOperator">cryojax.ndimage.AbstractRealOperator</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/ndimage/_operators/_real_operator.py#L177-L197"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_operators/_real_operator.py#L179-L199"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.ndimage.RealConstant" class="headerlink" title="Permanent link">¤</a></h4>
@@ -4681,6 +5074,77 @@ have units of inverse area (up to a scale factor).</p>
 
 </div><hr />
 <h2 id="utility-functions">Utility functions<a class="headerlink" href="#utility-functions" title="Permanent link">¤</a></h2>
+<h3 id="interpolation">Interpolation<a class="headerlink" href="#interpolation" title="Permanent link">¤</a></h3>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="cryojax.ndimage.map_coordinates" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">ndimage</span><span class="o">.</span><span class="n">map_coordinates</span><span class="p">(</span><span class="nb">input</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">coordinates</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Array</span><span class="p">],</span> <span class="n">order</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;fill&#39;</span><span class="p">,</span> <span class="n">cval</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="nb">complex</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">)</span></code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_map_coordinates.py#L19-L44"><code class='hippogriffe-repo-url'></code></a>
+
+
+<a href="#cryojax.ndimage.map_coordinates" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+        <p>Similar to <code>scipy.map_coordinates</code>, but diverges from the API.</p>
+<p>Adapted from Louis Desdoigts's <a href="https://github.com/LouisDesdoigts/jax/blob/cubic-spline-updated/jax/_src/scipy/ndimage.py">version of <code>jax.scipy.map_coordinates</code></a>,
+which was developed for the project <a href="https://louisdesdoigts.github.io/dLux/"><code>dLux</code></a>.</p>
+<p><strong>Arguments:</strong></p>
+<ul>
+<li><code>mode</code> :
+    Uses built-in <a href="https://jax.readthedocs.io/en/latest/_autosummary/jax.numpy.ndarray.at.html">JAX out-of-bounds indexing</a>
+    to determine how to extrapolate beyond boundaries.</li>
+</ul>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="cryojax.ndimage.map_coordinates_spline" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">ndimage</span><span class="o">.</span><span class="n">map_coordinates_spline</span><span class="p">(</span><span class="n">coefficients</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">coordinates</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Array</span><span class="p">],</span> <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;fill&#39;</span><span class="p">,</span> <span class="n">cval</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="nb">complex</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">)</span></code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_map_coordinates.py#L47-L57"><code class='hippogriffe-repo-url'></code></a>
+
+
+<a href="#cryojax.ndimage.map_coordinates_spline" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+        <p>Similar to <code>scipy.map_coordinates</code>, but takes coefficients computed from
+<a class="autorefs autorefs-internal" href="#cryojax.ndimage.compute_spline_coefficients"><code>cryojax.ndimage.compute_spline_coefficients</code></a> as input.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="cryojax.ndimage.compute_spline_coefficients" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">ndimage</span><span class="o">.</span><span class="n">compute_spline_coefficients</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">Array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span></code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/ndimage/_map_coordinates.py#L60-L71"><code class='hippogriffe-repo-url'></code></a>
+
+
+<a href="#cryojax.ndimage.compute_spline_coefficients" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+        <p>Solve for the spline coefficients of an input array.</p>
+
+
+    </div>
+
+</div>
 
 
 

@@ -1289,6 +1289,15 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#i-need-help-with-debugging" class="md-nav__link">
+    <span class="md-ellipsis">
+      I need help with debugging!
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1328,6 +1337,11 @@
 <p>JAX has a growing ecosystem for scientific computing in the physical sciences, such as for statistical inference. These can be leveraged for building exciting new cryo-EM data analysis applications. Check out <a href="https://github.com/patrick-kidger/optimistix"><code>optimistix</code></a> for non-linear optimization, <a href="https://github.com/patrick-kidger/lineax"><code>lineax</code></a> for linear solvers, and <a href="https://github.com/blackjax-devs/blackjax"><code>blackjax</code></a> for sampling.</p>
 <p>Additionally, cryoJAX is a part of a growing number of libraries for physical modeling, and some of these could be used with cryoJAX for cryo-EM. For example, see <a href="https://github.com/patrick-kidger/diffrax"><code>diffrax</code></a> for differential equation solvers and <a href="https://github.com/jax-md/jax-md"><code>jax-md</code></a> for molecular dynamics.</p>
 <p>See the Equinox <a href="https://docs.kidger.site/equinox/awesome-list/#awesome-list">awesome list</a> for more libraries in the JAX ecosystem.</p>
+<h2 id="i-need-help-with-debugging">I need help with debugging!<a class="headerlink" href="#i-need-help-with-debugging" title="Permanent link">¤</a></h2>
+<p>It can be challenging to debug JAX JIT-compiled code. To start learning about this, I recommend learning about <a href="https://docs.jax.dev/en/latest/debugging/index.html#debugging-runtime-values"><code>jax.debug</code></a> and <a href="https://docs.kidger.site/equinox/api/errors/#equinox.error_if"><code>equinox.error_if</code></a>.</p>
+<p>CryoJAX implements internal runtime checks for things such as if positive quantities (e.g. pixel size) have somehow become negative, such as during gradient descent. By default, cryoJAX will not perform these checks, but enable them by setting the environmental variable <code>CRYOJAX_ENABLE_CHECKS=true</code>.</p>
+<p>These checks are performed using the function <a class="autorefs autorefs-internal" href="../api/jax_util/#cryojax.jax_util.maybe_error_if"><code>cryojax.jax_util.maybe_error_if</code></a>, which wraps <a href="https://docs.kidger.site/equinox/api/errors/#equinox.error_if"><code>equinox.error_if</code></a>. To change the behavior of run-time error checks, see the <code>error_if</code> documentation to learn about the <code>EQX_ON_ERROR</code> environmental variable.</p>
+<p>Also, note that <a class="autorefs autorefs-internal" href="../api/jax_util/#cryojax.jax_util.maybe_error_if"><code>cryojax.jax_util.maybe_error_if</code></a> is public API so that developers of downstream cryoJAX libraries may also use <code>CRYOJAX_ENABLE_CHECKS</code>!</p>
 
 
 

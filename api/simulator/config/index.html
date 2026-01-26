@@ -1356,7 +1356,7 @@
 
 <h4 id="cryojax.simulator.AbstractImageConfig" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.AbstractImageConfig</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/simulator/_image_config.py#L133-L522"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/simulator/_image_config.py#L134-L535"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.AbstractImageConfig" class="headerlink" title="Permanent link">¤</a></h4>
@@ -2210,7 +2210,7 @@ information.</p>
 
 <h4 id="cryojax.simulator.BasicImageConfig" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.BasicImageConfig(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractImageConfig">cryojax.simulator.AbstractImageConfig</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/simulator/_image_config.py#L525-L608"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/simulator/_image_config.py#L538-L619"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.BasicImageConfig" class="headerlink" title="Permanent link">¤</a></h4>
@@ -2606,7 +2606,7 @@ information.</p>
 
 <h4 id="cryojax.simulator.DoseImageConfig" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.DoseImageConfig(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractImageConfig">cryojax.simulator.AbstractImageConfig</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/bc31153f4aa68bfa14ef4d66537e121dea11eb0e/cryojax/simulator/_image_config.py#L611-L699"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/409cfb0ceaefb4d890a0a2850b0806bd8fe61b89/cryojax/simulator/_image_config.py#L622-L714"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.DoseImageConfig" class="headerlink" title="Permanent link">¤</a></h4>
@@ -2881,8 +2881,9 @@ energy <code>voltage_in_kilovolts</code>.</p>
     The integrated dose rate of the electron beam in
     <span class="arithmatex">\(e^-/A^2\)</span></li>
 <li><code>pad_options</code>:
-    Options that control image padding.<ul>
-<li><code>shape</code>:
+    Options that control image padding. This is a dictionary
+    with keys:<ul>
+<li>'shape':
     The shape of the image after padding. By default, equal
     to <code>shape</code>.</li>
 </ul>
