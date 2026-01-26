@@ -15,7 +15,7 @@ jobs:
       fail-fast: false
       matrix:
         os: ${{ fromJSON(github.base_ref == 'main' && '["ubuntu-latest","macos-latest"]' || '["ubuntu-latest"]') }}
-        python-version: ${{ fromJSON(github.base_ref == 'main' && '["3.10", "3.13"]' || '["3.11"]') }}
+        python-version: ${{ fromJSON(github.base_ref == 'main' && '["3.10", "3.14"]' || '["3.11"]') }}
 
     steps:
       - name: Checkout repository
