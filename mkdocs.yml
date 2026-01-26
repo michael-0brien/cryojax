@@ -43,7 +43,6 @@ plugins:
             - "examples/.ipynb_checkpoints/"
             - "examples/old"
             - "examples/data"
-            - "examples/scripts"
     - ipynb
     - hippogriffe:
         extra_public_objects:
