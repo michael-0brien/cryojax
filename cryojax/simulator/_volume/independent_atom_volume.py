@@ -147,6 +147,8 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
     positions: PyTree[Float[Array, "_ 3"]]
     scattering_factors: PyTree[AbstractFourierOperator]
 
+    rotation_convention: ClassVar[Literal["object"]] = "object"
+
     def __init__(
         self,
         positions: PyTree[Float[NDArrayLike, "_ 3"], "T"],

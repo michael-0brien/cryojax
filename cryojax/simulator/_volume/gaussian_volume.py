@@ -65,6 +65,8 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
     amplitudes: Float[Array, "n_positions n_gaussians"]
     variances: Float[Array, " n_positions n_gaussians"]
 
+    rotation_convention: ClassVar[Literal["object"]] = "object"
+
     def __init__(
         self,
         positions: Float[NDArrayLike, "n_positions 3"],

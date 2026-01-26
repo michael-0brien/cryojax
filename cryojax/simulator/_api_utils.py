@@ -49,14 +49,19 @@ from ._volume import (
 identity_fn = eqxi.doc_repr(lambda x, _: x, "identity_fn")
 
 
-def _use_inverse_pose(volume: AbstractVolumeParametrization) -> bool:
+def _maybe_invert_rotation(
+    pose: AbstractPose,
+    volume: AbstractVolumeParametrization,
+    rotation_convention: Literal["object", "frame"],
+) -> AbstractPose:
     jaxpr_fn = eqx.filter_make_jaxpr(lambda vol: vol.to_representation())
     _, out_dynamic, out_static = jaxpr_fn(volume)
     out_struct = eqx.combine(out_dynamic, out_static)
-    expects_frame_rotation = isinstance(
-        out_struct, (FourierVoxelGridVolume, FourierVoxelSplineVolume)
-    )
-    return expects_frame_rotation
+    conventions = [rotation_convention, out_struct.rotation_convention]
+    if conventions[0] != conventions[1]:
+        pose = pose.to_inverse_rotation()
+
+    return pose
 
 
 @overload
@@ -74,6 +79,7 @@ def make_image_model(
     signal_centering: Literal["bg", "mean"] = "mean",
     translate_mode: Literal["fft", "atom", "none"] = "fft",
     quantity_mode: None = None,
+    rotation_convention: Literal["object", "frame"] = "object",
 ) -> ProjectionImageModel: ...
 
 
@@ -92,6 +98,7 @@ def make_image_model(  # pyright: ignore[reportOverlappingOverload]
     signal_centering: Literal["bg", "mean"] = "mean",
     translate_mode: Literal["fft", "atom", "none"] = "fft",
     quantity_mode: None = None,
+    rotation_convention: Literal["object", "frame"] = "object",
 ) -> LinearImageModel: ...
 
 
@@ -110,6 +117,7 @@ def make_image_model(
     signal_centering: Literal["bg", "mean"] = "mean",
     translate_mode: Literal["fft", "atom", "none"] = "fft",
     quantity_mode: Literal["contrast"] = "contrast",
+    rotation_convention: Literal["object", "frame"] = "object",
 ) -> ContrastImageModel: ...
 
 
@@ -128,6 +136,7 @@ def make_image_model(
     signal_centering: Literal["bg", "mean"] = "mean",
     translate_mode: Literal["fft", "atom", "none"] = "fft",
     quantity_mode: Literal["intensity"] = "intensity",
+    rotation_convention: Literal["object", "frame"] = "object",
 ) -> IntensityImageModel: ...
 
 
@@ -146,6 +155,7 @@ def make_image_model(
     signal_centering: Literal["bg", "mean"] = "mean",
     translate_mode: Literal["fft", "atom", "none"] = "fft",
     quantity_mode: Literal["counts"] = "counts",
+    rotation_convention: Literal["object", "frame"] = "object",
 ) -> ElectronCountsImageModel: ...
 
 
@@ -163,6 +173,7 @@ def make_image_model(
     signal_centering: Literal["bg", "mean"] = "mean",
     translate_mode: Literal["fft", "atom", "none"] = "fft",
     quantity_mode: Literal["contrast", "intensity", "counts"] | None = None,
+    rotation_convention: Literal["object", "frame"] = "object",
 ) -> AbstractImageModel:
     """Construct an [`cryojax.simulator.AbstractImageModel`][] for
     most common use-cases.
@@ -259,29 +270,24 @@ def make_image_model(
             Uses the [`cryojax.simulator.ElectronCountsImageModel`][]
             to simulate electron counts.
             If this is passed, a `detector` must also be passed.
+    - `rotation_convention`:
+        If `'object'`, the rotation given by `pose` is of the object.
+        If `'frame'`, the rotation given by `pose` is of the frame. These
+        are related by transpose.
 
-    !!! warning
-        The `pose` given to `make_image_model` always represents a
-        rotation of the *object*, not of the frame. Some volume
-        projection methods (e.g. [`cryojax.simulator.FourierSliceExtraction`][])
-        instead image
-        a rotation of the frame, so if `volume` is
-        such a representation, the pose is transposed under the hood.
+    !!! info
+        The `make_image_model` function enforces agreement between
+        rotation conventions of different volumes via the
+        `rotation_convention` argument. Lower level `cryojax` APIs
+        will not enforce this agreement, such as if the user instantiates
+        an [`cryojax.simulator.AbstractImageModel`][] directly.
 
-        Rotations will still differ by a transpose if:
-
-        - The `volume` is a custom subclass of
-        [`cryojax.simulator.AbstractVolumeRepresentation`][] that
-        implements a frame rotation.
-        - The user instantiates an [`cryojax.simulator.AbstractImageModel`][]
-        directly, rather than through `make_image_model`.
-
-        In these cases, it is necessary to manually transpose the pose by
-        calling `pose.to_inverse_rotation()`.
+        In these cases, agreement can be acheived with a manual transpose
+        via `pose.to_inverse_rotation()`.
 
     **Returns:**
 
-    A [`cryojax.simulator.AbstractImageModel`][] with type
+    An [`cryojax.simulator.AbstractImageModel`][]. This has type:
 
     - [`cryojax.simulator.ProjectionImageModel`][] if no `transfer_theory`
     is specified.
@@ -292,9 +298,13 @@ def make_image_model(
     [`cryojax.simulator.ElectronCountsImageModel`][] depending on
     the value of `quantity_mode`.
     """
-    # Invert pose if volume expects frame rotation
-    if _use_inverse_pose(volume):
-        pose = pose.to_inverse_rotation()
+    # Invert pose if
+    if rotation_convention not in ["object", "frame"]:
+        raise ValueError(
+            f"Found `rotation_convention = {rotation_convention}`, but valid "
+            "values are 'object' and 'frame'."
+        )
+    pose = _maybe_invert_rotation(pose, volume, rotation_convention)
     options = dict(
         normalizes_signal=normalizes_signal,
         signal_centering=signal_centering,
@@ -365,9 +375,8 @@ def make_image_model(
                 )
             else:
                 raise ValueError(
-                    f"`quantity_mode = {quantity_mode}` not supported. Supported "
-                    "modes for simulating "
-                    "physical quantities are 'contrast', 'intensity', and 'counts'."
+                    f"Found `quantity_mode = {quantity_mode}`, but valid "
+                    "values are 'contrast', 'intensity', and 'counts'."
                 )
 
     return image_model
