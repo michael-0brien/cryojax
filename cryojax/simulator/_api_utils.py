@@ -255,11 +255,15 @@ def make_image_model(
     - `translate_mode`:
         How to apply in-plane translation to the volume. Options are
         - 'fft':
-            Apply phase shifts in the Fourier domain.
+            Apply phase shifts in the Fourier domain. This option
+            is best for most use cases and is usually faster than
+            the `'atom'` option.
         - 'atom':
             Apply translation to atom positions before
-            projection. For this method, the `volume`
-            argument must be or yield a [`cryojax.simulator.AbstractAtomVolume`][].
+            projection. This method is more numerically accurate
+            than the `'fft'` option, but it is only supported if
+            the `volume` argument yields a
+            [`cryojax.simulator.AbstractAtomVolume`][].
         - 'none':
             Do not apply the translation.
     - `quantity_mode`:
