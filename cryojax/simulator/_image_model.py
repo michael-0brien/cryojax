@@ -755,7 +755,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
             if self.translate_mode == "fft":
                 fourier_intensity = self._phase_shift_translate(fourier_intensity)
             # ... now measure the detector readout
-            fourier_detector_readout = self.detector.compute_detector_readout(
+            fourier_detector_readout = self.detector.sample_counts(
                 keys[2],
                 fourier_intensity,
                 self.image_config,
