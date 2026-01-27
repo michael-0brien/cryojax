@@ -150,10 +150,7 @@ class WhiteningFilter(AbstractFilter, strict=True):
 
     def __init__(
         self,
-        image_or_image_stack: (
-            Float[NDArrayLike, "image_y_dim image_x_dim"]
-            | Float[NDArrayLike, "n_images image_y_dim image_x_dim"]
-        ),
+        images: Float[NDArrayLike, "_ _"] | Float[NDArrayLike, "_ _ _"],
         shape: tuple[int, int] | None = None,
         *,
         interpolation_mode: str = "linear",
@@ -161,7 +158,7 @@ class WhiteningFilter(AbstractFilter, strict=True):
     ):
         """**Arguments:**
 
-        - `image_or_image_stack`:
+        - `images`:
             The image (or stack of images) from which to compute the power spectrum.
         - `shape`:
             The shape of the resulting filter. This downsamples or
@@ -173,13 +170,9 @@ class WhiteningFilter(AbstractFilter, strict=True):
             If `False`, the whitening filter is the inverse square root of the image
             power. If `True`, the filter is the inverse of the image power.
         """
-        image_stack = (
-            jnp.expand_dims(image_or_image_stack, 0)
-            if image_or_image_stack.ndim == 2
-            else jnp.asarray(image_or_image_stack)
-        )
+        images = jnp.expand_dims(images, 0) if images.ndim == 2 else jnp.asarray(images)
         self.array = _compute_whitening_filter(
-            image_stack,
+            images,
             shape,
             interpolation_mode=interpolation_mode,
             outputs_squared=outputs_squared,
@@ -228,9 +221,10 @@ def _compute_lowpass_filter(
 
 def _compute_whitening_filter(
     image_stack: Float[Array, "n_images y_dim x_dim"],
-    shape: tuple[int, int] | None = None,
-    interpolation_mode: str = "linear",
-    outputs_squared: bool = False,
+    shape: tuple[int, int] | None,
+    *,
+    interpolation_mode: str,
+    outputs_squared: bool,
 ) -> Float[Array, "{shape[0]} {shape[1]}"]:
     # Make coordinates
     frequency_grid = make_frequency_grid(image_stack.shape[1:])
@@ -247,16 +241,14 @@ def _compute_whitening_filter(
         in_axes=[0, None],
         out_axes=(0, None),
     )
-    radially_averaged_powerspectrum_stack, frequency_bins = compute_powerspectrum_stack(
+    binned_powerspectrum_stack, frequency_bins = compute_powerspectrum_stack(
         fourier_image_stack, radial_frequency_grid
     )
     # Take the mean over the stack
-    radially_averaged_powerspectrum = jnp.mean(
-        radially_averaged_powerspectrum_stack, axis=0
-    )
+    binned_powerspectrum = jnp.mean(binned_powerspectrum_stack, axis=0)
     # Put onto a grid
-    radially_averaged_powerspectrum_on_grid = radial_average_to_grid(
-        radially_averaged_powerspectrum,
+    binned_powerspectrum_on_grid = radial_average_to_grid(
+        binned_powerspectrum,
         frequency_bins,
         radial_frequency_grid,
         interpolation_mode=interpolation_mode,
@@ -264,27 +256,27 @@ def _compute_whitening_filter(
     # Resize to be the desired shape
     if shape is not None:
         new_shape = shape
-        radially_averaged_powerspectrum_on_grid = rfftn(
+        binned_powerspectrum_on_grid = rfftn(
             resize_with_crop_or_pad(
-                irfftn(radially_averaged_powerspectrum_on_grid, s=image_stack.shape[1:]),
+                irfftn(binned_powerspectrum_on_grid, s=image_stack.shape[1:]),
                 shape,
                 mode="edge",
             )
         ).real
         # ... resizing and going back to fourier space can introduce negative values
-        radially_averaged_powerspectrum_on_grid = jnp.where(
-            radially_averaged_powerspectrum_on_grid < 0,
+        binned_powerspectrum_on_grid = jnp.where(
+            binned_powerspectrum_on_grid < 0,
             0.0,
-            radially_averaged_powerspectrum_on_grid,
+            binned_powerspectrum_on_grid,
         )
     else:
         new_shape = image_stack.shape[1], image_stack.shape[2]
     # Compute inverse square root (or inverse square)
     inverse_fn = jax.lax.reciprocal if outputs_squared else jax.lax.rsqrt
     whitening_filter = jnp.where(
-        jnp.isclose(radially_averaged_powerspectrum_on_grid, 0.0),
+        jnp.isclose(binned_powerspectrum_on_grid, 0.0),
         0.0,
-        inverse_fn(radially_averaged_powerspectrum_on_grid),
+        inverse_fn(binned_powerspectrum_on_grid),
     )
     # Set zero mode to 0, defining the filter to zero out these modes
     whitening_filter = whitening_filter.at[0, 0].set(0.0)

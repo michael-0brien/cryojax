@@ -159,7 +159,7 @@ class Cylindrical2DCosineMask(AbstractMask, strict=True):
         coordinate_grid: Float[Array, "y_dim x_dim 2"],
         radius: FloatLike,
         rolloff_width: FloatLike,
-        in_plane_rotation_angle: FloatLike = 0.0,
+        rotation_angle: FloatLike = 0.0,
         length: FloatLike | None = None,
     ):
         """**Arguments:**
@@ -170,7 +170,7 @@ class Cylindrical2DCosineMask(AbstractMask, strict=True):
             The radius of the cylinder.
         - `rolloff_width`:
             The rolloff width of the soft edge.
-        - `in_plane_rotation_angle`:
+        - `rotation_angle`:
             The in-plane rotation angle of the cylinder in degrees. By default,
             `0.0`.
         - `length`:
@@ -181,7 +181,7 @@ class Cylindrical2DCosineMask(AbstractMask, strict=True):
             self.array = _compute_cylindrical_mask_2d_without_length(
                 coordinate_grid,
                 jnp.asarray(radius),
-                jnp.asarray(in_plane_rotation_angle),
+                jnp.asarray(rotation_angle),
                 jnp.asarray(rolloff_width),
             )
         else:
@@ -189,7 +189,7 @@ class Cylindrical2DCosineMask(AbstractMask, strict=True):
                 coordinate_grid,
                 jnp.asarray(radius),
                 length,
-                jnp.asarray(in_plane_rotation_angle),
+                jnp.asarray(rotation_angle),
                 jnp.asarray(rolloff_width),
             )
 
@@ -211,7 +211,7 @@ class Rectangular2DCosineMask(AbstractMask, strict=True):
         x_width: FloatLike,
         y_width: FloatLike,
         rolloff_width: FloatLike,
-        in_plane_rotation_angle: FloatLike = 0.0,
+        rotation_angle: FloatLike = 0.0,
     ):
         """**Arguments:**
 
@@ -223,7 +223,7 @@ class Rectangular2DCosineMask(AbstractMask, strict=True):
             The width of the rectangle along the y-axis.
         - `rolloff_width`:
             The rolloff width of the soft edge.
-        - `in_plane_rotation_angle`:
+        - `rotation_angle`:
             The in-plane rotation angle of the rectangle in degrees. By default,
             `0.0`.
         """
@@ -231,7 +231,7 @@ class Rectangular2DCosineMask(AbstractMask, strict=True):
             coordinate_grid,
             jnp.asarray(y_width / 2),
             jnp.asarray(x_width),
-            jnp.asarray(in_plane_rotation_angle),
+            jnp.asarray(rotation_angle),
             jnp.asarray(rolloff_width),
         )
 

@@ -10,15 +10,15 @@ import jax.numpy as jnp
 import jax.random as jr
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
+from .._internal import error_if_negative
 from ..constants import PARKHURST2024_POWER_CONSTANTS
-from ..jax_util import error_if_negative
 from ..ndimage import (
     AbstractFourierOperator,
     FourierGaussian,
     PeakedFourierGaussian,
     ifftn,
     irfftn,
-    rescale_image,
+    rescale_fft,
 )
 from ._image_config import AbstractImageConfig
 
@@ -230,13 +230,17 @@ class GRFSolvent2D(AbstractRandomSolvent2D, strict=True):
         """
         n_pixels = config.padded_n_pixels
         if outputs_real_space:
-            frequency_grid_in_angstroms = config.padded_frequency_grid_in_angstroms
+            frequency_grid_in_angstroms = config.get_frequency_grid(
+                padding=True, physical=True
+            )
         else:
             if outputs_rfft:
-                frequency_grid_in_angstroms = config.padded_frequency_grid_in_angstroms
+                frequency_grid_in_angstroms = config.get_frequency_grid(
+                    padding=True, physical=True
+                )
             else:
-                frequency_grid_in_angstroms = (
-                    config.padded_full_frequency_grid_in_angstroms
+                frequency_grid_in_angstroms = config.get_frequency_grid(
+                    padding=True, physical=True, full=True
                 )
         # Compute standard deviation, scaling up by the variance by the number
         # of pixels to make the realization independent pixel-independent in real-space.
@@ -252,11 +256,10 @@ class GRFSolvent2D(AbstractRandomSolvent2D, strict=True):
         )
         mean = self.total_potential_per_molecule * molecules_per_angstrom_squared
         std = 1.0  # TODO: set standard deviation
-        fourier_in_plane_potential_of_solvent = rescale_image(
+        fourier_in_plane_potential_of_solvent = rescale_fft(
             solvent_grf,
             mean=mean,
             std=std,
-            input_is_real_space=False,
             input_is_rfft=outputs_rfft,
             shape_in_real_space=config.padded_shape,
         )

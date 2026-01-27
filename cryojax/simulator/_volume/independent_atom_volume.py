@@ -7,8 +7,9 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float, PyTree
 
+from ..._internal import error_if_not_positive
 from ...constants import LobatoScatteringFactorParameters, PengScatteringFactorParameters
-from ...jax_util import FloatLike, NDArrayLike, error_if_not_positive
+from ...jax_util import FloatLike, NDArrayLike
 from ...ndimage import (
     AbstractFourierOperator,
     FourierSinc,
@@ -65,9 +66,11 @@ class PengScatteringFactor(AbstractFourierOperator, strict=True):
         ),
     ):
         q_squared = jnp.sum(frequency_grid**2, axis=-1)
-        b_factor = 0.0 if self.b_factor is None else self.b_factor
+        b_factor = 0.0 if self.b_factor is None else error_if_not_positive(self.b_factor)
         gaussian_fn = lambda _a, _b: _a * jnp.exp(-0.25 * (_b + b_factor) * q_squared)
-        return jnp.sum(jax.vmap(gaussian_fn)(self.a, self.b), axis=0)
+        return jnp.sum(
+            jax.vmap(gaussian_fn)(self.a, error_if_not_positive(self.b)), axis=0
+        )
 
 
 class LobatoScatteringFactor(AbstractFourierOperator, strict=True):
@@ -97,13 +100,54 @@ class LobatoScatteringFactor(AbstractFourierOperator, strict=True):
         )
         scattering_factor = jnp.sum(jax.vmap(hydrogenic_fn)(self.a, self.b), axis=0)
         if self.b_factor is not None:
-            scattering_factor *= jnp.exp(-0.25 * self.b_factor * q_squared)
+            scattering_factor *= jnp.exp(
+                -0.25 * error_if_not_positive(self.b_factor) * q_squared
+            )
         return scattering_factor
 
 
 class IndependentAtomVolume(AbstractAtomVolume, strict=True):
+    """A representation of a volume that accepts an array of
+    atom positions and an electron scattering factor for these
+    atoms.
+
+    !!! example "A Gaussian at each atom"
+        ```python
+        import cryojax.simulator as cxs
+        import cryojax.ndimage as im
+
+        positions = ... # load atom positions
+        b_factor = ...  # ... and a B-factor
+        volume = cxs.IndependentAtomVolume(
+            positions=positions, scattering_factors=im.FourierGaussian(b_factor=b_factor)
+        )
+        ```
+
+    The arguments `positions` and `scattering_factors` may also be
+    pytrees of arrays and scattering factors, where each tree leaf represents
+    a different atom type.
+
+    !!! example "Multiple atom types"
+        ```python
+        import cryojax.simulator as cxs
+        import cryojax.ndimage as im
+
+        positions_1, positions_2 = ...
+        b_factor_1, b_factor_2 = ...
+        volume = cxs.IndependentAtomVolume(
+            positions=(positions_1, positions_2),
+            scattering_factors=(im.FourierGaussian(b_factor=b_factor_1), im.FourierGaussian(b_factor=b_factor_2))
+        )
+        ```
+
+    See [`cryojax.simulator.IndependentAtomVolume.from_tabulated_parameters`][] for
+    loading a volume from tabulated electron scattering factors.
+    """  # noqa: E501
+
     positions: PyTree[Float[Array, "_ 3"]]
     scattering_factors: PyTree[AbstractFourierOperator]
+
+    rotation_convention: ClassVar[Literal["object"]] = "object"
 
     def __init__(
         self,
@@ -143,7 +187,7 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
 
     @override
     def translate_to_pose(self, pose: AbstractPose) -> Self:
-        """Return a new potential with rotated `positions`."""
+        """Return a new potential with translated `positions`."""
         offset_in_angstroms = pose.offset_in_angstroms
         if pose.offset_z_in_angstroms is None:
             offset_in_angstroms = jnp.concatenate(
@@ -278,7 +322,7 @@ class FFTAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True
                 f"`sampling_mode = {sampling_mode}`."
             )
         self.shape = shape
-        self.voxel_size = error_if_not_positive(jnp.asarray(voxel_size, dtype=float))
+        self.voxel_size = jnp.asarray(voxel_size, dtype=float)
         self.frequency_grid = frequency_grid
         self.sampling_mode = sampling_mode
         self.eps = eps
@@ -310,16 +354,17 @@ class FFTAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True
             component is in the corner. Does nothing if
             `outputs_real_space = True`.
         """
+        voxel_size = error_if_not_positive(self.voxel_size)
         if self.frequency_grid is None:
             frequency_grid = jnp.fft.fftshift(
-                make_frequency_grid(self.shape, self.voxel_size, outputs_rfftfreqs=False),
+                make_frequency_grid(self.shape, voxel_size, outputs_rfftfreqs=False),
                 axes=(0, 1, 2),
             )
         else:
             frequency_grid = self.frequency_grid
         proj_kernel = lambda pos, kernel: _render_with_nufft(
             self.shape,
-            self.voxel_size,
+            voxel_size,
             pos,
             kernel,
             frequency_grid,
@@ -337,7 +382,7 @@ class FFTAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True
             ),
         )
         if self.sampling_mode == "average":
-            antialias_fn = FourierSinc(box_width=self.voxel_size)
+            antialias_fn = FourierSinc(box_width=voxel_size)
             fourier_voxel_grid *= antialias_fn(frequency_grid)
 
         if outputs_real_space:
@@ -461,7 +506,9 @@ class FFTAtomProjection(
         else:
             shape_u, pixel_size_u = (u * shape[0], u * shape[1]), pixel_size / u
         if shape_u == image_config.padded_shape:
-            frequency_grid = image_config.padded_full_frequency_grid_in_angstroms
+            frequency_grid = image_config.get_frequency_grid(
+                padding=True, physical=True, full=True
+            )
         else:
             frequency_grid = make_frequency_grid(
                 shape_u, pixel_size_u, outputs_rfftfreqs=False

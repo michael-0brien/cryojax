@@ -18,7 +18,6 @@ from ._image_config import (
     AbstractImageConfig as AbstractImageConfig,
     BasicImageConfig as BasicImageConfig,
     DoseImageConfig as DoseImageConfig,
-    GridHelper as GridHelper,
 )
 from ._image_model import (
     AbstractImageModel as AbstractImageModel,
@@ -49,7 +48,6 @@ from ._scattering_theory import (
     StrongPhaseScatteringTheory as StrongPhaseScatteringTheory,
     WeakPhaseScatteringTheory as WeakPhaseScatteringTheory,
 )
-from ._solvent_2d import AbstractRandomSolvent2D as AbstractRandomSolvent2D
 from ._transfer_theory import (
     AbstractCTF as AbstractCTF,
     AbstractTransferTheory as AbstractTransferTheory,

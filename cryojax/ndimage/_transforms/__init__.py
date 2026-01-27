@@ -1,6 +1,6 @@
 from ._base_transform import (
     AbstractImageTransform as AbstractImageTransform,
-    ImageScaling as ImageScaling,
+    ScaleImage as ScaleImage,
 )
 from ._filters import (
     AbstractFilter as AbstractFilter,
@@ -19,4 +19,8 @@ from ._masks import (
     SincCorrectionMask as SincCorrectionMask,
     SphericalCosineMask as SphericalCosineMask,
     SquareCosineMask as SquareCosineMask,
+)
+from ._spatial_transform import (
+    PhaseShiftFFT as PhaseShiftFFT,
+    RotateFFT as RotateFFT,
 )

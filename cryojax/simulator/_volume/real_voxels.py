@@ -3,7 +3,7 @@ Real voxel-based representations of a volume.
 """
 
 import math
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar, Literal, cast
 from typing_extensions import Self, override
 
 import equinox as eqx
@@ -48,6 +48,8 @@ class RealVoxelGridVolume(AbstractRealVoxelVolume, strict=True):
 
     real_voxel_grid: Float[Array, "dim dim dim"]
     coordinate_grid_in_pixels: Float[Array, "dim dim dim 3"]
+
+    rotation_convention: ClassVar[Literal["frame"]] = "frame"
 
     def __init__(
         self,

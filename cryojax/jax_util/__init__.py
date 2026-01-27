@@ -4,23 +4,17 @@ per-leaf behavior for pytrees.
 """
 
 from ._batched_loop import filter_bmap as filter_bmap, filter_bscan as filter_bscan
-from ._errors import (
-    error_if_negative as error_if_negative,
-    error_if_not_fractional as error_if_not_fractional,
-    error_if_not_positive as error_if_not_positive,
-    error_if_zero as error_if_zero,
-)
+from ._errors import maybe_error_if as maybe_error_if
 from ._filter_specs import make_filter_spec as make_filter_spec
 from ._grid_search import (
     AbstractGridSearchMethod as AbstractGridSearchMethod,
     MinimumSearchMethod as MinimumSearchMethod,
-    MinimumSolution as MinimumSolution,
-    MinimumState as MinimumState,
     run_grid_search as run_grid_search,
     tree_grid_shape as tree_grid_shape,
     tree_grid_take as tree_grid_take,
     tree_grid_unravel_index as tree_grid_unravel_index,
 )
+from ._linear_operator import make_linear_operator as make_linear_operator
 from ._pytree_transforms import (
     AbstractPyTreeTransform as AbstractPyTreeTransform,
     CustomTransform as CustomTransform,

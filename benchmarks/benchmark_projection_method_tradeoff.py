@@ -1,5 +1,6 @@
 from time import time
 
+import cryojax.ndimage as im
 import cryojax.simulator as cxs
 import equinox as eqx
 import jax
@@ -9,14 +10,14 @@ import numpy as np
 import pandas as pd
 from cryojax.constants import PengScatteringFactorParameters
 from cryojax.io import read_atoms_from_pdb
-from cryojax.ndimage import operators as op
 
 
 def setup_volumes_and_configs(n_iterations, n_atoms, box_size, pixel_size=2.0):
     """Setup volumes and image configs for different test conditions."""
-    # Read atoms (subsample to get desired n_atoms)
+    # Read atoms (subsample to get desired n_atoms). Make sure to pull from
+    # git LFS
     atom_positions, atom_types, atom_properties = read_atoms_from_pdb(
-        "data/thyroglobulin_initial.pdb",
+        "../docs/examples/data/thyroglobulin_initial.pdb",
         center=True,
         loads_properties=True,
         selection_string="name CA",
@@ -28,8 +29,8 @@ def setup_volumes_and_configs(n_iterations, n_atoms, box_size, pixel_size=2.0):
             jax.random.key(42), len(atom_positions), (n_atoms,), replace=False
         )
         atom_positions = atom_positions[indices]
-        atom_types = [atom_types[i] for i in indices]
-        atom_properties = {k: v[indices] for k, v in atom_properties.items()}
+        atom_types = np.asarray([atom_types[i] for i in indices])
+        atom_properties = {k: v[indices] for k, v in atom_properties.items()}  # type: ignore
 
     # Create volumes
     scattering_parameters = PengScatteringFactorParameters(atom_types)
@@ -60,8 +61,8 @@ def setup_volumes_and_configs(n_iterations, n_atoms, box_size, pixel_size=2.0):
 
     # Atom volume for direct projection
     atom_volume = cxs.IndependentAtomVolume(
-        position_pytree=atom_positions,
-        scattering_factor_pytree=op.FourierGaussian(amplitude=1.0, b_factor=10.0),
+        positions=atom_positions,
+        scattering_factors=im.FourierGaussian(amplitude=1.0, b_factor=10.0),
     )
 
     # Image config
@@ -81,7 +82,7 @@ def setup_volumes_and_configs(n_iterations, n_atoms, box_size, pixel_size=2.0):
 def simulate_image_batch(image_config, pose, transfer_theory, volume, integrator):
     """Simulate a batch of images."""
     image_model = cxs.make_image_model(
-        volume_parametrization=volume,
+        volume=volume,
         image_config=image_config,
         pose=pose,
         transfer_theory=transfer_theory,
@@ -133,12 +134,7 @@ def generate_random_parameters(n_projections, config):
 
 
 def benchmark_projection_methods(
-    n_projections_list,
-    n_atoms_list,
-    box_sizes,
-    n_iterations,
-    antialias,
-    use_error_functions,
+    n_projections_list, n_atoms_list, box_sizes, n_iterations
 ):
     """Benchmark both projection methods across different conditions."""
     results = []
@@ -180,7 +176,7 @@ def benchmark_projection_methods(
 
                 # Benchmark Atom Projection (FFT)
                 times = []
-                integrator = cxs.FFTAtomProjection(eps=1e-16, antialias=antialias)
+                integrator = cxs.FFTAtomProjection(eps=1e-16)
                 for _ in range(n_iterations + 1):
                     start_time = time()
                     images = simulate_image_batch(
@@ -197,9 +193,7 @@ def benchmark_projection_methods(
 
                 # Benchmark GMM Projection (FFT)
                 times = []
-                integrator = cxs.GaussianMixtureProjection(
-                    use_error_functions=use_error_functions
-                )
+                integrator = cxs.GaussianMixtureProjection()
                 for _ in range(n_iterations + 1):
                     start_time = time()
                     images = simulate_image_batch(
@@ -230,7 +224,7 @@ def benchmark_projection_methods(
     return pd.DataFrame(results)
 
 
-def plot_crossover_analysis(df, datetimestamp, antialias, use_error_functions):
+def plot_crossover_analysis(df, datetimestamp):
     """Plot the crossover analysis showing when each method is faster."""
     n_atoms_list = df["n_atoms"].unique()
     box_sizes = df["box_size"].unique()
@@ -260,7 +254,7 @@ def plot_crossover_analysis(df, datetimestamp, antialias, use_error_functions):
                 subset["n_projections"],
                 subset["atom_projection_time"] * 1000,
                 "s-",
-                label=f"Atom Projection (antialias={antialias})",
+                label="Atom Projection",
                 color="red",
                 linewidth=2,
             )
@@ -268,7 +262,7 @@ def plot_crossover_analysis(df, datetimestamp, antialias, use_error_functions):
                 subset["n_projections"],
                 subset["gmm_projection_time"] * 1000,
                 "^-",
-                label=f"GMM Projection (use_error_functions={use_error_functions})",
+                label="GMM Projection",
                 color="green",
                 linewidth=2,
             )
@@ -326,24 +320,14 @@ if __name__ == "__main__":
     # Test parameters
     n_projections_list = [1, 3, 10, 30, 100]
     n_atoms_list = [30, 100, 300]
-    box_sizes = [
-        32,
-        64,
-    ]
+    box_sizes = [32, 64]
 
     print("Running projection method crossover benchmark...")
     print("This will test Fourier slicing vs GMM projection across different conditions")
 
     # Run benchmark
-    antialias = False
-    use_error_functions = True
     results_df = benchmark_projection_methods(
-        n_projections_list,
-        n_atoms_list,
-        box_sizes,
-        n_iterations=3,
-        antialias=antialias,
-        use_error_functions=use_error_functions,
+        n_projections_list, n_atoms_list, box_sizes, n_iterations=3
     )
 
     # Save results
@@ -354,7 +338,7 @@ if __name__ == "__main__":
     print(f"Results saved to benchmark_projection_method_tradeoff_{datetimestamp}.csv")
 
     # Plot results
-    plot_crossover_analysis(results_df, datetimestamp, antialias, use_error_functions)
+    plot_crossover_analysis(results_df, datetimestamp)
 
     # Find and display crossover points
     crossovers = find_crossover_points(results_df)

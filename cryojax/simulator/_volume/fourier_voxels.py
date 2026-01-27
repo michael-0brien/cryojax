@@ -2,7 +2,7 @@
 Fourier voxel-based representations of a volume.
 """
 
-from typing import ClassVar, cast
+from typing import ClassVar, Literal, cast
 from typing_extensions import Self, override
 
 import equinox as eqx
@@ -55,6 +55,8 @@ class FourierVoxelGridVolume(AbstractFourierVoxelVolume, strict=True):
 
     fourier_voxel_grid: Complex[Array, "dim dim dim"]
     frequency_slice_in_pixels: Float[Array, "1 dim dim 3"]
+
+    rotation_convention: ClassVar[Literal["frame"]] = "frame"
 
     def __init__(
         self,
@@ -143,6 +145,8 @@ class FourierVoxelSplineVolume(AbstractFourierVoxelVolume, strict=True):
 
     spline_coefficients: Complex[Array, "coeff_dim coeff_dim coeff_dim"]
     frequency_slice_in_pixels: Float[Array, "1 dim dim 3"]
+
+    rotation_convention: ClassVar[Literal["frame"]] = "frame"
 
     def __init__(
         self,
@@ -554,16 +558,16 @@ def _extract_surface_from_voxel_grid(
     N = frequency_coordinates.shape[1]
     logical_frequency_coordinates = (frequency_coordinates * N) + N // 2
     # Convert arguments to map_coordinates convention and compute
-    k_z, k_y, k_x = jnp.transpose(logical_frequency_coordinates, axes=[3, 0, 1, 2])
+    k_x, k_y, k_z = jnp.transpose(logical_frequency_coordinates, axes=[3, 0, 1, 2])
     if is_spline_coefficients:
         spline_coefficients = voxel_grid
-        surface = map_coordinates_spline(spline_coefficients, (k_x, k_y, k_z), **kwargs)[
+        surface = map_coordinates_spline(spline_coefficients, (k_z, k_y, k_x), **kwargs)[
             0, :, :
         ]
     else:
         fourier_voxel_grid = voxel_grid
         surface = map_coordinates(
-            fourier_voxel_grid, (k_x, k_y, k_z), interpolation_order, **kwargs
+            fourier_voxel_grid, (k_z, k_y, k_x), interpolation_order, **kwargs
         )[0, :, :]
     # Shift zero frequency component to corner
     surface = jnp.fft.ifftshift(surface)

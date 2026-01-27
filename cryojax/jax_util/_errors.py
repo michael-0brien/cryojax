@@ -1,35 +1,38 @@
-"""
-Utilities for runtime errors, wrapping `equinox.error_if`.
-"""
+from collections.abc import Callable
+from typing import TypeVar
 
 import equinox as eqx
-import jax.numpy as jnp
-from jaxtyping import Array, ArrayLike
+from jaxtyping import ArrayLike, Bool, PyTree
+
+from .._config import CRYOJAX_ENABLE_CHECKS
 
 
-def error_if_negative(x: ArrayLike) -> Array:
-    x = jnp.asarray(x)
-    return eqx.error_if(x, x < 0, "A non-negative quantity was found to be negative!")
+T = TypeVar("T", bound="PyTree")
 
 
-def error_if_not_positive(x: ArrayLike) -> Array:
-    x = jnp.asarray(x)
-    return eqx.error_if(
-        x, x <= 0, "A positive quantity was found to be negative or zero!"
-    )
+def maybe_error_if(
+    x: T, pred_fn: Callable[[T], Bool[ArrayLike, "..."]], msg: str
+) -> PyTree:
+    """Applies [`equinox.error_if`](https://docs.kidger.site/equinox/api/errors/#equinox.error_if)
+    depending on the value of the environmental variable `CRYOJAX_ENABLE_CHECKS`.
 
+    - If `CRYOJAX_ENABLE_CHECKS=true`:
+        This function is equivalent to `equinox.error_if`, with the replacement of
+        the input `pred` with `pred_fn`, where `pred = pred_fn(x)`. This way, `pred` is only evaluated
+        if checks are enabled.
+    - If `CRYOJAX_ENABLE_CHECKS=false`:
+        This function is the identity, i.e. `lambda x: x`.
 
-def error_if_zero(x: ArrayLike) -> Array:
-    x = jnp.asarray(x)
-    return eqx.error_if(
-        x, jnp.isclose(x, 0.0), "A non-zero quantity was found to be zero!"
-    )
+    By default, `CRYOJAX_ENABLE_CHECKS=false` because checks may cause slowdowns, particularly
+    on GPU.
 
-
-def error_if_not_fractional(x: ArrayLike) -> Array:
-    x = jnp.asarray(x)
-    return eqx.error_if(
-        x,
-        ~jnp.logical_and(x >= 0.0, x <= 1.0),
-        "A fractional quantity was found to not be between 0 and 1!",
-    )
+    This function is used to achieve a similar idea as
+    ['JAX_ENABLE_CHECKS'](https://docs.jax.dev/en/latest/config_options.html#jax_enable_checks)
+    in `cryojax` and is exposed as public API for development downstream.
+    """  # noqa: E501
+    # `enable_checks` keyword is included for unit testing; it is not a public
+    # argument.
+    if CRYOJAX_ENABLE_CHECKS:
+        return eqx.error_if(x, pred_fn(x), msg)
+    else:
+        return x

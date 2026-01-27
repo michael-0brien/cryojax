@@ -61,7 +61,7 @@ class AbstractImageModel(eqx.Module, strict=True):
     image_config: eqx.AbstractVar[AbstractImageConfig]
     pose: eqx.AbstractVar[AbstractPose]
 
-    transform: eqx.AbstractVar[AbstractImageTransform | None]
+    image_transform: eqx.AbstractVar[AbstractImageTransform | None]
 
     signal_region: eqx.AbstractVar[Bool[Array, "_ _"] | None]
     normalizes_signal: eqx.AbstractVar[bool]
@@ -156,7 +156,10 @@ class AbstractImageModel(eqx.Module, strict=True):
         else:
             # ... otherwise, apply filter, crop, and mask, again trying to
             # minimize moving back and forth between real and fourier space
-            padded_rfft_shape = image_config.padded_frequency_grid_in_pixels.shape[0:2]
+            padded_rfft_shape = (
+                image_config.padded_shape[0],
+                image_config.padded_shape[1] // 2 + 1,
+            )
             if filter_c is not None:
                 # ... apply the filter
                 if filter is not None:
@@ -187,7 +190,7 @@ class AbstractImageModel(eqx.Module, strict=True):
 
     def _phase_shift_translate(self, fourier_image: Array) -> Array:
         phase_shifts = self.pose.compute_translation_operator(
-            self.image_config.padded_frequency_grid_in_angstroms
+            self.image_config.get_frequency_grid(physical=True, padding=True)
         )
         fourier_image = self.pose.translate_image(
             fourier_image,
@@ -210,19 +213,19 @@ class AbstractImageModel(eqx.Module, strict=True):
     def _compose_transform(
         self, mask: AbstractMask | None, filter: AbstractFilter | None
     ) -> tuple[AbstractImageTransform | None, AbstractImageTransform | None]:
-        if self.transform is None:
+        if self.image_transform is None:
             return mask, filter
         else:
-            if self.transform.is_real_space:
+            if self.image_transform.is_real_space:
                 if mask is None:
-                    return self.transform, filter
+                    return self.image_transform, filter
                 else:
-                    return mask * self.transform, filter
+                    return mask * self.image_transform, filter
             else:
                 if filter is None:
-                    return mask, self.transform
+                    return mask, self.image_transform
                 else:
-                    return mask, filter * self.transform
+                    return mask, filter * self.image_transform
 
     def _mean_subtract_normalize(self, image: Array) -> Array:
         mean, std = (
@@ -246,13 +249,13 @@ class AbstractImageModel(eqx.Module, strict=True):
 class LinearImageModel(AbstractImageModel, strict=True):
     """An simple image model in linear image formation theory."""
 
-    volume_parametrization: AbstractVolumeParametrization
+    volume: AbstractVolumeParametrization
     pose: AbstractPose
     volume_integrator: AbstractVolumeIntegrator
     transfer_theory: ContrastTransferTheory
     image_config: AbstractImageConfig
 
-    transform: AbstractImageTransform | None
+    image_transform: AbstractImageTransform | None
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
     signal_centering: Literal["bg", "mean"]
@@ -260,13 +263,13 @@ class LinearImageModel(AbstractImageModel, strict=True):
 
     def __init__(
         self,
-        volume_parametrization: AbstractVolumeParametrization,
+        volume: AbstractVolumeParametrization,
         pose: AbstractPose,
         image_config: AbstractImageConfig,
         transfer_theory: ContrastTransferTheory,
         volume_integrator: AbstractVolumeIntegrator = AutoVolumeProjection(),
         *,
-        transform: AbstractImageTransform | None = None,
+        image_transform: AbstractImageTransform | None = None,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
         signal_centering: Literal["bg", "mean"] = "mean",
@@ -274,7 +277,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
     ):
         """**Arguments:**
 
-        - `volume_parametrization`:
+        - `volume`:
             The parametrization of an imaging volume.
         - `pose`:
             The pose of the volume.
@@ -283,7 +286,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
             and the wavelength.
         - `volume_integrator`: The method for integrating the volume onto the plane.
         - `transfer_theory`: The contrast transfer theory.
-        - `transform`:
+        - `image_transform`:
             A [`cryojax.ndimage.AbstractImageTransform`][] applied to the
             image after simulation.
         - `normalizes_signal`:
@@ -318,13 +321,13 @@ class LinearImageModel(AbstractImageModel, strict=True):
                 Do not apply the translation.
         """
         # Simulator components
-        self.volume_parametrization = volume_parametrization
+        self.volume = volume
         self.pose = pose
         self.image_config = image_config
         self.volume_integrator = volume_integrator
         self.transfer_theory = transfer_theory
         # Options
-        self.transform = transform
+        self.image_transform = image_transform
         self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
         self.signal_centering = signal_centering
@@ -342,12 +345,10 @@ class LinearImageModel(AbstractImageModel, strict=True):
     ) -> PaddedFourierImageArray:
         # Get the representation of the volume
         if rng_key is None:
-            volume_representation = self.volume_parametrization.to_representation()
+            volume_representation = self.volume.to_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            volume_representation = self.volume_parametrization.to_representation(
-                rng_key=this_key
-            )
+            volume_representation = self.volume.to_representation(rng_key=this_key)
         # Rotate it to the lab frame
         volume_representation = volume_representation.rotate_to_pose(self.pose)
         # Translate if using atom translations
@@ -378,12 +379,12 @@ class LinearImageModel(AbstractImageModel, strict=True):
 class ProjectionImageModel(AbstractImageModel, strict=True):
     """An simple image model for computing a projection."""
 
-    volume_parametrization: AbstractVolumeParametrization
+    volume: AbstractVolumeParametrization
     pose: AbstractPose
     volume_integrator: AbstractVolumeIntegrator
     image_config: AbstractImageConfig
 
-    transform: AbstractImageTransform | None
+    image_transform: AbstractImageTransform | None
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
     signal_centering: Literal["bg", "mean"]
@@ -391,12 +392,12 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
 
     def __init__(
         self,
-        volume_parametrization: AbstractVolumeParametrization,
+        volume: AbstractVolumeParametrization,
         pose: AbstractPose,
         image_config: AbstractImageConfig,
         volume_integrator: AbstractVolumeIntegrator = AutoVolumeProjection(),
         *,
-        transform: AbstractImageTransform | None = None,
+        image_transform: AbstractImageTransform | None = None,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
         signal_centering: Literal["bg", "mean"] = "mean",
@@ -404,7 +405,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
     ):
         """**Arguments:**
 
-        - `volume_parametrization`:
+        - `volume`:
             The parametrization of the imaging volume
         - `pose`:
             The pose of the volume.
@@ -412,7 +413,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
             The configuration of the instrument, such as for the pixel size
             and the wavelength.
         - `volume_integrator`: The method for integrating the volume onto the plane.
-        - `transform`:
+        - `image_transform`:
             A [`cryojax.ndimage.AbstractImageTransform`][] applied to the
             image after simulation.
         - `normalizes_signal`:
@@ -447,12 +448,12 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
                 Do not apply the translation.
         """
         # Simulator components
-        self.volume_parametrization = volume_parametrization
+        self.volume = volume
         self.pose = pose
         self.image_config = image_config
         self.volume_integrator = volume_integrator
         # Options
-        self.transform = transform
+        self.image_transform = image_transform
         self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
         self.signal_centering = signal_centering
@@ -470,12 +471,10 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
     ) -> ImageArray | PaddedImageArray:
         # Get the representation of the volume
         if rng_key is None:
-            volume_representation = self.volume_parametrization.to_representation()
+            volume_representation = self.volume.to_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            volume_representation = self.volume_parametrization.to_representation(
-                rng_key=this_key
-            )
+            volume_representation = self.volume.to_representation(rng_key=this_key)
         # Rotate it to the lab frame
         volume_representation = volume_representation.rotate_to_pose(self.pose)
         # Translate if using atom translations
@@ -509,12 +508,12 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
     scattering theory.
     """
 
-    volume_parametrization: AbstractVolumeParametrization
+    volume: AbstractVolumeParametrization
     pose: AbstractPose
     image_config: AbstractImageConfig
     scattering_theory: AbstractScatteringTheory
 
-    transform: AbstractImageTransform | None
+    image_transform: AbstractImageTransform | None
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
     signal_centering: Literal["bg", "mean"]
@@ -522,22 +521,22 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
 
     def __init__(
         self,
-        volume_parametrization: AbstractVolumeParametrization,
+        volume: AbstractVolumeParametrization,
         pose: AbstractPose,
         image_config: AbstractImageConfig,
         scattering_theory: AbstractScatteringTheory,
         *,
-        transform: AbstractImageTransform | None = None,
+        image_transform: AbstractImageTransform | None = None,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
         signal_centering: Literal["bg", "mean"] = "mean",
         translate_mode: Literal["fft", "atom", "none"] = "fft",
     ):
-        self.volume_parametrization = volume_parametrization
+        self.volume = volume
         self.pose = pose
         self.image_config = image_config
         self.scattering_theory = scattering_theory
-        self.transform = transform
+        self.image_transform = image_transform
         self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
         self.signal_centering = signal_centering
@@ -556,12 +555,10 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
         # Get the volume representation. Its data should be a scattering potential
         # to simulate in physical units
         if rng_key is None:
-            volume_representation = self.volume_parametrization.to_representation()
+            volume_representation = self.volume.to_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            volume_representation = self.volume_parametrization.to_representation(
-                rng_key=this_key
-            )
+            volume_representation = self.volume.to_representation(rng_key=this_key)
         # Rotate it to the lab frame
         volume_representation = volume_representation.rotate_to_pose(self.pose)
         # Translate if using atom translations
@@ -590,12 +587,12 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
     words a squared wavefunction.
     """
 
-    volume_parametrization: AbstractVolumeParametrization
+    volume: AbstractVolumeParametrization
     pose: AbstractPose
     image_config: AbstractImageConfig
     scattering_theory: AbstractScatteringTheory
 
-    transform: AbstractImageTransform | None
+    image_transform: AbstractImageTransform | None
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
     signal_centering: Literal["bg", "mean"]
@@ -603,22 +600,22 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
 
     def __init__(
         self,
-        volume_parametrization: AbstractVolumeParametrization,
+        volume: AbstractVolumeParametrization,
         pose: AbstractPose,
         image_config: AbstractImageConfig,
         scattering_theory: AbstractScatteringTheory,
         *,
-        transform: AbstractImageTransform | None = None,
+        image_transform: AbstractImageTransform | None = None,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
         signal_centering: Literal["bg", "mean"] = "mean",
         translate_mode: Literal["fft", "atom", "none"] = "fft",
     ):
-        self.volume_parametrization = volume_parametrization
+        self.volume = volume
         self.pose = pose
         self.image_config = image_config
         self.scattering_theory = scattering_theory
-        self.transform = transform
+        self.image_transform = image_transform
         self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
         self.signal_centering = signal_centering
@@ -637,12 +634,10 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
         # Get the volume representation. Its data should be a scattering potential
         # to simulate in physical units
         if rng_key is None:
-            volume_representation = self.volume_parametrization.to_representation()
+            volume_representation = self.volume.to_representation()
         else:
             this_key, rng_key = jr.split(rng_key)
-            volume_representation = self.volume_parametrization.to_representation(
-                rng_key=this_key
-            )
+            volume_representation = self.volume.to_representation(rng_key=this_key)
         # Rotate it to the lab frame
         volume_representation = volume_representation.rotate_to_pose(self.pose)
         # Translate if using atom translations
@@ -670,13 +665,13 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
     model for the detector.
     """
 
-    volume_parametrization: AbstractVolumeParametrization
+    volume: AbstractVolumeParametrization
     pose: AbstractPose
     image_config: DoseImageConfig
     scattering_theory: AbstractScatteringTheory
     detector: AbstractDetector
 
-    transform: AbstractImageTransform | None
+    image_transform: AbstractImageTransform | None
     normalizes_signal: bool
     signal_region: Bool[Array, "_ _"] | None
     signal_centering: Literal["bg", "mean"]
@@ -684,24 +679,24 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
 
     def __init__(
         self,
-        volume_parametrization: AbstractVolumeParametrization,
+        volume: AbstractVolumeParametrization,
         pose: AbstractPose,
         image_config: DoseImageConfig,
         scattering_theory: AbstractScatteringTheory,
         detector: AbstractDetector,
         *,
-        transform: AbstractImageTransform | None = None,
+        image_transform: AbstractImageTransform | None = None,
         normalizes_signal: bool = False,
         signal_region: Bool[NDArrayLike, "_ _"] | None = None,
         signal_centering: Literal["bg", "mean"] = "mean",
         translate_mode: Literal["fft", "atom", "none"] = "fft",
     ):
-        self.volume_parametrization = volume_parametrization
+        self.volume = volume
         self.pose = pose
         self.image_config = image_config
         self.scattering_theory = scattering_theory
         self.detector = detector
-        self.transform = transform
+        self.image_transform = image_transform
         self.translate_mode = translate_mode
         self.normalizes_signal = normalizes_signal
         self.signal_centering = signal_centering
@@ -720,7 +715,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
         if rng_key is None:
             # Get the volume representation. Its data should be a scattering potential
             # to simulate in physical units
-            volume_representation = self.volume_parametrization.to_representation()
+            volume_representation = self.volume.to_representation()
             # Rotate it to the lab frame
             volume_representation = volume_representation.rotate_to_pose(self.pose)
             # Translate if using atom translations
@@ -750,7 +745,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
             keys = jr.split(rng_key, 3)
             # Get the volume representation. Its data should be a scattering potential
             # to simulate in physical units
-            volume_representation = self.volume_parametrization.to_representation(keys[0])
+            volume_representation = self.volume.to_representation(keys[0])
             # Rotate it to the lab frame
             volume_representation = volume_representation.rotate_to_pose(self.pose)
             # Translate if using atom translations
@@ -781,7 +776,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
 
 _init_doc = """**Arguments:**
 
-- `volume_parametrization`:
+- `volume`:
     The parametrization of the imaging volume.
 - `pose`:
     The pose of the volume.
@@ -790,7 +785,7 @@ _init_doc = """**Arguments:**
     and the wavelength.
 - `scattering_theory`:
     The scattering theory.
-- `transform`:
+- `image_transform`:
     A [`cryojax.ndimage.AbstractImageTransform`][] applied to the
     image after simulation.
 - `normalizes_signal`:

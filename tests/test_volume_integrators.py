@@ -384,7 +384,7 @@ def compute_projection_at_pose(
         rotated_volume, image_config, outputs_real_space=False
     )
     translation_operator = pose.compute_translation_operator(
-        image_config.padded_frequency_grid_in_angstroms
+        image_config.get_frequency_grid(padding=True, physical=True)
     )
     return im.crop_to_shape(
         im.irfftn(

@@ -21,7 +21,23 @@ The engine for handling rotations in cryoJAX is the `cryojax.rotations.SO3` clas
                 - as_matrix
                 - exp
                 - log
-                - adjoint
+                - normalize
+                - sample_uniform
+
+::: cryojax.rotations.SO2
+        options:
+            members:
+                - __init__
+                - apply
+                - compose
+                - inverse
+                - from_radians
+                - as_radians
+                - identity
+                - from_matrix
+                - as_matrix
+                - exp
+                - log
                 - normalize
                 - sample_uniform
 

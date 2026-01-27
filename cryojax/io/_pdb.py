@@ -8,7 +8,7 @@ import pathlib
 import typing
 import warnings
 from copy import copy
-from typing import Literal, TypedDict, overload
+from typing import Any, Literal, TypedDict, overload
 from xml.etree import ElementTree
 
 import jax
@@ -18,9 +18,8 @@ import numpy as np
 import pandas as pd
 from jaxtyping import Float, Int
 from mdtraj.core import element as elem
-from mdtraj.core.topology import Topology
 
-from ...atom_util import center_atom_positions
+from ..atom_util import center_atom_positions
 
 
 if hasattr(typing, "GENERATING_DOCUMENTATION"):
@@ -98,7 +97,7 @@ def read_atoms_from_pdb(
     | tuple[
         Float[np.ndarray, "... n_atoms 3"],
         Int[np.ndarray, " n_atoms"],
-        AtomProperties | np.ndarray,  # Included for `loads_b_factors=True`
+        dict[str, Any],
     ]
 ):
     """Load relevant atomic information for simulating cryo-EM
@@ -239,7 +238,7 @@ def mmdf_to_atoms(
     | tuple[
         Float[np.ndarray, "... n_atoms 3"],
         Int[np.ndarray, "... n_atoms"],
-        AtomProperties | np.ndarray,
+        dict[str, Any],
     ]
 ):
     """Load relevant atomic information for simulating cryo-EM
@@ -328,7 +327,7 @@ def mmdf_to_topology(
 
     An `mdtraj.Topology` object.
     """
-    topology = Topology()
+    topology = mdtraj.Topology()
     if standardizes_names:
         residue_name_replacements, atom_name_replacements = (
             _load_name_replacement_tables()
@@ -470,7 +469,7 @@ def _load_name_replacement_tables():
     Closely follows `mdtraj.formats.pdb.PDBTrajectoryFile._loadNameReplacementTables`.
     """
     tree = ElementTree.parse(
-        os.path.join(os.path.dirname(__file__), "pdbNames.xml"),
+        os.path.join(os.path.dirname(__file__), "pdb_names.xml"),
     )
     # Residue and atom replacements
     residue_name_replacements = {}

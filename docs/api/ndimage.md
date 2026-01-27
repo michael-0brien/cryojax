@@ -53,13 +53,6 @@ This documentation is a collection of functions used to work with coordinate sys
                 - __call__
 
 
-::: cryojax.ndimage.ImageScaling
-        options:
-            members:
-                - __init__
-                - __call__
-
-
 ### Filters
 
 ??? abstract "`cryojax.ndimage.AbstractFilter`"
@@ -103,6 +96,19 @@ This documentation is a collection of functions used to work with coordinate sys
                 - get
                 - __call__
 
+**Other Fourier space operations:**
+
+::: cryojax.ndimage.PhaseShiftFFT
+        options:
+            members:
+                - __init__
+                - __call__
+
+::: cryojax.ndimage.RotateFFT
+        options:
+            members:
+                - __init__
+                - __call__
 
 ### Masks
 
@@ -181,6 +187,13 @@ This documentation is a collection of functions used to work with coordinate sys
                 - __call__
 
 
+**Other real-space operations**
+
+::: cryojax.ndimage.ScaleImage
+        options:
+            members:
+                - __init__
+                - __call__
 
 ## Operators
 
@@ -218,6 +231,14 @@ This documentation is a collection of functions used to work with coordinate sys
 ---
 
 ::: cryojax.ndimage.FourierSinc
+        options:
+            members:
+                - __init__
+                - __call__
+
+---
+
+::: cryojax.ndimage.FourierPhaseShifts
         options:
             members:
                 - __init__
@@ -275,3 +296,11 @@ This documentation is a collection of functions used to work with coordinate sys
 
 
 ## Utility functions
+
+### Interpolation
+
+::: cryojax.ndimage.map_coordinates
+
+::: cryojax.ndimage.map_coordinates_spline
+
+::: cryojax.ndimage.compute_spline_coefficients

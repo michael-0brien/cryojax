@@ -1,5 +1,5 @@
 import abc
-from typing import Generic, TypeVar
+from typing import Generic, Literal, TypeVar
 from typing_extensions import Self, override
 
 import equinox as eqx
@@ -90,8 +90,15 @@ class AbstractVolumeParametrization(eqx.Module, strict=True):
     def to_representation(
         self, rng_key: PRNGKeyArray | None = None
     ) -> "AbstractVolumeRepresentation":
-        """Core interface for computing the representation of
-        the volume.
+        """Core interface for computing the
+        [`cryojax.simulator.AbstractVolumeRepresentation`][] for imaging.
+
+        Users looking to create custom volumes often won't implement this function
+        directly, but rather will implement the
+        a [`cryojax.simulator.AbstractVolumeRepresentation`][] subclass.
+        Implementing a [`cryojax.simulator.AbstractVolumeParametrization`][]
+        is useful when there is a distinction between how exactly to parametrize
+        the volume for analysis and how to represent it for imaging.
 
         **Arguments:**
 
@@ -107,8 +114,11 @@ class AbstractVolumeRepresentation(AbstractVolumeParametrization, strict=True):
     as atomic coordinates, voxels, or a neural network.
 
     Volume representations contain information of coordinates and may be
-    passed to `AbstractVolumeIntegrator` classes for imaging.
+    passed to [`cryojax.simulator.AbstractVolumeIntegrator`][]
+    classes for imaging.
     """
+
+    rotation_convention: eqx.AbstractClassVar[Literal["object", "frame"]]
 
     @abc.abstractmethod
     def rotate_to_pose(self, pose: AbstractPose, inverse: bool = False) -> Self:
