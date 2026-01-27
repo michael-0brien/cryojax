@@ -9,7 +9,6 @@ from .._internal import error_if_not_fractional
 from ..jax_util import FloatLike
 from ..ndimage import fftn, ifftn, irfftn, rfftn
 from ._image_config import AbstractImageConfig
-from ._solvent_2d import AbstractRandomSolvent2D
 from ._transfer_theory import ContrastTransferTheory, WaveTransferTheory
 from ._volume import AbstractVolumeIntegrator, AbstractVolumeRepresentation
 
@@ -112,23 +111,19 @@ class WeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
 
     volume_integrator: AbstractVolumeIntegrator
     transfer_theory: ContrastTransferTheory
-    solvent: AbstractRandomSolvent2D | None = None
 
     def __init__(
         self,
         volume_integrator: AbstractVolumeIntegrator,
         transfer_theory: ContrastTransferTheory,
-        solvent: AbstractRandomSolvent2D | None = None,
     ):
         """**Arguments:**
 
         - `volume_integrator`: The method for integrating the scattering potential.
         - `transfer_theory`: The contrast transfer theory.
-        - `solvent`: The model for the solvent.
         """
         self.volume_integrator = volume_integrator
         self.transfer_theory = transfer_theory
-        self.solvent = solvent
 
     def compute_object_spectrum(
         self,
@@ -136,20 +131,11 @@ class WeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
         image_config: AbstractImageConfig,
         rng_key: PRNGKeyArray | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
+        del rng_key
         # Compute the integrated potential
         fourier_in_plane_potential = self.volume_integrator.integrate(
             volume_representation, image_config, outputs_real_space=False
         )
-
-        if rng_key is not None:
-            # Get the potential of the specimen plus the ice
-            if self.solvent is not None:
-                fourier_in_plane_potential = self.solvent.compute_in_plane_potential(  # noqa: E501
-                    rng_key,
-                    fourier_in_plane_potential,
-                    image_config,
-                    input_is_rfft=not self.volume_integrator.outputs_ewald_sphere,
-                )
 
         object_spectrum = image_config.interaction_constant * fourier_in_plane_potential
 
@@ -224,26 +210,22 @@ class StrongPhaseScatteringTheory(AbstractWaveScatteringTheory, strict=True):
 
     volume_integrator: AbstractVolumeIntegrator
     transfer_theory: WaveTransferTheory
-    solvent: AbstractRandomSolvent2D | None
     amplitude_contrast_ratio: Float[Array, ""]
 
     def __init__(
         self,
         volume_integrator: AbstractVolumeIntegrator,
         transfer_theory: WaveTransferTheory,
-        solvent: AbstractRandomSolvent2D | None = None,
         amplitude_contrast_ratio: FloatLike = 0.1,
     ):
         """**Arguments:**
 
         - `volume_integrator`: The method for integrating the scattering potential.
         - `transfer_theory`: The wave transfer theory.
-        - `solvent`: The model for the solvent.
         - `amplitude_contrast_ratio`: The amplitude contrast ratio.
         """
         self.volume_integrator = volume_integrator
         self.transfer_theory = transfer_theory
-        self.solvent = solvent
         self.amplitude_contrast_ratio = jnp.asarray(amplitude_contrast_ratio, dtype=float)
 
     @override
@@ -253,27 +235,17 @@ class StrongPhaseScatteringTheory(AbstractWaveScatteringTheory, strict=True):
         image_config: AbstractImageConfig,
         rng_key: PRNGKeyArray | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]:
+        del rng_key
         # Compute the integrated potential in the exit plane
         fourier_in_plane_potential = self.volume_integrator.integrate(
             volume_representation, image_config, outputs_real_space=False
         )
-        # The integrated potential may not be from an rfft; this depends on
-        # if it is a projection approx
-        is_projection_approx = not self.volume_integrator.outputs_ewald_sphere
-        if rng_key is not None:
-            # Get the potential of the specimen plus the ice
-            if self.solvent is not None:
-                fourier_in_plane_potential = self.solvent.compute_in_plane_potential(
-                    rng_key,
-                    fourier_in_plane_potential,
-                    image_config,
-                    input_is_rfft=is_projection_approx,
-                )
         # Back to real-space; need to be careful if the object spectrum is not an
         # rfftn
+        is_proj = not self.volume_integrator.outputs_ewald_sphere
         do_ifft = lambda ft: (
             irfftn(ft, s=image_config.padded_shape)
-            if is_projection_approx
+            if is_proj
             else ifftn(ft, s=image_config.padded_shape)
         )
         integrated_potential = _compute_complex_potential(
@@ -293,7 +265,7 @@ def _compute_complex_potential(
     if jnp.iscomplexobj(in_plane_potential):
         raise NotImplementedError(
             "You may have tried to use a `StrongPhaseScatteringTheory` "
-            "together with `EwaldSphereExtraction` for simulating images. "
+            "together with an Ewald sphere method for simulating images. "
             "This is not implemented!"
         )
         # return jnp.sqrt(1.0 - ac**2) * integrated_potential.real + 1.0j * (

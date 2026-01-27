@@ -71,25 +71,6 @@ def detector_image_model(volume, dose_config):
     return image_model
 
 
-@pytest.fixture
-def solvent_image_model(volume, basic_config):
-    import cryojax.experimental as cxe
-
-    scattering_theory = cxs.WeakPhaseScatteringTheory(
-        volume_integrator=cxs.FourierSliceExtraction(),
-        transfer_theory=cxs.ContrastTransferTheory(cxs.AstigmaticCTF()),
-        solvent=cxe.GRFSolvent2D(100.0),
-    )
-    image_model = cxs.ContrastImageModel(
-        volume,
-        image_config=basic_config,
-        pose=cxs.EulerAnglePose(),
-        scattering_theory=scattering_theory,
-        normalizes_signal=True,
-    )
-    return image_model
-
-
 @pytest.mark.parametrize(
     "cls, model",
     [
@@ -125,8 +106,3 @@ def test_variance_correct(variance, dim):
 def test_detector_incompatible(detector_image_model):
     with pytest.raises(ValueError):
         _ = cxs.GaussianWhiteNoiseModel(detector_image_model)
-
-
-def test_solvent2d_incompatible(solvent_image_model):
-    with pytest.raises(ValueError):
-        _ = cxs.GaussianWhiteNoiseModel(solvent_image_model)
