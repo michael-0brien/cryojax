@@ -14,7 +14,7 @@ CryoJAX is a cryo-EM image simulation library for building downstream data analy
 | [`cryojax.rotations`](./api/rotations.md) | Backend for coordinate rotations |
 | [`cryojax.constants`](./api/constants.md) | Handle physical constants |
 
-### [`cryojax.simulator`](./api/simulator/entry-point.md)
+<!-- ### [`cryojax.simulator`](./api/simulator/entry-point.md)
 
 This contains algorithms and models for cryo-EM image simulation, as well as a framework for implementing new models and algorithms. See the [simulate an image](./examples/simulate-image.ipynb) tutorial to get started.
 
@@ -24,4 +24,4 @@ For example, read/write MRC files and PDB/PDBx files.
 
 ### [`cryojax.ndimage`](./api/ndimage.md)
 
-This includes cropping / padding, masks / filters, and downsampling.
+This includes cropping / padding, masks / filters, and downsampling. -->

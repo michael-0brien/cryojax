@@ -49,7 +49,7 @@ def make_linear_operator(
         # Compute backprojection
         adjoint = lx.conj(operator.T)
         backprojection = where_vector(adjoint.mv(image))
-    ```
+        ```
 
     !!! warning
 

@@ -191,14 +191,17 @@ def make_image_model(
         image = image_model.simulate()
         ```
 
-    **Arguments:**
+    **Main arguments:**
 
     - `volume`:
-        The volume for imaging. To get started building volumes, see the
-        [`cryojax.simulator.load_tabulated_volume`][] and
-        [`cryojax.simulator.render_voxel_volume`][] utilities, or explore
-        cryoJAX's [`cryojax.simulator.AbstractVolumeRepresentation`][] classes.
-        Advanced users may be interested in implementing
+        The volume for imaging. To get started building volumes:
+        - See [`cryojax.simulator.load_tabulated_volume`][] for instantiating
+        atomistic volumes
+        - See [`cryojax.simulator.render_voxel_volume`][] for converting them
+        to voxel maps
+        - Explore cryoJAX's [`cryojax.simulator.AbstractVolumeRepresentation`][]
+        classes; instantiate these directly for more flexibility
+        - Advanced users may also be interested in implementing
         [`cryojax.simulator.AbstractVolumeParametrization`][] classes.
     - `image_config`:
         The configuration for the image and imaging instrument. Unless using
@@ -222,6 +225,9 @@ def make_image_model(
         If `quantity_mode = 'counts'` is chosen, then an
         [`cryojax.simulator.AbstractDetector`][] class must be chosen to
         simulate electron counts.
+
+    **Options:**
+
     - `image_transform`:
         A [`cryojax.ndimage.AbstractImageTransform`][] applied to the
         the output of `image_model.simulate()` as a postprocessing step.

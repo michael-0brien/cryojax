@@ -78,9 +78,9 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
         - `image_config`:
             The configuration of the resulting image.
         - `input_is_ewald_sphere`:
-            If `False`, the `object_spectrum_in_exit_plane` is a projection
+            If `False`, the `object_spectrum` is a projection
             approximation and is therefore the fourier transform of a real-valued
-            array. If `True`, `object_spectrum_in_exit_plane` is extracted from
+            array. If `True`, `object_spectrum` is extracted from
             the ewald sphere and is therefore the fourier transform of a complex-valued
             array.
         - `defocus_offset`:
