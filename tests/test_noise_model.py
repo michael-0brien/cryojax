@@ -55,7 +55,7 @@ def image_model(volume, basic_config):
 
 @pytest.fixture
 def detector_image_model(volume, dose_config):
-    detector = cxs.PoissonDetector(cxs.NullDQE())
+    detector = cxs.PoissonDetector()
     scattering_theory = cxs.WeakPhaseScatteringTheory(
         volume_integrator=cxs.FourierSliceExtraction(),
         transfer_theory=cxs.ContrastTransferTheory(cxs.AstigmaticCTF()),
