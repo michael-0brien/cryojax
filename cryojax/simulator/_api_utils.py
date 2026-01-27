@@ -78,7 +78,7 @@ def make_image_model(
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
     signal_centering: Literal["bg", "mean"] = "mean",
     translate_mode: Literal["fft", "atom", "none"] = "fft",
-    quantity_mode: None = None,
+    quantity_mode: Literal["none"] = "none",
     rotation_convention: Literal["object", "frame"] = "object",
 ) -> ProjectionImageModel: ...
 
@@ -97,7 +97,7 @@ def make_image_model(  # pyright: ignore[reportOverlappingOverload]
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
     signal_centering: Literal["bg", "mean"] = "mean",
     translate_mode: Literal["fft", "atom", "none"] = "fft",
-    quantity_mode: None = None,
+    quantity_mode: Literal["none"] = "none",
     rotation_convention: Literal["object", "frame"] = "object",
 ) -> LinearImageModel: ...
 
@@ -172,7 +172,7 @@ def make_image_model(
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
     signal_centering: Literal["bg", "mean"] = "mean",
     translate_mode: Literal["fft", "atom", "none"] = "fft",
-    quantity_mode: Literal["contrast", "intensity", "counts"] | None = None,
+    quantity_mode: Literal["contrast", "intensity", "counts", "none"] = "none",
     rotation_convention: Literal["object", "frame"] = "object",
 ) -> AbstractImageModel:
     """Construct an [`cryojax.simulator.AbstractImageModel`][] for
@@ -329,7 +329,7 @@ def make_image_model(
         )
     else:
         # Simulate physical observables
-        if quantity_mode is None:
+        if quantity_mode == "none":
             # Linear image model
             image_model = LinearImageModel(
                 volume,
@@ -382,7 +382,7 @@ def make_image_model(
             else:
                 raise ValueError(
                     f"Found `quantity_mode = {quantity_mode}`, but valid "
-                    "values are 'contrast', 'intensity', and 'counts'."
+                    "values are 'contrast', 'intensity', 'counts', or 'none'."
                 )
 
     return image_model
