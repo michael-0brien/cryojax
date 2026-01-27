@@ -1327,6 +1327,30 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#debugging-and-runtime-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      Debugging and runtime errors
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Debugging and runtime errors">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cryojax.jax_util.maybe_error_if" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;maybe_error_if
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1425,30 +1449,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#debugging-and-runtime-errors" class="md-nav__link">
-    <span class="md-ellipsis">
-      Debugging and runtime errors
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Debugging and runtime errors">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cryojax.jax_util.maybe_error_if" class="md-nav__link">
-    <span class="md-ellipsis">
-      <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;maybe_error_if
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -1514,7 +1514,7 @@
 
 <h4 id="cryojax.jax_util.make_filter_spec" class="doc doc-heading">
   <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">make_filter_spec</span><span class="p">(</span><span class="n">pytree</span><span class="p">:</span> <span class="n">PyTree</span><span class="p">,</span> <span class="n">where</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">PyTree</span><span class="p">],</span> <span class="n">Any</span> <span class="o">|</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">]],</span> <span class="o">*</span><span class="p">,</span> <span class="n">inverse</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">is_leaf</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Any</span><span class="p">],</span> <span class="nb">bool</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PyTree</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span></code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/9b08227ad0457060bfa84e007fa0dba347523a59/cryojax/jax_util/_filter_specs.py#L13-L47"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/9aa7d8885176bc628482ec83792e7480ccc89b2c/cryojax/jax_util/_filter_specs.py#L13-L47"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.jax_util.make_filter_spec" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1547,7 +1547,7 @@ in the <code>equinox</code> documentation for an example.</p>
 
 <h4 id="cryojax.jax_util.filter_bmap" class="doc doc-heading">
   <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">filter_bmap</span><span class="p">(</span><span class="n">f</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">PyTree</span><span class="p">[</span><span class="n">Shaped</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;_ ...&#39;</span><span class="p">],</span> <span class="s1">&#39;X&#39;</span><span class="p">]],</span> <span class="n">PyTree</span><span class="p">[</span><span class="n">Shaped</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;_ ...&#39;</span><span class="p">],</span> <span class="s1">&#39;Y&#39;</span><span class="p">]],</span> <span class="n">xs</span><span class="p">:</span> <span class="n">PyTree</span><span class="p">[</span><span class="n">Shaped</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;_ ...&#39;</span><span class="p">],</span> <span class="s1">&#39;X&#39;</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PyTree</span><span class="p">[</span><span class="n">Shaped</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;_ ...&#39;</span><span class="p">],</span> <span class="s1">&#39;Y&#39;</span><span class="p">]</span></code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/9b08227ad0457060bfa84e007fa0dba347523a59/cryojax/jax_util/_batched_loop.py#L16-L48"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/9aa7d8885176bc628482ec83792e7480ccc89b2c/cryojax/jax_util/_batched_loop.py#L16-L48"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.jax_util.filter_bmap" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1581,7 +1581,7 @@ with the same rank as <code>xs</code>. <code>xs</code> is filtered in the usual
 
 <h4 id="cryojax.jax_util.filter_bscan" class="doc doc-heading">
   <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">filter_bscan</span><span class="p">(</span><span class="n">f</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="o">~</span><span class="n">Carry</span><span class="p">,</span> <span class="o">~</span><span class="n">X</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">[</span><span class="o">~</span><span class="n">Carry</span><span class="p">,</span> <span class="o">~</span><span class="n">Y</span><span class="p">]],</span> <span class="n">init</span><span class="p">:</span> <span class="o">~</span><span class="n">Carry</span><span class="p">,</span> <span class="n">xs</span><span class="p">:</span> <span class="o">~</span><span class="n">X</span><span class="p">,</span> <span class="n">length</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">unroll</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">bool</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="o">~</span><span class="n">Carry</span><span class="p">,</span> <span class="o">~</span><span class="n">Y</span><span class="p">]</span></code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/9b08227ad0457060bfa84e007fa0dba347523a59/cryojax/jax_util/_batched_loop.py#L51-L146"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/9aa7d8885176bc628482ec83792e7480ccc89b2c/cryojax/jax_util/_batched_loop.py#L51-L146"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.jax_util.filter_bscan" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1615,6 +1615,41 @@ rank as <code>xs</code> (e.g. perhaps it is vmapped over <code>x</code>).
 
     </div>
 
+</div><h3 id="debugging-and-runtime-errors">Debugging and runtime errors<a class="headerlink" href="#debugging-and-runtime-errors" title="Permanent link">¤</a></h3>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="cryojax.jax_util.maybe_error_if" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">maybe_error_if</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="o">~</span><span class="n">T</span><span class="p">,</span> <span class="n">pred_fn</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="o">~</span><span class="n">T</span><span class="p">],</span> <span class="n">Bool</span><span class="p">[</span><span class="n">ArrayLike</span><span class="p">,</span> <span class="s1">&#39;...&#39;</span><span class="p">]],</span> <span class="n">msg</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PyTree</span></code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/9aa7d8885176bc628482ec83792e7480ccc89b2c/cryojax/jax_util/_errors.py#L13-L38"><code class='hippogriffe-repo-url'></code></a>
+
+
+<a href="#cryojax.jax_util.maybe_error_if" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+        <p>Applies <a href="https://docs.kidger.site/equinox/api/errors/#equinox.error_if"><code>equinox.error_if</code></a>
+depending on the value of the environmental variable <code>CRYOJAX_ENABLE_CHECKS</code>.</p>
+<ul>
+<li>If <code>CRYOJAX_ENABLE_CHECKS=true</code>:
+    This function is equivalent to <code>equinox.error_if</code>, with the replacement of
+    the input <code>pred</code> with <code>pred_fn</code>, where <code>pred = pred_fn(x)</code>. This way, <code>pred</code> is only evaluated
+    if checks are enabled.</li>
+<li>If <code>CRYOJAX_ENABLE_CHECKS=false</code>:
+    This function is the identity, i.e. <code>lambda x: x</code>.</li>
+</ul>
+<p>By default, <code>CRYOJAX_ENABLE_CHECKS=false</code> because checks may cause slowdowns, particularly
+on GPU.</p>
+<p>This function is used to achieve a similar idea as
+<a href="https://docs.jax.dev/en/latest/config_options.html#jax_enable_checks"><code>JAX_ENABLE_CHECKS</code></a>
+in <code>cryojax</code> and is exposed as public API for development downstream.</p>
+
+
+    </div>
+
 </div><h2 id="interoperability-with-lineax">Interoperability with <code>lineax</code><a class="headerlink" href="#interoperability-with-lineax" title="Permanent link">¤</a></h2>
 
 
@@ -1623,7 +1658,7 @@ rank as <code>xs</code> (e.g. perhaps it is vmapped over <code>x</code>).
 
 <h4 id="cryojax.jax_util.make_linear_operator" class="doc doc-heading">
   <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">make_linear_operator</span><span class="p">(</span><span class="n">fn</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="o">~</span><span class="n">Args</span><span class="p">],</span> <span class="n">Array</span><span class="p">],</span> <span class="n">args</span><span class="p">:</span> <span class="o">~</span><span class="n">Args</span><span class="p">,</span> <span class="n">where_vector</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="o">~</span><span class="n">Args</span><span class="p">],</span> <span class="n">Any</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">tags</span><span class="p">:</span> <span class="nb">object</span> <span class="o">|</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">object</span><span class="p">]</span> <span class="o">=</span> <span class="p">())</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">lineax</span><span class="o">.</span><span class="n">FunctionLinearOperator</span><span class="p">,</span> <span class="o">~</span><span class="n">Args</span><span class="p">]</span></code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/9b08227ad0457060bfa84e007fa0dba347523a59/cryojax/jax_util/_linear_operator.py#L15-L92"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/9aa7d8885176bc628482ec83792e7480ccc89b2c/cryojax/jax_util/_linear_operator.py#L15-L92"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.jax_util.make_linear_operator" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1640,26 +1675,26 @@ calls <a href="https://docs.jax.dev/en/latest/_autosummary/jax.linear_transpose.
 under the hood.</p>
 <div class="admonition example">
 <p class="admonition-title">Backprojection with <code>lineax</code></p>
-<p>```python
-import cryojax.simulator as cxs
-import cryojax.jax_util as jxu
-import lineax as lx</p>
-<h5 id="cryojax.jax_util.make_linear_operator--instantiate-a-linear-operator">Instantiate a linear operator<a class="headerlink" href="#cryojax.jax_util.make_linear_operator--instantiate-a-linear-operator" title="Permanent link">¤</a></h5>
-<p>volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(...)
-image_model = cxs.make_image_model(volume, ...)
-where_vector = lambda x: x.volume.fourier_voxel_grid
-operator, vector = jxu.make_linear_operator(
-    fn=lambda x: x.simulate(),
-    args=image_model,
-    where_vector=where_vector,
-)</p>
-<h5 id="cryojax.jax_util.make_linear_operator--simulate-an-image">Simulate an image<a class="headerlink" href="#cryojax.jax_util.make_linear_operator--simulate-an-image" title="Permanent link">¤</a></h5>
-<p>image = operator.mv(vector)</p>
-<h5 id="cryojax.jax_util.make_linear_operator--compute-backprojection">Compute backprojection<a class="headerlink" href="#cryojax.jax_util.make_linear_operator--compute-backprojection" title="Permanent link">¤</a></h5>
-<p>adjoint = lx.conj(operator.T)
-backprojection = where_vector(adjoint.mv(image))</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">cryojax.simulator</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">cxs</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">cryojax.jax_util</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jxu</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">lineax</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">lx</span>
+
+<span class="c1"># Instantiate a linear operator</span>
+<span class="n">volume</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">FourierVoxelGridVolume</span><span class="o">.</span><span class="n">from_real_voxel_grid</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+<span class="n">image_model</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">make_image_model</span><span class="p">(</span><span class="n">volume</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>
+<span class="n">where_vector</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">volume</span><span class="o">.</span><span class="n">fourier_voxel_grid</span>
+<span class="n">operator</span><span class="p">,</span> <span class="n">vector</span> <span class="o">=</span> <span class="n">jxu</span><span class="o">.</span><span class="n">make_linear_operator</span><span class="p">(</span>
+    <span class="n">fn</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">simulate</span><span class="p">(),</span>
+    <span class="n">args</span><span class="o">=</span><span class="n">image_model</span><span class="p">,</span>
+    <span class="n">where_vector</span><span class="o">=</span><span class="n">where_vector</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="c1"># Simulate an image</span>
+<span class="n">image</span> <span class="o">=</span> <span class="n">operator</span><span class="o">.</span><span class="n">mv</span><span class="p">(</span><span class="n">vector</span><span class="p">)</span>
+<span class="c1"># Compute backprojection</span>
+<span class="n">adjoint</span> <span class="o">=</span> <span class="n">lx</span><span class="o">.</span><span class="n">conj</span><span class="p">(</span><span class="n">operator</span><span class="o">.</span><span class="n">T</span><span class="p">)</span>
+<span class="n">backprojection</span> <span class="o">=</span> <span class="n">where_vector</span><span class="p">(</span><span class="n">adjoint</span><span class="o">.</span><span class="n">mv</span><span class="p">(</span><span class="n">image</span><span class="p">))</span>
+</code></pre></div>
 </div>
-<p>```</p>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
 <p>This function promises that <code>fn</code> can be expressed as a
@@ -1696,7 +1731,7 @@ arguments at <code>where_vector</code>.</p>
 
 <h4 id="cryojax.jax_util.NDArrayLike" class="doc doc-heading">
     <code>cryojax.jax_util.NDArrayLike</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/9b08227ad0457060bfa84e007fa0dba347523a59/cryojax/jax_util/_typing.py#L10-L13"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/9aa7d8885176bc628482ec83792e7480ccc89b2c/cryojax/jax_util/_typing.py#L10-L13"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.jax_util.NDArrayLike" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1740,7 +1775,7 @@ arguments at <code>where_vector</code>.</p>
 
 <h4 id="cryojax.jax_util.FloatLike" class="doc doc-heading">
     <code>cryojax.jax_util.FloatLike</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/9b08227ad0457060bfa84e007fa0dba347523a59/cryojax/jax_util/_typing.py#L29-L34"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/9aa7d8885176bc628482ec83792e7480ccc89b2c/cryojax/jax_util/_typing.py#L29-L34"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.jax_util.FloatLike" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1785,7 +1820,7 @@ JAX/numpy float scalar.</p>
 
 <h4 id="cryojax.jax_util.ComplexLike" class="doc doc-heading">
     <code>cryojax.jax_util.ComplexLike</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/9b08227ad0457060bfa84e007fa0dba347523a59/cryojax/jax_util/_typing.py#L22-L27"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/9aa7d8885176bc628482ec83792e7480ccc89b2c/cryojax/jax_util/_typing.py#L22-L27"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.jax_util.ComplexLike" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1830,7 +1865,7 @@ JAX/numpy complex scalar.</p>
 
 <h4 id="cryojax.jax_util.InexactLike" class="doc doc-heading">
     <code>cryojax.jax_util.InexactLike</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/9b08227ad0457060bfa84e007fa0dba347523a59/cryojax/jax_util/_typing.py#L36-L41"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/9aa7d8885176bc628482ec83792e7480ccc89b2c/cryojax/jax_util/_typing.py#L36-L41"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.jax_util.InexactLike" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1875,7 +1910,7 @@ JAX/numpy float / complex scalar.</p>
 
 <h4 id="cryojax.jax_util.IntLike" class="doc doc-heading">
     <code>cryojax.jax_util.IntLike</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/9b08227ad0457060bfa84e007fa0dba347523a59/cryojax/jax_util/_typing.py#L43-L48"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/9aa7d8885176bc628482ec83792e7480ccc89b2c/cryojax/jax_util/_typing.py#L43-L48"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.jax_util.IntLike" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1920,7 +1955,7 @@ JAX/numpy integer scalar.</p>
 
 <h4 id="cryojax.jax_util.BoolLike" class="doc doc-heading">
     <code>cryojax.jax_util.BoolLike</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/9b08227ad0457060bfa84e007fa0dba347523a59/cryojax/jax_util/_typing.py#L15-L20"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/9aa7d8885176bc628482ec83792e7480ccc89b2c/cryojax/jax_util/_typing.py#L15-L20"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.jax_util.BoolLike" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1954,41 +1989,6 @@ JAX/numpy boolean scalar.</p>
 
 
   </div>
-
-    </div>
-
-</div><h2 id="debugging-and-runtime-errors">Debugging and runtime errors<a class="headerlink" href="#debugging-and-runtime-errors" title="Permanent link">¤</a></h2>
-
-
-<div class="doc doc-object doc-function">
-
-
-<h4 id="cryojax.jax_util.maybe_error_if" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">maybe_error_if</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="o">~</span><span class="n">T</span><span class="p">,</span> <span class="n">pred_fn</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="o">~</span><span class="n">T</span><span class="p">],</span> <span class="n">Bool</span><span class="p">[</span><span class="n">ArrayLike</span><span class="p">,</span> <span class="s1">&#39;...&#39;</span><span class="p">]],</span> <span class="n">msg</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PyTree</span></code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/9b08227ad0457060bfa84e007fa0dba347523a59/cryojax/jax_util/_errors.py#L13-L38"><code class='hippogriffe-repo-url'></code></a>
-
-
-<a href="#cryojax.jax_util.maybe_error_if" class="headerlink" title="Permanent link">¤</a></h4>
-
-
-    <div class="doc doc-contents first">
-
-        <p>Applies <a href="https://docs.kidger.site/equinox/api/errors/#equinox.error_if"><code>equinox.error_if</code></a>
-depending on the value of the environmental variable <code>CRYOJAX_ENABLE_CHECKS</code>.</p>
-<ul>
-<li>If <code>CRYOJAX_ENABLE_CHECKS=true</code>:
-    This function is equivalent to <code>equinox.error_if</code>, with the replacement of
-    the input <code>pred</code> with <code>pred_fn</code>, where <code>pred = pred_fn(x)</code>. This way, <code>pred</code> is only evaluated
-    if checks are enabled.</li>
-<li>If <code>CRYOJAX_ENABLE_CHECKS=false</code>:
-    This function is the identity, i.e. <code>lambda x: x</code>.</li>
-</ul>
-<p>By default, <code>CRYOJAX_ENABLE_CHECKS=false</code> because checks may cause slowdowns, particularly
-on GPU.</p>
-<p>This function is used to achieve a similar idea as
-<a href="https://docs.jax.dev/en/latest/config_options.html#jax_enable_checks">'JAX_ENABLE_CHECKS'</a>
-in <code>cryojax</code> and is exposed as public API for development downstream.</p>
-
 
     </div>
 

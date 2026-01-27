@@ -965,15 +965,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#cryojax.simulator.AbstractDQE" class="md-nav__link">
-    <span class="md-ellipsis">
-      <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;AbstractDQE
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -1346,7 +1337,7 @@
 
 <h4 id="cryojax.simulator.AbstractDetector" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.AbstractDetector</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/9b08227ad0457060bfa84e007fa0dba347523a59/cryojax/simulator/_detector.py#L43-L121"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/9aa7d8885176bc628482ec83792e7480ccc89b2c/cryojax/simulator/_detector.py#L18-L62"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.AbstractDetector" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1379,82 +1370,35 @@
 <div class="doc doc-object doc-function">
 
 
-<h5 id="cryojax.simulator.AbstractDetector.sample_readout_from_expected_events" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">sample_readout_from_expected_events</span><span class="p">(</span><span class="n">key</span><span class="p">:</span> <span class="n">PRNGKeyArray</span><span class="p">,</span> <span class="n">expected_electron_events</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim&#39;</span><span class="p">]</span></code>
-  
+<h5 id="cryojax.simulator.AbstractDetector.compute_expected_counts" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">compute_expected_counts</span><span class="p">(</span><span class="n">fourier_intensity</span><span class="p">:</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> {image_config.padded_x_dim//2+1}&#39;</span><span class="p">],</span> <span class="n">image_config</span><span class="p">:</span> <span class="n">DoseImageConfig</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">outputs_real_space</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> {image_config.padded_x_dim//2+1}&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> </span><span class="si">{image_config.padded_x_dim}</span><span class="s1">&#39;</span><span class="p">]</span></code>
 
-
-<a href="#cryojax.simulator.AbstractDetector.sample_readout_from_expected_events" class="headerlink" title="Permanent link">¤</a></h5>
+<a href="#cryojax.simulator.AbstractDetector.compute_expected_counts" class="headerlink" title="Permanent link">¤</a></h5>
 
 
     <div class="doc doc-contents ">
 
-        <p>Sample a realization from the detector noise model.</p>
+        <p>Compute the expected electron counts from the detector.</p>
 
 
     </div>
 
 </div>
 
-
-
-  </div>
-
-    </div>
-
-</div></details>
-<details class="abstract">
-<summary><code>cryojax.simulator.AbstractDQE</code></summary>
-
-
-<div class="doc doc-object doc-class">
-
-
-
-<h4 id="cryojax.simulator.AbstractDQE" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.AbstractDQE</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/9b08227ad0457060bfa84e007fa0dba347523a59/cryojax/simulator/_detector.py#L19-L24"><code class='hippogriffe-repo-url'></code></a>
-
-
-<a href="#cryojax.simulator.AbstractDQE" class="headerlink" title="Permanent link">¤</a></h4>
-
-
-    <div class="doc doc-contents first">
-
-
-        <p>Base class for a detector DQE.</p>
-
-
-
-
-
-
-
-
-
-
-  <div class="doc doc-children">
-
-
-
-
-
-
-
-
-
 <div class="doc doc-object doc-function">
 
 
-<h5 id="cryojax.simulator.AbstractDQE.__call__" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__call__</span><span class="p">(</span><span class="n">image_config</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">DoseImageConfig</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;_ _&#39;</span><span class="p">]</span></code>
+<h5 id="cryojax.simulator.AbstractDetector.sample_counts" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">sample_counts</span><span class="p">(</span><span class="n">key</span><span class="p">:</span> <span class="n">PRNGKeyArray</span><span class="p">,</span> <span class="n">fourier_intensity</span><span class="p">:</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> {image_config.padded_x_dim//2+1}&#39;</span><span class="p">],</span> <span class="n">image_config</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">DoseImageConfig</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">outputs_real_space</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> {image_config.padded_x_dim//2+1}&#39;</span><span class="p">]</span></code>
   
 
 
-<a href="#cryojax.simulator.AbstractDQE.__call__" class="headerlink" title="Permanent link">¤</a></h5>
+<a href="#cryojax.simulator.AbstractDetector.sample_counts" class="headerlink" title="Permanent link">¤</a></h5>
 
 
     <div class="doc doc-contents ">
+
+        <p>Measure the electron counts from the detector.</p>
 
 
     </div>
