@@ -729,17 +729,11 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
             )
             if self.translate_mode == "fft":
                 fourier_intensity = self._phase_shift_translate(fourier_intensity)
-            # ... now measure the expected electron events at the detector
-            fourier_expected_electron_events = (
-                self.detector.compute_expected_electron_events(
-                    fourier_intensity, self.image_config
-                )
-            )
-
-            return (
-                irfftn(fourier_expected_electron_events, s=self.image_config.padded_shape)
-                if outputs_real_space
-                else fourier_expected_electron_events
+            # ... now measure the expected electron events at the detector and return
+            return self.detector.compute_expected_counts(
+                fourier_intensity,
+                self.image_config,
+                outputs_real_space=outputs_real_space,
             )
         else:
             keys = jr.split(rng_key, 3)

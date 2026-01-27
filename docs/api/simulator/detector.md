@@ -4,10 +4,5 @@
     ::: cryojax.simulator.AbstractDetector
         options:
             members:
-                - sample_readout_from_expected_events
-
-??? abstract "`cryojax.simulator.AbstractDQE`"
-    ::: cryojax.simulator.AbstractDQE
-        options:
-            members:
-                - __call__
+                - compute_expected_counts
+                - sample_counts
