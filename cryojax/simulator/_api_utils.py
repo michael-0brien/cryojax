@@ -267,9 +267,10 @@ def make_image_model(
         - 'none':
             Do not apply the translation.
     - `quantity_mode`:
-        The physical observable to simulate. If `None`, simulate without scaling
-        to physical units using the [`cryojax.simulator.LinearImageModel`][].
-        Options are
+        The physical observable to simulate. Options are:
+        - 'none':
+            Use the [`cryojax.simulator.LinearImageModel`][]. This
+            simulates without scaling to physical units.
         - 'contrast':
             Uses the [`cryojax.simulator.ContrastImageModel`][]
             to simulate contrast.
