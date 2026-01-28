@@ -730,9 +730,9 @@ def _safe_multiply_by_constant(
         grid_x.at[:, 1:].multiply(constant),
         grid_y.at[1:, :].multiply(constant),
     )
-    mul_grid = grid.at[..., 0].set(mul_grid_x)
-    mul_grid = grid.at[..., 1].set(mul_grid_y)
-    return mul_grid
+    grid = grid.at[..., 0].set(mul_grid_x)
+    grid = grid.at[..., 1].set(mul_grid_y)
+    return grid
 
 
 def _dict_to_pad_options(d: dict[str, Any], default_shape: tuple[int, int]) -> PadOptions:
