@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from typing import TypeVar
 
 import equinox as eqx
 from jaxtyping import ArrayLike, Bool, PyTree
@@ -6,8 +7,11 @@ from jaxtyping import ArrayLike, Bool, PyTree
 from .._config import CRYOJAX_ENABLE_CHECKS
 
 
+T = TypeVar("T", bound="PyTree")
+
+
 def maybe_error_if(
-    x: PyTree, pred_fn: Callable[[PyTree], Bool[ArrayLike, "..."]], msg: str
+    x: T, pred_fn: Callable[[T], Bool[ArrayLike, "..."]], msg: str
 ) -> PyTree:
     """Applies [`equinox.error_if`](https://docs.kidger.site/equinox/api/errors/#equinox.error_if)
     depending on the value of the environmental variable `CRYOJAX_ENABLE_CHECKS`.
@@ -26,8 +30,6 @@ def maybe_error_if(
     [`JAX_ENABLE_CHECKS`](https://docs.jax.dev/en/latest/config_options.html#jax_enable_checks)
     in `cryojax` and is exposed as public API for development downstream.
     """  # noqa: E501
-    # `enable_checks` keyword is included for unit testing; it is not a public
-    # argument.
     if CRYOJAX_ENABLE_CHECKS:
         return eqx.error_if(x, pred_fn(x), msg)
     else:
