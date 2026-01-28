@@ -365,69 +365,18 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#simulating-an-image" class="md-nav__link">
+  <a href="#quick-example" class="md-nav__link">
     <span class="md-ellipsis">
-      Simulating an image
+      Quick example
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#jax-transformations" class="md-nav__link">
+  <a href="#what-next" class="md-nav__link">
     <span class="md-ellipsis">
-      JAX transformations
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="JAX transformations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#your-first-jit-compiled-function" class="md-nav__link">
-    <span class="md-ellipsis">
-      Your first JIT compiled function
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#computing-gradients-of-a-loss-function" class="md-nav__link">
-    <span class="md-ellipsis">
-      Computing gradients of a loss function
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#vectorizing-image-simulation" class="md-nav__link">
-    <span class="md-ellipsis">
-      Vectorizing image simulation
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#projects-using-cryojax" class="md-nav__link">
-    <span class="md-ellipsis">
-      Projects using cryoJAX
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#acknowledgements" class="md-nav__link">
-    <span class="md-ellipsis">
-      Acknowledgements
+      What next?
     </span>
   </a>
   
@@ -1400,8 +1349,8 @@ git<span class="w"> </span>checkout<span class="w"> </span>dev
 uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>.
 </code></pre></div>
 <p>The <a href="https://github.com/dfm/jax-finufft"><code>jax-finufft</code></a> package is an optional dependency used for non-uniform fast fourier transforms. This is used in select methods for computing image projections from atoms and voxels. If you would like to use these methods, we recommend first following the <code>jax_finufft</code> installation instructions and then installing <code>cryojax</code>.</p>
-<h2 id="simulating-an-image">Simulating an image<a class="headerlink" href="#simulating-an-image" title="Permanent link">¤</a></h2>
-<p>Image simulation in cryoJAX revolves around the <code>image_model</code> class. The following is a basic example for instantiating an <code>image_model</code> and simulating an image:</p>
+<h2 id="quick-example">Quick example<a class="headerlink" href="#quick-example" title="Permanent link">¤</a></h2>
+<p>The following is a basic example for simulating an image:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">cryojax.simulator</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">cxs</span>
@@ -1425,83 +1374,8 @@ uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </s
 <span class="c1"># Simulate an image</span>
 <span class="n">image</span> <span class="o">=</span> <span class="n">image_model</span><span class="o">.</span><span class="n">simulate</span><span class="p">(</span><span class="n">outputs_real_space</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </code></pre></div>
-<p>For more advanced image simulation examples and to understand the many features in this library, see the <a href="https://michael-0brien.github.io/cryojax/">documentation</a>.</p>
-<h2 id="jax-transformations">JAX transformations<a class="headerlink" href="#jax-transformations" title="Permanent link">¤</a></h2>
-<p>CryoJAX is built on JAX to make use of JIT-compilation, automatic differentiation, and vectorization for cryo-EM data analysis. JAX implements these operations as <em>function transformations</em>. If you aren't familiar with this concept, see the <a href="https://docs.jax.dev/en/latest/key-concepts.html#transformations">JAX documentation</a>.</p>
-<p>Below are examples of implementing these transformations using <a href="https://docs.kidger.site/equinox/"><code>equinox</code></a>, a popular JAX library for PyTorch-like classes that smoothly integrate with JAX functional programming. To learn more about how <code>equinox</code> assists with JAX transformations, see <a href="https://docs.kidger.site/equinox/all-of-equinox/#2-filtering">here</a>.</p>
-<h3 id="your-first-jit-compiled-function">Your first JIT compiled function<a class="headerlink" href="#your-first-jit-compiled-function" title="Permanent link">¤</a></h3>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">equinox</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">eqx</span>
-
-<span class="c1"># Define image simulation function using `equinox.filter_jit`</span>
-<span class="nd">@eqx</span><span class="o">.</span><span class="n">filter_jit</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">simulate_fn</span><span class="p">(</span><span class="n">image_model</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Simulate an image with JIT compilation&quot;&quot;&quot;</span>
-    <span class="k">return</span> <span class="n">image_model</span><span class="o">.</span><span class="n">simulate</span><span class="p">()</span>
-
-<span class="c1"># Simulate an image</span>
-<span class="n">image</span> <span class="o">=</span> <span class="n">simulate_fn</span><span class="p">(</span><span class="n">image_model</span><span class="p">)</span>
-</code></pre></div>
-<h3 id="computing-gradients-of-a-loss-function">Computing gradients of a loss function<a class="headerlink" href="#computing-gradients-of-a-loss-function" title="Permanent link">¤</a></h3>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">equinox</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">eqx</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
-
-<span class="c1"># Load observed data</span>
-<span class="n">observed_image</span> <span class="o">=</span> <span class="o">...</span>
-
-<span class="c1"># Split the `image_model` by differentiated and non-differentiated</span>
-<span class="c1"># arguments. Here, differentiate with respect to the pose.</span>
-<span class="n">is_pose</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">cxs</span><span class="o">.</span><span class="n">AbstractPose</span><span class="p">)</span>
-<span class="n">filter_spec</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">tree</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">is_pose</span><span class="p">,</span> <span class="n">image_model</span><span class="p">,</span> <span class="n">is_leaf</span><span class="o">=</span><span class="n">is_pose</span><span class="p">)</span>
-<span class="n">model_grad</span><span class="p">,</span> <span class="n">model_nograd</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">partition</span><span class="p">(</span><span class="n">image_model</span><span class="p">,</span> <span class="n">filter_spec</span><span class="p">)</span>
-
-<span class="nd">@eqx</span><span class="o">.</span><span class="n">filter_value_and_grad</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">loss_fn</span><span class="p">(</span><span class="n">model_grad</span><span class="p">,</span> <span class="n">model_nograd</span><span class="p">,</span> <span class="n">observed_image</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compute gradients with respect to the pose.&quot;&quot;&quot;</span>
-    <span class="n">image_model</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">combine</span><span class="p">(</span><span class="n">model_grad</span><span class="p">,</span> <span class="n">model_nograd</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sum</span><span class="p">((</span><span class="n">image_model</span><span class="o">.</span><span class="n">simulate</span><span class="p">()</span> <span class="o">-</span> <span class="n">observed_image</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
-
-<span class="c1"># Compute the loss and gradients</span>
-<span class="n">loss</span><span class="p">,</span> <span class="n">gradients</span> <span class="o">=</span> <span class="n">loss_fn</span><span class="p">(</span><span class="n">model_grad</span><span class="p">,</span> <span class="n">model_nograd</span><span class="p">,</span> <span class="n">observed_image</span><span class="p">)</span>
-</code></pre></div>
-<h3 id="vectorizing-image-simulation">Vectorizing image simulation<a class="headerlink" href="#vectorizing-image-simulation" title="Permanent link">¤</a></h3>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">equinox</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">eqx</span>
-
-<span class="c1"># Vectorize model instantiation over poses</span>
-<span class="nd">@eqx</span><span class="o">.</span><span class="n">filter_vmap</span><span class="p">(</span><span class="n">in_axes</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span> <span class="n">out_axes</span><span class="o">=</span><span class="p">(</span><span class="n">eqx</span><span class="o">.</span><span class="n">if_array</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="kc">None</span><span class="p">))</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">make_model_vmap</span><span class="p">(</span><span class="n">wxyz</span><span class="p">,</span> <span class="n">volume</span><span class="p">,</span> <span class="n">image_config</span><span class="p">,</span> <span class="n">transfer_theory</span><span class="p">):</span>
-    <span class="n">pose</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">QuaternionPose</span><span class="p">(</span><span class="n">wxyz</span><span class="o">=</span><span class="n">wxyz</span><span class="p">)</span>
-    <span class="n">image_model</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">make_image_model</span><span class="p">(</span>
-        <span class="n">volume</span><span class="p">,</span> <span class="n">image_config</span><span class="p">,</span> <span class="n">pose</span><span class="p">,</span> <span class="n">transfer_theory</span><span class="p">,</span> <span class="n">normalizes_signal</span><span class="o">=</span><span class="kc">True</span>
-    <span class="p">)</span>
-    <span class="n">is_pose</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">cxs</span><span class="o">.</span><span class="n">AbstractPose</span><span class="p">)</span>
-    <span class="n">filter_spec</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">tree</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">is_pose</span><span class="p">,</span> <span class="n">image_model</span><span class="p">,</span> <span class="n">is_leaf</span><span class="o">=</span><span class="n">is_pose</span><span class="p">)</span>
-    <span class="n">model_vmap</span><span class="p">,</span> <span class="n">model_novmap</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">partition</span><span class="p">(</span><span class="n">image_model</span><span class="p">,</span> <span class="n">filter_spec</span><span class="p">)</span>
-
-    <span class="k">return</span> <span class="n">model_vmap</span><span class="p">,</span> <span class="n">model_novmap</span>
-
-
-<span class="c1"># Define image simulation function with respect to vectorized arguments</span>
-<span class="nd">@eqx</span><span class="o">.</span><span class="n">filter_vmap</span><span class="p">(</span><span class="n">in_axes</span><span class="o">=</span><span class="p">(</span><span class="n">eqx</span><span class="o">.</span><span class="n">if_array</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="kc">None</span><span class="p">))</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">simulate_fn_vmap</span><span class="p">(</span><span class="n">model_vmap</span><span class="p">,</span> <span class="n">model_novmap</span><span class="p">):</span>
-    <span class="n">image_model</span> <span class="o">=</span> <span class="n">eqx</span><span class="o">.</span><span class="n">combine</span><span class="p">(</span><span class="n">model_vmap</span><span class="p">,</span> <span class="n">model_novmap</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">image_model</span><span class="o">.</span><span class="n">simulate</span><span class="p">()</span>
-
-<span class="c1"># Batch image simulation over poses</span>
-<span class="n">wxyz</span> <span class="o">=</span> <span class="o">...</span>  <span class="c1"># ... load quaternions</span>
-<span class="n">model_vmap</span><span class="p">,</span> <span class="n">model_novmap</span> <span class="o">=</span> <span class="n">make_model_vmap</span><span class="p">(</span><span class="n">wxyz</span><span class="p">,</span> <span class="n">volume</span><span class="p">,</span> <span class="n">image_config</span><span class="p">,</span> <span class="n">transfer_theory</span><span class="p">)</span>
-<span class="n">images</span> <span class="o">=</span> <span class="n">simulate_fn_vmap</span><span class="p">(</span><span class="n">model_vmap</span><span class="p">,</span> <span class="n">model_novmap</span><span class="p">)</span>
-</code></pre></div>
-<h2 id="projects-using-cryojax">Projects using cryoJAX<a class="headerlink" href="#projects-using-cryojax" title="Permanent link">¤</a></h2>
-<p>CryoJAX is meant to support an ecosystem of libraries for the development of emerging data analysis techniques in cryo-EM. If your package uses cryoJAX, <a href="https://github.com/michael-0brien/cryojax/pulls">open a PR</a> to get it added to this list!</p>
-<ul>
-<li><a href="https://github.com/michael-0brien/cryospax"><code>cryospax</code></a>: A small library to support cryo-EM single particle analysis applications using cryoJAX</li>
-</ul>
-<h2 id="acknowledgements">Acknowledgements<a class="headerlink" href="#acknowledgements" title="Permanent link">¤</a></h2>
-<ul>
-<li>Implementations of several models and algorithms, such as the CTF, fourier slice extraction, and electrostatic potential computations has been informed by the open-source cryo-EM software <a href="https://github.com/timothygrant80/cisTEM"><code>cisTEM</code></a>.</li>
-<li><code>cryojax</code> is built using <a href="https://github.com/patrick-kidger/equinox"><code>equinox</code></a>, a popular JAX library for PyTorch-like classes that smoothly integrate with JAX functional programming. We highly recommend learning about <code>equinox</code> to fully make use of the power of <code>jax</code>.</li>
-</ul>
+<h2 id="what-next">What next?<a class="headerlink" href="#what-next" title="Permanent link">¤</a></h2>
+<p>Keep reading further for an <a href="https://michael-0brien.github.io/cryojax/overview/">overview</a> of the library. Then, get started learning about using cryoJAX in practice with the <a href="https://michael-0brien.github.io/cryojax/examples/simulate-image/">image simulation</a> and <a href="https://michael-0brien.github.io/cryojax/examples/jax-transformations/">JAX transformation</a> tutorials, as well as the <a href="https://michael-0brien.github.io/cryojax/api/simulator/entry-point/">API documentation</a>!</p>
 
 
 
