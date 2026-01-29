@@ -725,13 +725,8 @@ def _safe_multiply_by_constant(
     term `sqrt(grid * constant)` that needs to be differentiated.
     This is undefined at locations where the grid is equal to zero.
     """
-    grid_x, grid_y = grid[..., 0], grid[..., 1]
-    mul_grid_x, mul_grid_y = (
-        grid_x.at[:, 1:].multiply(constant),
-        grid_y.at[1:, :].multiply(constant),
-    )
-    grid = grid.at[..., 0].set(mul_grid_x)
-    grid = grid.at[..., 1].set(mul_grid_y)
+    grid = grid.at[:, 1:, 0].multiply(constant)
+    grid = grid.at[1:, :, 1].multiply(constant)
     return grid
 
 
