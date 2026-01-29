@@ -719,8 +719,20 @@ def _safe_multiply_by_constant(
 ) -> Float[Array, "y_dim x_dim 2"]:
     """Multiplies a coordinate grid by a constant in a
     safe way for gradient computation.
+
+    If we naively wrote `grid * constant`, when we
+    take gradients with respect to pixel size there will be a
+    term `sqrt(grid * constant)` that needs to be differentiated.
+    This is undefined at locations where the grid is equal to zero.
     """
-    return jnp.where(grid != 0.0, constant * grid, 0.0)
+    grid_x, grid_y = grid[..., 0], grid[..., 1]
+    mul_grid_x, mul_grid_y = (
+        grid_x.at[:, 1:].multiply(constant),
+        grid_y.at[1:, :].multiply(constant),
+    )
+    grid = grid.at[..., 0].set(mul_grid_x)
+    grid = grid.at[..., 1].set(mul_grid_y)
+    return grid
 
 
 def _dict_to_pad_options(d: dict[str, Any], default_shape: tuple[int, int]) -> PadOptions:
