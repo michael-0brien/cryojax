@@ -731,6 +731,13 @@ def _safe_multiply_by_constant(
 
 
 def _dict_to_pad_options(d: dict[str, Any], default_shape: tuple[int, int]) -> PadOptions:
+    if not set(d.keys()).issubset({"shape"}):
+        raise ValueError(
+            "Expected that dictionary `pad_options` passed to "
+            "`BasicImageConfig(..., pad_options=...)` "
+            f"had a subset of keys {{'shape'}}, but found that it had keys "
+            f"{set(d.keys())}."
+        )
     shape = d["shape"] if "shape" in d else default_shape
 
     return PadOptions(shape=shape)

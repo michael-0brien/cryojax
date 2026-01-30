@@ -78,3 +78,13 @@ def test_compile_time_eval():
 
     _ = _get_coords(c)
     _ = _get_freqs(c)
+
+
+def test_init_error():
+    with pytest.raises(ValueError):
+        _ = cxs.BasicImageConfig(
+            (5, 5),
+            pixel_size=1.0,
+            voltage_in_kilovolts=300.0,
+            pad_options=dict(shap=(10, 10)),
+        )

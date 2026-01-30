@@ -4,6 +4,7 @@ import cryojax.simulator as cxs
 import jax.numpy as jnp
 import numpy as np
 import pytest
+from cryojax.constants import wavelength_from_kilovolts
 from cryojax.io import read_array_from_mrc
 from cryojax.ndimage import (
     cartesian_to_polar,
@@ -55,7 +56,11 @@ def test_ctf_with_cistem(defocus1, defocus2, asti_angle, kV, cs, ac, pixel_size)
             spherical_aberration_in_mm=cs,
         )
         ctf = jnp.array(
-            optics(freqs, voltage_in_kilovolts=kV, amplitude_contrast_ratio=ac)
+            optics(
+                freqs,
+                wavelength_in_angstroms=wavelength_from_kilovolts(kV),
+                amplitude_contrast_ratio=ac,
+            )
         )
         # Compute cisTEM CTF
         cisTEM_optics = cistemCTF(
