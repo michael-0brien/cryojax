@@ -1417,12 +1417,12 @@
 <span class="p">)</span>
 <span class="c1"># Instantiate `image_config`</span>
 <span class="n">padded_dim</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">PAD_SCALE</span> <span class="o">*</span> <span class="n">IMAGE_DIM</span><span class="p">)</span>
-<span class="n">pad_options</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">padded_dim</span><span class="p">,</span> <span class="n">padded_dim</span><span class="p">))</span>
+<span class="n">padded_shape</span> <span class="o">=</span> <span class="p">(</span><span class="n">padded_dim</span><span class="p">,</span> <span class="n">padded_dim</span><span class="p">)</span>
 <span class="n">image_config</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">BasicImageConfig</span><span class="p">(</span>
     <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">IMAGE_DIM</span><span class="p">,</span> <span class="n">IMAGE_DIM</span><span class="p">),</span>
     <span class="n">pixel_size</span><span class="o">=</span><span class="n">PIXEL_SIZE</span><span class="p">,</span>
     <span class="n">voltage_in_kilovolts</span><span class="o">=</span><span class="n">VOLTAGE_IN_KILOVOLTS</span><span class="p">,</span>
-    <span class="n">pad_options</span><span class="o">=</span><span class="n">pad_options</span><span class="p">,</span>
+    <span class="n">padded_shape</span><span class="o">=</span><span class="n">padded_shape</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="c1"># Create RNG keys and simulate</span>
 <span class="n">rng_keys</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">key</span><span class="p">(</span><span class="n">SIMULATE_RNG_SEED</span><span class="p">),</span> <span class="n">num</span><span class="o">=</span><span class="n">N_PARTICLES</span><span class="p">)</span>
@@ -1431,7 +1431,7 @@
 <span class="p">)</span>
 <span class="n">plot_image_stack</span><span class="p">(</span><span class="n">dataset_images</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">9</span><span class="p">])</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/7794793b143c4b7e810dafa488b413fa.png" /></p>
+<p><img alt="img" src="../_data/cebf35ed9dca44d990ee8f24a8fb8bf9.png" /></p>
 <p>Next, define the loss function. We will naively do a gradient descent on the positions of the C-alpha atoms to see if we can capture the large-scale difference of the conformational change.</p>
 <div class="highlight"><pre><span></span><code><span class="nd">@eqx</span><span class="o">.</span><span class="n">filter_value_and_grad</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">compute_loss</span><span class="p">(</span><span class="n">atom_positions</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
@@ -1554,7 +1554,7 @@ step=99, loss=-117238.9296875
 </code></pre></div>
 <div class="highlight"><pre><span></span><code>[Text(0.5, 0, &#39;step number&#39;), Text(0, 0.5, &#39;cross-correlation loss&#39;)]
 </code></pre></div>
-<p><img alt="img" src="../_data/526ed0d03c47456ea934bcc3541f0cb4.png" /></p>
+<p><img alt="img" src="../_data/a6dc3fe91bd34caeba7b95248fdfb162.png" /></p>
 <p>Now let's check the results! Let's first look at FSC curves between the ground truth and structure before and after refinement.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">cryojax.ndimage</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">compute_fourier_shell_correlation</span><span class="p">,</span>
@@ -1600,7 +1600,7 @@ step=99, loss=-117238.9296875
 <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/03617088edf0483c9b4948426c409d89.png" /></p>
+<p><img alt="img" src="../_data/9421287cded9453da67ebfb405054082.png" /></p>
 <p>The above FSC curves quantifies the increase in correlation after gradient descent refinement. Indeed, visually the refinement is able to (roughly) recover the ground truth conformation!</p>
 <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_cross_sections</span><span class="p">(</span>
     <span class="n">pos1</span><span class="p">,</span> <span class="n">pos2</span><span class="p">,</span> <span class="n">axes</span><span class="p">,</span> <span class="n">label1</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">label2</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">color1</span><span class="o">=</span><span class="s2">&quot;b&quot;</span><span class="p">,</span> <span class="n">color2</span><span class="o">=</span><span class="s2">&quot;orange&quot;</span>
@@ -1639,7 +1639,7 @@ step=99, loss=-117238.9296875
 <span class="n">fig</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s2">&quot;Central cross sections of GMM positions&quot;</span><span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/dea0e86a88f64de98358c70c60270679.png" /></p>
+<p><img alt="img" src="../_data/0671a9a032cc4db089a3ec47ccb9b5c4.png" /></p>
 <p>Interactive plots of the 3D point clouds can be generated locally using <code>plotly</code> with the following code block:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">plotly.graph_objects</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">go</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">plotly.subplots</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_subplots</span>

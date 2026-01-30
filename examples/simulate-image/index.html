@@ -1327,12 +1327,11 @@
 <span class="p">)</span>
 <span class="n">transfer_theory</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">ContrastTransferTheory</span><span class="p">(</span><span class="n">ctf</span><span class="p">,</span> <span class="n">amplitude_contrast_ratio</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
 <span class="c1"># Then the configuration. Add padding to avoid periodic artifacts due to CTF rings</span>
-<span class="n">pad_options</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="n">volume</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">2</span><span class="p">])</span>
 <span class="n">image_config</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">BasicImageConfig</span><span class="p">(</span>
     <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">80</span><span class="p">,</span> <span class="mi">80</span><span class="p">),</span>
     <span class="n">pixel_size</span><span class="o">=</span><span class="n">voxel_size</span><span class="p">,</span>
     <span class="n">voltage_in_kilovolts</span><span class="o">=</span><span class="mf">300.0</span><span class="p">,</span>
-    <span class="n">pad_options</span><span class="o">=</span><span class="n">pad_options</span><span class="p">,</span>
+    <span class="n">padded_shape</span><span class="o">=</span><span class="n">volume</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">2</span><span class="p">],</span>
 <span class="p">)</span>
 </code></pre></div>
 <p>Finally, instantiate the image model using <a class="autorefs autorefs-internal" href="../../api/simulator/entry-point/#cryojax.simulator.make_image_model"><code>cryojax.simulator.make_image_model</code></a>.</p>
@@ -1413,7 +1412,7 @@ simulating an image, such as the pose, the volume, and the CTF and 2) Images are
 <span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/012911c10f224408bd6bca01c637e5e1.png" /></p>
+<p><img alt="img" src="../_data/875c6db123964ab49f32eccb12b5c86f.png" /></p>
 <p>Alternatively, the user can simulate an image with noise from a particular statistical distribution. In this example, we use the <code>GaussianWhiteNoiseModel</code>.</p>
 <p>Here, we will directly control image SNR by transforming the final image output using a <code>cryojax.ndimage.ImageScaling</code>.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">cryojax.ndimage</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">im</span>
@@ -1458,7 +1457,7 @@ simulating an image, such as the pose, the volume, and the CTF and 2) Images are
 <span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/b43dccafda31437ebe67f483a45fb4d1.png" /></p>
+<p><img alt="img" src="../_data/d63af175f3024144b1033f6047c32550.png" /></p>
 <div class="highlight"><pre><span></span><code>
 </code></pre></div>
 
