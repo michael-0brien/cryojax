@@ -80,7 +80,7 @@ def relion_parameters():
         shape=(4, 4),
         pixel_size=1.5,
         voltage_in_kilovolts=300.0,
-        pad_options=dict(mode="constant", shape=(14, 14)),
+        pad_options=dict(shape=(14, 14)),
     )
 
     pose = cxs.EulerAnglePose()
