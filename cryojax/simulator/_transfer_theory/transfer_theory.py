@@ -93,7 +93,7 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
             # Compute the CTF, including additional phase shifts
             ctf_array = self.ctf(
                 frequency_grid,
-                voltage_in_kilovolts=image_config.voltage_in_kilovolts,
+                wavelength_in_angstroms=image_config.wavelength_in_angstroms,
                 phase_shift=self.phase_shift,
                 amplitude_contrast_ratio=amplitude_contrast_ratio,
                 outputs_exp=False,
@@ -153,7 +153,7 @@ class WaveTransferTheory(AbstractTransferTheory, strict=True):
         # Compute the wave transfer function
         ctf_array = self.ctf(
             frequency_grid,
-            voltage_in_kilovolts=image_config.voltage_in_kilovolts,
+            wavelength_in_angstroms=image_config.wavelength_in_angstroms,
             outputs_exp=True,
             defocus_offset=defocus_offset,
         )
