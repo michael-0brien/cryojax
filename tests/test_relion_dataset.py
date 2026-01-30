@@ -80,7 +80,7 @@ def relion_parameters():
         shape=(4, 4),
         pixel_size=1.5,
         voltage_in_kilovolts=300.0,
-        pad_options=dict(shape=(14, 14)),
+        padded_shape=(14, 14),
     )
 
     pose = cxs.EulerAnglePose()
@@ -194,7 +194,7 @@ def test_pad_options(sample_starfile_path):
         shape=(16, 16),
         pixel_size=12.0,
         voltage_in_kilovolts=300.0,
-        pad_options=pad_options,
+        padded_shape=pad_options["shape"],
     )
     assert image_config.shape == ref_config.shape
     assert image_config.pixel_size == np.asarray(ref_config.pixel_size)

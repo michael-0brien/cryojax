@@ -207,7 +207,7 @@ def image_config(voxel_volume, voxel_size):
         shape=(int(0.9 * shape[0]), int(0.9 * shape[1])),
         pixel_size=voxel_size,
         voltage_in_kilovolts=300.0,
-        pad_options=dict(shape=shape),
+        padded_shape=shape,
     )
 
 

@@ -20,6 +20,10 @@ def test_future_deprecated(sample_pdb_path):
         removal_version = parse_version(match.group(1))
         return current_version >= removal_version
 
+    with pytest.warns(FutureWarning) as record:
+        _ = cxs.BasicImageConfig((10, 10), 1.5, 300.0, pad_options=dict(shape=(15, 15)))
+        assert not should_be_removed(record)
+
     ic = cxs.BasicImageConfig((10, 10), 1.5, 300.0, precompute_mode="all")
 
     with pytest.warns(FutureWarning) as record:

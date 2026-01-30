@@ -66,12 +66,12 @@ def setup_volumes_and_configs(n_iterations, n_atoms, box_size, pixel_size=2.0):
     )
 
     # Image config
-    pad_options = dict(shape=(int(box_size * 1.5), int(box_size * 1.5)))
+    padded_shape = (int(box_size * 1.5), int(box_size * 1.5))
     config = cxs.BasicImageConfig(
         shape=(box_size, box_size),
         pixel_size=pixel_size,
         voltage_in_kilovolts=300.0,
-        pad_options=pad_options,
+        padded_shape=padded_shape,
     )
 
     return volume_fourier_grid, avg_time, volume_gmm, atom_volume, config

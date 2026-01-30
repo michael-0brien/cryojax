@@ -3,9 +3,10 @@
 import math
 import warnings
 from functools import cached_property
-from typing import Any, Literal, TypedDict
+from typing import Literal, TypedDict
 
 import equinox as eqx
+import equinox.internal as eqxi
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
@@ -29,8 +30,8 @@ _get_deprecation_msg = lambda self, prop, func: (
 
 # Not currently public API
 class PrecomputedGrids(eqx.Module, strict=True):
-    only_rfft: bool
-    only_fourier: bool
+    only_rfft: bool = eqx.field(static=True)
+    only_fourier: bool = eqx.field(static=True)
 
     _frequency_grid: Float[Array, "_ _ 2"]
     _coordinate_grid: Float[Array, "_ _ 2"] | None
@@ -138,8 +139,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
     pixel_size: eqx.AbstractVar[Float[Array, ""]]
     voltage_in_kilovolts: eqx.AbstractVar[Float[Array, ""]]
 
-    pad_options: eqx.AbstractVar[dict[str, Any]]
-
+    padded_shape: eqx.AbstractVar[tuple[int, int]]
     precompute_mode: eqx.AbstractVar[
         Literal["none", "rfft", "fft", "all", "compile_time_eval"]
     ]
@@ -159,12 +159,6 @@ class AbstractImageConfig(eqx.Module, strict=True):
             raise AttributeError(
                 f"Found that `{cls}.padded_shape` is less than `{cls}.shape` in one or "
                 " more dimensions."
-            )
-        if set(self.pad_options.keys()) != {"shape"}:
-            raise AttributeError(
-                f"Found that `{cls}.pad_options` was not a dictionary with "
-                "key 'shape'. "
-                f"Instead, had keys {set(self.pad_options.keys())}."
             )
 
     @property
@@ -277,10 +271,6 @@ class AbstractImageConfig(eqx.Module, strict=True):
             frequency_grid = _safe_multiply_by_constant(frequency_grid, 1 / pixel_size)
 
         return frequency_grid
-
-    @property
-    def padded_shape(self):
-        return self.pad_options["shape"]
 
     @property
     def n_pixels(self) -> int:
@@ -544,21 +534,24 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
     pixel_size: Float[Array, ""]
     voltage_in_kilovolts: Float[Array, ""]
 
-    pad_options: PadOptions
-
-    precompute_mode: Literal["none", "rfft", "fft", "all", "compile_time_eval"]
+    padded_shape: tuple[int, int]
+    precompute_mode: Literal["none", "rfft", "fft", "all", "compile_time_eval"] = (
+        eqx.field(static=True)
+    )
     precomputed_grids: PrecomputedGrids | None
 
+    @eqxi.doc_remove_args("pad_options")
     def __init__(
         self,
         shape: tuple[int, int],
         pixel_size: FloatLike,
         voltage_in_kilovolts: FloatLike,
         *,
+        padded_shape: tuple[int, int] | None = None,
         precompute_mode: Literal[
             "none", "rfft", "fft", "all", "compile_time_eval"
         ] = "none",
-        pad_options: dict[str, Any] = {},
+        pad_options: dict = {},
     ):
         """**Arguments:**
 
@@ -568,11 +561,9 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
             The pixel size of the image in angstroms.
         - `voltage_in_kilovolts`:
             The incident energy of the electron beam.
-        - `pad_options`:
-            Options that control image padding.
-            - 'shape':
-                The shape of the image after padding. By default, equal
-                to `shape`.
+        - `padded_shape`:
+            The shape of the image after padding. By default, equal
+            to `shape`.
         - `precompute_mode`:
             How to pre-compute coordinate and frequency grids stored in
             the `image_config`. Options are
@@ -597,10 +588,17 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
         # Set parameters
         self.pixel_size = jnp.asarray(pixel_size, dtype=float)
         self.voltage_in_kilovolts = jnp.asarray(voltage_in_kilovolts, dtype=float)
-        # Set shape
+        # Set shape and padded shape
+        if "shape" in pad_options:
+            warnings.warn(
+                "`BasicImageConfig(..., pad_options=...)` is deprecated and will "
+                "be removed in cryoJAX 0.6.0. Use `padded_shape` instead.",
+                category=FutureWarning,
+                stacklevel=2,
+            )
+            padded_shape = pad_options["shape"]
         self.shape = shape
-        # Set pad options
-        self.pad_options = _dict_to_pad_options(pad_options, shape)
+        self.padded_shape = shape if padded_shape is None else padded_shape
         # Finally, grid precompute
         if precompute_mode == "rfft":
             self.precomputed_grids = PrecomputedGrids(
@@ -628,11 +626,13 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
     voltage_in_kilovolts: Float[Array, ""]
     electron_dose: Float[Array, ""]
 
-    pad_options: PadOptions
-
-    precompute_mode: Literal["none", "rfft", "fft", "all", "compile_time_eval"]
+    padded_shape: tuple[int, int]
+    precompute_mode: Literal["none", "rfft", "fft", "all", "compile_time_eval"] = (
+        eqx.field(static=True)
+    )
     precomputed_grids: PrecomputedGrids | None
 
+    @eqxi.doc_remove_args("pad_options")
     def __init__(
         self,
         shape: tuple[int, int],
@@ -640,10 +640,11 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
         voltage_in_kilovolts: FloatLike,
         electron_dose: FloatLike,
         *,
+        padded_shape: tuple[int, int] | None = None,
         precompute_mode: Literal[
             "none", "rfft", "fft", "all", "compile_time_eval"
         ] = "none",
-        pad_options: dict[str, Any] = {},
+        pad_options: dict = {},
     ):
         """**Arguments:**
 
@@ -656,12 +657,9 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
         - `electron_dose`:
             The integrated dose rate of the electron beam in
             $e^-/A^2$
-        - `pad_options`:
-            Options that control image padding. This is a dictionary
-            with keys:
-            - 'shape':
-                The shape of the image after padding. By default, equal
-                to `shape`.
+        - `padded_shape`:
+            The shape of the image after padding. By default, equal
+            to `shape`.
         - `precompute_mode`:
             How to pre-compute coordinate and frequency grids stored in
             the `image_config`. Options are
@@ -687,10 +685,17 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
         self.pixel_size = jnp.asarray(pixel_size, dtype=float)
         self.voltage_in_kilovolts = jnp.asarray(voltage_in_kilovolts, dtype=float)
         self.electron_dose = jnp.asarray(electron_dose, dtype=float)
-        # Set shape
+        # Set shape and padded shape
+        if "shape" in pad_options:
+            warnings.warn(
+                "`BasicImageConfig(..., pad_options=...)` is deprecated and will "
+                "be removed in cryoJAX 0.6.0. Use `padded_shape` instead.",
+                category=FutureWarning,
+                stacklevel=2,
+            )
+            padded_shape = pad_options["shape"]
         self.shape = shape
-        # Set pad options
-        self.pad_options = _dict_to_pad_options(pad_options, shape)
+        self.padded_shape = shape if padded_shape is None else padded_shape
         # Finally, grid precompute
         if precompute_mode == "rfft":
             self.precomputed_grids = PrecomputedGrids(
@@ -728,16 +733,3 @@ def _safe_multiply_by_constant(
     grid = grid.at[:, 1:, 0].multiply(constant)
     grid = grid.at[1:, :, 1].multiply(constant)
     return grid
-
-
-def _dict_to_pad_options(d: dict[str, Any], default_shape: tuple[int, int]) -> PadOptions:
-    if not set(d.keys()).issubset({"shape"}):
-        raise ValueError(
-            "Expected that dictionary `pad_options` passed to "
-            "`BasicImageConfig(..., pad_options=...)` "
-            f"had a subset of keys {{'shape'}}, but found that it had keys "
-            f"{set(d.keys())}."
-        )
-    shape = d["shape"] if "shape" in d else default_shape
-
-    return PadOptions(shape=shape)

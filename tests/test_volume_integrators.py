@@ -68,9 +68,8 @@ def test_fft_atom_projection_exact(pdb_info, pixel_size, shape):
     if jnufft is not None:
         atom_positions, _, _ = pdb_info
         pixel_size, shape = 0.5, (64, 64)
-        pad_options = dict(shape=(128, 128))
         image_config = cxs.BasicImageConfig(
-            shape, pixel_size, voltage_in_kilovolts=300.0, pad_options=pad_options
+            shape, pixel_size, voltage_in_kilovolts=300.0, padded_shape=(128, 128)
         )
         amplitude, b_factor = 1.0, 100.0
         gaussian_volume, gaussian_integrator = (
@@ -123,9 +122,9 @@ def test_fft_atom_projection_antialias(pdb_info, width, pixel_size, shape):
         )
         gaussian_integrator = cxs.GaussianMixtureProjection(sampling_mode="average")
         fft_integrator = cxs.FFTAtomProjection(eps=1e-16)
-        pad_options = dict(shape=(2 * shape[0], 2 * shape[1]))
+        padded_shape = (2 * shape[0], 2 * shape[1])
         image_config = cxs.BasicImageConfig(
-            shape, pixel_size, voltage_in_kilovolts=300.0, pad_options=pad_options
+            shape, pixel_size, voltage_in_kilovolts=300.0, padded_shape=padded_shape
         )
         proj_by_gaussians = compute_projection(
             gaussian_volume, gaussian_integrator, image_config
