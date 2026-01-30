@@ -41,7 +41,7 @@ def basic_config(voxel_volume, voxel_size):
         shape=(int(0.9 * shape[0]), int(0.9 * shape[1])),
         pixel_size=voxel_size,
         voltage_in_kilovolts=300.0,
-        pad_options=dict(shape=shape),
+        padded_shape=shape,
     )
 
 
@@ -119,7 +119,7 @@ def test_translate_mode(pdb_info, offset_xy, pixel_size, shape, pad_scale):
         shape,
         pixel_size,
         voltage_in_kilovolts=300.0,
-        pad_options=dict(shape=(pad_scale * shape[0], pad_scale * shape[1])),
+        padded_shape=(pad_scale * shape[0], pad_scale * shape[1]),
     )
     gaussian_width = 2 * pixel_size
     volume, integrator = (

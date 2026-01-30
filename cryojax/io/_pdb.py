@@ -11,6 +11,7 @@ from copy import copy
 from typing import Any, Literal, TypedDict, overload
 from xml.etree import ElementTree
 
+import equinox.internal as eqxi
 import jax
 import mdtraj
 import mmdf
@@ -23,10 +24,10 @@ from ..atom_util import center_atom_positions
 
 
 if hasattr(typing, "GENERATING_DOCUMENTATION"):
-    AtomProperties = dict  # pyright: ignore[reportAssignmentType]
+    _AtomProperties = dict[str, Any]  # pyright: ignore[reportAssignmentType]
 else:
 
-    class AtomProperties(TypedDict):
+    class _AtomProperties(TypedDict):
         masses: Float[np.ndarray, "... n_atoms"]
         b_factors: Float[np.ndarray, "... n_atoms"]
         charges: Float[np.ndarray, "... n_atoms"]
@@ -62,7 +63,7 @@ def read_atoms_from_pdb(  # type: ignore
 ) -> tuple[
     Float[np.ndarray, "... n_atoms 3"],
     Int[np.ndarray, " n_atoms"],
-    AtomProperties,
+    dict[str, Any],
 ]: ...
 
 
@@ -81,6 +82,7 @@ def read_atoms_from_pdb(
 ) -> tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, "... n_atoms"]]: ...
 
 
+@eqxi.doc_remove_args("loads_b_factors")
 def read_atoms_from_pdb(
     filename: str | pathlib.Path,
     *,
@@ -203,7 +205,7 @@ def mmdf_to_atoms(  # type: ignore
 ) -> tuple[
     Float[np.ndarray, "... n_atoms 3"],
     Int[np.ndarray, "... n_atoms"],
-    AtomProperties,
+    dict[str, Any],
 ]: ...
 
 
@@ -408,7 +410,7 @@ def read_topology_from_pdb(
 class _AtomicModelInfo(TypedDict):
     positions: Float[np.ndarray, "M N 3"]
     numbers: Int[np.ndarray, "M N 3"]
-    properties: AtomProperties
+    properties: _AtomProperties
 
 
 def _load_atom_info(df: pd.DataFrame, model_index: int | None, stack_models: bool):
@@ -450,7 +452,7 @@ def _load_atom_info(df: pd.DataFrame, model_index: int | None, stack_models: boo
             )
 
     # Gather atom info and return
-    properties = AtomProperties(
+    properties = _AtomProperties(
         charges=np.asarray(charges, dtype=int),
         b_factors=np.asarray(b_factors, dtype=float),
         masses=np.asarray(atom_masses, dtype=float),

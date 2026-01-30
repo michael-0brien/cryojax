@@ -1148,9 +1148,10 @@ def _make_config(
     voltage_in_kilovolts,
     pad_options,
 ):
+    padded_shape = None if "shape" not in pad_options else pad_options["shape"]
     return eqx.tree_at(
         lambda x: (x.pixel_size, x.voltage_in_kilovolts),
-        BasicImageConfig(image_shape, 1.0, 1.0, pad_options=pad_options),
+        BasicImageConfig(image_shape, 1.0, 1.0, padded_shape=padded_shape),
         (pixel_size, voltage_in_kilovolts),
     )
 

@@ -8,7 +8,7 @@ The `AbstractImageConfig` is an object at the core of simulating images in `cryo
                 - shape
                 - pixel_size
                 - voltage_in_kilovolts
-                - pad_options
+                - padded_shape
 
 ---
 
@@ -16,9 +16,6 @@ The `AbstractImageConfig` is an object at the core of simulating images in `cryo
         options:
             members:
                 - __init__
-                - shape
-                - pixel_size
-                - voltage_in_kilovolts
                 - wavelength_in_angstroms
                 - lorentz_factor
                 - interaction_constant
@@ -27,7 +24,6 @@ The `AbstractImageConfig` is an object at the core of simulating images in `cryo
                 - n_pixels
                 - y_dim
                 - x_dim
-                - padded_shape
                 - padded_n_pixels
                 - padded_y_dim
                 - padded_x_dim
@@ -38,10 +34,6 @@ The `AbstractImageConfig` is an object at the core of simulating images in `cryo
         options:
             members:
                 - __init__
-                - shape
-                - pixel_size
-                - voltage_in_kilovolts
-                - electron_dose
                 - wavelength_in_angstroms
                 - lorentz_factor
                 - interaction_constant
@@ -50,7 +42,6 @@ The `AbstractImageConfig` is an object at the core of simulating images in `cryo
                 - n_pixels
                 - y_dim
                 - x_dim
-                - padded_shape
                 - padded_n_pixels
                 - padded_y_dim
                 - padded_x_dim

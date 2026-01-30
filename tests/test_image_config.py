@@ -19,7 +19,7 @@ def test_precompute(padded_shape, precompute_mode):
         (5, 5),
         pixel_size=1.0,
         voltage_in_kilovolts=300.0,
-        pad_options=dict(shape=padded_shape),
+        padded_shape=padded_shape,
         precompute_mode=precompute_mode,
     )
     precomputed_grids = c.precomputed_grids
@@ -64,7 +64,7 @@ def test_compile_time_eval():
         (5, 5),
         pixel_size=1.0,
         voltage_in_kilovolts=300.0,
-        pad_options=dict(shape=(10, 10)),
+        padded_shape=(10, 10),
         precompute_mode="compile_time_eval",
     )
 
@@ -78,13 +78,3 @@ def test_compile_time_eval():
 
     _ = _get_coords(c)
     _ = _get_freqs(c)
-
-
-def test_init_error():
-    with pytest.raises(ValueError):
-        _ = cxs.BasicImageConfig(
-            (5, 5),
-            pixel_size=1.0,
-            voltage_in_kilovolts=300.0,
-            pad_options=dict(shap=(10, 10)),
-        )
