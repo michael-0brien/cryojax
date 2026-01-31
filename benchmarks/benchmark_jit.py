@@ -67,13 +67,11 @@ def setup(num_images, path_to_pdb):
         }
 
     # Generate particle parameters. First, the image config
-    pad_options = dict(shape=(200, 200))
-
     config = cxs.BasicImageConfig(
         shape=(150, 150),
         pixel_size=2.0,
         voltage_in_kilovolts=300.0,
-        pad_options=pad_options,
+        padded_shape=(200, 200),
     )
     # ... RNG keys
     keys = jax.random.split(jax.random.key(0), num_images)

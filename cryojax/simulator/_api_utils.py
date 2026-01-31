@@ -78,7 +78,7 @@ def make_image_model(
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
     signal_centering: Literal["bg", "mean"] = "mean",
     translate_mode: Literal["fft", "atom", "none"] = "fft",
-    quantity_mode: None = None,
+    quantity_mode: Literal["none"] = "none",
     rotation_convention: Literal["object", "frame"] = "object",
 ) -> ProjectionImageModel: ...
 
@@ -97,7 +97,7 @@ def make_image_model(  # pyright: ignore[reportOverlappingOverload]
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
     signal_centering: Literal["bg", "mean"] = "mean",
     translate_mode: Literal["fft", "atom", "none"] = "fft",
-    quantity_mode: None = None,
+    quantity_mode: Literal["none"] = "none",
     rotation_convention: Literal["object", "frame"] = "object",
 ) -> LinearImageModel: ...
 
@@ -172,7 +172,7 @@ def make_image_model(
     signal_region: Bool[NDArrayLike, "_ _"] | None = None,
     signal_centering: Literal["bg", "mean"] = "mean",
     translate_mode: Literal["fft", "atom", "none"] = "fft",
-    quantity_mode: Literal["contrast", "intensity", "counts"] | None = None,
+    quantity_mode: Literal["contrast", "intensity", "counts", "none"] = "none",
     rotation_convention: Literal["object", "frame"] = "object",
 ) -> AbstractImageModel:
     """Construct an [`cryojax.simulator.AbstractImageModel`][] for
@@ -191,14 +191,17 @@ def make_image_model(
         image = image_model.simulate()
         ```
 
-    **Arguments:**
+    **Main arguments:**
 
     - `volume`:
-        The volume for imaging. To get started building volumes, see the
-        [`cryojax.simulator.load_tabulated_volume`][] and
-        [`cryojax.simulator.render_voxel_volume`][] utilities, or explore
-        cryoJAX's [`cryojax.simulator.AbstractVolumeRepresentation`][] classes.
-        Advanced users may be interested in implementing
+        The volume for imaging. To get started building volumes:
+        - See [`cryojax.simulator.load_tabulated_volume`][] for instantiating
+        atomistic volumes
+        - See [`cryojax.simulator.render_voxel_volume`][] for converting them
+        to voxel maps
+        - Explore cryoJAX's [`cryojax.simulator.AbstractVolumeRepresentation`][]
+        classes; instantiate these directly for more flexibility
+        - Advanced users may also be interested in implementing
         [`cryojax.simulator.AbstractVolumeParametrization`][] classes.
     - `image_config`:
         The configuration for the image and imaging instrument. Unless using
@@ -222,6 +225,9 @@ def make_image_model(
         If `quantity_mode = 'counts'` is chosen, then an
         [`cryojax.simulator.AbstractDetector`][] class must be chosen to
         simulate electron counts.
+
+    **Options:**
+
     - `image_transform`:
         A [`cryojax.ndimage.AbstractImageTransform`][] applied to the
         the output of `image_model.simulate()` as a postprocessing step.
@@ -249,17 +255,22 @@ def make_image_model(
     - `translate_mode`:
         How to apply in-plane translation to the volume. Options are
         - 'fft':
-            Apply phase shifts in the Fourier domain.
+            Apply phase shifts in the Fourier domain. This option
+            is best for most use cases and is usually faster than
+            the `'atom'` option.
         - 'atom':
             Apply translation to atom positions before
-            projection. For this method, the `volume`
-            argument must be or yield a [`cryojax.simulator.AbstractAtomVolume`][].
+            projection. This method is more numerically accurate
+            than the `'fft'` option, but it is only supported if
+            the `volume` argument yields a
+            [`cryojax.simulator.AbstractAtomVolume`][].
         - 'none':
             Do not apply the translation.
     - `quantity_mode`:
-        The physical observable to simulate. If `None`, simulate without scaling
-        to physical units using the [`cryojax.simulator.LinearImageModel`][].
-        Options are
+        The physical observable to simulate. Options are:
+        - 'none':
+            Use the [`cryojax.simulator.LinearImageModel`][]. This
+            simulates without scaling to physical units.
         - 'contrast':
             Uses the [`cryojax.simulator.ContrastImageModel`][]
             to simulate contrast.
@@ -323,7 +334,7 @@ def make_image_model(
         )
     else:
         # Simulate physical observables
-        if quantity_mode is None:
+        if quantity_mode == "none":
             # Linear image model
             image_model = LinearImageModel(
                 volume,
@@ -376,7 +387,7 @@ def make_image_model(
             else:
                 raise ValueError(
                     f"Found `quantity_mode = {quantity_mode}`, but valid "
-                    "values are 'contrast', 'intensity', and 'counts'."
+                    "values are 'contrast', 'intensity', 'counts', or 'none'."
                 )
 
     return image_model

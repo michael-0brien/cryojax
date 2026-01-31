@@ -19,16 +19,15 @@ def test_constant_wavefunction_gives_constant_expected_events():
     vacuum_squared_wavefunction = jnp.ones(image_config.shape, dtype=float)
     fourier_vacuum_squared_wavefunction = rfftn(vacuum_squared_wavefunction)
     # Create detector models
-    dqe = cs.NullDQE()
-    poisson_detector = cs.PoissonDetector(dqe)
+    poisson_detector = cs.PoissonDetector()
     # Compute expected events
-    fourier_expected_electron_events = poisson_detector.compute_expected_electron_events(
+    expected_electron_events = poisson_detector.compute_expected_counts(
         fourier_vacuum_squared_wavefunction,
         image_config,
     )
     # Make sure it is equal to the electron per pixel
     np.testing.assert_allclose(
-        irfftn(fourier_expected_electron_events, s=image_config.padded_shape),
+        expected_electron_events,
         jnp.full(image_config.padded_shape, electrons_per_pixel),
         # rtol=1e-2,
     )
@@ -50,29 +49,24 @@ def test_gaussian_limit():
     fourier_vacuum_squared_wavefunction = rfftn(vacuum_squared_wavefunction)
     # Create detector models
     key = jax.random.key(1234)
-    dqe = cs.NullDQE()
-    gaussian_detector = cs.GaussianDetector(dqe)
-    poisson_detector = cs.PoissonDetector(dqe)
+    gaussian_detector = cs.GaussianDetector()
+    poisson_detector = cs.PoissonDetector()
     # Compute detector readout
-    fourier_gaussian_detector_readout = gaussian_detector.compute_detector_readout(
-        key,
-        fourier_vacuum_squared_wavefunction,
-        image_config,
+    gaussian_detector_readout_fft = gaussian_detector.sample_counts(
+        key, fourier_vacuum_squared_wavefunction, image_config, outputs_real_space=False
     )
-    fourier_poisson_detector_readout = poisson_detector.compute_detector_readout(
-        key,
-        fourier_vacuum_squared_wavefunction,
-        image_config,
+    poisson_detector_readout_fft = poisson_detector.sample_counts(
+        key, fourier_vacuum_squared_wavefunction, image_config, outputs_real_space=False
     )
     # Compare to see if the autocorrelation has converged
     np.testing.assert_allclose(
         irfftn(
-            jnp.abs(fourier_gaussian_detector_readout) ** 2
+            jnp.abs(gaussian_detector_readout_fft) ** 2
             / (n_pixels * electrons_per_pixel**2),
             s=image_config.padded_shape,
         ),
         irfftn(
-            jnp.abs(fourier_poisson_detector_readout) ** 2
+            jnp.abs(poisson_detector_readout_fft) ** 2
             / (n_pixels * electrons_per_pixel**2),
             s=image_config.padded_shape,
         ),

@@ -27,11 +27,9 @@ def maybe_error_if(
     on GPU.
 
     This function is used to achieve a similar idea as
-    ['JAX_ENABLE_CHECKS'](https://docs.jax.dev/en/latest/config_options.html#jax_enable_checks)
+    [`JAX_ENABLE_CHECKS`](https://docs.jax.dev/en/latest/config_options.html#jax_enable_checks)
     in `cryojax` and is exposed as public API for development downstream.
     """  # noqa: E501
-    # `enable_checks` keyword is included for unit testing; it is not a public
-    # argument.
     if CRYOJAX_ENABLE_CHECKS:
         return eqx.error_if(x, pred_fn(x), msg)
     else:

@@ -9,9 +9,7 @@ from ._api_utils import (
 )
 from ._detector import (
     AbstractDetector as AbstractDetector,
-    AbstractDQE as AbstractDQE,
     GaussianDetector as GaussianDetector,
-    NullDQE as NullDQE,
     PoissonDetector as PoissonDetector,
 )
 from ._image_config import (

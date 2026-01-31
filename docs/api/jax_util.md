@@ -16,6 +16,11 @@ To make use of the full power of JAX, it is highly recommended to learn about [e
 
 ::: cryojax.jax_util.filter_bscan
 
+### Debugging and runtime errors
+
+::: cryojax.jax_util.maybe_error_if
+
+
 ## Interoperability with `lineax`
 
 ::: cryojax.jax_util.make_linear_operator
@@ -51,7 +56,3 @@ To make use of the full power of JAX, it is highly recommended to learn about [e
     options:
         members: false
         show_symbol_type_heading: false
-
-## Debugging and runtime errors
-
-::: cryojax.jax_util.maybe_error_if

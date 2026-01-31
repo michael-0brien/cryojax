@@ -37,10 +37,15 @@ def convert_fftn_to_rfftn(
     """
     shape = fftn_array.shape
     # Take upper half plane
+    kwargs = dict(mode="promise_in_bounds", indices_are_sorted=True, unique_indices=True)
     if fftn_array.ndim == 2:
-        rfftn_array = fftn_array[:, : shape[-1] // 2 + 1]
+        rfftn_array = fftn_array.at[:, : shape[-1] // 2 + 1].get(
+            **kwargs  # pyright: ignore[reportArgumentType]
+        )
     elif fftn_array.ndim == 3:
-        rfftn_array = fftn_array[:, :, : shape[-1] // 2 + 1]
+        rfftn_array = fftn_array.at[:, :, : shape[-1] // 2 + 1].get(
+            **kwargs  # pyright: ignore[reportArgumentType]
+        )
     else:
         raise NotImplementedError(
             "Only 2D and 3D arrays are supported "

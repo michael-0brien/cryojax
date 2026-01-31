@@ -20,10 +20,10 @@ def make_linear_operator(
     tags: object | Iterable[object] = (),
 ) -> tuple[lx.FunctionLinearOperator, Args]:
     """Instantiate a [`lineax.FunctionLinearOperator`](https://docs.kidger.site/lineax/api/operators/#lineax.FunctionLinearOperator)
-    to from a function that takes an arbitrary pytree as input.
+    from a function that takes an arbitrary pytree as input.
 
     This is useful for converting from the cryoJAX abstraction for image simulation
-    to a [`lineax`](https://docs.kidger.site/lineax/)'s matrix-vector multiplication
+    to a [`lineax`](https://docs.kidger.site/lineax/) matrix-vector multiplication
     abstraction. It is easy to get backprojection operators using `lineax`, which
     calls [`jax.linear_transpose`](https://docs.jax.dev/en/latest/_autosummary/jax.linear_transpose.html)
     under the hood.
@@ -49,7 +49,7 @@ def make_linear_operator(
         # Compute backprojection
         adjoint = lx.conj(operator.T)
         backprojection = where_vector(adjoint.mv(image))
-    ```
+        ```
 
     !!! warning
 

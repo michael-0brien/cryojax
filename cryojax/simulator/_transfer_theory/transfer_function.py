@@ -5,7 +5,6 @@ import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
 from ..._internal import error_if_negative
-from ...constants import wavelength_from_kilovolts
 from ...jax_util import FloatLike
 from .common_functions import (
     compute_phase_shift_from_amplitude_contrast_ratio,
@@ -28,7 +27,7 @@ class AbstractCTF(eqx.Module, strict=True):
     def __call__(
         self,
         frequency_grid_in_angstroms: Float[Array, "y_dim x_dim 2"],
-        voltage_in_kilovolts: FloatLike,
+        wavelength_in_angstroms: FloatLike,
         amplitude_contrast_ratio: FloatLike = 0.1,
         phase_shift: FloatLike = 0.0,
         outputs_exp: bool = False,
@@ -40,11 +39,11 @@ class AbstractCTF(eqx.Module, strict=True):
 
         - `frequency_grid_in_angstroms`:
             The grid of frequencies in units of inverse angstroms. This can
-            be computed with [`cryojax.coordinates.make_frequency_grid`](https://mjo22.github.io/cryojax/api/coordinates/making_coordinates/#cryojax.coordinates.make_frequency_grid)
-        - `voltage_in_kilovolts`:
-            The accelerating voltage of the microscope in kilovolts. This
-            is converted to the wavelength of incident electrons using
-            the function [`cryojax.constants.convert_keV_to_angstroms`](https://mjo22.github.io/cryojax/api/constants/units/#cryojax.constants.convert_keV_to_angstroms)
+            be computed with [`cryojax.ndimage.make_frequency_grid`][]
+        - `wavelength_in_angstroms`:
+            The wavelength of the incident electrons in Angstroms. This
+            can be retrieved from the accelerating voltage using the function
+            the function [`cryojax.constants.wavelength_from_kilovolts`][].
         - `amplitude_contrast_ratio`:
             The amplitude contrast ratio. This argument is not used if `outputs_exp = True`, as
             the amplitude contrast ratio cannot simply be absorbed into a phase shift.
@@ -55,9 +54,7 @@ class AbstractCTF(eqx.Module, strict=True):
             the CTF (or wave transfer function) as a complex exponential.
         """  # noqa: E501
         # Get the wavelength
-        wavelength_in_angstroms = wavelength_from_kilovolts(
-            jnp.asarray(voltage_in_kilovolts)
-        )
+        wavelength_in_angstroms = jnp.asarray(wavelength_in_angstroms, dtype=float)
         # Frequency-dependent phase shifts
         aberration_phase_shifts = self.compute_aberration_phase_shifts(
             frequency_grid_in_angstroms,
@@ -143,11 +140,11 @@ class AstigmaticCTF(AbstractCTF, strict=True):
 
         - `frequency_grid_in_angstroms`:
             The grid of frequencies in units of inverse angstroms. This can
-            be computed with [`cryojax.coordinates.make_frequency_grid`](https://mjo22.github.io/cryojax/api/coordinates/making_coordinates/#cryojax.coordinates.make_frequency_grid)
-        - `voltage_in_kilovolts`:
-            The accelerating voltage of the microscope in kilovolts. This
-            is converted to the wavelength of incident electrons using
-            the function [`cryojax.constants.convert_keV_to_angstroms`](https://mjo22.github.io/cryojax/api/constants/units/#cryojax.constants.convert_keV_to_angstroms)
+            be computed with [`cryojax.ndimage.make_frequency_grid`][]
+        - `wavelength_in_angstroms`:
+            The wavelength of the incident electrons in Angstroms. This
+            can be retrieved from the accelerating voltage using the function
+            the function [`cryojax.constants.wavelength_from_kilovolts`][].
         - `defocus_offset`:
             An optional defocus offset to apply to the `defocus_in_angstroms` at runtime.
         """
