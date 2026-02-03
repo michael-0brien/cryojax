@@ -62,3 +62,22 @@ image = image_model.simulate(outputs_real_space=True)
 ## What next?
 
 Keep reading further for an [overview](https://michael-0brien.github.io/cryojax/overview/) of the library. Then, get started learning about using cryoJAX in practice with the [image simulation](https://michael-0brien.github.io/cryojax/examples/simulate-image/) and [JAX transformation](https://michael-0brien.github.io/cryojax/examples/jax-transformations/) tutorials, as well as the [API documentation](https://michael-0brien.github.io/cryojax/api/simulator/entry-point/)!
+
+## Citation
+
+If you use cryoJAX in your work, we would appreciate it if you cite:
+
+```bibtex
+@article{obrien2026cryojax,
+author = "O'Brien, Michael J. and Silva-S{\'{a}}nchez, David and Woollard, Geoffrey and Je, Kwanghwi and Hanson, Sonya M. and Needleman, Daniel J. and Cossio, Pilar and Thiede, Erik Henning and Astore, Miro A.",
+title = "{CryoJAX: a cryo-electron microscopy image-simulation library in JAX}",
+journal = "Acta Crystallographica Section D",
+year = "2026",
+volume = "82",
+number = "3",
+pages = "",
+month = "Mar",
+doi = {10.1107/S2059798326000550},
+url = {https://doi.org/10.1107/S2059798326000550},
+}
+```
