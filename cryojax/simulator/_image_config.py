@@ -3,7 +3,7 @@
 import math
 import warnings
 from functools import cached_property
-from typing import Literal, TypedDict
+from typing import Literal
 
 import equinox as eqx
 import equinox.internal as eqxi
@@ -126,10 +126,6 @@ class PrecomputedGrids(eqx.Module, strict=True):
                     return self._full_frequency_grid
                 else:
                     return self._frequency_grid
-
-
-class PadOptions(TypedDict):
-    shape: tuple[int, int]
 
 
 class AbstractImageConfig(eqx.Module, strict=True):
