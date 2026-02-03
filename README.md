@@ -160,16 +160,16 @@ If you use cryoJAX in your work, we would appreciate it if you cite:
 
 ```bibtex
 @article{obrien2026cryojax,
-author = "O'Brien, Michael J. and Silva-S{\'{a}}nchez, David and Woollard, Geoffrey and Je, Kwanghwi and Hanson, Sonya M. and Needleman, Daniel J. and Cossio, Pilar and Thiede, Erik Henning and Astore, Miro A.",
-title = "{CryoJAX: a cryo-electron microscopy image-simulation library in JAX}",
-journal = "Acta Crystallographica Section D",
-year = "2026",
-volume = "82",
-number = "3",
-pages = "",
-month = "Mar",
-doi = {10.1107/S2059798326000550},
-url = {https://doi.org/10.1107/S2059798326000550},
+    author = "O'Brien, Michael J. and Silva-S{\'{a}}nchez, David and Woollard, Geoffrey and Je, Kwanghwi and Hanson, Sonya M. and Needleman, Daniel J. and Cossio, Pilar and Thiede, Erik Henning and Astore, Miro A.",
+    title = "{CryoJAX: a cryo-electron microscopy image-simulation library in JAX}",
+    journal = "Acta Crystallographica Section D",
+    year = "2026",
+    volume = "82",
+    number = "3",
+    pages = "",
+    month = "Mar",
+    doi = {10.1107/S2059798326000550},
+    url = {https://doi.org/10.1107/S2059798326000550},
 }
 ```
 
