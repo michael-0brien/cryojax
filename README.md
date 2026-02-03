@@ -154,6 +154,25 @@ CryoJAX is meant to support an ecosystem of libraries for the development of eme
 
 - [`cryospax`](https://github.com/michael-0brien/cryospax): A small library to support cryo-EM single particle analysis applications using cryoJAX
 
+## Citation
+
+If you use cryoJAX in your work, we would appreciate it if you cite:
+
+```bibtex
+@article{obrien2026cryojax,
+author = "O'Brien, Michael J. and Silva-S{\'{a}}nchez, David and Woollard, Geoffrey and Je, Kwanghwi and Hanson, Sonya M. and Needleman, Daniel J. and Cossio, Pilar and Thiede, Erik Henning and Astore, Miro A.",
+title = "{CryoJAX: a cryo-electron microscopy image-simulation library in JAX}",
+journal = "Acta Crystallographica Section D",
+year = "2026",
+volume = "82",
+number = "3",
+pages = "",
+month = "Mar",
+doi = {10.1107/S2059798326000550},
+url = {https://doi.org/10.1107/S2059798326000550},
+}
+```
+
 ## Acknowledgements
 
 - Implementations of several models and algorithms, such as the CTF, fourier slice extraction, and electrostatic potential computations has been informed by the open-source cryo-EM software [`cisTEM`](https://github.com/timothygrant80/cisTEM).
