@@ -4,7 +4,7 @@ Transformations used for reparameterizing cryojax models.
 
 from abc import abstractmethod
 from collections.abc import Callable
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, ParamSpec, TypeVar
 from typing_extensions import override
 
 import equinox as eqx
@@ -13,6 +13,7 @@ from equinox import Module, field
 from jaxtyping import PyTree
 
 
+P = ParamSpec("P")
 T = TypeVar("T")
 
 
@@ -77,9 +78,9 @@ class CustomTransform(AbstractPyTreeTransform[T], strict=True):
 
     def __init__(
         self,
-        func: Callable[..., T],
-        *args: Any,
-        **kwargs: Any,
+        func: Callable[P, T],
+        *args: P.args,
+        **kwargs: P.kwargs,
     ):
         """**Arguments:**
 
