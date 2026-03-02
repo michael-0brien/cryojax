@@ -725,8 +725,8 @@ def _gaussians_to_real_voxels_kernel(
         grid_x, grid_y, grid_z, positions, amplitudes, b_factors, voxel_size
     )
     # Get function to compute voxel grid at a single z-plane
-    render_at_z_plane = (
-        lambda gaussian_integrals_per_position_z: _evaluate_multivariate_gaussian_3d(
+    render_at_z_plane = lambda gaussian_integrals_per_position_z: (
+        _evaluate_multivariate_gaussian_3d(
             gaussian_integrals_times_prefactor_per_interval_per_position_x,
             gaussian_integrals_per_interval_per_position_y,
             gaussian_integrals_per_position_z,
