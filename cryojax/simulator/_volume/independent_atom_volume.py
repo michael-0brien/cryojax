@@ -613,9 +613,9 @@ def _render_with_nufft(shape, ps, pos, kernel, freqs, eps=1e-6, opts=None):
             unpack_opts(opts, finufft_type=1, forward=True),
             unpack_opts(opts, finufft_type=1, forward=False),
         )
-        if not opts_fwd.modeord:
+        if opts_fwd.modeord:
             raise ValueError(_get_modeord_msg("forward", False, "FFTAtomRenderFn"))
-        if not opts_bwd.modeord:
+        if opts_bwd.modeord:
             raise ValueError(_get_modeord_msg("backward", False, "FFTAtomRenderFn"))
 
     return fourier_projection
