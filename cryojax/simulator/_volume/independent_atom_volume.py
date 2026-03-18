@@ -573,10 +573,9 @@ _get_modeord_msg = lambda _fwd_or_bwd, t_or_f, _cls: (
     f"Manually passed `opts` as `{_cls}(..., opts=...)`, "
     f"but found that the `modeord` property was not equal to "
     f"`{t_or_f}` on the {_fwd_or_bwd} pass. Setting `modeord={t_or_f}` is "
-    f"required for correct behavior of `{_cls}`, e.g. "
-    f"`opts = NestedOpts(forward=Opts(..., modeord={t_or_f}), "
-    f"forward=Opts(..., modeord={t_or_f}))`. See the `jax-finufft` "
-    "documentation for more information."
+    f"required for correct behavior of `{_cls}`, i.e. "
+    f"`opts = NestedOpts({_fwd_or_bwd}=Opts(modeord={t_or_f}, ...), ...) "
+    f"See the `jax-finufft` documentation for more information."
 )
 
 
@@ -627,7 +626,7 @@ def _project_with_nufft(shape, ps, pos, kernel, freqs, eps=1e-6, opts=None):
     assert NestedOpts is not None
     assert unpack_opts is not None
     if opts is None:
-        opts = NestedOpts(forward=Opts(modeord=True), backward=Opts(modeord=True))
+        opts = NestedOpts(forward=Opts(modeord=True), backward=Opts(modeord=False))
     # Get x and y coordinates
     positions_xy = pos[:, :2]
     # Normalize coordinates betweeen -pi and pi
@@ -658,8 +657,8 @@ def _project_with_nufft(shape, ps, pos, kernel, freqs, eps=1e-6, opts=None):
         )
         if not opts_fwd.modeord:
             raise ValueError(_get_modeord_msg("forward", True, "FFTAtomProjection"))
-        if not opts_bwd.modeord:
-            raise ValueError(_get_modeord_msg("backward", True, "FFTAtomProjection"))
+        if opts_bwd.modeord:
+            raise ValueError(_get_modeord_msg("backward", False, "FFTAtomProjection"))
 
     return fourier_projection
 
