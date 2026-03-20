@@ -96,8 +96,8 @@ class LobatoScatteringFactor(AbstractFourierOperator, strict=True):
         ),
     ):
         q_squared = jnp.sum(frequency_grid**2, axis=-1)
-        hydrogenic_fn = (
-            lambda _a, _b: _a * (2 + _b * q_squared) / (1 + _b * q_squared) ** 2
+        hydrogenic_fn = lambda _a, _b: (
+            _a * (2 + _b * q_squared) / (1 + _b * q_squared) ** 2
         )
         scattering_factor = jnp.sum(jax.vmap(hydrogenic_fn)(self.a, self.b), axis=0)
         if self.b_factor is not None:
