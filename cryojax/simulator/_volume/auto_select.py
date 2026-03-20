@@ -28,7 +28,7 @@ from .independent_atom_volume import (
     FFTAtomRenderFn,
     IndependentAtomVolume,
 )
-from .real_voxels import RealVoxelGridVolume, RealVoxelProjection
+from .real_voxels import RealVoxelCloudVolume, RealVoxelProjection
 
 
 class AutoVolumeProjection(
@@ -47,10 +47,13 @@ class AutoVolumeProjection(
         | [`cryojax.simulator.GaussianMixtureVolume`][] | [`cryojax.simulator.GaussianMixtureProjection`][] | atom |
         | [`cryojax.simulator.IndependentAtomVolume`][] | [`cryojax.simulator.FFTAtomProjection`][] | atom |
         | [`cryojax.simulator.FourierVoxelGridVolume`][] or [`cryojax.simulator.FourierVoxelSplineVolume`][] | [`cryojax.simulator.FourierSliceExtraction`][] | voxel |
-        | [`cryojax.simulator.RealVoxelGridVolume`][] | [`cryojax.simulator.RealVoxelProjection`][] | voxel |
+        | [`cryojax.simulator.RealVoxelCloudVolume`][] | [`cryojax.simulator.RealVoxelProjection`][] | voxel |
+
+        Note that [`cryojax.simulator.RealVoxelGridVolume`][] does not have an associated projection method. To
+        compute projections from real-space voxels, use [`cryojax.simulator.RealVoxelCloudVolume`][].
 
         To use advanced options for a given projection method,
-        see each respective class.
+        instantiate each respective class directly.
 
     !!! warning
         If using [`cryojax.simulator.FFTAtomRenderFn`][] or [`cryojax.simulator.RealVoxelProjection`][], [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft)
@@ -67,14 +70,15 @@ class AutoVolumeProjection(
             integrator = FourierSliceExtraction()
         elif isinstance(volume, GaussianMixtureVolume):
             integrator = GaussianMixtureProjection()
-        elif isinstance(volume, RealVoxelGridVolume):
+        elif isinstance(volume, RealVoxelCloudVolume):
             integrator = RealVoxelProjection()
         elif isinstance(volume, IndependentAtomVolume):
             integrator = FFTAtomProjection()
         else:
             raise ValueError(
                 "Could not use `AutoVolumeProjection` for volume of "
-                f"type {type(volume).__name__}. If using a custom volume, "
+                f"type {type(volume).__name__}. See the documentation for "
+                "supported types. If using a custom volume, "
                 "please directly pass an integrator."
             )
         return integrator

@@ -65,7 +65,7 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
     amplitudes: Float[Array, "n_positions n_gaussians"]
     variances: Float[Array, " n_positions n_gaussians"]
 
-    rotation_convention: ClassVar[Literal["object"]] = "object"
+    is_frame_rotation: ClassVar[bool] = False
 
     def __init__(
         self,
@@ -197,12 +197,12 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
         return cls(atom_positions, amplitudes, b_factor_to_variance(b_factors))
 
     @override
-    def rotate_to_pose(self, pose: AbstractPose, inverse: bool = False) -> Self:
+    def rotate_to_pose(self, pose: AbstractPose) -> Self:
         """Return a new potential with rotated `positions`."""
         return eqx.tree_at(
             lambda d: d.positions,
             self,
-            pose.rotate_coordinates(self.positions, inverse=inverse),
+            pose.rotate_coordinates(self.positions, inverse=self.is_frame_rotation),
         )
 
     @override

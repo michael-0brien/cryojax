@@ -29,6 +29,7 @@ from .independent_atom_volume import (
     PengScatteringFactor as PengScatteringFactor,
 )
 from .real_voxels import (
+    RealVoxelCloudVolume as RealVoxelCloudVolume,
     RealVoxelGridVolume as RealVoxelGridVolume,
     RealVoxelProjection as RealVoxelProjection,
 )

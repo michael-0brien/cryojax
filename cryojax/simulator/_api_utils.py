@@ -2,7 +2,6 @@ import pathlib
 from collections.abc import Callable
 from typing import Any, Literal, overload
 
-import equinox as eqx
 import equinox.internal as eqxi
 import jax.numpy as jnp
 import mmdf
@@ -42,26 +41,12 @@ from ._volume import (
     FourierVoxelSplineVolume,
     GaussianMixtureVolume,
     IndependentAtomVolume,
+    RealVoxelCloudVolume,
     RealVoxelGridVolume,
 )
 
 
 identity_fn = eqxi.doc_repr(lambda x, _: x, "identity_fn")
-
-
-def _maybe_invert_rotation(
-    pose: AbstractPose,
-    volume: AbstractVolumeParametrization,
-    rotation_convention: Literal["object", "frame"],
-) -> AbstractPose:
-    jaxpr_fn = eqx.filter_make_jaxpr(lambda vol: vol.to_representation())
-    _, out_dynamic, out_static = jaxpr_fn(volume)
-    out_struct = eqx.combine(out_dynamic, out_static)
-    conventions = [rotation_convention, out_struct.rotation_convention]
-    if conventions[0] != conventions[1]:
-        pose = pose.to_inverse_rotation()
-
-    return pose
 
 
 @overload
@@ -79,7 +64,6 @@ def make_image_model(
     signal_centering: Literal["bg", "mean"] = "mean",
     translate_mode: Literal["fft", "atom", "none"] = "fft",
     quantity_mode: Literal["none"] = "none",
-    rotation_convention: Literal["object", "frame"] = "object",
 ) -> ProjectionImageModel: ...
 
 
@@ -98,7 +82,6 @@ def make_image_model(  # pyright: ignore[reportOverlappingOverload]
     signal_centering: Literal["bg", "mean"] = "mean",
     translate_mode: Literal["fft", "atom", "none"] = "fft",
     quantity_mode: Literal["none"] = "none",
-    rotation_convention: Literal["object", "frame"] = "object",
 ) -> LinearImageModel: ...
 
 
@@ -117,7 +100,6 @@ def make_image_model(
     signal_centering: Literal["bg", "mean"] = "mean",
     translate_mode: Literal["fft", "atom", "none"] = "fft",
     quantity_mode: Literal["contrast"] = "contrast",
-    rotation_convention: Literal["object", "frame"] = "object",
 ) -> ContrastImageModel: ...
 
 
@@ -136,7 +118,6 @@ def make_image_model(
     signal_centering: Literal["bg", "mean"] = "mean",
     translate_mode: Literal["fft", "atom", "none"] = "fft",
     quantity_mode: Literal["intensity"] = "intensity",
-    rotation_convention: Literal["object", "frame"] = "object",
 ) -> IntensityImageModel: ...
 
 
@@ -155,7 +136,6 @@ def make_image_model(
     signal_centering: Literal["bg", "mean"] = "mean",
     translate_mode: Literal["fft", "atom", "none"] = "fft",
     quantity_mode: Literal["counts"] = "counts",
-    rotation_convention: Literal["object", "frame"] = "object",
 ) -> ElectronCountsImageModel: ...
 
 
@@ -173,7 +153,6 @@ def make_image_model(
     signal_centering: Literal["bg", "mean"] = "mean",
     translate_mode: Literal["fft", "atom", "none"] = "fft",
     quantity_mode: Literal["contrast", "intensity", "counts", "none"] = "none",
-    rotation_convention: Literal["object", "frame"] = "object",
 ) -> AbstractImageModel:
     """Construct an [`cryojax.simulator.AbstractImageModel`][] for
     most common use-cases.
@@ -281,20 +260,6 @@ def make_image_model(
             Uses the [`cryojax.simulator.ElectronCountsImageModel`][]
             to simulate electron counts.
             If this is passed, a `detector` must also be passed.
-    - `rotation_convention`:
-        If `'object'`, the rotation given by `pose` is of the object.
-        If `'frame'`, the rotation given by `pose` is of the frame. These
-        are related by transpose.
-
-    !!! info
-        The `make_image_model` function enforces agreement between
-        rotation conventions of different volumes via the
-        `rotation_convention` argument. Lower level `cryojax` APIs
-        will not enforce this agreement, such as if the user instantiates
-        an [`cryojax.simulator.AbstractImageModel`][] directly.
-
-        In these cases, agreement can be acheived with a manual transpose
-        via `pose.to_inverse_rotation()`.
 
     **Returns:**
 
@@ -309,13 +274,6 @@ def make_image_model(
     [`cryojax.simulator.ElectronCountsImageModel`][] depending on
     the value of `quantity_mode`.
     """
-    # Invert pose if
-    if rotation_convention not in ["object", "frame"]:
-        raise ValueError(
-            f"Found `rotation_convention = {rotation_convention}`, but valid "
-            "values are 'object' and 'frame'."
-        )
-    pose = _maybe_invert_rotation(pose, volume, rotation_convention)
     options = dict(
         normalizes_signal=normalizes_signal,
         signal_centering=signal_centering,
@@ -581,14 +539,31 @@ def render_voxel_volume(
 ) -> RealVoxelGridVolume: ...
 
 
+@overload
+def render_voxel_volume(
+    atom_volume: AbstractAtomVolume,
+    render_fn: AbstractVolumeRenderFn,
+    *,
+    output_type: type[RealVoxelCloudVolume] = RealVoxelCloudVolume,
+) -> RealVoxelCloudVolume: ...
+
+
 def render_voxel_volume(
     atom_volume: AbstractAtomVolume,
     render_fn: AbstractVolumeRenderFn,
     *,
     output_type: type[
-        FourierVoxelGridVolume | FourierVoxelSplineVolume | RealVoxelGridVolume
+        FourierVoxelGridVolume
+        | FourierVoxelSplineVolume
+        | RealVoxelGridVolume
+        | RealVoxelCloudVolume
     ] = FourierVoxelGridVolume,
-) -> FourierVoxelGridVolume | FourierVoxelSplineVolume | RealVoxelGridVolume:
+) -> (
+    FourierVoxelGridVolume
+    | FourierVoxelSplineVolume
+    | RealVoxelGridVolume
+    | RealVoxelCloudVolume
+):
     """Render a voxel volume representation from an atomistic one.
 
     !!! example "Simulate an image with Fourier slice extraction"
@@ -624,7 +599,8 @@ def render_voxel_volume(
         Either [`cryojax.simulator.FourierVoxelGridVolume`][] /
         [`cryojax.simulator.FourierVoxelSplineVolume`][] for
         fourier-space representations, or
-        [`cryojax.simulator.RealVoxelGridVolume`][] for real-space.
+        [`cryojax.simulator.RealVoxelGridVolume`][] /
+        [`cryojax.simulator.RealVoxelCloudVolume`][] for real-space.
 
 
     **Returns:**
@@ -650,14 +626,20 @@ def render_voxel_volume(
         else:
             spline_coefficients = compute_spline_coefficients(fourier_voxel_grid)
             return FourierVoxelSplineVolume(spline_coefficients, frequency_slice)
-    elif output_type == RealVoxelGridVolume:
+    elif output_type == RealVoxelGridVolume or output_type == RealVoxelCloudVolume:
         coordinate_grid = make_coordinate_grid(render_fn.shape)
         real_voxel_grid = render_fn(atom_volume, outputs_real_space=True)
-        return RealVoxelGridVolume(real_voxel_grid, coordinate_grid)
+        if output_type == RealVoxelGridVolume:
+            return RealVoxelGridVolume(real_voxel_grid, coordinate_grid)
+        else:
+            return RealVoxelCloudVolume.from_real_voxel_grid(
+                real_voxel_grid, coordinate_grid_in_pixels=coordinate_grid
+            )
     else:
         raise ValueError(
-            "Only `output_type` equal to `FourierVoxelGridVolume`, "
-            "`FourierVoxelSplineVolume`, or `RealVoxelGridVolume` "
-            "are supported."
-            f"Got `output_type = {output_type}`."
+            f"Got `output_type = {output_type}`, but this is "
+            "not supported by `render_voxel_volume(..., output_type=...)`."
+            "Valid values for `output_type` are `FourierVoxelGridVolume`, "
+            "`FourierVoxelSplineVolume`, `RealVoxelGridVolume`, or "
+            "`RealVoxelCloudVolume`."
         )

@@ -73,6 +73,7 @@ from ._volume import (
     IndependentAtomVolume as IndependentAtomVolume,
     LobatoScatteringFactor as LobatoScatteringFactor,
     PengScatteringFactor as PengScatteringFactor,
+    RealVoxelCloudVolume as RealVoxelCloudVolume,
     RealVoxelGridVolume as RealVoxelGridVolume,
     RealVoxelProjection as RealVoxelProjection,
 )
