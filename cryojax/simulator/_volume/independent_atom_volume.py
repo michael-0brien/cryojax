@@ -148,7 +148,7 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
     positions: PyTree[Float[Array, "_ 3"]]
     scattering_factors: PyTree[AbstractFourierOperator]
 
-    rotation_convention: ClassVar[Literal["object"]] = "object"
+    is_frame_rotation: ClassVar[bool] = False
 
     def __init__(
         self,
@@ -177,9 +177,11 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
         self.scattering_factors = scattering_factors
 
     @override
-    def rotate_to_pose(self, pose: AbstractPose, inverse: bool = False) -> Self:
+    def rotate_to_pose(self, pose: AbstractPose) -> Self:
         """Return a new potential with rotated `positions`."""
-        rotate_fn = lambda pos: pose.rotate_coordinates(pos, inverse=inverse)
+        rotate_fn = lambda pos: pose.rotate_coordinates(
+            pos, inverse=self.is_frame_rotation
+        )
         return eqx.tree_at(
             lambda x: x.positions,
             self,

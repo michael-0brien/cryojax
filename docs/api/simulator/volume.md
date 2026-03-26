@@ -70,7 +70,6 @@ There are many different volume representations of biological structures for cry
                 - from_real_voxel_grid
                 - to_representation
                 - rotate_to_pose
-                - frequency_slice_in_pixels
                 - shape
 
 ---
@@ -82,11 +81,16 @@ There are many different volume representations of biological structures for cry
                 - from_real_voxel_grid
                 - to_representation
                 - rotate_to_pose
-                - frequency_slice_in_pixels
                 - shape
 
 
 #### Real-space
+
+!!! info "Real-space projections"
+    The [`cryojax.simulator.RealVoxelGridVolume`][] does not have an associated
+    method in cryoJAX for computing projections and therefore
+    cannot be used with with [`cryojax.simulator.make_image_model`][]. Instead,
+    use [`cryojax.simulator.RealVoxelCloudVolume`][].
 
 ::: cryojax.simulator.RealVoxelGridVolume
         options:
@@ -95,7 +99,17 @@ There are many different volume representations of biological structures for cry
                 - from_real_voxel_grid
                 - to_representation
                 - rotate_to_pose
-                - coordinate_grid_in_pixels
+                - shape
+
+---
+
+::: cryojax.simulator.RealVoxelCloudVolume
+        options:
+            members:
+                - __init__
+                - from_real_voxel_grid
+                - to_representation
+                - rotate_to_pose
                 - shape
 
 ## Volume rendering

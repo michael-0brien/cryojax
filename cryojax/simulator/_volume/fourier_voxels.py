@@ -2,7 +2,7 @@
 Fourier voxel-based representations of a volume.
 """
 
-from typing import ClassVar, Literal, cast
+from typing import ClassVar, cast
 from typing_extensions import Self, override
 
 import equinox as eqx
@@ -41,12 +41,14 @@ class AbstractFourierVoxelVolume(AbstractVoxelVolume, strict=True):
     frequency_slice_in_pixels: eqx.AbstractVar[Float[Array, "1 dim dim 3"]]
 
     @override
-    def rotate_to_pose(self, pose: AbstractPose, inverse: bool = False) -> Self:
+    def rotate_to_pose(self, pose: AbstractPose) -> Self:
         """Return a new volume with a rotated `frequency_slice_in_pixels`."""
         return eqx.tree_at(
             lambda d: d.frequency_slice_in_pixels,
             self,
-            pose.rotate_coordinates(self.frequency_slice_in_pixels, inverse=inverse),
+            pose.rotate_coordinates(
+                self.frequency_slice_in_pixels, inverse=self.is_frame_rotation
+            ),
         )
 
 
@@ -56,7 +58,7 @@ class FourierVoxelGridVolume(AbstractFourierVoxelVolume, strict=True):
     fourier_voxel_grid: Complex[Array, "dim dim dim"]
     frequency_slice_in_pixels: Float[Array, "1 dim dim 3"]
 
-    rotation_convention: ClassVar[Literal["frame"]] = "frame"
+    is_frame_rotation: ClassVar[bool] = True
 
     def __init__(
         self,
@@ -146,7 +148,7 @@ class FourierVoxelSplineVolume(AbstractFourierVoxelVolume, strict=True):
     spline_coefficients: Complex[Array, "coeff_dim coeff_dim coeff_dim"]
     frequency_slice_in_pixels: Float[Array, "1 dim dim 3"]
 
-    rotation_convention: ClassVar[Literal["frame"]] = "frame"
+    is_frame_rotation: ClassVar[bool] = True
 
     def __init__(
         self,
@@ -317,8 +319,10 @@ class FourierSliceExtraction(
             )
         else:
             raise ValueError(
-                "Supported types for `volume_representation` are "
-                "`FourierVoxelGridVolume` and FourierVoxelSplineVolume`."
+                "Got unsupported type for `volume_representation` in "
+                "`FourierSliceExtraction.integrate`. Expected `FourierVoxelGridVolume` "
+                "or `FourierVoxelSplineVolume`, "
+                f"but got `{volume_representation.__class__.__name__}`."
             )
 
         # Resize the image to match the AbstractImageConfig.padded_shape
@@ -435,8 +439,10 @@ class EwaldSphereExtraction(
             )
         else:
             raise ValueError(
-                "Supported types for `volume_representation` are "
-                "`FourierVoxelGridVolume` and `FourierVoxelSplineVolume`."
+                "Got unsupported type for `volume_representation` in "
+                "`EwaldSphereExtraction.integrate`. Expected `FourierVoxelGridVolume` "
+                "or `FourierVoxelSplineVolume`, "
+                f"but got `{volume_representation.__class__.__name__}`."
             )
 
         # Resize the image to match the AbstractImageConfig.padded_shape
