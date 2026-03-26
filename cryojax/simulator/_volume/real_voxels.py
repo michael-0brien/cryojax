@@ -109,7 +109,7 @@ class RealVoxelCloudVolume(AbstractRealVoxelVolume, strict=True):
     """A 3D cloud of voxels in real-space."""
 
     weights: Float[Array, " N"]
-    coordinate_list: Float[Array, "N 3"]
+    coordinate_list_in_pixels: Float[Array, "N 3"]
     box_dim: int
 
     is_frame_rotation: ClassVar[bool] = False
@@ -117,20 +117,33 @@ class RealVoxelCloudVolume(AbstractRealVoxelVolume, strict=True):
     def __init__(
         self,
         weights: Float[NDArrayLike, " N"],
-        coordinate_list: Float[NDArrayLike, "N 3"],
+        coordinate_list_in_pixels: Float[NDArrayLike, "N 3"],
         box_dim: int,
     ):
         """**Arguments:**
 
         - `weights`:
             The intensity of each voxel.
-        - `coordinate_list`:
-            The coordinate for each voxel.
+        - `coordinate_list_in_pixels`:
+            The coordinate for each voxel in pixel units, e.g.
+
+            ```python
+            import math
+            import cryojax.ndimage as im
+
+            box_dim = 128
+            shape = (box_dim, box_dim, box_dim)
+            coordinate_grid = im.make_coordinate_grid(shape)
+            n_voxels =
+            coordinate_list_in_pixels = coordinate_grid.reshape((math.prod(shape), 3))
+            ```
         - `box_dim`:
             The box dimension of the original unflattened voxel array.
-        """
+        """  # noqa: E501
         self.weights = jnp.asarray(weights, dtype=float)
-        self.coordinate_list = jnp.asarray(coordinate_list, dtype=float)
+        self.coordinate_list_in_pixels = jnp.asarray(
+            coordinate_list_in_pixels, dtype=float
+        )
         self.box_dim = box_dim
 
     @override
@@ -139,9 +152,11 @@ class RealVoxelCloudVolume(AbstractRealVoxelVolume, strict=True):
         `coordinate_grid_in_pixels`.
         """
         return eqx.tree_at(
-            lambda d: d.coordinate_list,
+            lambda d: d.coordinate_list_in_pixels,
             self,
-            pose.rotate_coordinates(self.coordinate_list, inverse=self.is_frame_rotation),
+            pose.rotate_coordinates(
+                self.coordinate_list_in_pixels, inverse=self.is_frame_rotation
+            ),
         )
 
     @property
@@ -183,9 +198,11 @@ class RealVoxelCloudVolume(AbstractRealVoxelVolume, strict=True):
         # Convert to cloud of voxels
         n_voxels = math.prod(voxel_volume.real_voxel_grid.shape)
         weights = voxel_volume.real_voxel_grid.ravel()
-        coordinate_list = voxel_volume.coordinate_grid_in_pixels.reshape((n_voxels, 3))
+        coordinate_list_in_pixels = voxel_volume.coordinate_grid_in_pixels.reshape(
+            (n_voxels, 3)
+        )
 
-        return cls(weights, coordinate_list, box_dim)
+        return cls(weights, coordinate_list_in_pixels, box_dim)
 
 
 class RealVoxelProjection(
@@ -254,7 +271,7 @@ class RealVoxelProjection(
             )
         fourier_projection = _project_with_nufft(
             volume_representation.weights,
-            volume_representation.coordinate_list,
+            volume_representation.coordinate_list_in_pixels,
             image_config.padded_shape,
             eps=self.eps,
             opts=self.opts,
