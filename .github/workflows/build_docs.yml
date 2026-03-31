@@ -25,7 +25,7 @@ jobs:
 
       - name: Build
         run: |
-          uv run --no-sync mkdocs build
+          mkdocs build
 
       # Push the site to github-pages
       - name: GitHub Pages action
