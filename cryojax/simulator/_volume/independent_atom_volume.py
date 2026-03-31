@@ -638,7 +638,7 @@ def _project_with_nufft(shape, ps, pos, kernel, freqs, eps=1e-6, opts=None):
     n_atoms = x.size
     area_element = ps**2
     # Compute
-    fourier_projection = kernel(freqs) * (
+    fourier_projection = kernel(freqs) * jnp.fft.ifftshift(
         jnufft.nufft1(
             shape,
             jnp.full((n_atoms,), 1.0 + 0.0j),
@@ -650,16 +650,15 @@ def _project_with_nufft(shape, ps, pos, kernel, freqs, eps=1e-6, opts=None):
         )
         / area_element
     )
-    fourier_projection = jnp.fft.ifftshift(fourier_projection)
     if opts is not None:
         opts_fwd, opts_bwd = (
             unpack_opts(opts, finufft_type=1, forward=True),
             unpack_opts(opts, finufft_type=1, forward=False),
         )
         if opts_fwd.modeord:
-            raise ValueError(_get_modeord_msg("forward", True, "FFTAtomProjection"))
+            raise ValueError(_get_modeord_msg("forward", False, "FFTAtomProjection"))
         if opts_bwd.modeord:
-            raise ValueError(_get_modeord_msg("backward", True, "FFTAtomProjection"))
+            raise ValueError(_get_modeord_msg("backward", False, "FFTAtomProjection"))
 
     return fourier_projection
 
