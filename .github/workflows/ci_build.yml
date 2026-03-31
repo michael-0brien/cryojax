@@ -47,4 +47,4 @@ jobs:
 
       - name: Check that documentation can be built.
         run: |
-          uv run --no-sync mkdocs build
+          mkdocs build
