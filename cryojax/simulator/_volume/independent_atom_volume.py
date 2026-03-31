@@ -315,7 +315,8 @@ class FFTAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True
             A `jax_finufft.options.Opts` or `jax_finufft.options.NestedOpts`
             dataclass.
             See [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft)
-            for documentation.
+            for documentation. If passing these advanced options, do not change
+            `modeord=False` for both the forward and the backward pass.
         """
         if sampling_mode not in ["average", "point"]:
             raise ValueError(
@@ -455,9 +456,8 @@ class FFTAtomProjection(
             dataclass. These provide advanced options for controlling the
             behavior of the non-uniform FFT (
             see [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft)
-            for documentation). If passing these advanced options, *it is required
-            to set `modeord=True`* for both the forward and the backward pass.
-            Otherwise, an error will be thrown.
+            for documentation). If passing these advanced options, do not change
+            `modeord=False` for both the forward and the backward pass.
         """
         if jnufft is None:
             raise RuntimeError(
@@ -627,8 +627,6 @@ def _project_with_nufft(shape, ps, pos, kernel, freqs, eps=1e-6, opts=None):
     assert Opts is not None
     assert NestedOpts is not None
     assert unpack_opts is not None
-    if opts is None:
-        opts = NestedOpts(forward=Opts(modeord=True), backward=Opts(modeord=False))
     # Get x and y coordinates
     positions_xy = pos[:, :2]
     # Normalize coordinates betweeen -pi and pi
@@ -652,15 +650,16 @@ def _project_with_nufft(shape, ps, pos, kernel, freqs, eps=1e-6, opts=None):
         )
         / area_element
     )
+    fourier_projection = jnp.fft.ifftshift(fourier_projection)
     if opts is not None:
         opts_fwd, opts_bwd = (
             unpack_opts(opts, finufft_type=1, forward=True),
             unpack_opts(opts, finufft_type=1, forward=False),
         )
-        if not opts_fwd.modeord:
+        if opts_fwd.modeord:
             raise ValueError(_get_modeord_msg("forward", True, "FFTAtomProjection"))
         if opts_bwd.modeord:
-            raise ValueError(_get_modeord_msg("backward", False, "FFTAtomProjection"))
+            raise ValueError(_get_modeord_msg("backward", True, "FFTAtomProjection"))
 
     return fourier_projection
 
