@@ -410,3 +410,12 @@ def make_spline(real_voxel_grid):
     return cxs.FourierVoxelSplineVolume.from_real_voxel_grid(
         real_voxel_grid,
     )
+
+
+# def _plot_image_compare(im1, im2):
+#     from matplotlib import pyplot as plt
+
+#     _, axes = plt.subplots(figsize=(7, 4), ncols=2)
+#     axes[0].imshow(im1)
+#     axes[1].imshow(im2)
+#     plt.show()
