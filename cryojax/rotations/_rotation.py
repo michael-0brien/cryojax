@@ -3,8 +3,7 @@ Abstraction of a rotation.
 """
 
 from abc import abstractmethod
-from typing import overload
-from typing_extensions import Self
+from typing import Self, overload
 
 from equinox import AbstractClassVar, Module
 from jaxtyping import Array, PRNGKeyArray

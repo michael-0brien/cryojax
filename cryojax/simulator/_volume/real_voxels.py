@@ -3,8 +3,8 @@ Real voxel-based representations of a volume.
 """
 
 import math
-from typing import Any, ClassVar, cast
-from typing_extensions import Self, override
+from typing import Any, ClassVar, Self, cast
+from typing_extensions import override
 
 import equinox as eqx
 import jax.numpy as jnp

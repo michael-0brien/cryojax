@@ -1,7 +1,7 @@
 import warnings
 from collections.abc import Callable
-from typing import Any, ClassVar, Literal, TypedDict
-from typing_extensions import Self, override
+from typing import Any, ClassVar, Literal, Self, TypedDict
+from typing_extensions import override
 
 import equinox as eqx
 import jax
