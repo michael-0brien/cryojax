@@ -44,6 +44,7 @@ docs = [
     "mkdocstrings==0.28.3",
     "mkdocstrings-python==1.16.8",
     "pymdown-extensions==10.14.3",
+    "pygments<2.20",
     "ruff"
 ]
 tests = [
