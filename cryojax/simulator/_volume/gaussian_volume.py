@@ -577,10 +577,15 @@ def _evaluate_multivariate_gaussian_2d(
 ) -> Float[Array, "dim_y dim_x"]:
     # Prepare matrices with dimensions of the number of positions and the number of grid
     # points. There are as many matrices as number of gaussians per position
-    gauss_x = jnp.transpose(gaussians_per_interval_per_position_x, (2, 1, 0))
-    gauss_y = jnp.transpose(gaussians_per_interval_per_position_y, (2, 0, 1))
-    # Compute matrix multiplication then sum over the number of gaussians per position
-    return jnp.sum(jnp.matmul(gauss_y, gauss_x), axis=0)
+    # gauss_x = jnp.transpose(gaussians_per_interval_per_position_x, (2, 1, 0))
+    # gauss_y = jnp.transpose(gaussians_per_interval_per_position_y, (2, 0, 1))
+    # # Compute matrix multiplication then sum over the number of gaussians per position
+    # return jnp.sum(jnp.matmul(gauss_y, gauss_x), axis=0)
+    return jnp.einsum(
+        "ikl, jkl -> ij",
+        gaussians_per_interval_per_position_y,
+        gaussians_per_interval_per_position_x,
+    )
 
 
 def _evaluate_gaussian_integrals_2d(
@@ -822,14 +827,12 @@ def _evaluate_multivariate_gaussian_3d(
 ) -> Float[Array, "dim_y dim_x"]:
     # Prepare matrices with dimensions of the number of positions and the number of grid
     # points. There are as many matrices as number of gaussians per position
-    gauss_x = jnp.transpose(gaussian_integrals_per_interval_per_position_x, (2, 1, 0))
-    gauss_yz = jnp.transpose(
+    return jnp.einsum(
+        "ikl, jkl -> ij",
         gaussian_integrals_per_interval_per_position_y
         * gaussian_integrals_per_position_z[None, :, :],
-        (2, 0, 1),
+        gaussian_integrals_per_interval_per_position_x,
     )
-    # Compute matrix multiplication then sum over the number of gaussians per position
-    return jnp.sum(jnp.matmul(gauss_yz, gauss_x), axis=0)
 
 
 def _batched_map_with_n_batches(

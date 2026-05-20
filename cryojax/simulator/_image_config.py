@@ -212,7 +212,9 @@ class AbstractImageConfig(eqx.Module, strict=True):
 
         if physical:
             pixel_size = error_if_not_positive(self.pixel_size)
-            coordinate_grid = _safe_multiply_by_constant(coordinate_grid, pixel_size)
+            coordinate_grid = _safe_multiply_by_constant(
+                coordinate_grid, pixel_size, is_fft_grid=False
+            )
 
         return coordinate_grid
 
@@ -264,7 +266,9 @@ class AbstractImageConfig(eqx.Module, strict=True):
 
         if physical:
             pixel_size = error_if_not_positive(self.pixel_size)
-            frequency_grid = _safe_multiply_by_constant(frequency_grid, 1 / pixel_size)
+            frequency_grid = _safe_multiply_by_constant(
+                frequency_grid, 1 / pixel_size, is_fft_grid=True
+            )
 
         return frequency_grid
 
@@ -716,7 +720,7 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
 
 
 def _safe_multiply_by_constant(
-    grid: Float[Array, "y_dim x_dim 2"], constant: Float[Array, ""]
+    grid: Float[Array, "y_dim x_dim 2"], constant: Float[Array, ""], is_fft_grid: bool
 ) -> Float[Array, "y_dim x_dim 2"]:
     """Multiplies a coordinate grid by a constant in a
     safe way for gradient computation.
@@ -726,6 +730,12 @@ def _safe_multiply_by_constant(
     term `sqrt(grid * constant)` that needs to be differentiated.
     This is undefined at locations where the grid is equal to zero.
     """
-    grid = grid.at[:, 1:, 0].multiply(constant)
-    grid = grid.at[1:, :, 1].multiply(constant)
+    if is_fft_grid:
+        grid = grid.at[:, 1:, 0].multiply(constant)
+        grid = grid.at[1:, :, 1].multiply(constant)
+
+    else:
+        s1, s2 = grid.shape[0], grid.shape[1]
+        grid = grid.at[:, s2 // 2, 0].multiply(constant)
+        grid = grid.at[s1 // 2, :, 1].multiply(constant)
     return grid
