@@ -1,6 +1,6 @@
 from collections.abc import Sequence
-from typing import Any, ClassVar, Literal, TypeVar
-from typing_extensions import Self, override
+from typing import Any, ClassVar, Literal, Self, TypeVar
+from typing_extensions import override
 
 import equinox as eqx
 import jax

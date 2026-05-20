@@ -1,6 +1,6 @@
 import abc
-from typing import Generic, TypeVar
-from typing_extensions import Self, override
+from typing import Generic, Self, TypeVar
+from typing_extensions import override
 
 import equinox as eqx
 from jaxtyping import Array, Complex, Float, Inexact, PRNGKeyArray
