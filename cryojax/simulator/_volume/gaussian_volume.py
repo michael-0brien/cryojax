@@ -1,7 +1,7 @@
 import warnings
 from collections.abc import Callable
-from typing import Any, ClassVar, Literal, TypedDict
-from typing_extensions import Self, override
+from typing import Any, ClassVar, Literal, Self, TypedDict
+from typing_extensions import override
 
 import equinox as eqx
 import jax
@@ -65,7 +65,7 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
     amplitudes: Float[Array, "n_positions n_gaussians"]
     variances: Float[Array, " n_positions n_gaussians"]
 
-    rotation_convention: ClassVar[Literal["object"]] = "object"
+    is_frame_rotation: ClassVar[bool] = False
 
     def __init__(
         self,
@@ -197,12 +197,12 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
         return cls(atom_positions, amplitudes, b_factor_to_variance(b_factors))
 
     @override
-    def rotate_to_pose(self, pose: AbstractPose, inverse: bool = False) -> Self:
+    def rotate_to_pose(self, pose: AbstractPose) -> Self:
         """Return a new potential with rotated `positions`."""
         return eqx.tree_at(
             lambda d: d.positions,
             self,
-            pose.rotate_coordinates(self.positions, inverse=inverse),
+            pose.rotate_coordinates(self.positions, inverse=self.is_frame_rotation),
         )
 
     @override
@@ -577,10 +577,15 @@ def _evaluate_multivariate_gaussian_2d(
 ) -> Float[Array, "dim_y dim_x"]:
     # Prepare matrices with dimensions of the number of positions and the number of grid
     # points. There are as many matrices as number of gaussians per position
-    gauss_x = jnp.transpose(gaussians_per_interval_per_position_x, (2, 1, 0))
-    gauss_y = jnp.transpose(gaussians_per_interval_per_position_y, (2, 0, 1))
-    # Compute matrix multiplication then sum over the number of gaussians per position
-    return jnp.sum(jnp.matmul(gauss_y, gauss_x), axis=0)
+    # gauss_x = jnp.transpose(gaussians_per_interval_per_position_x, (2, 1, 0))
+    # gauss_y = jnp.transpose(gaussians_per_interval_per_position_y, (2, 0, 1))
+    # # Compute matrix multiplication then sum over the number of gaussians per position
+    # return jnp.sum(jnp.matmul(gauss_y, gauss_x), axis=0)
+    return jnp.einsum(
+        "ikl, jkl -> ij",
+        gaussians_per_interval_per_position_y,
+        gaussians_per_interval_per_position_x,
+    )
 
 
 def _evaluate_gaussian_integrals_2d(
@@ -725,8 +730,8 @@ def _gaussians_to_real_voxels_kernel(
         grid_x, grid_y, grid_z, positions, amplitudes, b_factors, voxel_size
     )
     # Get function to compute voxel grid at a single z-plane
-    render_at_z_plane = (
-        lambda gaussian_integrals_per_position_z: _evaluate_multivariate_gaussian_3d(
+    render_at_z_plane = lambda gaussian_integrals_per_position_z: (
+        _evaluate_multivariate_gaussian_3d(
             gaussian_integrals_times_prefactor_per_interval_per_position_x,
             gaussian_integrals_per_interval_per_position_y,
             gaussian_integrals_per_position_z,
@@ -822,14 +827,12 @@ def _evaluate_multivariate_gaussian_3d(
 ) -> Float[Array, "dim_y dim_x"]:
     # Prepare matrices with dimensions of the number of positions and the number of grid
     # points. There are as many matrices as number of gaussians per position
-    gauss_x = jnp.transpose(gaussian_integrals_per_interval_per_position_x, (2, 1, 0))
-    gauss_yz = jnp.transpose(
+    return jnp.einsum(
+        "ikl, jkl -> ij",
         gaussian_integrals_per_interval_per_position_y
         * gaussian_integrals_per_position_z[None, :, :],
-        (2, 0, 1),
+        gaussian_integrals_per_interval_per_position_x,
     )
-    # Compute matrix multiplication then sum over the number of gaussians per position
-    return jnp.sum(jnp.matmul(gauss_yz, gauss_x), axis=0)
 
 
 def _batched_map_with_n_batches(

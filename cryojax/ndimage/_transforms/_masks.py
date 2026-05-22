@@ -369,8 +369,8 @@ def _compute_square_mask(
     is_in_edge_fn = lambda abs_x_or_y, s, w: jnp.logical_and(
         abs_x_or_y > s / 2, abs_x_or_y < s / 2 + w
     )
-    compute_edge_fn = lambda abs_x_or_y, s, w: 0.5 * (
-        1 + jnp.cos(jnp.pi * (abs_x_or_y - s / 2) / w)
+    compute_edge_fn = lambda abs_x_or_y, s, w: (
+        0.5 * (1 + jnp.cos(jnp.pi * (abs_x_or_y - s / 2) / w))
     )
 
     def compute_mask_at_coordinate(coordinate):
@@ -468,8 +468,8 @@ def _compute_cylindrical_mask_2d_with_length(
     is_in_edge_fn = lambda abs_x_or_y, s, w: jnp.logical_and(
         abs_x_or_y > s / 2, abs_x_or_y < s / 2 + w
     )
-    compute_edge_fn = lambda abs_x_or_y, s, w: 0.5 * (
-        1 + jnp.cos(jnp.pi * (abs_x_or_y - s / 2) / w)
+    compute_edge_fn = lambda abs_x_or_y, s, w: (
+        0.5 * (1 + jnp.cos(jnp.pi * (abs_x_or_y - s / 2) / w))
     )
 
     def compute_mask_at_coordinate(r, z):
@@ -523,8 +523,8 @@ def _compute_rectangular_mask_3d(
     is_in_edge_fn = lambda abs_x_or_y_or_z, s, w: jnp.logical_and(
         abs_x_or_y_or_z > s / 2, abs_x_or_y_or_z < s / 2 + w
     )
-    compute_edge_fn = lambda abs_x_or_y_or_z, s, w: 0.5 * (
-        1 + jnp.cos(jnp.pi * (abs_x_or_y_or_z - s / 2) / w)
+    compute_edge_fn = lambda abs_x_or_y_or_z, s, w: (
+        0.5 * (1 + jnp.cos(jnp.pi * (abs_x_or_y_or_z - s / 2) / w))
     )
 
     def compute_mask_at_coordinate(coordinate):

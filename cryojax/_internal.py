@@ -15,8 +15,8 @@ from .jax_util import maybe_error_if
 #
 # Helpers for performing internal error checks
 #
-_make_msg = (
-    lambda _s: "While inspecting runtime errors with `CRYOJAX_ENABLE_CHECKS=true`, "
+_make_msg = lambda _s: (
+    "While inspecting runtime errors with `CRYOJAX_ENABLE_CHECKS=true`, "
     + _s
     + (
         " Inspect the traceback to determine where this occurred, or "

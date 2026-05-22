@@ -5,7 +5,8 @@ Representations of rigid body rotations and translations of 3D coordinate system
 from abc import abstractmethod
 from collections.abc import Sequence
 from functools import cached_property
-from typing_extensions import Self, override
+from typing import Self
+from typing_extensions import override
 
 import equinox as eqx
 import jax

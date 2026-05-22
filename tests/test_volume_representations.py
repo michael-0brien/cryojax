@@ -173,6 +173,7 @@ def test_render_voxels(sample_pdb_path):
         cxs.FourierVoxelGridVolume,
         cxs.FourierVoxelSplineVolume,
         cxs.RealVoxelGridVolume,
+        cxs.RealVoxelCloudVolume,
     ]:
         assert (
             type(cxs.render_voxel_volume(atom_volume, render_fn, output_type=cls)) == cls
@@ -290,7 +291,7 @@ def test_render_options(pdb_info):
                 ),
             )
         )
-        render_fns.append(cxs.FFTAtomRenderFn(shape, voxel_size, eps=1e-16))
+        render_fns.append(cxs.FFTAtomRenderFn(shape, voxel_size, eps=1e-10))
     for volume, render_fn in zip(volumes, render_fns):
         real_voxel_grid = render_fn(volume, outputs_real_space=True)
         assert real_voxel_grid.shape == shape
@@ -330,7 +331,7 @@ def test_fft_atom_render(pdb_info, width, voxel_size, shape):
             ),
         )
         gaussian_render_fn = cxs.GaussianMixtureRenderFn(shape, voxel_size)
-        fft_render_fn = cxs.FFTAtomRenderFn(shape, voxel_size, eps=1e-16)
+        fft_render_fn = cxs.FFTAtomRenderFn(shape, voxel_size, eps=1e-10)
         voxels_by_gaussians = gaussian_render_fn(gaussian_volume)
         voxels_by_fft = fft_render_fn(atom_volume)
 

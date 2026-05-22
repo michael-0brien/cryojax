@@ -1,6 +1,6 @@
 from collections.abc import Sequence
-from typing import Any, ClassVar, Literal, TypeVar
-from typing_extensions import Self, override
+from typing import Any, ClassVar, Literal, Self, TypeVar
+from typing_extensions import override
 
 import equinox as eqx
 import jax
@@ -96,8 +96,8 @@ class LobatoScatteringFactor(AbstractFourierOperator, strict=True):
         ),
     ):
         q_squared = jnp.sum(frequency_grid**2, axis=-1)
-        hydrogenic_fn = (
-            lambda _a, _b: _a * (2 + _b * q_squared) / (1 + _b * q_squared) ** 2
+        hydrogenic_fn = lambda _a, _b: (
+            _a * (2 + _b * q_squared) / (1 + _b * q_squared) ** 2
         )
         scattering_factor = jnp.sum(jax.vmap(hydrogenic_fn)(self.a, self.b), axis=0)
         if self.b_factor is not None:
@@ -148,7 +148,7 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
     positions: PyTree[Float[Array, "_ 3"]]
     scattering_factors: PyTree[AbstractFourierOperator]
 
-    rotation_convention: ClassVar[Literal["object"]] = "object"
+    is_frame_rotation: ClassVar[bool] = False
 
     def __init__(
         self,
@@ -177,9 +177,11 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
         self.scattering_factors = scattering_factors
 
     @override
-    def rotate_to_pose(self, pose: AbstractPose, inverse: bool = False) -> Self:
+    def rotate_to_pose(self, pose: AbstractPose) -> Self:
         """Return a new potential with rotated `positions`."""
-        rotate_fn = lambda pos: pose.rotate_coordinates(pos, inverse=inverse)
+        rotate_fn = lambda pos: pose.rotate_coordinates(
+            pos, inverse=self.is_frame_rotation
+        )
         return eqx.tree_at(
             lambda x: x.positions,
             self,
@@ -313,7 +315,8 @@ class FFTAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True
             A `jax_finufft.options.Opts` or `jax_finufft.options.NestedOpts`
             dataclass.
             See [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft)
-            for documentation.
+            for documentation. If passing these advanced options, do not change
+            `modeord=False` for both the forward and the backward pass.
         """
         if sampling_mode not in ["average", "point"]:
             raise ValueError(
@@ -453,9 +456,8 @@ class FFTAtomProjection(
             dataclass. These provide advanced options for controlling the
             behavior of the non-uniform FFT (
             see [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft)
-            for documentation). If passing these advanced options, *it is required
-            to set `modeord=True`* for both the forward and the backward pass.
-            Otherwise, an error will be thrown.
+            for documentation). If passing these advanced options, do not change
+            `modeord=False` for both the forward and the backward pass.
         """
         if jnufft is None:
             raise RuntimeError(
@@ -573,10 +575,9 @@ _get_modeord_msg = lambda _fwd_or_bwd, t_or_f, _cls: (
     f"Manually passed `opts` as `{_cls}(..., opts=...)`, "
     f"but found that the `modeord` property was not equal to "
     f"`{t_or_f}` on the {_fwd_or_bwd} pass. Setting `modeord={t_or_f}` is "
-    f"required for correct behavior of `{_cls}`, e.g. "
-    f"`opts = NestedOpts(forward=Opts(..., modeord={t_or_f}), "
-    f"forward=Opts(..., modeord={t_or_f}))`. See the `jax-finufft` "
-    "documentation for more information."
+    f"required for correct behavior of `{_cls}`, i.e. "
+    f"`opts = NestedOpts({_fwd_or_bwd}=Opts(modeord={t_or_f}, ...), ...) "
+    f"See the `jax-finufft` documentation for more information."
 )
 
 
@@ -613,9 +614,9 @@ def _render_with_nufft(shape, ps, pos, kernel, freqs, eps=1e-6, opts=None):
             unpack_opts(opts, finufft_type=1, forward=True),
             unpack_opts(opts, finufft_type=1, forward=False),
         )
-        if not opts_fwd.modeord:
+        if opts_fwd.modeord:
             raise ValueError(_get_modeord_msg("forward", False, "FFTAtomRenderFn"))
-        if not opts_bwd.modeord:
+        if opts_bwd.modeord:
             raise ValueError(_get_modeord_msg("backward", False, "FFTAtomRenderFn"))
 
     return fourier_projection
@@ -626,8 +627,6 @@ def _project_with_nufft(shape, ps, pos, kernel, freqs, eps=1e-6, opts=None):
     assert Opts is not None
     assert NestedOpts is not None
     assert unpack_opts is not None
-    if opts is None:
-        opts = NestedOpts(forward=Opts(modeord=True), backward=Opts(modeord=True))
     # Get x and y coordinates
     positions_xy = pos[:, :2]
     # Normalize coordinates betweeen -pi and pi
@@ -639,7 +638,7 @@ def _project_with_nufft(shape, ps, pos, kernel, freqs, eps=1e-6, opts=None):
     n_atoms = x.size
     area_element = ps**2
     # Compute
-    fourier_projection = kernel(freqs) * (
+    fourier_projection = kernel(freqs) * jnp.fft.ifftshift(
         jnufft.nufft1(
             shape,
             jnp.full((n_atoms,), 1.0 + 0.0j),
@@ -656,10 +655,10 @@ def _project_with_nufft(shape, ps, pos, kernel, freqs, eps=1e-6, opts=None):
             unpack_opts(opts, finufft_type=1, forward=True),
             unpack_opts(opts, finufft_type=1, forward=False),
         )
-        if not opts_fwd.modeord:
-            raise ValueError(_get_modeord_msg("forward", True, "FFTAtomProjection"))
-        if not opts_bwd.modeord:
-            raise ValueError(_get_modeord_msg("backward", True, "FFTAtomProjection"))
+        if opts_fwd.modeord:
+            raise ValueError(_get_modeord_msg("forward", False, "FFTAtomProjection"))
+        if opts_bwd.modeord:
+            raise ValueError(_get_modeord_msg("backward", False, "FFTAtomProjection"))
 
     return fourier_projection
 

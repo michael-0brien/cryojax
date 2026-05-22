@@ -1,6 +1,6 @@
 import abc
-from typing import Generic, Literal, TypeVar
-from typing_extensions import Self, override
+from typing import Generic, Self, TypeVar
+from typing_extensions import override
 
 import equinox as eqx
 from jaxtyping import Array, Complex, Float, Inexact, PRNGKeyArray
@@ -118,10 +118,10 @@ class AbstractVolumeRepresentation(AbstractVolumeParametrization, strict=True):
     classes for imaging.
     """
 
-    rotation_convention: eqx.AbstractClassVar[Literal["object", "frame"]]
+    is_frame_rotation: eqx.AbstractClassVar[bool]
 
     @abc.abstractmethod
-    def rotate_to_pose(self, pose: AbstractPose, inverse: bool = False) -> Self:
+    def rotate_to_pose(self, pose: AbstractPose) -> Self:
         """Rotate the coordinate system of the volume."""
         raise NotImplementedError
 
@@ -174,7 +174,7 @@ class AbstractVoxelVolume(AbstractVolumeRepresentation, strict=True):
     @property
     @abc.abstractmethod
     def shape(self) -> tuple[int, ...]:
-        """The shape of the voxel array."""
+        """The shape of the voxel grid."""
         raise NotImplementedError
 
     @classmethod

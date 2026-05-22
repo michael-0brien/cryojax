@@ -287,7 +287,7 @@ def mmdf_to_atoms(
     if loads_properties or loads_b_factors:
         # Optionally return atom properties
         atom_properties = jax.tree.map(
-            lambda arr: (arr[0] if arr.shape[0] == 1 else arr), atom_properties
+            lambda arr: arr[0] if arr.shape[0] == 1 else arr, atom_properties
         )
         if loads_b_factors:
             warnings.warn(

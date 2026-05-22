@@ -87,7 +87,7 @@ def test_fft_atom_projection_exact(pdb_info, pixel_size, shape):
                     amplitude=amplitude, b_factor=b_factor
                 ),
             ),
-            cxs.FFTAtomProjection(sampling_mode="point", eps=1e-16),
+            cxs.FFTAtomProjection(sampling_mode="point", eps=1e-10),
         )
         proj_by_gaussians = compute_projection(
             gaussian_volume, gaussian_integrator, image_config
@@ -121,7 +121,7 @@ def test_fft_atom_projection_antialias(pdb_info, width, pixel_size, shape):
             ),
         )
         gaussian_integrator = cxs.GaussianMixtureProjection(sampling_mode="average")
-        fft_integrator = cxs.FFTAtomProjection(eps=1e-16)
+        fft_integrator = cxs.FFTAtomProjection(eps=1e-10)
         padded_shape = (2 * shape[0], 2 * shape[1])
         image_config = cxs.BasicImageConfig(
             shape, pixel_size, voltage_in_kilovolts=300.0, padded_shape=padded_shape
@@ -168,7 +168,7 @@ def test_fft_atom_projection_peng(pdb_info, pixel_size, shape, upsample_factor):
         # nufft (don't include anti-aliasing)
         gaussian_integrator = cxs.GaussianMixtureProjection(sampling_mode="average")
         fft_integrator = cxs.FFTAtomProjection(
-            sampling_mode="average", upsample_factor=upsample_factor, eps=1e-16
+            sampling_mode="average", upsample_factor=upsample_factor, eps=1e-10
         )
         proj_by_gaussians = compute_projection(
             gaussian_volume, gaussian_integrator, image_config
@@ -220,9 +220,9 @@ def test_analytic_vs_voxels_nopose(pdb_info, pixel_size, shape):
         cxs.FourierSliceExtraction(),
     ]
     if jnufft is not None:
-        other_projection_methods.append(cxs.RealVoxelProjection(eps=1e-16))  # type: ignore
+        other_projection_methods.append(cxs.RealVoxelProjection(eps=1e-15))  # type: ignore
         other_volumes.append(
-            cxs.RealVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
+            cxs.RealVoxelCloudVolume.from_real_voxel_grid(real_voxel_grid)
         )
     else:
         warnings.warn(
@@ -234,10 +234,17 @@ def test_analytic_vs_voxels_nopose(pdb_info, pixel_size, shape):
     projection_by_gaussian_integration = compute_projection(
         base_volume, base_method, image_config
     )
+    # from matplotlib import pyplot as plt
+
     for volume, projection_method in zip(other_volumes, other_projection_methods):
         projection_by_other_method = compute_projection(
             volume, projection_method, image_config
         )
+        # fig, axes = plt.subplots(figsize=(12, 4), ncols=3)
+        # axes[0].imshow(projection_by_gaussian_integration)
+        # axes[1].imshow(projection_by_other_method)
+        # axes[2].imshow(projection_by_other_method - projection_by_gaussian_integration)
+        # plt.show()
         np.testing.assert_allclose(
             projection_by_gaussian_integration, projection_by_other_method, atol=1e-12
         )
@@ -403,3 +410,12 @@ def make_spline(real_voxel_grid):
     return cxs.FourierVoxelSplineVolume.from_real_voxel_grid(
         real_voxel_grid,
     )
+
+
+# def _plot_image_compare(im1, im2):
+#     from matplotlib import pyplot as plt
+
+#     _, axes = plt.subplots(figsize=(7, 4), ncols=2)
+#     axes[0].imshow(im1)
+#     axes[1].imshow(im2)
+#     plt.show()

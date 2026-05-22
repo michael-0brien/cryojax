@@ -95,7 +95,7 @@ def block_reduce_downsample(
             if not is_complex:
                 array = array.real
     block_reduce_fn = lambda x: eqx.nn.Pool(
-        init=jnp.asarray(0.0, array.dtype),
+        init=0.0,
         operation=operation,
         num_spatial_dims=array.ndim,
         kernel_size=kernel_size,

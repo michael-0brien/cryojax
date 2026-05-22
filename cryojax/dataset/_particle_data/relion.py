@@ -6,8 +6,8 @@ import re
 import warnings
 from collections.abc import Callable
 from copy import deepcopy
-from typing import Any, Literal, TypedDict, cast
-from typing_extensions import Self, override
+from typing import Any, Literal, Self, TypedDict, cast
+from typing_extensions import override
 
 import equinox as eqx
 import jax
