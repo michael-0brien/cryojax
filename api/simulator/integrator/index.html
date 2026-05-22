@@ -1413,7 +1413,7 @@
 
 <h4 id="cryojax.simulator.AbstractVolumeIntegrator" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.AbstractVolumeIntegrator</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/3dafae10a5693209a2b55c44cb9b902554145fbd/cryojax/simulator/_volume/base_volume.py#L191-L205"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/736e8aa815e52f6d45d67344c512930d2d47c599/cryojax/simulator/_volume/base_volume.py#L191-L205"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.AbstractVolumeIntegrator" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1477,7 +1477,7 @@ the exit plane.</p>
 
 <h4 id="cryojax.simulator.AutoVolumeProjection" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.AutoVolumeProjection(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractVolumeIntegrator">cryojax.simulator.AbstractVolumeIntegrator</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/3dafae10a5693209a2b55c44cb9b902554145fbd/cryojax/simulator/_volume/auto_select.py#L34-L110"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/736e8aa815e52f6d45d67344c512930d2d47c599/cryojax/simulator/_volume/auto_select.py#L34-L114"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.AutoVolumeProjection" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1518,14 +1518,16 @@ In particular,</p>
 <td style="text-align: left;">voxel</td>
 </tr>
 <tr>
-<td style="text-align: left;"><a class="autorefs autorefs-internal" href="../volume/#cryojax.simulator.RealVoxelGridVolume"><code>cryojax.simulator.RealVoxelGridVolume</code></a></td>
+<td style="text-align: left;"><a class="autorefs autorefs-internal" href="../volume/#cryojax.simulator.RealVoxelCloudVolume"><code>cryojax.simulator.RealVoxelCloudVolume</code></a></td>
 <td style="text-align: left;"><a class="autorefs autorefs-internal" href="#cryojax.simulator.RealVoxelProjection"><code>cryojax.simulator.RealVoxelProjection</code></a></td>
 <td style="text-align: left;">voxel</td>
 </tr>
 </tbody>
 </table>
+<p>Note that <a class="autorefs autorefs-internal" href="../volume/#cryojax.simulator.RealVoxelGridVolume"><code>cryojax.simulator.RealVoxelGridVolume</code></a> does not have an associated projection method. To
+compute projections from real-space voxels, use <a class="autorefs autorefs-internal" href="../volume/#cryojax.simulator.RealVoxelCloudVolume"><code>cryojax.simulator.RealVoxelCloudVolume</code></a>.</p>
 <p>To use advanced options for a given projection method,
-see each respective class.</p>
+instantiate each respective class directly.</p>
 </div>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
@@ -1627,7 +1629,7 @@ volume representation.</p>
 
 <h4 id="cryojax.simulator.FourierSliceExtraction" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.FourierSliceExtraction(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractVolumeIntegrator">cryojax.simulator.AbstractVolumeIntegrator</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/3dafae10a5693209a2b55c44cb9b902554145fbd/cryojax/simulator/_volume/fourier_voxels.py#L227-L338"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/736e8aa815e52f6d45d67344c512930d2d47c599/cryojax/simulator/_volume/fourier_voxels.py#L229-L342"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.FourierSliceExtraction" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1744,7 +1746,7 @@ using fourier slice extraction.</p>
 
 <h4 id="cryojax.simulator.RealVoxelProjection" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.RealVoxelProjection(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractVolumeIntegrator">cryojax.simulator.AbstractVolumeIntegrator</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/3dafae10a5693209a2b55c44cb9b902554145fbd/cryojax/simulator/_volume/real_voxels.py#L108-L180"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/736e8aa815e52f6d45d67344c512930d2d47c599/cryojax/simulator/_volume/real_voxels.py#L208-L285"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.RealVoxelProjection" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1808,7 +1810,7 @@ using fourier slice extraction.</p>
 
 
 <h5 id="cryojax.simulator.RealVoxelProjection.integrate" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">integrate</span><span class="p">(</span><span class="n">volume_representation</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">RealVoxelGridVolume</span><span class="p">,</span> <span class="n">image_config</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractImageConfig</span><span class="p">,</span> <span class="n">outputs_real_space</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> {image_config.padded_x_dim//2+1}&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> </span><span class="si">{image_config.padded_x_dim}</span><span class="s1">&#39;</span><span class="p">]</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">integrate</span><span class="p">(</span><span class="n">volume_representation</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">RealVoxelCloudVolume</span><span class="p">,</span> <span class="n">image_config</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractImageConfig</span><span class="p">,</span> <span class="n">outputs_real_space</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> {image_config.padded_x_dim//2+1}&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> </span><span class="si">{image_config.padded_x_dim}</span><span class="s1">&#39;</span><span class="p">]</span></code>
   
 
 
@@ -1853,7 +1855,7 @@ of a voxel-based representation in real-space, using non-uniform FFTs.</p>
 
 <h4 id="cryojax.simulator.GaussianMixtureProjection" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.GaussianMixtureProjection(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractVolumeIntegrator">cryojax.simulator.AbstractVolumeIntegrator</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/3dafae10a5693209a2b55c44cb9b902554145fbd/cryojax/simulator/_volume/gaussian_volume.py#L244-L359"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/736e8aa815e52f6d45d67344c512930d2d47c599/cryojax/simulator/_volume/gaussian_volume.py#L244-L359"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.GaussianMixtureProjection" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1967,7 +1969,7 @@ of a voxel-based representation in real-space, using non-uniform FFTs.</p>
 
 <h4 id="cryojax.simulator.FFTAtomProjection" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.FFTAtomProjection(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractVolumeIntegrator">cryojax.simulator.AbstractVolumeIntegrator</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/3dafae10a5693209a2b55c44cb9b902554145fbd/cryojax/simulator/_volume/independent_atom_volume.py#L407-L569"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/736e8aa815e52f6d45d67344c512930d2d47c599/cryojax/simulator/_volume/independent_atom_volume.py#L410-L571"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.FFTAtomProjection" class="headerlink" title="Permanent link">¤</a></h4>
@@ -2035,9 +2037,8 @@ the exit plane using non-uniform FFTs plus convolution.</p>
     dataclass. These provide advanced options for controlling the
     behavior of the non-uniform FFT (
     see <a href="https://github.com/flatironinstitute/jax-finufft"><code>jax-finufft</code></a>
-    for documentation). If passing these advanced options, <em>it is required
-    to set <code>modeord=True</code></em> for both the forward and the backward pass.
-    Otherwise, an error will be thrown.</li>
+    for documentation). If passing these advanced options, do not change
+    <code>modeord=False</code> for both the forward and the backward pass.</li>
 </ul>
 
 

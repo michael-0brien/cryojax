@@ -1351,7 +1351,7 @@
 <h4 id="cryojax.simulator.make_image_model" class="doc doc-heading">
   <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">cryojax.simulator.make_image_model</span>
 
-  <a href="https://github.com/michael-0brien/cryojax/blob/3dafae10a5693209a2b55c44cb9b902554145fbd/cryojax/simulator/_api_utils.py#L162-L393"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/736e8aa815e52f6d45d67344c512930d2d47c599/cryojax/simulator/_api_utils.py#L142-L351"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.make_image_model" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1369,7 +1369,6 @@
     <span class="n">signal_centering</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;bg&quot;</span><span class="p">,</span> <span class="s2">&quot;mean&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mean&quot;</span><span class="p">,</span>
     <span class="n">translate_mode</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;fft&quot;</span><span class="p">,</span> <span class="s2">&quot;atom&quot;</span><span class="p">,</span> <span class="s2">&quot;none&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;fft&quot;</span><span class="p">,</span>
     <span class="n">quantity_mode</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;contrast&quot;</span><span class="p">,</span> <span class="s2">&quot;intensity&quot;</span><span class="p">,</span> <span class="s2">&quot;counts&quot;</span><span class="p">,</span> <span class="s2">&quot;none&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;none&quot;</span><span class="p">,</span>
-    <span class="n">rotation_convention</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;object&quot;</span><span class="p">,</span> <span class="s2">&quot;frame&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;object&quot;</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractImageModel</span>
 </code></pre></div>
 
@@ -1487,21 +1486,7 @@ classes; instantiate these directly for more flexibility</li>
     If this is passed, a <code>detector</code> must also be passed.</li>
 </ul>
 </li>
-<li><code>rotation_convention</code>:
-    If <code>'object'</code>, the rotation given by <code>pose</code> is of the object.
-    If <code>'frame'</code>, the rotation given by <code>pose</code> is of the frame. These
-    are related by transpose.</li>
 </ul>
-<div class="admonition info">
-<p class="admonition-title">Info</p>
-<p>The <code>make_image_model</code> function enforces agreement between
-rotation conventions of different volumes via the
-<code>rotation_convention</code> argument. Lower level <code>cryojax</code> APIs
-will not enforce this agreement, such as if the user instantiates
-an <a class="autorefs autorefs-internal" href="../image_model/#cryojax.simulator.AbstractImageModel"><code>cryojax.simulator.AbstractImageModel</code></a> directly.</p>
-<p>In these cases, agreement can be acheived with a manual transpose
-via <code>pose.to_inverse_rotation()</code>.</p>
-</div>
 <p><strong>Returns:</strong></p>
 <p>An <a class="autorefs autorefs-internal" href="../image_model/#cryojax.simulator.AbstractImageModel"><code>cryojax.simulator.AbstractImageModel</code></a>. This has type:</p>
 <ul>
@@ -1527,7 +1512,7 @@ the value of <code>quantity_mode</code>.</li>
 <h4 id="cryojax.simulator.load_tabulated_volume" class="doc doc-heading">
   <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">cryojax.simulator.load_tabulated_volume</span>
 
-  <a href="https://github.com/michael-0brien/cryojax/blob/3dafae10a5693209a2b55c44cb9b902554145fbd/cryojax/simulator/_api_utils.py#L422-L554"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/736e8aa815e52f6d45d67344c512930d2d47c599/cryojax/simulator/_api_utils.py#L380-L512"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.load_tabulated_volume" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1619,7 +1604,7 @@ equal to <code>output_type</code>.</p>
 <h4 id="cryojax.simulator.render_voxel_volume" class="doc doc-heading">
   <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">cryojax.simulator.render_voxel_volume</span>
 
-  <a href="https://github.com/michael-0brien/cryojax/blob/3dafae10a5693209a2b55c44cb9b902554145fbd/cryojax/simulator/_api_utils.py#L584-L663"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/736e8aa815e52f6d45d67344c512930d2d47c599/cryojax/simulator/_api_utils.py#L551-L645"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.render_voxel_volume" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1631,11 +1616,13 @@ equal to <code>output_type</code>.</p>
         <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelGridVolume</span>
         <span class="o">|</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelSplineVolume</span>
         <span class="o">|</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">RealVoxelGridVolume</span>
+        <span class="o">|</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">RealVoxelCloudVolume</span>
     <span class="p">]</span> <span class="o">=</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelGridVolume</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="p">(</span>
     <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelGridVolume</span>
     <span class="o">|</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelSplineVolume</span>
     <span class="o">|</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">RealVoxelGridVolume</span>
+    <span class="o">|</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">RealVoxelCloudVolume</span>
 <span class="p">)</span>
 </code></pre></div>
 
@@ -1674,7 +1661,8 @@ equal to <code>output_type</code>.</p>
     Either <a class="autorefs autorefs-internal" href="../volume/#cryojax.simulator.FourierVoxelGridVolume"><code>cryojax.simulator.FourierVoxelGridVolume</code></a> /
     <a class="autorefs autorefs-internal" href="../volume/#cryojax.simulator.FourierVoxelSplineVolume"><code>cryojax.simulator.FourierVoxelSplineVolume</code></a> for
     fourier-space representations, or
-    <a class="autorefs autorefs-internal" href="../volume/#cryojax.simulator.RealVoxelGridVolume"><code>cryojax.simulator.RealVoxelGridVolume</code></a> for real-space.</li>
+    <a class="autorefs autorefs-internal" href="../volume/#cryojax.simulator.RealVoxelGridVolume"><code>cryojax.simulator.RealVoxelGridVolume</code></a> /
+    <a class="autorefs autorefs-internal" href="../volume/#cryojax.simulator.RealVoxelCloudVolume"><code>cryojax.simulator.RealVoxelCloudVolume</code></a> for real-space.</li>
 </ul>
 <p><strong>Returns:</strong></p>
 <p>A <a class="autorefs autorefs-internal" href="../volume/#cryojax.simulator.AbstractVoxelVolume"><code>cryojax.simulator.AbstractVoxelVolume</code></a> with exact type
