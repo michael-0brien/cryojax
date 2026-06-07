@@ -32,15 +32,9 @@ class AbstractRealOperator(eqx.Module, strict=True):
     def __call__(  # pyright: ignore
         self,
         coordinate_grid: (
-            Float[Array, " x_dim"]
-            | Float[Array, "y_dim x_dim 2"]
-            | Float[Array, "z_dim y_dim x_dim 3"]
+            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
         ),
-    ) -> (
-        Inexact[Array, " x_dim"]
-        | Inexact[Array, "y_dim x_dim"]
-        | Float[Array, "z_dim y_dim x_dim"]
-    ):
+    ) -> Inexact[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]:
         raise NotImplementedError
 
     def __add__(self, other) -> "AbstractRealOperator":
@@ -84,15 +78,9 @@ class _SumRealOperator(AbstractRealOperator, strict=True):
     def __call__(
         self,
         coordinate_grid: (
-            Float[Array, " x_dim"]
-            | Float[Array, "y_dim x_dim 2"]
-            | Float[Array, "z_dim y_dim x_dim 3"]
+            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
         ),
-    ) -> (
-        Inexact[Array, " x_dim"]
-        | Inexact[Array, "y_dim x_dim"]
-        | Inexact[Array, "z_dim y_dim x_dim"]
-    ):
+    ) -> Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"]:
         return self.operator1(coordinate_grid) * self.operator2(coordinate_grid)
 
     def __repr__(self):
@@ -109,15 +97,9 @@ class _DiffRealOperator(AbstractRealOperator, strict=True):
     def __call__(
         self,
         coordinate_grid: (
-            Float[Array, " x_dim"]
-            | Float[Array, "y_dim x_dim 2"]
-            | Float[Array, "z_dim y_dim x_dim 3"]
+            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
         ),
-    ) -> (
-        Inexact[Array, " x_dim"]
-        | Inexact[Array, "y_dim x_dim"]
-        | Inexact[Array, "z_dim y_dim x_dim"]
-    ):
+    ) -> Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"]:
         return self.operator1(coordinate_grid) * self.operator2(coordinate_grid)
 
     def __repr__(self):
@@ -134,15 +116,9 @@ class _ProductRealOperator(AbstractRealOperator, strict=True):
     def __call__(
         self,
         coordinate_grid: (
-            Float[Array, " x_dim"]
-            | Float[Array, "y_dim x_dim 2"]
-            | Float[Array, "z_dim y_dim x_dim 3"]
+            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
         ),
-    ) -> (
-        Inexact[Array, " x_dim"]
-        | Inexact[Array, "y_dim x_dim"]
-        | Inexact[Array, "z_dim y_dim x_dim"]
-    ):
+    ) -> Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"]:
         return self.operator1(coordinate_grid) * self.operator2(coordinate_grid)
 
     def __repr__(self):
@@ -165,7 +141,7 @@ class RealGaussian(AbstractRealOperator, strict=True):
         self,
         amplitude: FloatLike = 1.0,
         variance: FloatLike = 1.0,
-        offset: FloatLike | Float[NDArrayLike, " _"] | Sequence[float] | None = None,
+        offset: Float[NDArrayLike, " _"] | Sequence[float] | None = None,
     ):
         """**Arguments:**
 
@@ -182,25 +158,14 @@ class RealGaussian(AbstractRealOperator, strict=True):
         self.amplitude = jnp.asarray(amplitude, dtype=float)
         self.variance = jnp.asarray(variance, dtype=float)
         if offset is not None:
-            self.offset = jnp.atleast_1d(jnp.asarray(offset, dtype=float))
+            self.offset = jnp.asarray(offset, dtype=float)
         else:
             self.offset = None
 
     @override
     def __call__(
-        self,
-        coordinate_grid: (
-            Float[Array, " x_dim"]
-            | Float[Array, "y_dim x_dim 2"]
-            | Float[Array, "z_dim y_dim x_dim 3"]
-        ),
-    ) -> (
-        Float[Array, " x_dim"]
-        | Float[Array, "y_dim x_dim"]
-        | Float[Array, "z_dim y_dim x_dim"]
-    ):
-        if coordinate_grid.ndim == 1:
-            coordinate_grid = coordinate_grid[:, None]
+        self, coordinate_grid: Float[Array, "y_dim x_dim 2"]
+    ) -> Float[Array, "y_dim x_dim"]:
         ndim = coordinate_grid.ndim - 1
         offset = jnp.zeros((ndim,), dtype=float) if self.offset is None else self.offset
         r_squared = jnp.sum((coordinate_grid - offset) ** 2, axis=-1)
@@ -227,9 +192,7 @@ class RealConstant(AbstractRealOperator, strict=True):
     def __call__(
         self,
         coordinate_grid: (
-            Float[Array, " x_dim"]
-            | Float[Array, "y_dim x_dim 2"]
-            | Float[Array, "z_dim y_dim x_dim 3"]
+            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
         ),
     ) -> Float[Array, ""]:
         del coordinate_grid
