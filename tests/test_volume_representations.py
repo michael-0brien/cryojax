@@ -276,7 +276,7 @@ def test_render_options(pdb_info):
     atom_volume, atom_render_fn = (
         cxs.IndependentAtomVolume(
             positions=atom_positions,
-            scattering_factors=im.FourierGaussian(
+            kernel_fns=im.FourierGaussian(
                 amplitude=1.0, b_factor=width**2 * (8 * np.pi**2)
             ),
         ),
@@ -319,9 +319,7 @@ def test_fft_atom_render(pdb_info, width, voxel_size, shape):
     )
     atom_volume = cxs.IndependentAtomVolume(
         positions=atom_positions,
-        scattering_factors=im.FourierGaussian(
-            amplitude=1.0, b_factor=width**2 * (8 * np.pi**2)
-        ),
+        kernel_fns=im.FourierGaussian(amplitude=1.0, b_factor=width**2 * (8 * np.pi**2)),
     )
     gaussian_render_fn = cxs.GaussianMixtureRenderFn(shape, voxel_size)
     atom_render_fn = cxs.IndependentAtomRenderFn(shape, voxel_size, eps=1e-10)
