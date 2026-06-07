@@ -273,18 +273,18 @@ def test_render_options(pdb_info):
         ),
         cxs.GaussianMixtureRenderFn(shape, voxel_size),
     )
-    fft_volume, fft_render_fn = (
+    atom_volume, atom_render_fn = (
         cxs.IndependentAtomVolume(
             positions=atom_positions,
             scattering_factors=im.FourierGaussian(
                 amplitude=1.0, b_factor=width**2 * (8 * np.pi**2)
             ),
         ),
-        cxs.FFTAtomRenderFn(shape, voxel_size, eps=1e-10),
+        cxs.IndependentAtomRenderFn(shape, voxel_size, eps=1e-10),
     )
     volumes, render_fns = (
-        [gaussian_volume, fft_volume],
-        [gaussian_render_fn, fft_render_fn],
+        [gaussian_volume, atom_volume],
+        [gaussian_render_fn, atom_render_fn],
     )
     for volume, render_fn in zip(volumes, render_fns):
         real_voxel_grid = render_fn(volume, outputs_real_space=True)
@@ -324,11 +324,11 @@ def test_fft_atom_render(pdb_info, width, voxel_size, shape):
         ),
     )
     gaussian_render_fn = cxs.GaussianMixtureRenderFn(shape, voxel_size)
-    fft_render_fn = cxs.FFTAtomRenderFn(shape, voxel_size, eps=1e-10)
+    atom_render_fn = cxs.IndependentAtomRenderFn(shape, voxel_size, eps=1e-10)
     voxels_by_gaussians = gaussian_render_fn(gaussian_volume)
-    voxels_by_fft = fft_render_fn(atom_volume)
+    voxels_by_atoms = atom_render_fn(atom_volume)
 
-    np.testing.assert_allclose(voxels_by_gaussians, voxels_by_fft, atol=1e-8)
+    np.testing.assert_allclose(voxels_by_gaussians, voxels_by_atoms, atol=1e-8)
 
 
 #

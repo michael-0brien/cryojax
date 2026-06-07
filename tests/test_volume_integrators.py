@@ -68,18 +68,18 @@ def test_fft_atom_projection_exact(pdb_info, pixel_size, shape):
         ),
         cxs.GaussianMixtureProjection(sampling_mode="point"),
     )
-    atom_volume, fft_integrator = (
+    atom_volume, atom_integrator = (
         cxs.IndependentAtomVolume(
             positions=atom_positions,
             scattering_factors=im.FourierGaussian(amplitude=amplitude, b_factor=b_factor),
         ),
-        cxs.FFTAtomProjection(sampling_mode="point", eps=1e-10),
+        cxs.IndependentAtomProjection(sampling_mode="point", eps=1e-10),
     )
     proj_by_gaussians = compute_projection(
         gaussian_volume, gaussian_integrator, image_config
     )
-    proj_by_fft = compute_projection(atom_volume, fft_integrator, image_config)
-    np.testing.assert_allclose(proj_by_gaussians, proj_by_fft, atol=1e-8)
+    proj_by_atom = compute_projection(atom_volume, atom_integrator, image_config)
+    np.testing.assert_allclose(proj_by_gaussians, proj_by_atom, atol=1e-8)
 
 
 @pytest.mark.parametrize(
@@ -100,7 +100,7 @@ def test_fft_atom_projection_antialias(pdb_info, width, pixel_size, shape):
         ),
     )
     gaussian_integrator = cxs.GaussianMixtureProjection(sampling_mode="average")
-    fft_integrator = cxs.FFTAtomProjection(eps=1e-10)
+    atom_integrator = cxs.IndependentAtomProjection(eps=1e-10)
     padded_shape = (2 * shape[0], 2 * shape[1])
     image_config = cxs.BasicImageConfig(
         shape, pixel_size, voltage_in_kilovolts=300.0, padded_shape=padded_shape
@@ -108,9 +108,9 @@ def test_fft_atom_projection_antialias(pdb_info, width, pixel_size, shape):
     proj_by_gaussians = compute_projection(
         gaussian_volume, gaussian_integrator, image_config
     )
-    proj_by_fft = compute_projection(atom_volume, fft_integrator, image_config)
+    proj_by_atoms = compute_projection(atom_volume, atom_integrator, image_config)
 
-    np.testing.assert_allclose(proj_by_gaussians, proj_by_fft, atol=1e-8)
+    np.testing.assert_allclose(proj_by_gaussians, proj_by_atoms, atol=1e-8)
 
 
 @pytest.mark.parametrize(
@@ -143,15 +143,14 @@ def test_fft_atom_projection_peng(pdb_info, pixel_size, shape, upsample_factor):
     # Check to make sure the implementations are identical, up to the
     # nufft (don't include anti-aliasing)
     gaussian_integrator = cxs.GaussianMixtureProjection(sampling_mode="average")
-    fft_integrator = cxs.FFTAtomProjection(
+    atom_integrator = cxs.IndependentAtomProjection(
         sampling_mode="average", upsample_factor=upsample_factor, eps=1e-10
     )
     proj_by_gaussians = compute_projection(
         gaussian_volume, gaussian_integrator, image_config
     )
-    proj_by_fft = compute_projection(atom_volume, fft_integrator, image_config)
-    np.testing.assert_allclose(proj_by_gaussians, proj_by_fft, atol=5e-3)
-
+    proj_by_atoms = compute_projection(atom_volume, atom_integrator, image_config)
+    np.testing.assert_allclose(proj_by_gaussians, proj_by_atoms, atol=5e-3)
 
 @pytest.mark.parametrize(
     "pixel_size, shape",

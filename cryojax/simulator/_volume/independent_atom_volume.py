@@ -255,7 +255,7 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
         return cls(positions_by_element, scattering_factors_by_element)
 
 
-class FFTAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True):
+class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True):
     """Render a voxel grid using non-uniform FFTs and convolution."""
 
     shape: tuple[int, int, int]
@@ -303,7 +303,7 @@ class FFTAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True
         """
         if sampling_mode not in ["average", "point"]:
             raise ValueError(
-                "`sampling_mode` in `FFTAtomRenderFn` "
+                "`sampling_mode` in `IndependentAtomRenderFn` "
                 "must be either 'average' for averaging within a "
                 "pixel or 'point' for point sampling. Got "
                 f"`sampling_mode = {sampling_mode}`."
@@ -388,7 +388,7 @@ class FFTAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True
                     return jnp.fft.ifftshift(fourier_voxel_grid)
 
 
-class FFTAtomProjection(
+class IndependentAtomProjection(
     AbstractVolumeIntegrator[IndependentAtomVolume],
     strict=True,
 ):
@@ -433,7 +433,7 @@ class FFTAtomProjection(
         """
         if sampling_mode not in ["average", "point"]:
             raise ValueError(
-                "`sampling_mode` in `FFTAtomProjection` "
+                "`sampling_mode` in `IndependentAtomProjection` "
                 "must be either 'average' for averaging within a "
                 "pixel or 'point' for point sampling. Got "
                 f"`sampling_mode = {sampling_mode}`."
@@ -599,7 +599,7 @@ def _apply_subpixel_shift(target_shape, fourier_image, frequency_grid, k):
     if len(set(target_shape)) > 1:
         raise NotImplementedError(
             "Even `upsample_factor` and non-square image shape not "
-            f"supported in `FFTAtomProjection`. Got `upsample_factor = {k}` "
+            f"supported in `IndependentAtomProjection`. Got `upsample_factor = {k}` "
             f"and `shape = {target_shape}`."
         )
     dim = target_shape[0]
