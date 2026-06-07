@@ -264,7 +264,7 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
         return cls(positions_by_element, scattering_factors_by_element)
 
 
-class FFTAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True):
+class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True):
     """Render a voxel grid using non-uniform FFTs and convolution."""
 
     shape: tuple[int, int, int]
@@ -320,7 +320,7 @@ class FFTAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True
         """
         if sampling_mode not in ["average", "point"]:
             raise ValueError(
-                "`sampling_mode` in `FFTAtomRenderFn` "
+                "`sampling_mode` in `IndependentAtomRenderFn` "
                 "must be either 'average' for averaging within a "
                 "pixel or 'point' for point sampling. Got "
                 f"`sampling_mode = {sampling_mode}`."
@@ -407,7 +407,7 @@ class FFTAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True
                     return jnp.fft.ifftshift(fourier_voxel_grid)
 
 
-class FFTAtomProjection(
+class IndependentAtomProjection(
     AbstractVolumeIntegrator[IndependentAtomVolume],
     strict=True,
 ):
@@ -461,14 +461,14 @@ class FFTAtomProjection(
         """
         if jnufft is None:
             raise RuntimeError(
-                "Tried to use the `FFTAtomProjection` "
+                "Tried to use the `IndependentAtomProjection` "
                 "class, but `jax-finufft` is not installed. "
                 "See https://github.com/flatironinstitute/jax-finufft "
                 "for installation instructions."
             ) from JAX_FINUFFT_IMPORT_ERROR
         if sampling_mode not in ["average", "point"]:
             raise ValueError(
-                "`sampling_mode` in `FFTAtomProjection` "
+                "`sampling_mode` in `IndependentAtomProjection` "
                 "must be either 'average' for averaging within a "
                 "pixel or 'point' for point sampling. Got "
                 f"`sampling_mode = {sampling_mode}`."
@@ -615,9 +615,13 @@ def _render_with_nufft(shape, ps, pos, kernel, freqs, eps=1e-6, opts=None):
             unpack_opts(opts, finufft_type=1, forward=False),
         )
         if opts_fwd.modeord:
-            raise ValueError(_get_modeord_msg("forward", False, "FFTAtomRenderFn"))
+            raise ValueError(
+                _get_modeord_msg("forward", False, "IndependentAtomRenderFn")
+            )
         if opts_bwd.modeord:
-            raise ValueError(_get_modeord_msg("backward", False, "FFTAtomRenderFn"))
+            raise ValueError(
+                _get_modeord_msg("backward", False, "IndependentAtomRenderFn")
+            )
 
     return fourier_projection
 
@@ -656,9 +660,13 @@ def _project_with_nufft(shape, ps, pos, kernel, freqs, eps=1e-6, opts=None):
             unpack_opts(opts, finufft_type=1, forward=False),
         )
         if opts_fwd.modeord:
-            raise ValueError(_get_modeord_msg("forward", False, "FFTAtomProjection"))
+            raise ValueError(
+                _get_modeord_msg("forward", False, "IndependentAtomProjection")
+            )
         if opts_bwd.modeord:
-            raise ValueError(_get_modeord_msg("backward", False, "FFTAtomProjection"))
+            raise ValueError(
+                _get_modeord_msg("backward", False, "IndependentAtomProjection")
+            )
 
     return fourier_projection
 
@@ -674,7 +682,7 @@ def _apply_subpixel_shift(target_shape, fourier_image, frequency_grid, k):
     if len(set(target_shape)) > 1:
         raise NotImplementedError(
             "Even `upsample_factor` and non-square image shape not "
-            f"supported in `FFTAtomProjection`. Got `upsample_factor = {k}` "
+            f"supported in `IndependentAtomProjection`. Got `upsample_factor = {k}` "
             f"and `shape = {target_shape}`."
         )
     dim = target_shape[0]

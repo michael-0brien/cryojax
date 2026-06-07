@@ -87,7 +87,7 @@ def test_fft_atom_projection_exact(pdb_info, pixel_size, shape):
                     amplitude=amplitude, b_factor=b_factor
                 ),
             ),
-            cxs.FFTAtomProjection(sampling_mode="point", eps=1e-10),
+            cxs.IndependentAtomProjection(sampling_mode="point", eps=1e-10),
         )
         proj_by_gaussians = compute_projection(
             gaussian_volume, gaussian_integrator, image_config
@@ -96,7 +96,7 @@ def test_fft_atom_projection_exact(pdb_info, pixel_size, shape):
         np.testing.assert_allclose(proj_by_gaussians, proj_by_fft, atol=1e-8)
     else:
         warnings.warn(
-            "Could not test projection method `FFTAtomProjection`, "
+            "Could not test projection method `IndependentAtomProjection`, "
             "most likely because `jax_finufft` is not installed. "
             f"Error traceback is:\n{JAX_FINUFFT_IMPORT_ERROR}"
         )
@@ -121,7 +121,7 @@ def test_fft_atom_projection_antialias(pdb_info, width, pixel_size, shape):
             ),
         )
         gaussian_integrator = cxs.GaussianMixtureProjection(sampling_mode="average")
-        fft_integrator = cxs.FFTAtomProjection(eps=1e-10)
+        fft_integrator = cxs.IndependentAtomProjection(eps=1e-10)
         padded_shape = (2 * shape[0], 2 * shape[1])
         image_config = cxs.BasicImageConfig(
             shape, pixel_size, voltage_in_kilovolts=300.0, padded_shape=padded_shape
@@ -167,7 +167,7 @@ def test_fft_atom_projection_peng(pdb_info, pixel_size, shape, upsample_factor):
         # Check to make sure the implementations are identical, up to the
         # nufft (don't include anti-aliasing)
         gaussian_integrator = cxs.GaussianMixtureProjection(sampling_mode="average")
-        fft_integrator = cxs.FFTAtomProjection(
+        fft_integrator = cxs.IndependentAtomProjection(
             sampling_mode="average", upsample_factor=upsample_factor, eps=1e-10
         )
         proj_by_gaussians = compute_projection(

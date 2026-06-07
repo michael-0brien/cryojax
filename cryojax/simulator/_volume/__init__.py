@@ -22,8 +22,8 @@ from .gaussian_volume import (
     GaussianMixtureVolume as GaussianMixtureVolume,
 )
 from .independent_atom_volume import (
-    FFTAtomProjection as FFTAtomProjection,
-    FFTAtomRenderFn as FFTAtomRenderFn,
+    IndependentAtomProjection as IndependentAtomProjection,
+    IndependentAtomRenderFn as IndependentAtomRenderFn,
     IndependentAtomVolume as IndependentAtomVolume,
     LobatoScatteringFactor as LobatoScatteringFactor,
     PengScatteringFactor as PengScatteringFactor,
