@@ -277,21 +277,27 @@ def test_frc_fsc_jit(shape):
 
 
 def test_operators_instantiate():
+    frequency_grid_1d = im.make_1d_frequency_grid(10)
     frequency_grid_2d = im.make_frequency_grid((10, 10))
     frequency_grid_3d = im.make_frequency_grid((10, 10, 10))
+    coordinate_grid_1d = im.make_1d_coordinate_grid(10)
     coordinate_grid_2d = im.make_coordinate_grid((10, 10))
     coordinate_grid_3d = im.make_coordinate_grid((10, 10, 10))
+    for cls in _real_operators_1d:
+        _ = cls(coordinate_grid_1d)
     for cls in _real_operators_2d:
         _ = cls(coordinate_grid_2d)
     for cls in _real_operators_3d:
         _ = cls(coordinate_grid_3d)
+    for cls in _fourier_operators_1d:
+        _ = cls(frequency_grid_1d)
     for cls in _fourier_operators_2d:
         _ = cls(frequency_grid_2d)
     for cls in _fourier_operators_3d:
         _ = cls(frequency_grid_3d)
 
 
-_fourier_operators_2d = [
+_fourier_operators_common = [
     im.FourierGaussian(),
     im.PeakedFourierGaussian(),
     im.FourierConstant(1.0),
@@ -303,34 +309,17 @@ _fourier_operators_2d = [
     im.FourierConstant(1.0) - im.FourierConstant(1.0),
     im.FourierConstant(1.0) * im.FourierConstant(1.0),
 ]
-
-
-_fourier_operators_3d = [
-    im.FourierGaussian(),
-    im.PeakedFourierGaussian(),
-    im.FourierConstant(1.0),
-    im.FourierSinc(),
-    im.CustomFourierOperator(lambda _, a, b: a + b, 1.0, b=1.0),
-    im.FourierDC(),
-    im.FourierConstant(1.0) + im.FourierConstant(1.0),
-    im.FourierConstant(1.0) - im.FourierConstant(1.0),
-    im.FourierConstant(1.0) * im.FourierConstant(1.0),
-]
-
-_real_operators_2d = [
+_real_operators_common = [
     im.RealGaussian(),
-    im.RealGaussian(offset=(1.0, -1.0)),
     im.RealConstant(1.0),
     im.RealConstant(1.0) + im.RealConstant(1.0),
     im.RealConstant(1.0) - im.RealConstant(1.0),
     im.RealConstant(1.0) * im.RealConstant(1.0),
 ]
 
-_real_operators_3d = [
-    im.RealGaussian(),
-    im.RealGaussian(offset=(1.0, -1.0, 0.0)),
-    im.RealConstant(1.0),
-    im.RealConstant(1.0) + im.RealConstant(1.0),
-    im.RealConstant(1.0) - im.RealConstant(1.0),
-    im.RealConstant(1.0) * im.RealConstant(1.0),
-]
+_fourier_operators_1d = _fourier_operators_common
+_fourier_operators_2d = _fourier_operators_common
+_fourier_operators_3d = _fourier_operators_common
+_real_operators_1d = [*_real_operators_common, im.RealGaussian(offset=1.0)]
+_real_operators_2d = [*_real_operators_common, im.RealGaussian(offset=(1.0, -1.0))]
+_real_operators_3d = [*_real_operators_common, im.RealGaussian(offset=(1.0, -1.0, 0.0))]

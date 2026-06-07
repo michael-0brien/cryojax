@@ -42,9 +42,15 @@ class AbstractFourierOperator(eqx.Module, strict=True):
     def __call__(
         self,
         frequency_grid: (
-            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
+            Float[Array, " x_dim"]
+            | Float[Array, "y_dim x_dim 2"]
+            | Float[Array, "z_dim y_dim x_dim 3"]
         ),
-    ) -> Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"]:
+    ) -> (
+        Inexact[Array, " x_dim"]
+        | Inexact[Array, "y_dim x_dim"]
+        | Inexact[Array, "z_dim y_dim x_dim"]
+    ):
         raise NotImplementedError
 
     def __add__(self, other) -> "AbstractFourierOperator":
@@ -88,9 +94,15 @@ class _SumFourierOperator(AbstractFourierOperator, strict=True):
     def __call__(
         self,
         frequency_grid: (
-            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
+            Float[Array, " x_dim"]
+            | Float[Array, "y_dim x_dim 2"]
+            | Float[Array, "z_dim y_dim x_dim 3"]
         ),
-    ) -> Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"]:
+    ) -> (
+        Inexact[Array, " x_dim"]
+        | Inexact[Array, "y_dim x_dim"]
+        | Inexact[Array, "z_dim y_dim x_dim"]
+    ):
         return self.operator1(frequency_grid) + self.operator2(frequency_grid)
 
     def __repr__(self):
@@ -107,9 +119,15 @@ class _DiffFourierOperator(AbstractFourierOperator, strict=True):
     def __call__(
         self,
         frequency_grid: (
-            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
+            Float[Array, " x_dim"]
+            | Float[Array, "y_dim x_dim 2"]
+            | Float[Array, "z_dim y_dim x_dim 3"]
         ),
-    ) -> Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"]:
+    ) -> (
+        Inexact[Array, " x_dim"]
+        | Inexact[Array, "y_dim x_dim"]
+        | Inexact[Array, "z_dim y_dim x_dim"]
+    ):
         return self.operator1(frequency_grid) - self.operator2(frequency_grid)
 
     def __repr__(self):
@@ -126,9 +144,15 @@ class _ProductFourierOperator(AbstractFourierOperator, strict=True):
     def __call__(
         self,
         frequency_grid: (
-            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
+            Float[Array, " x_dim"]
+            | Float[Array, "y_dim x_dim 2"]
+            | Float[Array, "z_dim y_dim x_dim 3"]
         ),
-    ) -> Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"]:
+    ) -> (
+        Inexact[Array, " x_dim"]
+        | Inexact[Array, "y_dim x_dim"]
+        | Inexact[Array, "z_dim y_dim x_dim"]
+    ):
         return self.operator1(frequency_grid) * self.operator2(frequency_grid)
 
     def __repr__(self):
@@ -138,14 +162,22 @@ class _ProductFourierOperator(AbstractFourierOperator, strict=True):
 class CustomFourierOperator(AbstractFourierOperator, strict=True):
     """An operator that calls a custom function."""
 
-    fn: Callable[..., Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"]]
+    fn: Callable[
+        ...,
+        Inexact[Array, " x_dim"]
+        | Inexact[Array, "y_dim x_dim"]
+        | Inexact[Array, "z_dim y_dim x_dim"],
+    ]
     args: Any
     kwargs: Any
 
     def __init__(
         self,
         fn: Callable[
-            ..., Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"]
+            ...,
+            Inexact[Array, " x_dim"]
+            | Inexact[Array, "y_dim x_dim"]
+            | Inexact[Array, "z_dim y_dim x_dim"],
         ],
         *args: Any,
         **kwargs: Any,
@@ -158,9 +190,15 @@ class CustomFourierOperator(AbstractFourierOperator, strict=True):
     def __call__(
         self,
         frequency_grid: (
-            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
+            Float[Array, " x_dim"]
+            | Float[Array, "y_dim x_dim 2"]
+            | Float[Array, "z_dim y_dim x_dim 3"]
         ),
-    ) -> Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"]:
+    ) -> (
+        Inexact[Array, " x_dim"]
+        | Inexact[Array, "y_dim x_dim"]
+        | Inexact[Array, "z_dim y_dim x_dim"]
+    ):
         return self.fn(frequency_grid, *self.args, **self.kwargs)
 
 
@@ -192,10 +230,27 @@ class FourierDC(AbstractFourierOperator, strict=True):
     def __call__(
         self,
         frequency_grid: (
-            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
+            Float[Array, " x_dim"]
+            | Float[Array, "y_dim x_dim 2"]
+            | Float[Array, "z_dim y_dim x_dim 3"]
         ),
-    ) -> Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]:
-        return jnp.zeros(frequency_grid.shape[0:-1]).at[0, 0].set(self.value)
+    ) -> (
+        Float[Array, " x_dim"]
+        | Float[Array, "y_dim x_dim"]
+        | Float[Array, "z_dim y_dim x_dim"]
+    ):
+        if frequency_grid.ndim == 1:
+            return jnp.zeros(frequency_grid.shape).at[0].set(self.value)
+        elif frequency_grid.ndim - 1 == 2:
+            return jnp.zeros(frequency_grid.shape[0:-1]).at[0, 0].set(self.value)
+        elif frequency_grid.ndim - 1 == 3:
+            return jnp.zeros(frequency_grid.shape[0:-1]).at[0, 0, 0].set(self.value)
+        else:
+            raise ValueError(
+                "Unrecognized format for `frequency_grid` passed to `FourierDC` "
+                f"Was shape {frequency_grid.shape}, but only shapes `(N,)` "
+                "`(N1, N2, 2)`, and `(N1, N2, N3, 3)` are supported."
+            )
 
 
 class FourierConstant(AbstractFourierOperator, strict=True):
@@ -214,7 +269,9 @@ class FourierConstant(AbstractFourierOperator, strict=True):
     def __call__(
         self,
         frequency_grid: (
-            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
+            Float[Array, " x_dim"]
+            | Float[Array, "y_dim x_dim 2"]
+            | Float[Array, "z_dim y_dim x_dim 3"]
         ),
     ) -> Float[Array, "..."]:
         del frequency_grid
@@ -305,10 +362,20 @@ class FourierGaussian(AbstractFourierOperator, strict=True):
     def __call__(
         self,
         frequency_grid: (
-            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
+            Float[Array, " x_dim"]
+            | Float[Array, "y_dim x_dim 2"]
+            | Float[Array, "z_dim y_dim x_dim 3"]
         ),
-    ) -> Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]:
-        k_sqr = jnp.sum(frequency_grid**2, axis=-1)
+    ) -> (
+        Float[Array, " x_dim"]
+        | Float[Array, "y_dim x_dim"]
+        | Float[Array, "z_dim y_dim x_dim"]
+    ):
+        k_sqr = (
+            frequency_grid**2
+            if frequency_grid.ndim == 1
+            else jnp.sum(frequency_grid**2, axis=-1)
+        )
         gaussian = self.amplitude * jnp.exp(
             -0.25 * error_if_not_positive(self.b_factor) * k_sqr
         )
@@ -350,10 +417,20 @@ class PeakedFourierGaussian(AbstractFourierOperator, strict=True):
     def __call__(
         self,
         frequency_grid: (
-            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
+            Float[Array, " x_dim"]
+            | Float[Array, "y_dim x_dim 2"]
+            | Float[Array, "z_dim y_dim x_dim 3"]
         ),
-    ) -> Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]:
-        k = jnp.linalg.norm(frequency_grid, axis=-1)
+    ) -> (
+        Float[Array, " x_dim"]
+        | Float[Array, "y_dim x_dim"]
+        | Float[Array, "z_dim y_dim x_dim"]
+    ):
+        k = (
+            jnp.linalg.norm(frequency_grid)
+            if frequency_grid.ndim == 1
+            else jnp.linalg.norm(frequency_grid, axis=-1)
+        )
         gaussian = self.amplitude * jnp.exp(
             -0.25
             * error_if_not_positive(self.b_factor)
@@ -395,9 +472,17 @@ class FourierSinc(AbstractFourierOperator, strict=True):
     def __call__(
         self,
         frequency_grid: (
-            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
+            Float[Array, " x_dim"]
+            | Float[Array, "y_dim x_dim 2"]
+            | Float[Array, "z_dim y_dim x_dim 3"]
         ),
-    ) -> Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]:
+    ) -> (
+        Float[Array, " x_dim"]
+        | Float[Array, "y_dim x_dim"]
+        | Float[Array, "z_dim y_dim x_dim"]
+    ):
+        if frequency_grid.ndim == 1:
+            frequency_grid = frequency_grid[:, None]
         ndim = frequency_grid.ndim - 1
         return functools.reduce(
             operator.mul,
@@ -410,22 +495,33 @@ class FourierPhaseShifts(AbstractFourierOperator):
 
     shift: Float[Array, " _"]
 
-    def __init__(self, shift: Float[NDArrayLike, "2"] | Float[NDArrayLike, "3"]):
+    def __init__(
+        self,
+        shift: FloatLike | Float[NDArrayLike, "2"] | Float[NDArrayLike, "3"],
+    ):
         """**Arguments:**
 
         - `shift`:
             The shift to apply in the Fourier domain. The units of this should
             be the inverse of the units of the `frequency_grid` passed at runtime.
         """
-        self.shift = jnp.asarray(shift, dtype=float)
+        self.shift = jnp.asarray(jnp.atleast_1d(shift), dtype=float)
 
     @override
     def __call__(
         self,
         frequency_grid: (
-            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
+            Float[Array, " x_dim"]
+            | Float[Array, "y_dim x_dim 2"]
+            | Float[Array, "z_dim y_dim x_dim 3"]
         ),
-    ) -> Complex[Array, "y_dim x_dim"] | Complex[Array, "z_dim y_dim x_dim"]:
+    ) -> (
+        Complex[Array, " x_dim"]
+        | Complex[Array, "y_dim x_dim"]
+        | Complex[Array, "z_dim y_dim x_dim"]
+    ):
+        if frequency_grid.ndim == 1:
+            frequency_grid = frequency_grid[:, None]
         ndim = frequency_grid.ndim - 1
         if ndim != self.shift.size:
             raise ValueError(
