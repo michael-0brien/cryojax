@@ -73,7 +73,7 @@ def test_fft_atom_projection_exact(pdb_info, pixel_size, shape):
             positions=atom_positions,
             scattering_factors=im.FourierGaussian(amplitude=amplitude, b_factor=b_factor),
         ),
-        cxs.IndependentAtomProjection(sampling_mode="point", eps=1e-10),
+        cxs.FFTAtomProjection(sampling_mode="point", eps=1e-10),
     )
     proj_by_gaussians = compute_projection(
         gaussian_volume, gaussian_integrator, image_config
@@ -100,7 +100,7 @@ def test_fft_atom_projection_antialias(pdb_info, width, pixel_size, shape):
         ),
     )
     gaussian_integrator = cxs.GaussianMixtureProjection(sampling_mode="average")
-    fft_integrator = cxs.IndependentAtomProjection(eps=1e-10)
+    fft_integrator = cxs.FFTAtomProjection(eps=1e-10)
     padded_shape = (2 * shape[0], 2 * shape[1])
     image_config = cxs.BasicImageConfig(
         shape, pixel_size, voltage_in_kilovolts=300.0, padded_shape=padded_shape
@@ -143,7 +143,7 @@ def test_fft_atom_projection_peng(pdb_info, pixel_size, shape, upsample_factor):
     # Check to make sure the implementations are identical, up to the
     # nufft (don't include anti-aliasing)
     gaussian_integrator = cxs.GaussianMixtureProjection(sampling_mode="average")
-    fft_integrator = cxs.IndependentAtomProjection(
+    fft_integrator = cxs.FFTAtomProjection(
         sampling_mode="average", upsample_factor=upsample_factor, eps=1e-10
     )
     proj_by_gaussians = compute_projection(

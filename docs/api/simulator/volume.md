@@ -140,7 +140,7 @@ There are many different volume representations of biological structures for cry
 
 ---
 
-::: cryojax.simulator.IndependentAtomRenderFn
+::: cryojax.simulator.FFTAtomRenderFn
         options:
             members:
                 - __init__
