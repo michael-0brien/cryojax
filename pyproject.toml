@@ -22,6 +22,7 @@ dependencies = [
     "equinox>=0.11.0",
     "jaxtyping>=0.2.23",
     "lineax",
+    "nufftax",
     "mrcfile",
     "starfile",
     "pandas",
@@ -52,9 +53,6 @@ tests = [
     "pytest-cov",
     "pycistem==0.4.1; sys_platform == 'linux' and python_version < '3.12'",
     "typeguard==2.13.3"
-]
-extras = [
-    "jax-finufft>=1.2.0"
 ]
 
 [build-system]

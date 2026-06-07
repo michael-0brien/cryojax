@@ -1,4 +1,3 @@
-import warnings
 from typing import Literal
 
 import jax.numpy as jnp
@@ -18,13 +17,8 @@ with install_import_hook("cryojax", "typeguard.typechecked"):
     from cryojax.io import read_array_from_mrc, read_atoms_from_pdb
     from cryojax.ndimage import make_coordinate_grid
 
-try:
-    import jax_finufft as jnufft
-
-    JAX_FINUFFT_IMPORT_ERROR = None
-except ModuleNotFoundError as err:
-    jnufft = None
-    JAX_FINUFFT_IMPORT_ERROR = err
+# jnufft = None
+# JAX_FINUFFT_IMPORT_ERROR = err
 
 
 @pytest.fixture
@@ -271,7 +265,6 @@ def test_downsampled_voxel_volume_agreement(sample_pdb_path):
 def test_render_options(pdb_info):
     width, voxel_size, shape = (1.0, 1.0, (31, 32, 33))
     atom_positions, _, _ = pdb_info
-    volumes, render_fns = [], []
     gaussian_volume, gaussian_render_fn = (
         cxs.GaussianMixtureVolume(
             atom_positions,
@@ -280,18 +273,19 @@ def test_render_options(pdb_info):
         ),
         cxs.GaussianMixtureRenderFn(shape, voxel_size),
     )
-    volumes.append(gaussian_volume)
-    render_fns.append(gaussian_render_fn)
-    if jnufft is not None:
-        volumes.append(
-            cxs.IndependentAtomVolume(
-                positions=atom_positions,
-                scattering_factors=im.FourierGaussian(
-                    amplitude=1.0, b_factor=width**2 * (8 * np.pi**2)
-                ),
-            )
-        )
-        render_fns.append(cxs.IndependentAtomRenderFn(shape, voxel_size, eps=1e-10))
+    atom_volume, atom_render_fn = (
+        cxs.IndependentAtomVolume(
+            positions=atom_positions,
+            scattering_factors=im.FourierGaussian(
+                amplitude=1.0, b_factor=width**2 * (8 * np.pi**2)
+            ),
+        ),
+        cxs.IndependentAtomRenderFn(shape, voxel_size, eps=1e-10),
+    )
+    volumes, render_fns = (
+        [gaussian_volume, atom_volume],
+        [gaussian_render_fn, atom_render_fn],
+    )
     for volume, render_fn in zip(volumes, render_fns):
         real_voxel_grid = render_fn(volume, outputs_real_space=True)
         assert real_voxel_grid.shape == shape
@@ -317,31 +311,24 @@ def test_render_options(pdb_info):
     ((1.0, 0.5, (64, 64, 64)), (1.0, 0.5, (63, 63, 63))),
 )
 def test_fft_atom_render(pdb_info, width, voxel_size, shape):
-    if jnufft is not None:
-        atom_positions, _, _ = pdb_info
-        gaussian_volume = cxs.GaussianMixtureVolume(
-            atom_positions,
-            amplitudes=1.0,
-            variances=width**2,
-        )
-        atom_volume = cxs.IndependentAtomVolume(
-            positions=atom_positions,
-            scattering_factors=im.FourierGaussian(
-                amplitude=1.0, b_factor=width**2 * (8 * np.pi**2)
-            ),
-        )
-        gaussian_render_fn = cxs.GaussianMixtureRenderFn(shape, voxel_size)
-        fft_render_fn = cxs.IndependentAtomRenderFn(shape, voxel_size, eps=1e-10)
-        voxels_by_gaussians = gaussian_render_fn(gaussian_volume)
-        voxels_by_fft = fft_render_fn(atom_volume)
+    atom_positions, _, _ = pdb_info
+    gaussian_volume = cxs.GaussianMixtureVolume(
+        atom_positions,
+        amplitudes=1.0,
+        variances=width**2,
+    )
+    atom_volume = cxs.IndependentAtomVolume(
+        positions=atom_positions,
+        scattering_factors=im.FourierGaussian(
+            amplitude=1.0, b_factor=width**2 * (8 * np.pi**2)
+        ),
+    )
+    gaussian_render_fn = cxs.GaussianMixtureRenderFn(shape, voxel_size)
+    atom_render_fn = cxs.IndependentAtomRenderFn(shape, voxel_size, eps=1e-10)
+    voxels_by_gaussians = gaussian_render_fn(gaussian_volume)
+    voxels_by_atoms = atom_render_fn(atom_volume)
 
-        np.testing.assert_allclose(voxels_by_gaussians, voxels_by_fft, atol=1e-8)
-    else:
-        warnings.warn(
-            "Could not test rendering method `IndependentAtomRenderFn`, "
-            "most likely because `jax_finufft` is not installed. "
-            f"Error traceback is:\n{JAX_FINUFFT_IMPORT_ERROR}"
-        )
+    np.testing.assert_allclose(voxels_by_gaussians, voxels_by_atoms, atol=1e-8)
 
 
 #
