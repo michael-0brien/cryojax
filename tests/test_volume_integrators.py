@@ -152,6 +152,7 @@ def test_fft_atom_projection_peng(pdb_info, pixel_size, shape, upsample_factor):
     proj_by_atoms = compute_projection(atom_volume, atom_integrator, image_config)
     np.testing.assert_allclose(proj_by_gaussians, proj_by_atoms, atol=5e-3)
 
+
 @pytest.mark.parametrize(
     "pixel_size, shape",
     (
