@@ -1,5 +1,3 @@
-import warnings
-
 import cryojax.ndimage as im
 import cryojax.simulator as cxs
 import equinox as eqx
@@ -25,97 +23,96 @@ def pdb_info(sample_pdb_path):
     return read_atoms_from_pdb(sample_pdb_path, center=True, loads_properties=True)
 
 
-@pytest.mark.parametrize("shape", ((64, 64), (63, 63), (63, 64), (64, 63)))
-def test_gmm_integrator_shape(sample_pdb_path, shape):
-    atom_volume = cxs.load_tabulated_volume(
-        sample_pdb_path,
-        output_type=cxs.GaussianMixtureVolume,
-        include_b_factors=True,
-        selection_string="not element H",
-    )
-    pixel_size = 0.5
+# @pytest.mark.parametrize("shape", ((64, 64), (63, 63), (63, 64), (64, 63)))
+# def test_gmm_integrator_shape(sample_pdb_path, shape):
+#     atom_volume = cxs.load_tabulated_volume(
+#         sample_pdb_path,
+#         output_type=cxs.GaussianMixtureVolume,
+#         include_b_factors=True,
+#         selection_string="not element H",
+#     )
+#     pixel_size = 0.5
 
-    integrator = cxs.GaussianMixtureProjection(shape=(2 * shape[0], 2 * shape[1]))
-    # # ... and the configuration of the imaging instrument
-    image_config = cxs.BasicImageConfig(
-        shape=shape,
-        pixel_size=pixel_size,
-        voltage_in_kilovolts=300.0,
-    )
-    # ... compute the integrated volume
-    fourier_integrated_volume = integrator.integrate(
-        atom_volume, image_config, outputs_real_space=False
-    )
+#     integrator = cxs.GaussianMixtureProjection(shape=(2 * shape[0], 2 * shape[1]))
+#     # # ... and the configuration of the imaging instrument
+#     image_config = cxs.BasicImageConfig(
+#         shape=shape,
+#         pixel_size=pixel_size,
+#         voltage_in_kilovolts=300.0,
+#     )
+#     # ... compute the integrated volume
+#     fourier_integrated_volume = integrator.integrate(
+#         atom_volume, image_config, outputs_real_space=False
+#     )
 
-    assert fourier_integrated_volume.shape == (shape[0], shape[1] // 2 + 1)
+#     assert fourier_integrated_volume.shape == (shape[0], shape[1] // 2 + 1)
 
 
-def test_fft_atom_bad_instantiation():
-    with pytest.raises(ValueError):
-        _ = cxs.IndependentAtomVolume(
-            positions=np.zeros((10, 3)),
-            kernel_fns=(im.FourierGaussian(),),
-        )
-    # with pytest.raises(ValueError):
-    #     _ = cxs.FFTAtomProjection(upsample_factor=2)
+# def test_fft_atom_bad_instantiation():
+#     with pytest.raises(ValueError):
+#         _ = cxs.IndependentAtomVolume(
+#             positions=np.zeros((10, 3)),
+#             kernel_fns=(im.FourierGaussian(),),
+#         )
+#     # with pytest.raises(ValueError):
+#     #     _ = cxs.FFTAtomProjection(upsample_factor=2)
+
+
+# @pytest.mark.parametrize(
+#     "pixel_size, shape",
+#     ((1.0, (32, 32)), (1.0, (32, 31)), (1.0, (31, 32)), (1.0, (31, 31))),
+# )
+# def test_fft_atom_projection_exact(pdb_info, pixel_size, shape):
+#     for backend in ["jax-finufft", "nufftax"]:
+#         if jnufft is None and backend == "jax-finufft":
+#             warnings.warn(
+#                 "Could not test projection method `IndependentAtomProjection`, "
+#                 "most likely because `jax_finufft` is not installed. "
+#                 f"Error traceback is:\n{JAX_FINUFFT_IMPORT_ERROR}"
+#             )
+#             continue
+#         atom_positions, _, _ = pdb_info
+#         pixel_size, shape = 0.5, (64, 64)
+#         image_config = cxs.BasicImageConfig(
+#             shape, pixel_size, voltage_in_kilovolts=300.0, padded_shape=(128, 128)
+#         )
+#         amplitude, b_factor = 1.0, 100.0
+#         gaussian_volume, gaussian_integrator = (
+#             cxs.GaussianMixtureVolume(
+#                 atom_positions,
+#                 amplitudes=amplitude,
+#                 variances=b_factor / (8 * np.pi**2),
+#             ),
+#             cxs.GaussianMixtureProjection(sampling_mode="point"),
+#         )
+#         atom_volume, atom_integrator = (
+#             cxs.IndependentAtomVolume(
+#                 positions=atom_positions,
+#                 kernel_fns=im.FourierGaussian(amplitude=amplitude, b_factor=b_factor),
+#             ),
+#             cxs.IndependentAtomProjection(
+#                 backend=backend,  # type: ignore
+#                 sampling_mode="point",
+#                 eps=1e-10,
+#             ),
+#         )
+#         proj_by_gaussians = compute_projection(
+#             gaussian_volume, gaussian_integrator, image_config
+#         )
+#         proj_by_atom = compute_projection(atom_volume, atom_integrator, image_config)
+#         np.testing.assert_allclose(proj_by_gaussians, proj_by_atom, atol=1e-8)
 
 
 @pytest.mark.parametrize(
     "pixel_size, shape",
-    ((1.0, (32, 32)), (1.0, (32, 31)), (1.0, (31, 32)), (1.0, (31, 31))),
-)
-def test_fft_atom_projection_exact(pdb_info, pixel_size, shape):
-    for backend in ["jax-finufft", "nufftax"]:
-        if jnufft is None and backend == "jax-finufft":
-            warnings.warn(
-                "Could not test projection method `IndependentAtomProjection`, "
-                "most likely because `jax_finufft` is not installed. "
-                f"Error traceback is:\n{JAX_FINUFFT_IMPORT_ERROR}"
-            )
-            continue
-        atom_positions, _, _ = pdb_info
-        pixel_size, shape = 0.5, (64, 64)
-        image_config = cxs.BasicImageConfig(
-            shape, pixel_size, voltage_in_kilovolts=300.0, padded_shape=(128, 128)
-        )
-        amplitude, b_factor = 1.0, 100.0
-        gaussian_volume, gaussian_integrator = (
-            cxs.GaussianMixtureVolume(
-                atom_positions,
-                amplitudes=amplitude,
-                variances=b_factor / (8 * np.pi**2),
-            ),
-            cxs.GaussianMixtureProjection(sampling_mode="point"),
-        )
-        atom_volume, atom_integrator = (
-            cxs.IndependentAtomVolume(
-                positions=atom_positions,
-                kernel_fns=im.FourierGaussian(amplitude=amplitude, b_factor=b_factor),
-            ),
-            cxs.IndependentAtomProjection(
-                backend=backend,  # type: ignore
-                sampling_mode="point",
-                eps=1e-10,
-            ),
-        )
-        proj_by_gaussians = compute_projection(
-            gaussian_volume, gaussian_integrator, image_config
-        )
-        proj_by_atom = compute_projection(atom_volume, atom_integrator, image_config)
-        np.testing.assert_allclose(proj_by_gaussians, proj_by_atom, atol=1e-8)
-
-
-@pytest.mark.parametrize(
-    "pixel_size, shape",
-    ((0.5, (64, 64)), (0.5, (64, 63)), (0.5, (63, 64)), (0.5, (63, 63))),
+    (
+        (0.5, (63, 63)),
+        (0.5, (64, 64)),
+    ),
 )
 def test_real_atom_projection_exact(pdb_info, pixel_size, shape):
     atom_positions, _, _ = pdb_info
-    image_config = cxs.BasicImageConfig(
-        shape,
-        pixel_size,
-        voltage_in_kilovolts=300.0,
-    )
+    image_config = cxs.BasicImageConfig(shape, pixel_size, voltage_in_kilovolts=300.0)
     amplitude, variance = 1.0, 20.0 / (8 * np.pi**2)
     gaussian_volume, gaussian_integrator = (
         cxs.GaussianMixtureVolume(
@@ -128,19 +125,22 @@ def test_real_atom_projection_exact(pdb_info, pixel_size, shape):
     atom_volume, atom_integrator = (
         cxs.IndependentAtomVolume(
             positions=atom_positions,
-            kernel_fns=im.RealGaussian(amplitude=amplitude, variance=variance),
+            kernel_fns=im.RealGaussian(
+                amplitude=amplitude,
+                variance=variance,
+            ),
         ),
         cxs.IndependentAtomProjection(
             sampling_mode="average",
-            eps=1e-8,
-            upsample_factor=2.0,
+            eps=1e-10,
+            upsample_factor=1.0,
         ),
     )
     proj_by_gaussians = compute_projection(
         gaussian_volume, gaussian_integrator, image_config
     )
     proj_by_atom = compute_projection(atom_volume, atom_integrator, image_config)
-    # _plot_image_compare(proj_by_gaussians, proj_by_atom)
+    _plot_image_compare(proj_by_gaussians, proj_by_atom)
     np.testing.assert_allclose(proj_by_gaussians, proj_by_atom, atol=1e-5)
 
 

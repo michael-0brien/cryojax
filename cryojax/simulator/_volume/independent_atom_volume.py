@@ -754,9 +754,16 @@ def project_impl(
         _kernel_fn: AbstractRealOperator,
         _amplitudes: Inexact[Array, " _"],
     ) -> Array:
+        dim = _shape[0]
+        if not all(s == dim for s in _shape):
+            raise ValueError(
+                "`IndependentAtomProjection` for real-valued kernels "
+                "only supports rendering square images. Found a shape "
+                f"equal to {(_shape[0] // block_size, _shape[1] // block_size)}"
+            )
         u = upsampfac
         nspread = _eps_to_nspread(eps)
-        shape_u = (int(u * _shape[0]), int(u * _shape[1]))
+        shape_u = (int(u * dim), int(u * dim))
         (ny, nx) = _shape
         box_xy = _ps * jnp.asarray((nx, ny), dtype=float)
         xy = 2 * jnp.pi * _positions[:, :2] / box_xy
@@ -766,9 +773,8 @@ def project_impl(
             c=_amplitudes,
             nf1=shape_u[1],
             nf2=shape_u[0],
-            kernel_params=Kernel(
-                nspread=nspread,
-                phi=lambda _z: eqx.filter_vmap(_kernel_fn)((_ps / u) * _z),
+            kernel_params=_make_nufftax_kernel(
+                _kernel_fn, image_dim=dim, pixel_size=_ps / u, nspread=nspread
             ),
             **options,
         )
@@ -894,6 +900,13 @@ def render_impl(
         _kernel_fn: AbstractRealOperator,
         _amplitudes: Inexact[Array, " _"],
     ) -> Array:
+        dim = _shape[0]
+        if not all(s == dim for s in _shape):
+            raise ValueError(
+                "`IndependentAtomRenderFn` for real-valued kernels "
+                "only supports rendering square voxel arrays. Found a shape "
+                f"equal to {(_shape[0], _shape[1], _shape[2])}"
+            )
         nspread = _eps_to_nspread(eps)
         u = upsampfac
         shape_u = (int(u * _shape[0]), int(u * _shape[1]), int(u * _shape[2]))
@@ -908,9 +921,8 @@ def render_impl(
             nf1=shape_u[2],
             nf2=shape_u[1],
             nf3=shape_u[0],
-            kernel_params=Kernel(
-                nspread=nspread,
-                phi=lambda _z: eqx.filter_vmap(_kernel_fn)((_vs / u) * _z),
+            kernel_params=_make_nufftax_kernel(
+                _kernel_fn, image_dim=dim, pixel_size=_vs / u, nspread=nspread
             ),
             **options,
         )
@@ -1130,6 +1142,20 @@ def _standardize_amplitudes(amplitudes: PyTree[Array] | None, positions: PyTree[
         )
     else:
         return amplitudes
+
+
+def _make_nufftax_kernel(
+    kernel_fn: AbstractRealOperator,
+    *,
+    image_dim: int,
+    pixel_size: Float[Array, ""],
+    nspread: int,
+):
+    offset = 0.5 if image_dim % 2 == 1 else 0.0
+    return Kernel(
+        nspread=nspread,
+        phi=lambda _z: eqx.filter_vmap(kernel_fn)(pixel_size * (_z + offset)),
+    )
 
 
 class _IntegratedRealGaussian(AbstractRealOperator, strict=True):
