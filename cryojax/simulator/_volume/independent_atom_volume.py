@@ -161,6 +161,7 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
 
     positions: PyTree[Float[Array, "_ 3"]]
     kernel_fns: PyTree[AbstractFourierOperator] | PyTree[AbstractRealOperator]
+    amplitudes: PyTree[Inexact[Array, " _"]] | None
 
     is_frame_rotation: ClassVar[bool] = False
 
@@ -170,6 +171,7 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
         kernel_fns: (
             PyTree[AbstractFourierOperator, "T"] | PyTree[AbstractRealOperator, "T"]
         ),
+        amplitudes: PyTree[Inexact[NDArrayLike, " _"], "T"] | None = None,
     ):
         """**Arguments:**
 
@@ -196,6 +198,18 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
             )
         self.positions = jax.tree.map(lambda x: jnp.asarray(x, dtype=float), positions)
         self.kernel_fns = kernel_fns
+        if amplitudes is None:
+            self.amplitudes = None
+        else:
+            if jax.tree.structure(positions) != jax.tree.structure(amplitudes):
+                raise ValueError(
+                    "When instantiating an `IndependentAtomVolume`, found "
+                    "that the pytree structures of `positions` and "
+                    "`amplitudes` were not equal."
+                )
+            self.amplitudes = jax.tree.map(
+                lambda x: jnp.asarray(x, dtype=float), amplitudes
+            )
 
     @override
     def rotate_to_pose(self, pose: AbstractPose) -> Self:
@@ -409,6 +423,7 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
         return render_impl(
             volume_representation.positions,
             volume_representation.kernel_fns,
+            volume_representation.amplitudes,
             shape=self.shape,
             voxel_size=error_if_not_positive(self.voxel_size),
             backend=self.backend,
@@ -560,6 +575,7 @@ class IndependentAtomProjection(
         return project_impl(
             volume_representation.positions,
             volume_representation.kernel_fns,
+            volume_representation.amplitudes,
             shape=shape_b,
             pixel_size=pixel_size_b,
             backend=self.backend,
@@ -707,6 +723,7 @@ def _project_postprocess(
 def project_impl(
     positions: PyTree[Float[Array, "_ 3"]],
     kernel_fns: PyTree[AbstractRealOperator] | PyTree[AbstractFourierOperator],
+    amplitudes: PyTree[Inexact[Array, " _"]] | None,
     *,
     shape: tuple[int, int],
     pixel_size: Float[Array, ""],
@@ -728,23 +745,25 @@ def project_impl(
         kernel_fns, sampling_mode = _maybe_gaussians_to_erf(
             kernel_fns, pixel_size, sampling_mode, upsampfac
         )
+    amplitudes = _standardize_amplitudes(amplitudes, positions)
 
     def real_impl(
         _shape: tuple[int, int],
         _ps: Float[Array, ""],
         _positions: Float[Array, "_ 3"],
         _kernel_fn: AbstractRealOperator,
+        _amplitudes: Inexact[Array, " _"],
     ) -> Array:
         u = upsampfac
         nspread = _eps_to_nspread(eps)
         shape_u = (int(u * _shape[0]), int(u * _shape[1]))
-        (ny, nx), num_atoms = _shape, _positions.shape[0]
+        (ny, nx) = _shape
         box_xy = _ps * jnp.asarray((nx, ny), dtype=float)
         xy = 2 * jnp.pi * _positions[:, :2] / box_xy
         projection = spread_2d(
             x=xy[:, 0],
             y=xy[:, 1],
-            c=jnp.ones(num_atoms, dtype=float),
+            c=_amplitudes,
             nf1=shape_u[1],
             nf2=shape_u[0],
             kernel_params=Kernel(
@@ -761,9 +780,10 @@ def project_impl(
         _ps: Float[Array, ""],
         _positions: Float[Array, "_ 3"],
         _kernel_fn: AbstractFourierOperator,
+        _amplitudes: Inexact[Array, " _"],
         _frequency_grid: Array,
     ) -> Array:
-        (ny, nx), num_atoms = _shape, _positions.shape[0]
+        (ny, nx) = _shape
         box_xy = _ps * jnp.asarray((nx, ny))
         # Compute
         return (
@@ -771,7 +791,7 @@ def project_impl(
             * jnp.fft.ifftshift(
                 _nufft2d1(
                     _shape,  # type: ignore
-                    source=jnp.full((num_atoms,), 1.0 + 0.0j),
+                    source=_amplitudes.astype(complex),
                     xy=2 * jnp.pi * _positions[:, :2] / box_xy,
                     backend=backend,
                     eps=eps,
@@ -788,12 +808,14 @@ def project_impl(
         project_impl, project_args = fourier_impl, (frequency_grid,)
 
     # Project and sum over kernels
-    project_dispatch = lambda _positions, _kernel_fn: project_impl(
-        shape, pixel_size, _positions, _kernel_fn, *project_args
+    project_dispatch = lambda _positions, _kernel_fn, _amplitudes: project_impl(
+        shape, pixel_size, _positions, _kernel_fn, _amplitudes, *project_args
     )
     projection_out = jax.tree.reduce(
         lambda x, y: x + y,
-        jax.tree.map(project_dispatch, positions, kernel_fns, is_leaf=is_leaf),
+        jax.tree.map(
+            project_dispatch, positions, kernel_fns, amplitudes, is_leaf=is_leaf
+        ),
     )
     return _project_postprocess(
         projection_out,
@@ -844,6 +866,7 @@ def _render_postprocess(
 def render_impl(
     positions: PyTree[Float[Array, "_ 3"]],
     kernel_fns: PyTree[AbstractRealOperator] | PyTree[AbstractFourierOperator],
+    amplitudes: PyTree[Inexact[Array, " _"]] | None,
     *,
     shape: tuple[int, int, int],
     voxel_size: Float[Array, ""],
@@ -862,24 +885,26 @@ def render_impl(
         kernel_fns, sampling_mode = _maybe_gaussians_to_erf(
             kernel_fns, voxel_size, sampling_mode, upsampfac
         )
+    amplitudes = _standardize_amplitudes(amplitudes, positions)
 
     def real_impl(
         _shape: tuple[int, int, int],
         _vs: Float[Array, ""],
         _positions: Float[Array, "_ 3"],
         _kernel_fn: AbstractRealOperator,
+        _amplitudes: Inexact[Array, " _"],
     ) -> Array:
         nspread = _eps_to_nspread(eps)
         u = upsampfac
         shape_u = (int(u * _shape[0]), int(u * _shape[1]), int(u * _shape[2]))
-        (nz, ny, nx), num_atoms = _shape, _positions.shape[0]
+        (nz, ny, nx) = _shape
         box_xyz = _vs * jnp.asarray((nx, ny, nz), dtype=float)
         xyz = 2 * jnp.pi * _positions / box_xyz
         projection = spread_3d(
             x=xyz[:, 0],
             y=xyz[:, 1],
             z=xyz[:, 2],
-            c=jnp.ones(num_atoms, dtype=float),
+            c=_amplitudes,
             nf1=shape_u[2],
             nf2=shape_u[1],
             nf3=shape_u[0],
@@ -897,15 +922,16 @@ def render_impl(
         _vs: Float[Array, ""],
         _positions: Float[Array, "_ 3"],
         _kernel_fn: AbstractFourierOperator,
+        _amplitudes: Inexact[Array, " _"],
         _frequency_grid: Array,
     ) -> Array:
-        (nz, ny, nx), num_atoms = _shape, _positions.shape[0]
+        (nz, ny, nx) = _shape
         box_xyz = _vs * jnp.asarray((nx, ny, nz))
         # Compute
         return _kernel_fn(_frequency_grid) * (
             _nufft3d1(
                 _shape,  # type: ignore
-                source=jnp.full((num_atoms,), 1.0 + 0.0j),
+                source=_amplitudes.astype(complex),
                 xyz=2 * jnp.pi * _positions / box_xyz,
                 backend=backend,
                 eps=eps,
@@ -920,12 +946,12 @@ def render_impl(
     else:
         render_impl, render_args = fourier_impl, (frequency_grid,)
 
-    render_dispatch = lambda _positions, _kernel_fn: render_impl(
-        shape, voxel_size, _positions, _kernel_fn, *render_args
+    render_dispatch = lambda _positions, _kernel_fn, _amplitudes: render_impl(
+        shape, voxel_size, _positions, _kernel_fn, _amplitudes, *render_args
     )
     render_out = jax.tree.reduce(
         lambda x, y: x + y,
-        jax.tree.map(render_dispatch, positions, kernel_fns, is_leaf=is_leaf),
+        jax.tree.map(render_dispatch, positions, kernel_fns, amplitudes, is_leaf=is_leaf),
     )
 
     return _render_postprocess(
@@ -1094,6 +1120,16 @@ def _build_extraction_indices_1d(dim: int, dim_ds: int):
     indices = jnp.concatenate([idx_pos, idx_neg])
 
     return indices
+
+
+def _standardize_amplitudes(amplitudes: PyTree[Array] | None, positions: PyTree[Array]):
+    if amplitudes is None:
+        return jax.tree.map(
+            lambda x: jnp.ones((x.shape[0],), dtype=complex),
+            positions,
+        )
+    else:
+        return amplitudes
 
 
 class _IntegratedRealGaussian(AbstractRealOperator, strict=True):
