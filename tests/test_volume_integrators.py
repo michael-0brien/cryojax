@@ -106,6 +106,44 @@ def test_fft_atom_projection_exact(pdb_info, pixel_size, shape):
 
 
 @pytest.mark.parametrize(
+    "pixel_size, shape",
+    ((0.5, (64, 64)), (0.5, (64, 63)), (0.5, (63, 64)), (0.5, (63, 63))),
+)
+def test_real_atom_projection_exact(pdb_info, pixel_size, shape):
+    atom_positions, _, _ = pdb_info
+    image_config = cxs.BasicImageConfig(
+        shape,
+        pixel_size,
+        voltage_in_kilovolts=300.0,
+    )
+    amplitude, b_factor = 1.0, 40.0
+    variance = b_factor / (8 * np.pi**2)
+    gaussian_volume, gaussian_integrator = (
+        cxs.GaussianMixtureVolume(
+            atom_positions,
+            amplitudes=amplitude,
+            variances=variance,
+        ),
+        cxs.GaussianMixtureProjection(sampling_mode="average"),
+    )
+    atom_volume, atom_integrator = (
+        cxs.IndependentAtomVolume(
+            positions=atom_positions,
+            kernel_fns=im.RealGaussian(amplitude=amplitude, variance=variance),
+        ),
+        cxs.IndependentAtomProjection(
+            sampling_mode="average", eps=1e-10, upsample_factor=2
+        ),
+    )
+    proj_by_gaussians = compute_projection(
+        gaussian_volume, gaussian_integrator, image_config
+    )
+    proj_by_atom = compute_projection(atom_volume, atom_integrator, image_config)
+    _plot_image_compare(proj_by_gaussians, proj_by_atom)
+    np.testing.assert_allclose(proj_by_gaussians, proj_by_atom, atol=1e-8)
+
+
+@pytest.mark.parametrize(
     "width, pixel_size, shape",
     ((5.0, 0.5, (64, 64)), (1.0, 0.5, (64, 64)), (2.0, 1.0, (32, 32))),
 )
@@ -366,7 +404,7 @@ def test_analytic_vs_voxels_nopose(pdb_info, pixel_size, shape):
 #     plt.show()
 
 
-@eqx.filter_jit
+# @eqx.filter_jit
 def compute_projection(
     volume: cxs.AbstractVolumeRepresentation,
     integrator: cxs.AbstractVolumeIntegrator,
@@ -418,10 +456,10 @@ def make_spline(real_voxel_grid):
     )
 
 
-# def _plot_image_compare(im1, im2):
-#     from matplotlib import pyplot as plt
+def _plot_image_compare(im1, im2):
+    from matplotlib import pyplot as plt
 
-#     _, axes = plt.subplots(figsize=(7, 4), ncols=2)
-#     axes[0].imshow(im1)
-#     axes[1].imshow(im2)
-#     plt.show()
+    _, axes = plt.subplots(figsize=(7, 4), ncols=2)
+    axes[0].imshow(im1)
+    axes[1].imshow(im2)
+    plt.show()

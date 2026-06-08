@@ -180,6 +180,7 @@ def fourier_crop_to_shape(
     image_or_volume: Inexact[NDArrayLike, "_ _"] | Inexact[NDArrayLike, "_ _ _"],
     shape: tuple[int, int] | tuple[int, int, int],
     outputs_real_space: bool = True,
+    outputs_rfft: bool = True,
     preserve_mean: bool = False,
 ) -> Inexact[Array, "_ _"] | Inexact[Array, "_ _ _"]:
     """Downsample an array to a specified shape using fourier cropping.
@@ -199,6 +200,9 @@ def fourier_crop_to_shape(
         If `False`, the `image_or_volume` is returned in fourier space
         with the zero-frequency component in the corner. For real signals,
         hermitian symmetry is assumed.
+    - `outputs_rfft`:
+        Returns the result `fftn` instead of `rfftn` if equal to `False`.
+        Only applies to real signals, and ignored if `outputs_real_space` is `False`.
     - `preserve_mean`:
         Preserve the mean of the volume after downsampling, rather
         than the sum.
@@ -214,16 +218,23 @@ def fourier_crop_to_shape(
         )
     else:
         signal = _fft_ds_real_signal_to_shape(
-            image_or_volume, shape, outputs_real_space=outputs_real_space
+            image_or_volume,
+            shape,
+            outputs_real_space=outputs_real_space,
+            outputs_rfft=outputs_rfft,
         )
     n_pixels, n_pixels_ds = math.prod(image_or_volume.shape), math.prod(shape)
-    return (n_pixels_ds / n_pixels) * signal if preserve_mean else signal
+    if outputs_real_space:
+        return signal
+    else:
+        return (n_pixels_ds / n_pixels) * signal if preserve_mean else signal
 
 
 def _fft_ds_real_signal_to_shape(
     image_or_volume: Float[NDArrayLike, "_ _"] | Float[NDArrayLike, "_ _ _"],
     downsampled_shape: tuple[int, int] | tuple[int, int, int],
     outputs_real_space: bool = True,
+    outputs_rfft: bool = True,
 ) -> Inexact[Array, "_ _"] | Inexact[Array, "_ _ _"]:
     # Forward Hartley Transform
     hartley_array = jnp.fft.fftshift(fftn(image_or_volume))
@@ -240,7 +251,7 @@ def _fft_ds_real_signal_to_shape(
     if outputs_real_space:
         return ds_array
     else:
-        return rfftn(ds_array)
+        return rfftn(ds_array) if outputs_rfft else fftn(ds_array)
 
 
 def _fft_ds_complex_signal_to_shape(

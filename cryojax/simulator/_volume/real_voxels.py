@@ -225,12 +225,15 @@ class RealVoxelProjection(
 
         - `backend`:
             The backend for non-uniform FFT computation. This is either
-            `nufftax` for a pure-JAX implementation of FINUFFT,
-            or `jax-finufft` for calling FINUFFT directly.
+            [`nufftax`](https://github.com/GragasLab/nufftax/tree/custom-kernel-spread)
+            for a pure-JAX implementation of the
+            [`finufft`](https://finufft.readthedocs.io) algorithm,
+            or [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft) for
+            calling `finufft` directly via `jax.ffi`.
         - `eps`:
-            See [`nufftax`](https://github.com/GragasLab/nufftax)
+            See [`finufft`](https://finufft.readthedocs.io/en/latest/opts.html#options-parameters-cpu)
             for documentation.
-        """
+        """  # noqa: E501
         if backend not in ["jax-finufft", "nufftax"]:
             raise ValueError(
                 "`backend` in `IndependentAtomRenderFn` "
