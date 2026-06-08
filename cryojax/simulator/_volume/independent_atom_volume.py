@@ -1,3 +1,4 @@
+import math
 from collections.abc import Callable, Sequence
 from typing import ClassVar, Literal, Self, TypeVar
 from typing_extensions import override
@@ -6,7 +7,7 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import nufftax
-from jaxtyping import Array, Complex, Float, Inexact, PyTree
+from jaxtyping import Array, Float, Inexact, PyTree
 
 from ..._internal import error_if_not_positive
 from ...constants import (
@@ -640,7 +641,7 @@ def _check_kernel_fns(
 
 
 def _project_postprocess(
-    projection_out: Complex[Array, "_ _"],
+    projection_out: Inexact[Array, "_ _"],
     *,
     is_real_space: bool,
     compute_shape: tuple[int, int],
@@ -654,8 +655,11 @@ def _project_postprocess(
     reduce_shape = tuple(s // block_size for s in projection_out.shape)
     assert len(reduce_shape) == 2
     if is_real_space:
+        # Optimized code path for case where `render_out`
+        # is in real-space
         raise NotImplementedError()
     else:
+        # ... and fourier-space
         projection_fft = projection_out
         if sampling_mode == "average":
             antialias_fn = FourierSinc(box_width=pixel_size)
@@ -718,6 +722,7 @@ def project_impl(
         _positions: Float[Array, "_ 3"],
         _kernel_fn: AbstractRealOperator,
     ) -> Array:
+        # nspread = _eps_to_nspread(eps)
         raise NotImplementedError(
             "Projections in real-space using the `IndependentAtomProjection` is not yet "
             "implemented."
@@ -775,7 +780,7 @@ def project_impl(
 
 
 def _render_postprocess(
-    render_fft: Complex[Array, "_ _ _"],
+    render_out: Inexact[Array, "_ _ _"],
     voxel_size: Float[Array, ""],
     *,
     is_real_space: bool,
@@ -786,8 +791,12 @@ def _render_postprocess(
     fftshifted: bool,
 ) -> Inexact[Array, "_ _ _"]:
     if is_real_space:
+        # Optimized code path for case where `render_out`
+        # is in real-space
         raise NotImplementedError()
     else:
+        # ... and fourier-space
+        render_fft = render_out
         if sampling_mode == "average":
             antialias_fn = FourierSinc(box_width=voxel_size)
             render_fft *= antialias_fn(frequency_grid)
@@ -833,6 +842,7 @@ def render_impl(
         _positions: Float[Array, "_ 3"],
         _kernel_fn: AbstractRealOperator,
     ) -> Array:
+        # nspread = _eps_to_nspread(eps)
         raise NotImplementedError(
             "Rendering in real-space using the `IndependentAtomRenderFn` is not yet "
             "implemented."
@@ -868,13 +878,13 @@ def render_impl(
     render_dispatch = lambda _positions, _kernel_fn: render_impl(
         shape, voxel_size, _positions, _kernel_fn, *render_args
     )
-    render_fft = jax.tree.reduce(
+    render_out = jax.tree.reduce(
         lambda x, y: x + y,
         jax.tree.map(render_dispatch, positions, kernel_fns, is_leaf=is_leaf),
     )
 
     return _render_postprocess(
-        render_fft,
+        render_out,
         is_real_space=is_real_space,
         voxel_size=voxel_size,
         frequency_grid=frequency_grid,
@@ -996,3 +1006,11 @@ def _nufft3d1(
             eps=eps,
             isign=-1,
         )
+
+
+def _eps_to_nspread(eps: float) -> int:
+    # FINUFFT heuristic for choosing `nspread` parameter
+    # based on desired precision `eps`
+    max_nspread = 16
+    log_tol = -math.log10(max(eps, 1e-16))
+    return max(2, min(int(math.ceil(log_tol + 1)), max_nspread))
