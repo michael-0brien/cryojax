@@ -317,10 +317,23 @@ def test_render_options(pdb_info):
 
 @pytest.mark.parametrize(
     "width, voxel_size, shape",
-    ((1.0, 0.5, (64, 64, 64)), (1.0, 0.5, (63, 63, 63))),
+    (
+        (1.0, 0.5, (64, 64, 64)),
+        (1.0, 0.5, (63, 63, 63)),
+        (1.0, 0.5, (64, 64, 64)),
+        (1.0, 0.5, (63, 63, 63)),
+    ),
 )
 def test_fft_atom_render(pdb_info, width, voxel_size, shape):
-    if jnufft is not None:
+    for backend in ["jax-finufft", "nufftax"]:
+        if jnufft is None and backend == "jax-finufft":
+            warnings.warn(
+                "Could not test rendering method `IndependentAtomRenderFn`, "
+                "with backend `'jax-finufft'` mostly likely because it is "
+                "not installed. "
+                f"Error traceback is:\n{JAX_FINUFFT_IMPORT_ERROR}"
+            )
+            continue
         atom_positions, _, _ = pdb_info
         gaussian_volume = cxs.GaussianMixtureVolume(
             atom_positions,
@@ -334,17 +347,16 @@ def test_fft_atom_render(pdb_info, width, voxel_size, shape):
             ),
         )
         gaussian_render_fn = cxs.GaussianMixtureRenderFn(shape, voxel_size)
-        atom_render_fn = cxs.IndependentAtomRenderFn(shape, voxel_size, eps=1e-10)
+        atom_render_fn = cxs.IndependentAtomRenderFn(
+            shape,
+            voxel_size,
+            eps=1e-10,
+            backend=backend,  # type: ignore
+        )
         voxels_by_gaussians = gaussian_render_fn(gaussian_volume)
         voxels_by_atoms = atom_render_fn(atom_volume)
 
         np.testing.assert_allclose(voxels_by_gaussians, voxels_by_atoms, atol=1e-8)
-    else:
-        warnings.warn(
-            "Could not test rendering method `IndependentAtomRenderFn`, "
-            "most likely because `jax_finufft` is not installed. "
-            f"Error traceback is:\n{JAX_FINUFFT_IMPORT_ERROR}"
-        )
 
 
 #

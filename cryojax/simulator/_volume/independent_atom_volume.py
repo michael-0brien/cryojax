@@ -5,7 +5,8 @@ from typing_extensions import override
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, Complex, Float, PyTree
+import nufftax
+from jaxtyping import Array, Complex, Float, Inexact, PyTree
 
 from ..._internal import error_if_not_positive
 from ...constants import (
@@ -38,12 +39,12 @@ from .base_volume import (
 
 
 try:
-    from jax_finufft import nufft1
+    import jax_finufft
     from jax_finufft.options import NestedOpts, Opts
 
     JAX_FINUFFT_IMPORT_ERROR = None
 except ModuleNotFoundError as err:
-    nufft1, Opts, NestedOpts = None, None, None
+    jax_finufft, Opts, NestedOpts = None, None, None
     JAX_FINUFFT_IMPORT_ERROR = err
 
 
@@ -350,6 +351,8 @@ or [`cryojax.ndimage.AbstractRealOperator`][] classes.
 class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True):
     shape: tuple[int, int, int]
     voxel_size: Float[Array, ""]
+
+    backend: Literal["nufftax", "jax-finufft"]
     sampling_mode: Literal["average", "point"]
     upsample_factor: tuple[float, float]
     eps: float
@@ -359,6 +362,7 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
         shape: tuple[int, int, int],
         voxel_size: FloatLike,
         *,
+        backend: Literal["nufftax", "jax-finufft"] = "nufftax",
         sampling_mode: Literal["average", "point"] = "average",
         upsample_factor: int | float | tuple[float, float] = 2.0,
         eps: float = 1e-6,
@@ -374,6 +378,12 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
             projected volume at a pixel to be the average value of the
             underlying continuous function. If `'point'`, the volume at
             a pixel will be point sampled.
+        - `backend`:
+            The backend for non-uniform FFT computation. This is either
+            `nufftax` for a pure-JAX implementation of FINUFFT,
+            or `jax-finufft` for calling FINUFFT directly.
+            Used only when `IndependentAtomVolume.kernel_fns` are type
+            `AbstractFourierOperator`.
         - `upsample_factor`:
             How much to upsample the grid on which atoms are spread onto.
             See [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft)
@@ -392,8 +402,15 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
                 "pixel or 'point' for point sampling. Got "
                 f"`sampling_mode = {sampling_mode}`."
             )
+        if backend not in ["jax-finufft", "nufftax"]:
+            raise ValueError(
+                "`backend` in `IndependentAtomRenderFn` "
+                "must be either 'jax-finufft' or 'nufftax'. Got "
+                f"`backend = {backend}`."
+            )
         self.shape = shape
         self.voxel_size = jnp.asarray(voxel_size, dtype=float)
+        self.backend = backend
         self.sampling_mode = sampling_mode
         self.upsample_factor = _standardize_upsampfac(upsample_factor)
         self.eps = eps
@@ -433,6 +450,7 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
             volume_representation.kernel_fns,
             shape=self.shape,
             voxel_size=error_if_not_positive(self.voxel_size),
+            backend=self.backend,
             frequency_grid=frequency_grid,
             sampling_mode=self.sampling_mode,
             eps=self.eps,
@@ -452,6 +470,7 @@ class IndependentAtomProjection(
     AbstractVolumeIntegrator[IndependentAtomVolume],
     strict=True,
 ):
+    backend: Literal["nufftax", "jax-finufft"]
     sampling_mode: Literal["average", "point"]
     upsample_factor: tuple[float, float]
     block_size: int
@@ -463,6 +482,7 @@ class IndependentAtomProjection(
     def __init__(
         self,
         *,
+        backend: Literal["jax-finufft", "nufftax"] = "nufftax",
         sampling_mode: Literal["average", "point"] = "average",
         block_size: int = 1,
         upsample_factor: float | tuple[float, float] = 2.0,
@@ -471,6 +491,12 @@ class IndependentAtomProjection(
     ):
         """**Arguments:**
 
+        - `backend`:
+            The backend for non-uniform FFT computation. This is either
+            `nufftax` for a pure-JAX implementation of FINUFFT,
+            or `jax-finufft` for calling FINUFFT directly.
+            Used only when `IndependentAtomVolume.kernel_fns` are type
+            `AbstractFourierOperator`.
         - `sampling_mode`:
             If `'average'`, convolve with a box function to sample the
             projected volume at a pixel to be the average value of the
@@ -502,6 +528,13 @@ class IndependentAtomProjection(
                 "pixel or 'point' for point sampling. Got "
                 f"`sampling_mode = {sampling_mode}`."
             )
+        if backend not in ["jax-finufft", "nufftax"]:
+            raise ValueError(
+                "`backend` in `IndependentAtomRenderFn` "
+                "must be either 'jax-finufft' or 'nufftax'. Got "
+                f"`backend = {backend}`."
+            )
+        self.backend = backend
         self.sampling_mode = sampling_mode
         self.block_size = block_size
         self.shape = shape
@@ -557,6 +590,7 @@ class IndependentAtomProjection(
             volume_representation.kernel_fns,
             shape=shape_u,
             pixel_size=pixel_size_u,
+            backend=self.backend,
             frequency_grid=frequency_grid,
             sampling_mode=self.sampling_mode,
             eps=self.eps,
@@ -616,7 +650,7 @@ def _project_postprocess(
     block_size: int,
     output_shape: tuple[int, int],
     outputs_real_space: bool,
-) -> Complex[Array, "_ _"]:
+) -> Inexact[Array, "_ _"]:
     reduce_shape = tuple(s // block_size for s in projection_out.shape)
     assert len(reduce_shape) == 2
     if is_real_space:
@@ -666,6 +700,7 @@ def project_impl(
     *,
     shape: tuple[int, int],
     pixel_size: Float[Array, ""],
+    backend: Literal["jax-finufft", "nufftax"],
     frequency_grid: Float[Array, "_ _ 2"],
     sampling_mode: Literal["average", "point"],
     eps: float,
@@ -695,28 +730,22 @@ def project_impl(
         _kernel_fn: AbstractFourierOperator,
         _frequency_grid: Array,
     ) -> Array:
-        if nufft1 is None:
-            raise RuntimeError(
-                "Tried to use the `IndependentAtomProjection` "
-                "class, but `jax-finufft` is not installed. "
-                "See https://github.com/flatironinstitute/jax-finufft "
-                "for installation instructions."
-            ) from JAX_FINUFFT_IMPORT_ERROR
         (ny, nx), num_atoms = _shape, _positions.shape[0]
         box_xy = _ps * jnp.asarray((nx, ny))
-        xy = 2 * jnp.pi * _positions[:, :2] / box_xy
         # Compute
-        return _kernel_fn(_frequency_grid) * jnp.fft.ifftshift(
-            nufft1(
-                _shape,  # type: ignore
-                jnp.full((num_atoms,), 1.0 + 0.0j),
-                xy[:, 1],
-                xy[:, 0],
-                eps=eps,
-                iflag=-1,
-                opts=_make_opts(upsampfac),
+        return (
+            _kernel_fn(_frequency_grid)
+            * jnp.fft.ifftshift(
+                _nufft2d1(
+                    _shape,  # type: ignore
+                    source=jnp.full((num_atoms,), 1.0 + 0.0j),
+                    xy=2 * jnp.pi * _positions[:, :2] / box_xy,
+                    backend=backend,
+                    eps=eps,
+                    upsampfac=upsampfac,
+                )
+                / _ps**2
             )
-            / _ps**2
         )
 
     if is_real_space:
@@ -755,7 +784,7 @@ def _render_postprocess(
     outputs_real_space: bool,
     outputs_rfft: bool,
     fftshifted: bool,
-) -> Complex[Array, "_ _ _"]:
+) -> Inexact[Array, "_ _ _"]:
     if is_real_space:
         raise NotImplementedError()
     else:
@@ -786,6 +815,7 @@ def render_impl(
     *,
     shape: tuple[int, int, int],
     voxel_size: Float[Array, ""],
+    backend: Literal["jax-finufft", "nufftax"],
     frequency_grid: Float[Array, "_ _ _ 3"],
     sampling_mode: Literal["average", "point"],
     eps: float,
@@ -815,27 +845,17 @@ def render_impl(
         _kernel_fn: AbstractFourierOperator,
         _frequency_grid: Array,
     ) -> Array:
-        if nufft1 is None:
-            raise RuntimeError(
-                "Tried to use the `IndependentAtomRenderFn` "
-                "class, but `jax-finufft` is not installed. "
-                "See https://github.com/flatironinstitute/jax-finufft "
-                "for installation instructions."
-            ) from JAX_FINUFFT_IMPORT_ERROR
         (nz, ny, nx), num_atoms = _shape, _positions.shape[0]
         box_xyz = _vs * jnp.asarray((nx, ny, nz))
-        xyz = 2 * jnp.pi * _positions / box_xyz
         # Compute
         return _kernel_fn(_frequency_grid) * (
-            nufft1(
+            _nufft3d1(
                 _shape,  # type: ignore
-                jnp.full((num_atoms,), 1.0 + 0.0j),
-                xyz[:, 2],
-                xyz[:, 1],
-                xyz[:, 0],
+                source=jnp.full((num_atoms,), 1.0 + 0.0j),
+                xyz=2 * jnp.pi * _positions / box_xyz,
+                backend=backend,
                 eps=eps,
-                iflag=-1,
-                opts=_make_opts(upsampfac),
+                upsampfac=upsampfac,
             )
             / _vs**3
         )
@@ -898,3 +918,81 @@ def _make_opts(upsampfac: tuple[float, float]):
         forward=Opts(upsampfac=upsampfac[0], gpu_upsampfac=upsampfac[0]),
         backward=Opts(upsampfac=upsampfac[1], gpu_upsampfac=upsampfac[1]),
     )
+
+
+def _nufft2d1(
+    shape: tuple[int, int],
+    source: Array,
+    xy: Array,
+    *,
+    backend: Literal["jax-finufft", "nufftax"],
+    eps: float,
+    upsampfac: tuple[float, float],
+):
+    if backend == "jax-finufft":
+        if jax_finufft is None:
+            raise RuntimeError(
+                "Tried to use "
+                "`IndependentAtomProjection(..., backend='jax-finufft')`, "
+                "but `jax-finufft` is not installed. "
+                "See https://github.com/flatironinstitute/jax-finufft "
+                "for installation instructions."
+            ) from JAX_FINUFFT_IMPORT_ERROR
+        return jax_finufft.nufft1(
+            shape,
+            source,
+            xy[:, 1],
+            xy[:, 0],
+            eps=eps,
+            iflag=-1,
+            opts=_make_opts(upsampfac),
+        )
+    else:
+        return nufftax.nufft2d1(
+            n_modes=shape[::-1],
+            c=source,
+            x=xy[:, 0],
+            y=xy[:, 1],
+            eps=eps,
+            isign=-1,
+        )
+
+
+def _nufft3d1(
+    shape: tuple[int, int, int],
+    source: Array,
+    xyz: Array,
+    *,
+    backend: Literal["jax-finufft", "nufftax"],
+    eps: float,
+    upsampfac: tuple[float, float],
+):
+    if backend == "jax-finufft":
+        if jax_finufft is None:
+            raise RuntimeError(
+                "Tried to use "
+                "`IndependentAtomRenderFn(..., backend='jax-finufft')`, "
+                "but `jax-finufft` is not installed. "
+                "See https://github.com/flatironinstitute/jax-finufft "
+                "for installation instructions."
+            ) from JAX_FINUFFT_IMPORT_ERROR
+        return jax_finufft.nufft1(
+            shape,
+            source,
+            xyz[:, 2],
+            xyz[:, 1],
+            xyz[:, 0],
+            eps=eps,
+            iflag=-1,
+            opts=_make_opts(upsampfac),
+        )
+    else:
+        return nufftax.nufft3d1(
+            n_modes=shape[::-1],
+            c=source,
+            x=xyz[:, 0],
+            y=xyz[:, 1],
+            z=xyz[:, 2],
+            eps=eps,
+            isign=-1,
+        )
