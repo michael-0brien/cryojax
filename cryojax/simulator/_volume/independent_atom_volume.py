@@ -211,9 +211,12 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
         - `positions`:
             A pytree of atom positions.
         - `kernel_fns`:
-            A pytree of scattering factors with the same tree structure
+            A pytree of functions with the same tree structure
             as `positions`, where each leaf is a
+            [`cryojax.ndimage.AbstractRealOperator`][] or a
             [`cryojax.ndimage.AbstractFourierOperator`][].
+            Real-space represents the scattering potential, while
+            fourier-space represents the scattering factor.
         """
         if jax.tree.structure(positions) != jax.tree.structure(
             kernel_fns,
