@@ -140,7 +140,7 @@ def test_real_atom_projection_exact(pdb_info, pixel_size, shape):
         gaussian_volume, gaussian_integrator, image_config
     )
     proj_by_atom = compute_projection(atom_volume, atom_integrator, image_config)
-    _plot_image_compare(proj_by_gaussians, proj_by_atom)
+    # _plot_image_compare(proj_by_gaussians, proj_by_atom)
     np.testing.assert_allclose(proj_by_gaussians, proj_by_atom, atol=1e-5)
 
 
