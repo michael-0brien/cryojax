@@ -229,8 +229,13 @@ def test_analytic_vs_voxels_nopose(pdb_info, pixel_size, shape):
     other_projection_methods = [
         cxs.FourierSliceExtraction(),
         cxs.FourierSliceExtraction(),
-        cxs.RealVoxelProjection(eps=1e-15),
+        cxs.RealVoxelProjection(eps=1e-15, backend="nufftax"),
     ]
+    if jnufft is not None:
+        other_volumes.append(other_volumes[-1])
+        other_projection_methods.append(
+            cxs.RealVoxelProjection(eps=1e-15, backend="jax-finufft")  # type: ignore
+        )
 
     projection_by_gaussian_integration = compute_projection(
         base_volume, base_method, image_config
