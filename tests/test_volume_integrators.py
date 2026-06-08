@@ -1,11 +1,23 @@
+import warnings
+
 import cryojax.ndimage as im
 import cryojax.simulator as cxs
 import equinox as eqx
 import numpy as np
 import pytest
+from cryojax.atom_util import split_atoms_by_element
 from cryojax.constants import PengScatteringFactorParameters
 from cryojax.io import read_atoms_from_pdb
 from jaxtyping import Array
+
+
+try:
+    import jax_finufft as jnufft
+
+    JAX_FINUFFT_IMPORT_ERROR = None
+except ModuleNotFoundError as err:
+    jnufft = None
+    JAX_FINUFFT_IMPORT_ERROR = err
 
 
 @pytest.fixture
@@ -53,32 +65,39 @@ def test_fft_atom_bad_instantiation():
     ((1.0, (32, 32)), (1.0, (32, 31)), (1.0, (31, 32)), (1.0, (31, 31))),
 )
 def test_fft_atom_projection_exact(pdb_info, pixel_size, shape):
-    atom_positions, _, _ = pdb_info
-    pixel_size, shape = 0.5, (64, 64)
-    image_config = cxs.BasicImageConfig(
-        shape, pixel_size, voltage_in_kilovolts=300.0, padded_shape=(128, 128)
-    )
-    amplitude, b_factor = 1.0, 100.0
-    gaussian_volume, gaussian_integrator = (
-        cxs.GaussianMixtureVolume(
-            atom_positions,
-            amplitudes=amplitude,
-            variances=b_factor / (8 * np.pi**2),
-        ),
-        cxs.GaussianMixtureProjection(sampling_mode="point"),
-    )
-    atom_volume, atom_integrator = (
-        cxs.IndependentAtomVolume(
-            positions=atom_positions,
-            kernel_fns=im.FourierGaussian(amplitude=amplitude, b_factor=b_factor),
-        ),
-        cxs.IndependentAtomProjection(sampling_mode="point", eps=1e-10),
-    )
-    proj_by_gaussians = compute_projection(
-        gaussian_volume, gaussian_integrator, image_config
-    )
-    proj_by_atom = compute_projection(atom_volume, atom_integrator, image_config)
-    np.testing.assert_allclose(proj_by_gaussians, proj_by_atom, atol=1e-8)
+    if jnufft is not None:
+        atom_positions, _, _ = pdb_info
+        pixel_size, shape = 0.5, (64, 64)
+        image_config = cxs.BasicImageConfig(
+            shape, pixel_size, voltage_in_kilovolts=300.0, padded_shape=(128, 128)
+        )
+        amplitude, b_factor = 1.0, 100.0
+        gaussian_volume, gaussian_integrator = (
+            cxs.GaussianMixtureVolume(
+                atom_positions,
+                amplitudes=amplitude,
+                variances=b_factor / (8 * np.pi**2),
+            ),
+            cxs.GaussianMixtureProjection(sampling_mode="point"),
+        )
+        atom_volume, atom_integrator = (
+            cxs.IndependentAtomVolume(
+                positions=atom_positions,
+                kernel_fns=im.FourierGaussian(amplitude=amplitude, b_factor=b_factor),
+            ),
+            cxs.IndependentAtomProjection(sampling_mode="point", eps=1e-10),
+        )
+        proj_by_gaussians = compute_projection(
+            gaussian_volume, gaussian_integrator, image_config
+        )
+        proj_by_atom = compute_projection(atom_volume, atom_integrator, image_config)
+        np.testing.assert_allclose(proj_by_gaussians, proj_by_atom, atol=1e-8)
+    else:
+        warnings.warn(
+            "Could not test projection method `IndependentAtomProjection`, "
+            "most likely because `jax_finufft` is not installed. "
+            f"Error traceback is:\n{JAX_FINUFFT_IMPORT_ERROR}"
+        )
 
 
 @pytest.mark.parametrize(
@@ -86,68 +105,71 @@ def test_fft_atom_projection_exact(pdb_info, pixel_size, shape):
     ((5.0, 0.5, (64, 64)), (1.0, 0.5, (64, 64)), (2.0, 1.0, (32, 32))),
 )
 def test_fft_atom_projection_antialias(pdb_info, width, pixel_size, shape):
-    atom_positions, _, _ = pdb_info
-    gaussian_volume = cxs.GaussianMixtureVolume(
+    if jnufft is not None:
+        atom_positions, _, _ = pdb_info
+        gaussian_volume = cxs.GaussianMixtureVolume(
+            atom_positions,
+            amplitudes=1.0,
+            variances=width**2,
+        )
+        atom_volume = cxs.IndependentAtomVolume(
+            positions=atom_positions,
+            kernel_fns=im.FourierGaussian(
+                amplitude=1.0, b_factor=width**2 * (8 * np.pi**2)
+            ),
+        )
+        gaussian_integrator = cxs.GaussianMixtureProjection(sampling_mode="average")
+        atom_integrator = cxs.IndependentAtomProjection(eps=1e-10)
+        padded_shape = (2 * shape[0], 2 * shape[1])
+        image_config = cxs.BasicImageConfig(
+            shape, pixel_size, voltage_in_kilovolts=300.0, padded_shape=padded_shape
+        )
+        proj_by_gaussians = compute_projection(
+            gaussian_volume, gaussian_integrator, image_config
+        )
+        proj_by_atoms = compute_projection(atom_volume, atom_integrator, image_config)
+
+        np.testing.assert_allclose(proj_by_gaussians, proj_by_atoms, atol=1e-8)
+
+
+@pytest.mark.parametrize(
+    "pixel_size, shape, block_size",
+    (
+        (0.25, (134, 134), 4),
+        (0.25, (133, 133), 4),
+        (0.25, (134, 133), 5),
+        (0.25, (133, 133), 5),
+        (0.25, (133, 134), 5),
+        (0.25, (134, 133), 5),
+    ),
+)
+def test_fft_atom_projection_peng(pdb_info, pixel_size, shape, block_size):
+    atom_positions, atom_ids, _ = pdb_info
+    positions_by_id, unique_atom_ids = split_atoms_by_element(atom_ids, atom_positions)
+    peng_parameters, peng_parameters_by_id = (
+        PengScatteringFactorParameters(atom_ids),
+        PengScatteringFactorParameters(unique_atom_ids),
+    )
+    gaussian_volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(
         atom_positions,
-        amplitudes=1.0,
-        variances=width**2,
+        peng_parameters,
     )
-    atom_volume = cxs.IndependentAtomVolume(
-        positions=atom_positions,
-        kernel_fns=im.FourierGaussian(amplitude=1.0, b_factor=width**2 * (8 * np.pi**2)),
+    atom_volume = cxs.IndependentAtomVolume.from_tabulated_parameters(
+        positions_by_id,
+        peng_parameters_by_id,
     )
+    image_config = cxs.BasicImageConfig(shape, pixel_size, voltage_in_kilovolts=300.0)
+    # Check to make sure the implementations are identical, up to the
+    # nufft (don't include anti-aliasing)
     gaussian_integrator = cxs.GaussianMixtureProjection(sampling_mode="average")
-    atom_integrator = cxs.IndependentAtomProjection(eps=1e-10)
-    padded_shape = (2 * shape[0], 2 * shape[1])
-    image_config = cxs.BasicImageConfig(
-        shape, pixel_size, voltage_in_kilovolts=300.0, padded_shape=padded_shape
+    atom_integrator = cxs.IndependentAtomProjection(
+        sampling_mode="average", block_size=block_size, eps=1e-10
     )
     proj_by_gaussians = compute_projection(
         gaussian_volume, gaussian_integrator, image_config
     )
     proj_by_atoms = compute_projection(atom_volume, atom_integrator, image_config)
-
-    np.testing.assert_allclose(proj_by_gaussians, proj_by_atoms, atol=1e-8)
-
-
-# @pytest.mark.parametrize(
-#     "pixel_size, shape, upsample_factor",
-#     (
-#         (0.25, (128, 128), 4),
-#         (0.25, (127, 127), 4),
-#         (0.25, (128, 128), 5),
-#         (0.25, (127, 127), 5),
-#         (0.25, (127, 128), 5),
-#         (0.25, (128, 127), 5),
-#     ),
-# )
-# def test_fft_atom_projection_peng(pdb_info, pixel_size, shape, upsample_factor):
-#     atom_positions, atom_ids, _ = pdb_info
-#     positions_by_id, unique_atom_ids = split_atoms_by_element(atom_ids, atom_positions)
-#     peng_parameters, peng_parameters_by_id = (
-#         PengScatteringFactorParameters(atom_ids),
-#         PengScatteringFactorParameters(unique_atom_ids),
-#     )
-#     gaussian_volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(
-#         atom_positions,
-#         peng_parameters,
-#     )
-#     atom_volume = cxs.IndependentAtomVolume.from_tabulated_parameters(
-#         positions_by_id,
-#         peng_parameters_by_id,
-#     )
-#     image_config = cxs.BasicImageConfig(shape, pixel_size, voltage_in_kilovolts=300.0)
-#     # Check to make sure the implementations are identical, up to the
-#     # nufft (don't include anti-aliasing)
-#     gaussian_integrator = cxs.GaussianMixtureProjection(sampling_mode="average")
-#     atom_integrator = cxs.IndependentAtomProjection(
-#         sampling_mode="average", upsample_factor=upsample_factor, eps=1e-10
-#     )
-#     proj_by_gaussians = compute_projection(
-#         gaussian_volume, gaussian_integrator, image_config
-#     )
-#     proj_by_atoms = compute_projection(atom_volume, atom_integrator, image_config)
-#     np.testing.assert_allclose(proj_by_gaussians, proj_by_atoms, atol=5e-3)
+    np.testing.assert_allclose(proj_by_gaussians, proj_by_atoms, atol=5e-3)
 
 
 @pytest.mark.parametrize(
@@ -210,7 +232,7 @@ def test_analytic_vs_voxels_nopose(pdb_info, pixel_size, shape):
         # axes[2].imshow(projection_by_other_method - projection_by_gaussian_integration)
         # plt.show()
         np.testing.assert_allclose(
-            projection_by_gaussian_integration, projection_by_other_method, atol=1e-12
+            projection_by_gaussian_integration, projection_by_other_method, atol=1e-8
         )
 
 

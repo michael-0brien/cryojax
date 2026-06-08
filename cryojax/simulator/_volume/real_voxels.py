@@ -8,7 +8,6 @@ from typing_extensions import override
 
 import equinox as eqx
 import jax.numpy as jnp
-import nufftax
 from jaxtyping import Array, Float
 
 from ...jax_util import NDArrayLike
@@ -16,6 +15,16 @@ from ...ndimage import convert_fftn_to_rfftn, crop_to_shape, irfftn, make_coordi
 from .._image_config import AbstractImageConfig
 from .._pose import AbstractPose
 from .base_volume import AbstractVolumeIntegrator, AbstractVoxelVolume, ProjectionArray
+
+
+try:
+    from jax_finufft import nufft1
+    from jax_finufft.options import NestedOpts, Opts
+
+    JAX_FINUFFT_IMPORT_ERROR = None
+except ModuleNotFoundError as err:
+    nufft1, Opts, NestedOpts = None, None, None
+    JAX_FINUFFT_IMPORT_ERROR = err
 
 
 class AbstractRealVoxelVolume(AbstractVoxelVolume, strict=True):
@@ -214,6 +223,13 @@ class RealVoxelProjection(
             See [`nufftax`](https://github.com/GragasLab/nufftax)
             for documentation.
         """
+        if nufft1 is None:
+            raise RuntimeError(
+                "Tried to use the `RealVoxelProjection` "
+                "class, but `jax-finufft` is not installed. "
+                "See https://github.com/flatironinstitute/jax-finufft "
+                "for installation instructions."
+            ) from JAX_FINUFFT_IMPORT_ERROR
         self.eps = eps
 
     @override
@@ -263,6 +279,7 @@ class RealVoxelProjection(
 
 
 def _project_with_nufft(weights, coordinate_list, shape, eps=1e-6):
+    assert nufft1 is not None
     weights, coordinate_list = (
         jnp.asarray(weights, dtype=complex),
         jnp.asarray(coordinate_list, dtype=float),
@@ -275,10 +292,19 @@ def _project_with_nufft(weights, coordinate_list, shape, eps=1e-6):
     coordinates_periodic = 2 * jnp.pi * coordinates_xy / box_xy
     # Unpack and compute
     x, y = coordinates_periodic[:, 0], coordinates_periodic[:, 1]
-    fourier_projection = nufftax.nufft2d1(
-        n_modes=shape[::-1], c=weights, x=x, y=y, eps=eps, isign=-1
+    fourier_projection = nufft1(
+        shape, weights, y, x, eps=eps, iflag=-1, opts=_make_opts()
     )
     # Shift zero frequency component to corner
     fourier_projection = jnp.fft.ifftshift(fourier_projection)
     # Convert to rfftn output
     return convert_fftn_to_rfftn(fourier_projection, mode="real")
+
+
+def _make_opts():
+    assert NestedOpts is not None
+    assert Opts is not None
+    return NestedOpts(
+        forward=Opts(upsampfac=1.25, gpu_upsampfac=1.25),
+        backward=Opts(upsampfac=1.25, gpu_upsampfac=1.25),
+    )

@@ -13,7 +13,7 @@ import functools
 import operator
 from abc import abstractmethod
 from collections.abc import Callable
-from typing import Any
+from typing import Any, ClassVar
 from typing_extensions import override
 
 import equinox as eqx
@@ -37,6 +37,8 @@ class AbstractFourierOperator(eqx.Module, strict=True):
            the class definition.
         2) Overrwrite the `__call__` method.
     """
+
+    spatial_dims: eqx.AbstractClassVar[list[int]]
 
     @abstractmethod
     def __call__(
@@ -90,6 +92,8 @@ class _SumFourierOperator(AbstractFourierOperator, strict=True):
     operator1: AbstractFourierOperator
     operator2: AbstractFourierOperator
 
+    spatial_dims: ClassVar[list[int]] = [1, 2, 3]
+
     @override
     def __call__(
         self,
@@ -115,6 +119,8 @@ class _DiffFourierOperator(AbstractFourierOperator, strict=True):
     operator1: AbstractFourierOperator
     operator2: AbstractFourierOperator
 
+    spatial_dims: ClassVar[list[int]] = [1, 2, 3]
+
     @override
     def __call__(
         self,
@@ -139,6 +145,8 @@ class _ProductFourierOperator(AbstractFourierOperator, strict=True):
 
     operator1: AbstractFourierOperator
     operator2: AbstractFourierOperator
+
+    spatial_dims: ClassVar[list[int]] = [1, 2, 3]
 
     @override
     def __call__(
@@ -170,6 +178,8 @@ class CustomFourierOperator(AbstractFourierOperator, strict=True):
     ]
     args: Any
     kwargs: Any
+
+    spatial_dims: ClassVar[list[int]] = [1, 2, 3]
 
     def __init__(
         self,
@@ -219,6 +229,8 @@ class FourierDC(AbstractFourierOperator, strict=True):
 
     value: Float[Array, ""]
 
+    spatial_dims: ClassVar[list[int]] = [1, 2, 3]
+
     def __init__(self, value: FloatLike = 0.0):
         """**Arguments:**
 
@@ -257,6 +269,8 @@ class FourierConstant(AbstractFourierOperator, strict=True):
     """An operator that is a constant."""
 
     value: Float[Array, "..."]
+
+    spatial_dims: ClassVar[list[int]] = [1, 2, 3]
 
     def __init__(self, value: float | Float[Array, "..."]):
         """**Arguments:**
@@ -301,6 +315,8 @@ class FourierExp2D(AbstractFourierOperator, strict=True):
     amplitude: Float[Array, ""]
     length_scale: Float[Array, ""]
 
+    spatial_dims: ClassVar[list[int]] = [2]
+
     def __init__(
         self,
         amplitude: FloatLike = 1.0,
@@ -344,6 +360,8 @@ class FourierGaussian(AbstractFourierOperator, strict=True):
 
     amplitude: Float[Array, ""]
     b_factor: Float[Array, ""]
+
+    spatial_dims: ClassVar[list[int]] = [1, 2, 3]
 
     def __init__(self, amplitude: FloatLike = 1.0, b_factor: FloatLike = 1.0):
         """**Arguments:**
@@ -391,6 +409,8 @@ class PeakedFourierGaussian(AbstractFourierOperator, strict=True):
     amplitude: Float[Array, ""]
     b_factor: Float[Array, ""]
     radial_peak: Float[Array, ""]
+
+    spatial_dims: ClassVar[list[int]] = [1, 2, 3]
 
     def __init__(
         self,
@@ -458,6 +478,8 @@ class FourierSinc(AbstractFourierOperator, strict=True):
 
     box_width: Float[Array, ""]
 
+    spatial_dims: ClassVar[list[int]] = [1, 2, 3]
+
     def __init__(self, box_width: FloatLike = 1.0):
         """**Arguments:**
 
@@ -494,6 +516,8 @@ class FourierPhaseShifts(AbstractFourierOperator):
     """Apply a phase shift the Fourier domain."""
 
     shift: Float[Array, " _"]
+
+    spatial_dims: ClassVar[list[int]] = [1, 2, 3]
 
     def __init__(
         self,

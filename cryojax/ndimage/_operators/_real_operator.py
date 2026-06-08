@@ -4,6 +4,7 @@ Implementation of operators on images in real-space.
 
 from abc import abstractmethod
 from collections.abc import Sequence
+from typing import ClassVar
 from typing_extensions import override
 
 import equinox as eqx
@@ -27,6 +28,8 @@ class AbstractRealOperator(eqx.Module, strict=True):
            the class definition.
         2) Overrwrite the `__call__` method.
     """
+
+    spatial_dims: eqx.AbstractClassVar[list[int]]
 
     @abstractmethod
     def __call__(  # pyright: ignore
@@ -80,6 +83,8 @@ class _SumRealOperator(AbstractRealOperator, strict=True):
     operator1: AbstractRealOperator
     operator2: AbstractRealOperator
 
+    spatial_dims: ClassVar[list[int]] = [1, 2, 3]
+
     @override
     def __call__(
         self,
@@ -105,6 +110,8 @@ class _DiffRealOperator(AbstractRealOperator, strict=True):
     operator1: AbstractRealOperator
     operator2: AbstractRealOperator
 
+    spatial_dims: ClassVar[list[int]] = [1, 2, 3]
+
     @override
     def __call__(
         self,
@@ -129,6 +136,8 @@ class _ProductRealOperator(AbstractRealOperator, strict=True):
 
     operator1: AbstractRealOperator
     operator2: AbstractRealOperator
+
+    spatial_dims: ClassVar[list[int]] = [1, 2, 3]
 
     @override
     def __call__(
@@ -160,6 +169,8 @@ class RealGaussian(AbstractRealOperator, strict=True):
     amplitude: Float[Array, ""]
     variance: Float[Array, ""]
     offset: Float[Array, " _"] | None
+
+    spatial_dims: ClassVar[list[int]] = [1, 2, 3]
 
     def __init__(
         self,
@@ -215,6 +226,8 @@ class RealConstant(AbstractRealOperator, strict=True):
     """An operator that is a constant."""
 
     value: Float[Array, "..."]
+
+    spatial_dims: ClassVar[list[int]] = [1, 2, 3]
 
     def __init__(self, value: float | Float[NDArrayLike, "..."]):
         """**Arguments:**
