@@ -425,7 +425,7 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
             make_frequency_grid(self.shape, self.voxel_size, outputs_rfftfreqs=False),
             axes=(0, 1, 2),
         )
-        fourier_voxel_grid = render_impl(
+        return render_impl(
             volume_representation.positions,
             volume_representation.kernel_fns,
             shape=self.shape,
@@ -434,24 +434,10 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
             sampling_mode=self.sampling_mode,
             eps=self.eps,
             upsampfac=self.upsample_factor,
+            outputs_real_space=outputs_real_space,
+            outputs_rfft=outputs_rfft,
+            fftshifted=fftshifted,
         )
-
-        if outputs_real_space:
-            return ifftn(jnp.fft.ifftshift(fourier_voxel_grid)).real
-        else:
-            if outputs_rfft:
-                fourier_voxel_grid = convert_fftn_to_rfftn(
-                    jnp.fft.ifftshift(fourier_voxel_grid), mode="real"
-                )
-                if fftshifted:
-                    return jnp.fft.fftshift(fourier_voxel_grid, axes=(0, 1))
-                else:
-                    return fourier_voxel_grid
-            else:
-                if fftshifted:
-                    return fourier_voxel_grid
-                else:
-                    return jnp.fft.ifftshift(fourier_voxel_grid)
 
 
 IndependentAtomRenderFn.__doc__ = (
@@ -563,7 +549,7 @@ class IndependentAtomProjection(
                 else make_frequency_grid(shape, pixel_size, outputs_rfftfreqs=False)
             )
         # Compute projection
-        projection_fft = project_impl(
+        return project_impl(
             volume_representation.positions,
             volume_representation.kernel_fns,
             shape=shape_u,
@@ -573,30 +559,9 @@ class IndependentAtomProjection(
             eps=self.eps,
             upsampfac=self.upsample_factor,
             block_size=self.block_size,
+            output_shape=image_config.padded_shape,
+            outputs_real_space=outputs_real_space,
         )
-        # Block average and return
-        block_average_fn = lambda x, factor: (
-            block_reduce_downsample(x, factor, jax.lax.add, center_correct=False)
-            / factor**x.ndim
-        )
-        if self.shape is None:
-            if self.block_size > 1:
-                projection = block_average_fn(
-                    irfftn(projection_fft, s=shape_u), self.block_size
-                )
-                return projection if outputs_real_space else rfftn(projection)
-            else:
-                return (
-                    irfftn(projection_fft, s=shape)
-                    if outputs_real_space
-                    else projection_fft
-                )
-        else:
-            projection = irfftn(projection_fft, s=shape_u)
-            if self.block_size > 1:
-                projection = block_average_fn(projection, self.block_size)
-            projection = resize_with_crop_or_pad(projection, image_config.padded_shape)
-            return projection if outputs_real_space else rfftn(projection)
 
 
 IndependentAtomProjection.__doc__ = f"""Integrate atomic parametrization of a volume "
@@ -638,28 +603,58 @@ def _check_kernel_fns(
 
 
 def _project_postprocess(
-    projection_fft: Complex[Array, "_ _"],
+    projection_out: Complex[Array, "_ _"],
     *,
+    is_real_space: bool,
+    compute_shape: tuple[int, int],
     pixel_size: Float[Array, ""],
     frequency_grid: Float[Array, "_ _ 2"],
     sampling_mode: Literal["average", "point"],
     block_size: int,
+    output_shape: tuple[int, int],
+    outputs_real_space: bool,
 ) -> Complex[Array, "_ _"]:
-    if sampling_mode == "average":
-        antialias_fn = FourierSinc(box_width=pixel_size)
-        projection_fft *= antialias_fn(frequency_grid)
-    if block_size % 2 == 0:
-        target_shape = tuple(s // block_size for s in projection_fft.shape)
-        assert len(target_shape) == 2
-        projection_fft = _phase_shift_correct(
-            projection_fft,
-            block_size=block_size,
-            target_shape=target_shape,
-            pixel_size=pixel_size,
-            frequency_grid=frequency_grid,
+    reduce_shape = tuple(s // block_size for s in projection_out.shape)
+    assert len(reduce_shape) == 2
+    if is_real_space:
+        raise NotImplementedError()
+    else:
+        projection_fft = projection_out
+        if sampling_mode == "average":
+            antialias_fn = FourierSinc(box_width=pixel_size)
+            projection_fft *= antialias_fn(frequency_grid)
+        if block_size % 2 == 0:
+            projection_fft = _phase_shift_correct(
+                projection_fft,
+                block_size=block_size,
+                target_shape=reduce_shape,
+                pixel_size=pixel_size,
+                frequency_grid=frequency_grid,
+            )
+        projection_fft = convert_fftn_to_rfftn(projection_fft, mode="real")
+        # Block average and return
+        block_average_fn = lambda x, factor: (
+            block_reduce_downsample(x, factor, jax.lax.add, center_correct=False)
+            / factor**x.ndim
         )
-    projection_fft = convert_fftn_to_rfftn(projection_fft, mode="real")
-    return projection_fft
+        if output_shape == reduce_shape:
+            if block_size > 1:
+                projection = block_average_fn(
+                    irfftn(projection_fft, s=compute_shape), block_size
+                )
+                return projection if outputs_real_space else rfftn(projection)
+            else:
+                return (
+                    irfftn(projection_fft, s=output_shape)
+                    if outputs_real_space
+                    else projection_fft
+                )
+        else:
+            projection = irfftn(projection_fft, s=compute_shape)
+            if block_size > 1:
+                projection = block_average_fn(projection, block_size)
+            projection = resize_with_crop_or_pad(projection, output_shape)
+            return projection if outputs_real_space else rfftn(projection)
 
 
 def project_impl(
@@ -673,7 +668,9 @@ def project_impl(
     eps: float,
     upsampfac: tuple[float, float],
     block_size: int,
-) -> Complex[Array, "{shape[0]} {shape[1]}"]:
+    output_shape: tuple[int, int],
+    outputs_real_space: bool,
+) -> Array:
 
     is_real_space, is_leaf = _check_kernel_fns(kernel_fns)
 
@@ -728,16 +725,20 @@ def project_impl(
     project_dispatch = lambda _positions, _kernel_fn: project_impl(
         shape, pixel_size, _positions, _kernel_fn, *project_args
     )
-    projection_fft = jax.tree.reduce(
+    projection_out = jax.tree.reduce(
         lambda x, y: x + y,
         jax.tree.map(project_dispatch, positions, kernel_fns, is_leaf=is_leaf),
     )
     return _project_postprocess(
-        projection_fft,
+        projection_out,
+        is_real_space=is_real_space,
+        compute_shape=shape,
         pixel_size=pixel_size,
         frequency_grid=frequency_grid,
         sampling_mode=sampling_mode,
         block_size=block_size,
+        output_shape=output_shape,
+        outputs_real_space=outputs_real_space,
     )
 
 
@@ -745,13 +746,35 @@ def _render_postprocess(
     render_fft: Complex[Array, "_ _ _"],
     voxel_size: Float[Array, ""],
     *,
+    is_real_space: bool,
     frequency_grid: Float[Array, "_ _ _ 3"],
     sampling_mode: Literal["average", "point"],
+    outputs_real_space: bool,
+    outputs_rfft: bool,
+    fftshifted: bool,
 ) -> Complex[Array, "_ _ _"]:
-    if sampling_mode == "average":
-        antialias_fn = FourierSinc(box_width=voxel_size)
-        render_fft *= antialias_fn(frequency_grid)
-    return render_fft
+    if is_real_space:
+        raise NotImplementedError()
+    else:
+        if sampling_mode == "average":
+            antialias_fn = FourierSinc(box_width=voxel_size)
+            render_fft *= antialias_fn(frequency_grid)
+        if outputs_real_space:
+            return ifftn(jnp.fft.ifftshift(render_fft)).real
+        else:
+            if outputs_rfft:
+                render_fft = convert_fftn_to_rfftn(
+                    jnp.fft.ifftshift(render_fft), mode="real"
+                )
+                if fftshifted:
+                    return jnp.fft.fftshift(render_fft, axes=(0, 1))
+                else:
+                    return render_fft
+            else:
+                if fftshifted:
+                    return render_fft
+                else:
+                    return jnp.fft.ifftshift(render_fft)
 
 
 def render_impl(
@@ -764,7 +787,10 @@ def render_impl(
     sampling_mode: Literal["average", "point"],
     eps: float,
     upsampfac: tuple[float, float],
-) -> Complex[Array, "{shape[0]} {shape[1]} {shape[2]}"]:
+    outputs_real_space: bool,
+    outputs_rfft: bool,
+    fftshifted: bool,
+) -> Array:
 
     is_real_space, is_leaf = _check_kernel_fns(kernel_fns)
 
@@ -826,9 +852,13 @@ def render_impl(
 
     return _render_postprocess(
         render_fft,
+        is_real_space=is_real_space,
         voxel_size=voxel_size,
         frequency_grid=frequency_grid,
         sampling_mode=sampling_mode,
+        outputs_real_space=outputs_real_space,
+        outputs_rfft=outputs_rfft,
+        fftshifted=fftshifted,
     )
 
 

@@ -295,7 +295,11 @@ This documentation is a collection of functions used to work with coordinate sys
 ---
 
 
-## Utility functions
+## Downsampling
+
+::: cryojax.ndimage.block_reduce_downsample
+
+::: cryojax.ndimage.fourier_crop_downsample
 
 ### Interpolation
 
