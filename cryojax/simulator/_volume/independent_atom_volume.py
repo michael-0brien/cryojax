@@ -639,7 +639,7 @@ def _maybe_gaussians_to_erf(
         if all(isinstance(kernel, RealGaussian) for kernel in kernel_list):
             return (
                 jax.tree.map(
-                    lambda x: _IntegratedRealGaussian.from_gaussians(
+                    lambda x: _IntegratedRealGaussian.from_gaussian(
                         x, pixel_size / upsampfac
                     ),
                     kernel_pytree,
@@ -1105,7 +1105,7 @@ class _IntegratedRealGaussian(AbstractRealOperator, strict=True):
     spatial_dims: ClassVar[list[int]] = [1]
 
     @classmethod
-    def from_gaussians(cls, fn: RealGaussian, pixel_size: Float[Array, ""]):
+    def from_gaussian(cls, fn: RealGaussian, pixel_size: Float[Array, ""]):
         return cls(
             amplitude=fn.amplitude,
             variance=fn.variance,
