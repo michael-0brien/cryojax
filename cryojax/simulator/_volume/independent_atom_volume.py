@@ -1,6 +1,6 @@
 import math
 from collections.abc import Callable, Sequence
-from typing import ClassVar, Literal, Self, TypeVar
+from typing import Any, ClassVar, Literal, Self, TypeVar
 from typing_extensions import override
 
 import equinox as eqx
@@ -357,8 +357,9 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
 
     backend: Literal["nufftax", "jax-finufft"]
     sampling_mode: Literal["average", "point"]
-    upsample_factor: tuple[float, float]
+    upsample_factor: float
     eps: float
+    options: dict[str, Any]
 
     def __init__(
         self,
@@ -367,8 +368,9 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
         *,
         backend: Literal["nufftax", "jax-finufft"] = "nufftax",
         sampling_mode: Literal["average", "point"] = "average",
-        upsample_factor: int | float | tuple[float, float] = 2.0,
+        upsample_factor: int | float = 2.0,
         eps: float = 1e-6,
+        options: dict[str, Any] = {},
     ):
         """**Arguments:**
 
@@ -400,6 +402,10 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
             Controls speed / accuracy tradeoff.
             See [`finufft`](https://finufft.readthedocs.io/en/latest/opts.html#options-parameters-cpu)
             for documentation.
+        - `options`:
+            A dictionary of options for advanced usage. This is passed directly to the underlying
+            non-uniform FFT implementation if kernels are in fourier-space, or to the `nufftax`
+            spreading function if kernels are in real-space.
         """  # noqa: E501
         if sampling_mode not in ["average", "point"]:
             raise ValueError(
@@ -418,8 +424,9 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
         self.voxel_size = jnp.asarray(voxel_size, dtype=float)
         self.backend = backend
         self.sampling_mode = sampling_mode
-        self.upsample_factor = _standardize_upsampfac(upsample_factor)
+        self.upsample_factor = float(upsample_factor)
         self.eps = eps
+        self.options = options
 
     @override
     def __call__(
@@ -464,6 +471,7 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
             outputs_real_space=outputs_real_space,
             outputs_rfft=outputs_rfft,
             fftshifted=fftshifted,
+            options=self.options,
         )
 
 
@@ -478,10 +486,11 @@ class IndependentAtomProjection(
 ):
     backend: Literal["nufftax", "jax-finufft"]
     sampling_mode: Literal["average", "point"]
-    upsample_factor: tuple[float, float]
+    upsample_factor: float
     block_size: int
     eps: float
     shape: tuple[int, int] | None
+    options: dict[str, Any]
 
     outputs_ewald_sphere: ClassVar[bool] = False
 
@@ -491,9 +500,10 @@ class IndependentAtomProjection(
         backend: Literal["jax-finufft", "nufftax"] = "nufftax",
         sampling_mode: Literal["average", "point"] = "average",
         block_size: int = 1,
-        upsample_factor: float | tuple[float, float] = 2.0,
+        upsample_factor: int | float = 2.0,
         eps: float = 1e-6,
         shape: tuple[int, int] | None = None,
+        options: dict[str, Any] = {},
     ):
         """**Arguments:**
 
@@ -529,6 +539,10 @@ class IndependentAtomProjection(
         - `shape`:
             If given, first compute the image at `shape`, then
             pad or crop to `image_config.padded_shape`.
+        - `options`:
+            A dictionary of options for advanced usage. This is passed directly to the underlying
+            non-uniform FFT implementation if kernels are in fourier-space, or to the `nufftax`
+            spreading function if kernels are in real-space.
         """  # noqa: E501
         if sampling_mode not in ["average", "point"]:
             raise ValueError(
@@ -547,8 +561,9 @@ class IndependentAtomProjection(
         self.sampling_mode = sampling_mode
         self.block_size = block_size
         self.shape = shape
-        self.upsample_factor = _standardize_upsampfac(upsample_factor)
+        self.upsample_factor = float(upsample_factor)
         self.eps = eps
+        self.options = options
 
     @override
     def integrate(
@@ -607,23 +622,12 @@ class IndependentAtomProjection(
             block_size=self.block_size,
             output_shape=image_config.padded_shape,
             outputs_real_space=outputs_real_space,
+            options=self.options,
         )
 
 
 IndependentAtomProjection.__doc__ = f"""Integrate atomic parametrization of a volume "
 "onto the exit plane from an `IndependentAtomVolume`. {_REAL_VS_FOURIER_DOC}"""
-
-
-def _standardize_upsampfac(
-    upsample_factor: int | float | tuple[float, float],
-) -> tuple[float, float]:
-    if isinstance(upsample_factor, (float, int)):
-        u = float(upsample_factor)
-        return (u, u)
-    else:
-        u = tuple(float(fac) for fac in upsample_factor)
-        assert len(u) == 2
-        return u
 
 
 def _check_kernel_fns(
@@ -734,10 +738,11 @@ def project_impl(
     frequency_grid: Float[Array, "_ _ 2"],
     sampling_mode: Literal["average", "point"],
     eps: float,
-    upsampfac: tuple[float, float],
+    upsampfac: float,
     block_size: int,
     output_shape: tuple[int, int],
     outputs_real_space: bool,
+    options: dict[str, Any],
 ) -> Array:
     is_real_space, is_leaf = _check_kernel_fns(kernel_fns, spatial_dim=2)
 
@@ -747,8 +752,8 @@ def project_impl(
         _positions: Float[Array, "_ 3"],
         _kernel_fn: AbstractRealOperator,
     ) -> Array:
+        u = upsampfac
         nspread = _eps_to_nspread(eps)
-        u = upsampfac[0]
         shape_u = (int(u * _shape[0]), int(u * _shape[1]))
         (ny, nx), num_atoms = _shape, _positions.shape[0]
         box_xy = _ps * jnp.asarray((nx, ny), dtype=float)
@@ -763,6 +768,7 @@ def project_impl(
                 nspread=nspread,
                 phi=lambda _z: eqx.filter_vmap(_kernel_fn)((_ps / u) * _z),
             ),
+            **options,
         )
         indices_y, indices_x = _build_extraction_mesh(shape_u, _shape)
         return fftn(projection)[indices_y, indices_x]
@@ -787,6 +793,7 @@ def project_impl(
                     backend=backend,
                     eps=eps,
                     upsampfac=upsampfac,
+                    options=options,
                 )
                 / _ps**2
             )
@@ -861,10 +868,11 @@ def render_impl(
     frequency_grid: Float[Array, "_ _ _ 3"],
     sampling_mode: Literal["average", "point"],
     eps: float,
-    upsampfac: tuple[float, float],
+    upsampfac: float,
     outputs_real_space: bool,
     outputs_rfft: bool,
     fftshifted: bool,
+    options: dict[str, Any],
 ) -> Array:
     is_real_space, is_leaf = _check_kernel_fns(kernel_fns, spatial_dim=3)
 
@@ -875,7 +883,7 @@ def render_impl(
         _kernel_fn: AbstractRealOperator,
     ) -> Array:
         nspread = _eps_to_nspread(eps)
-        u = upsampfac[0]
+        u = upsampfac
         shape_u = (int(u * _shape[0]), int(u * _shape[1]), int(u * _shape[2]))
         (nz, ny, nx), num_atoms = _shape, _positions.shape[0]
         box_xyz = _vs * jnp.asarray((nx, ny, nz), dtype=float)
@@ -892,6 +900,7 @@ def render_impl(
                 nspread=nspread,
                 phi=lambda _z: eqx.filter_vmap(_kernel_fn)((_vs / u) * _z),
             ),
+            **options,
         )
         indices_z, indices_y, indices_x = _build_extraction_mesh(shape_u, _shape)
         return fftn(projection)[indices_z, indices_y, indices_x]
@@ -914,6 +923,7 @@ def render_impl(
                 backend=backend,
                 eps=eps,
                 upsampfac=upsampfac,
+                options=options,
             )
             / _vs**3
         )
@@ -969,12 +979,12 @@ def _phase_shift_correct(
     )
 
 
-def _make_opts(upsampfac: tuple[float, float]):
+def _make_jax_finufft_opts(upsampfac: float):
     assert NestedOpts is not None
     assert Opts is not None
     return NestedOpts(
-        forward=Opts(upsampfac=upsampfac[0], gpu_upsampfac=upsampfac[0]),
-        backward=Opts(upsampfac=upsampfac[1], gpu_upsampfac=upsampfac[1]),
+        forward=Opts(upsampfac=upsampfac, gpu_upsampfac=upsampfac),
+        backward=Opts(upsampfac=upsampfac, gpu_upsampfac=upsampfac),
     )
 
 
@@ -985,7 +995,8 @@ def _nufft2d1(
     *,
     backend: Literal["jax-finufft", "nufftax"],
     eps: float,
-    upsampfac: tuple[float, float],
+    upsampfac: float,
+    options: dict[str, Any],
 ):
     if backend == "jax-finufft":
         if jax_finufft is None:
@@ -996,14 +1007,13 @@ def _nufft2d1(
                 "See https://github.com/flatironinstitute/jax-finufft "
                 "for installation instructions."
             ) from JAX_FINUFFT_IMPORT_ERROR
+        opts = (
+            options.pop("opts")
+            if "opts" in options
+            else _make_jax_finufft_opts(upsampfac)
+        )
         return jax_finufft.nufft1(
-            shape,
-            source,
-            xy[:, 1],
-            xy[:, 0],
-            eps=eps,
-            iflag=-1,
-            opts=_make_opts(upsampfac),
+            shape, source, xy[:, 1], xy[:, 0], eps=eps, iflag=-1, opts=opts, **options
         )
     else:
         return nufftax.nufft2d1(
@@ -1013,6 +1023,7 @@ def _nufft2d1(
             y=xy[:, 1],
             eps=eps,
             isign=-1,
+            **options,
         )
 
 
@@ -1023,7 +1034,8 @@ def _nufft3d1(
     *,
     backend: Literal["jax-finufft", "nufftax"],
     eps: float,
-    upsampfac: tuple[float, float],
+    upsampfac: float,
+    options: dict[str, Any],
 ):
     if backend == "jax-finufft":
         if jax_finufft is None:
@@ -1034,6 +1046,11 @@ def _nufft3d1(
                 "See https://github.com/flatironinstitute/jax-finufft "
                 "for installation instructions."
             ) from JAX_FINUFFT_IMPORT_ERROR
+        opts = (
+            options.pop("opts")
+            if "opts" in options
+            else _make_jax_finufft_opts(upsampfac)
+        )
         return jax_finufft.nufft1(
             shape,
             source,
@@ -1042,7 +1059,8 @@ def _nufft3d1(
             xyz[:, 0],
             eps=eps,
             iflag=-1,
-            opts=_make_opts(upsampfac),
+            opts=opts,
+            **options,
         )
     else:
         return nufftax.nufft3d1(
@@ -1053,6 +1071,7 @@ def _nufft3d1(
             z=xyz[:, 2],
             eps=eps,
             isign=-1,
+            **options,
         )
 
 
