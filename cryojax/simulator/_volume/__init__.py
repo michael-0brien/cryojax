@@ -27,7 +27,6 @@ from .independent_atom_volume import (
     IndependentAtomVolume as IndependentAtomVolume,
     LobatoScatteringFactor as LobatoScatteringFactor,
     PengScatteringFactor as PengScatteringFactor,
-    PengScatteringPotential as PengScatteringPotential,
 )
 from .real_voxels import (
     RealVoxelCloudVolume as RealVoxelCloudVolume,

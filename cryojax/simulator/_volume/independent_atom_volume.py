@@ -6,6 +6,7 @@ from typing_extensions import override
 import equinox as eqx
 import jax
 import jax.numpy as jnp
+import jax.scipy as jsp
 import nufftax
 from jaxtyping import Array, Float, Inexact, PyTree
 from nufftax.core import Kernel, spread_2d, spread_3d
@@ -14,13 +15,13 @@ from ..._internal import error_if_not_positive
 from ...constants import (
     LobatoScatteringFactorParameters,
     PengScatteringFactorParameters,
-    b_factor_to_variance,
 )
 from ...jax_util import FloatLike, NDArrayLike
 from ...ndimage import (
     AbstractFourierOperator,
     AbstractRealOperator,
     FourierSinc,
+    RealGaussian,
     block_reduce_downsample,
     convert_fftn_to_rfftn,
     fftn,
@@ -54,50 +55,10 @@ except ModuleNotFoundError as err:
 T = TypeVar("T")
 
 
-class PengScatteringPotential(AbstractRealOperator, strict=True):
-    a: Float[Array, " n"]
-    b: Float[Array, " n"]
-    b_factor: Float[Array, ""] | None
-
-    spatial_dims: ClassVar[list[int]] = [1, 2, 3]
-
-    def __init__(
-        self,
-        a: Float[NDArrayLike, " n"],
-        b: Float[NDArrayLike, " n"],
-        b_factor: FloatLike | None = None,
-    ):
-        self.a = jnp.asarray(a, dtype=float)
-        self.b = jnp.asarray(b, dtype=float)
-        self.b_factor = None if b_factor is None else jnp.asarray(b_factor, dtype=float)
-
-    def __call__(
-        self,
-        coordinate_grid: (
-            Float[Array, " x_dim"]
-            | Float[Array, "y_dim x_dim 2"]
-            | Float[Array, "z_dim y_dim x_dim 3"]
-        ),
-    ):
-        ndim = 1 if coordinate_grid.ndim == 1 else coordinate_grid.ndim - 1
-        if ndim == 1:
-            r_squared = coordinate_grid**2
-        else:
-            r_squared = jnp.sum(coordinate_grid**2, axis=-1)
-        b_factor = 0.0 if self.b_factor is None else error_if_not_positive(self.b_factor)
-        variances = b_factor_to_variance(
-            (error_if_not_positive(self.b) + b_factor) / (8 * jnp.pi**2)
-        )
-        gaussian_fn = lambda _amp, _var: (
-            (_amp / (2 * jnp.pi * _var) ** (ndim / 2)) * jnp.exp(-r_squared / (2 * _var))
-        )
-        return jnp.sum(jax.vmap(gaussian_fn)(self.a, variances), axis=0)
-
-
 class PengScatteringFactor(AbstractFourierOperator, strict=True):
     a: Float[Array, " n"]
     b: Float[Array, " n"]
-    b_factor: Float[Array, ""] | None
+    b_factor: Float[Array, ""] | None = None
 
     spatial_dims: ClassVar[list[int]] = [2, 3]
 
@@ -128,7 +89,7 @@ class PengScatteringFactor(AbstractFourierOperator, strict=True):
 class LobatoScatteringFactor(AbstractFourierOperator, strict=True):
     a: Float[Array, " n"]
     b: Float[Array, " n"]
-    b_factor: Float[Array, ""] | None
+    b_factor: Float[Array, ""] | None = None
 
     spatial_dims: ClassVar[list[int]] = [2, 3]
 
@@ -270,25 +231,12 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
         parameters: PengScatteringFactorParameters | LobatoScatteringFactorParameters,
         *,
         b_factor_by_element: FloatLike | tuple[FloatLike, ...] | None = None,
-        outputs_real_space: bool = False,
     ) -> Self:
         def make_kernel_fn(a, b, b_factor):
             if isinstance(parameters, PengScatteringFactorParameters):
-                if outputs_real_space:
-                    return PengScatteringPotential(a, b, b_factor)
-                else:
-                    return PengScatteringFactor(a, b, b_factor)
+                return PengScatteringFactor(a, b, b_factor)
             elif isinstance(parameters, LobatoScatteringFactorParameters):
-                if outputs_real_space:
-                    raise NotImplementedError(
-                        "`IndependentAtomVolume(..., parameters=..., "
-                        "outputs_real_space=True)` does not support "
-                        "`parameters = LobatoScatteringFactorParameters(...)`. "
-                        "Instead, use `PengScatteringFactorParameters` or set "
-                        "`outputs_real_space = False`."
-                    )
-                else:
-                    return LobatoScatteringFactor(a, b, b_factor)
+                return LobatoScatteringFactor(a, b, b_factor)
             else:
                 raise ValueError(
                     "Unrecognized argument `parameters` when "
@@ -674,6 +622,34 @@ def _check_kernel_fns(
     return is_real_space, is_leaf
 
 
+def _maybe_gaussians_to_erf(
+    kernel_pytree: PyTree[AbstractRealOperator],
+    pixel_size: Float[Array, ""],
+    sampling_mode: Literal["average", "point"],
+    upsampfac: float,
+) -> tuple[PyTree[AbstractRealOperator], Literal["average", "point"]]:
+    """Modify gaussian kernels at runtime to the error function."""
+    kernel_list = jax.tree.leaves(
+        kernel_pytree,
+        is_leaf=lambda x: isinstance(x, AbstractRealOperator),
+    )
+    if sampling_mode == "point":
+        return kernel_pytree, "point"
+    else:
+        if all(isinstance(kernel, RealGaussian) for kernel in kernel_list):
+            return (
+                jax.tree.map(
+                    lambda x: _IntegratedRealGaussian.from_gaussians(
+                        x, pixel_size / upsampfac
+                    ),
+                    kernel_pytree,
+                    is_leaf=lambda x: isinstance(x, AbstractRealOperator),
+                ),
+                "point",
+            )
+        return kernel_pytree, "average"
+
+
 def _project_postprocess(
     projection_out: Inexact[Array, "_ _"],
     *,
@@ -744,7 +720,14 @@ def project_impl(
     outputs_real_space: bool,
     options: dict[str, Any],
 ) -> Array:
-    is_real_space, is_leaf = _check_kernel_fns(kernel_fns, spatial_dim=2)
+    is_real_space, is_leaf = _check_kernel_fns(
+        kernel_fns,
+        spatial_dim=2,
+    )
+    if is_real_space:
+        kernel_fns, sampling_mode = _maybe_gaussians_to_erf(
+            kernel_fns, pixel_size, sampling_mode, upsampfac
+        )
 
     def real_impl(
         _shape: tuple[int, int],
@@ -770,8 +753,8 @@ def project_impl(
             ),
             **options,
         )
-        indices_y, indices_x = _build_extraction_mesh(shape_u, _shape)
-        return fftn(projection)[indices_y, indices_x]
+        (indices_y, indices_x), fac = _build_extraction_mesh(shape_u, _shape)
+        return fac * fftn(projection)[indices_y, indices_x]
 
     def fourier_impl(
         _shape: tuple[int, int],
@@ -875,6 +858,10 @@ def render_impl(
     options: dict[str, Any],
 ) -> Array:
     is_real_space, is_leaf = _check_kernel_fns(kernel_fns, spatial_dim=3)
+    if is_real_space:
+        kernel_fns, sampling_mode = _maybe_gaussians_to_erf(
+            kernel_fns, voxel_size, sampling_mode, upsampfac
+        )
 
     def real_impl(
         _shape: tuple[int, int, int],
@@ -902,8 +889,8 @@ def render_impl(
             ),
             **options,
         )
-        indices_z, indices_y, indices_x = _build_extraction_mesh(shape_u, _shape)
-        return fftn(projection)[indices_z, indices_y, indices_x]
+        (indices_z, indices_y, indices_x), fac = _build_extraction_mesh(shape_u, _shape)
+        return fac * fftn(projection)[indices_z, indices_y, indices_x]
 
     def fourier_impl(
         _shape: tuple[int, int, int],
@@ -1088,10 +1075,11 @@ def _build_extraction_mesh(shape: tuple[int, ...], shape_ds: tuple[int, ...]):
 
     assert len(shape) == len(shape_ds)
     assert len(shape) in [2, 3]
+    mean_factor = math.prod(shape_ds) / math.prod(shape)
     indices_1d = tuple(
         _build_extraction_indices_1d(dim, dim_ds) for dim, dim_ds in zip(shape, shape_ds)
     )
-    return jnp.meshgrid(*indices_1d, indexing="ij")
+    return jnp.meshgrid(*indices_1d, indexing="ij"), mean_factor
 
 
 def _build_extraction_indices_1d(dim: int, dim_ds: int):
@@ -1106,3 +1094,32 @@ def _build_extraction_indices_1d(dim: int, dim_ds: int):
     indices = jnp.concatenate([idx_pos, idx_neg])
 
     return indices
+
+
+class _IntegratedRealGaussian(AbstractRealOperator, strict=True):
+    amplitude: Float[Array, ""]
+    variance: Float[Array, ""]
+
+    pixel_size: Float[Array, ""]
+
+    spatial_dims: ClassVar[list[int]] = [1]
+
+    @classmethod
+    def from_gaussians(cls, fn: RealGaussian, pixel_size: Float[Array, ""]):
+        return cls(
+            amplitude=fn.amplitude,
+            variance=fn.variance,
+            pixel_size=pixel_size,
+        )
+
+    @override
+    def __call__(self, coordinate_grid: Float[Array, " x_dim"]) -> Array:
+        scaling = 1.0 / jnp.sqrt(2 * self.variance)
+        left, right = (
+            coordinate_grid - self.pixel_size / 2,
+            coordinate_grid + self.pixel_size / 2,
+        )
+        weight = (1 / (2 * self.pixel_size)) * (
+            jsp.special.erf(scaling * right) - jsp.special.erf(scaling * left)
+        )
+        return self.amplitude * weight

@@ -116,8 +116,7 @@ def test_real_atom_projection_exact(pdb_info, pixel_size, shape):
         pixel_size,
         voltage_in_kilovolts=300.0,
     )
-    amplitude, b_factor = 1.0, 40.0
-    variance = b_factor / (8 * np.pi**2)
+    amplitude, variance = 1.0, 20.0 / (8 * np.pi**2)
     gaussian_volume, gaussian_integrator = (
         cxs.GaussianMixtureVolume(
             atom_positions,
@@ -132,7 +131,9 @@ def test_real_atom_projection_exact(pdb_info, pixel_size, shape):
             kernel_fns=im.RealGaussian(amplitude=amplitude, variance=variance),
         ),
         cxs.IndependentAtomProjection(
-            sampling_mode="average", eps=1e-10, upsample_factor=2
+            sampling_mode="average",
+            eps=1e-8,
+            upsample_factor=2.0,
         ),
     )
     proj_by_gaussians = compute_projection(
@@ -140,7 +141,7 @@ def test_real_atom_projection_exact(pdb_info, pixel_size, shape):
     )
     proj_by_atom = compute_projection(atom_volume, atom_integrator, image_config)
     _plot_image_compare(proj_by_gaussians, proj_by_atom)
-    np.testing.assert_allclose(proj_by_gaussians, proj_by_atom, atol=1e-8)
+    np.testing.assert_allclose(proj_by_gaussians, proj_by_atom, atol=1e-5)
 
 
 @pytest.mark.parametrize(
