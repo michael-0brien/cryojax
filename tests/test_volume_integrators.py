@@ -203,6 +203,7 @@ def test_fft_atom_projection_peng(pdb_info, pixel_size, shape, upsampfac):
             positions_by_id,
             peng_parameters_by_id,
             b_factor_by_element=4.0,
+            use_real_space=False,
         )
         image_config = cxs.BasicImageConfig(shape, pixel_size, voltage_in_kilovolts=300.0)
         # Check to make sure the implementations are identical, up to the
@@ -247,7 +248,7 @@ def test_real_atom_projection_peng(pdb_info, pixel_size, shape):
         positions_by_id,
         peng_parameters_by_id,
         b_factor_by_element=10.0,
-        outputs_real_space=True,
+        use_real_space=True,
     )
     image_config = cxs.BasicImageConfig(shape, pixel_size, voltage_in_kilovolts=300.0)
     # Check to make sure the implementations are identical, up to the
@@ -258,6 +259,7 @@ def test_real_atom_projection_peng(pdb_info, pixel_size, shape):
         gaussian_volume, gaussian_integrator, image_config
     )
     proj_by_atoms = compute_projection(atom_volume, atom_integrator, image_config)
+    # _plot_image_compare(proj_by_gaussians, proj_by_atoms)
     np.testing.assert_allclose(proj_by_gaussians, proj_by_atoms, atol=5e-3)
 
 

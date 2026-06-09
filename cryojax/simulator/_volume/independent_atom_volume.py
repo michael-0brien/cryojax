@@ -245,12 +245,12 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
         positions_by_element: tuple[Float[NDArrayLike, "_ 3"], ...],
         parameters: PengScatteringFactorParameters | LobatoScatteringFactorParameters,
         *,
-        outputs_real_space: bool = False,
+        use_real_space: bool = False,
         b_factor_by_element: FloatLike | tuple[FloatLike, ...] | None = None,
     ) -> Self:
         def make_kernel_fn(a, b, b_factor):
             if isinstance(parameters, PengScatteringFactorParameters):
-                if outputs_real_space:
+                if use_real_space:
                     b = b + jnp.asarray(b_factor)[None] if b_factor is not None else b
                     return eqx.filter_vmap(
                         lambda _a, _b: RealGaussian(
@@ -260,13 +260,13 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
                 else:
                     return PengScatteringFactor(a, b, b_factor)
             elif isinstance(parameters, LobatoScatteringFactorParameters):
-                if outputs_real_space:
+                if use_real_space:
                     raise NotImplementedError(
                         "`IndependentAtomVolume(..., parameters=..., "
-                        "outputs_real_space=True)` does not support "
+                        "use_real_space=True)` does not support "
                         "`parameters = LobatoScatteringFactorParameters(...)`. "
                         "Instead, use `PengScatteringFactorParameters` or set "
-                        "`outputs_real_space = False`."
+                        "`use_real_space = False`."
                     )
                 else:
                     return LobatoScatteringFactor(a, b, b_factor)
@@ -338,7 +338,7 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
 
     backend: Literal["nufftax", "jax-finufft"]
     sampling_mode: Literal["average", "point"]
-    upsample_factor: float
+    upsample_factor: float | None
     eps: float
     options: dict[str, Any]
 
@@ -349,7 +349,7 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
         *,
         backend: Literal["nufftax", "jax-finufft"] = "nufftax",
         sampling_mode: Literal["average", "point"] = "average",
-        upsample_factor: int | float = 2.0,
+        upsample_factor: int | float | None = None,
         eps: float = 1e-6,
         options: dict[str, Any] = {},
     ):
@@ -359,11 +359,6 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
             The shape of the resulting voxel grid.
         - `voxel_size`:
             The voxel size of the resulting voxel grid.
-        - `sampling_mode`:
-            If `'average'`, convolve with a box function to sample the
-            projected volume at a pixel to be the average value of the
-            underlying continuous function. If `'point'`, the volume at
-            a pixel will be point sampled.
         - `backend`:
             The backend for non-uniform FFT computation. This is either
             [`nufftax`](https://github.com/GragasLab/nufftax/tree/custom-kernel-spread)
@@ -373,12 +368,17 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
             calling `finufft` directly via `jax.ffi`.
             Used only when `IndependentAtomVolume.kernel_fns` are type
             `AbstractFourierOperator`.
+        - `sampling_mode`:
+            If `'average'`, convolve with a box function to sample the
+            projected volume at a pixel to be the average value of the
+            underlying continuous function. If `'point'`, the volume at
+            a pixel will be point sampled.
+            If `IndependentAtomVolume` is instantiated with real-space
+            gaussians, then error functions are used in
+            `sampling_mode = 'average'`.
         - `upsample_factor`:
             How much to upsample the grid on which atoms are spread onto.
-            See [`finufft`](https://finufft.readthedocs.io/en/latest/opts.html#options-parameters-cpu)
-            for documentation. If a 2-tuple is passed, `upsample_factor[0]` is
-            used for the forward pass and `upsample_factor[1]` is used for the
-            backward pass.
+            If equal to `None`, choose a default value at run-time.
         - `eps`:
             Controls speed / accuracy tradeoff.
             See [`finufft`](https://finufft.readthedocs.io/en/latest/opts.html#options-parameters-cpu)
@@ -405,7 +405,7 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
         self.voxel_size = jnp.asarray(voxel_size, dtype=float)
         self.backend = backend
         self.sampling_mode = sampling_mode
-        self.upsample_factor = float(upsample_factor)
+        self.upsample_factor = None if upsample_factor is None else float(upsample_factor)
         self.eps = eps
         self.options = options
 
@@ -443,17 +443,28 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
         amplitudes = _standardize_amplitudes(volume_representation.amplitudes, positions)
         # Check and modify kernels if using error functions
         is_real_space, kernel_fns = _standardize_kernel_fns(kernel_fns, spatial_dim=3)
+        # Upsample factor logic
         upsampfac, sampling_mode = self.upsample_factor, self.sampling_mode
+        if upsampfac is None:
+            upsampfac = 1.0 if (is_real_space and sampling_mode == "average") else 2.0
+        upsampfac = _find_exact_upsampfac(upsampfac, self.shape)
+        # Modify kernels if using error functions
         if is_real_space:
-            kernel_fns, sampling_mode, upsampfac = _maybe_gaussians_to_erf(
-                kernel_fns, self.voxel_size, sampling_mode, upsampfac
+            kernel_fns, sampling_mode = _maybe_use_erf(
+                kernel_fns,
+                pixel_size=self.voxel_size,
+                sampling_mode=sampling_mode,
+                upsampfac=upsampfac,
             )
         # Upsampling arguments
         if upsampfac > 1:
-            u = _find_exact_upsampfac(self.upsample_factor, self.shape)
             shape_u, voxel_size_u = (
-                (int(u * self.shape[0]), int(u * self.shape[1]), int(u * self.shape[2])),
-                self.voxel_size / u,
+                (
+                    int(upsampfac * self.shape[0]),
+                    int(upsampfac * self.shape[1]),
+                    int(upsampfac * self.shape[2]),
+                ),
+                self.voxel_size / upsampfac,
             )
         else:
             shape_u, voxel_size_u = self.shape, self.voxel_size
@@ -493,8 +504,8 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
             rendering_fft = rendering_out
         # Average within a pixel size
         if sampling_mode == "average":
-            antialias_fn = FourierSinc(box_width=self.voxel_size)
-            rendering_fft *= antialias_fn(frequency_grid)
+            box_fn = FourierSinc(box_width=self.voxel_size)
+            rendering_fft *= box_fn(frequency_grid)
         # Downsample by extracting fourier modes
         if self.shape != shape_u:
             (indices_z, indices_y, indices_x), fac = _build_extraction_mesh(
@@ -523,7 +534,7 @@ class IndependentAtomProjection(
 ):
     backend: Literal["nufftax", "jax-finufft"]
     sampling_mode: Literal["average", "point"]
-    upsample_factor: float
+    upsample_factor: float | None
     eps: float
     shape: tuple[int, int] | None
     options: dict[str, Any]
@@ -535,7 +546,7 @@ class IndependentAtomProjection(
         *,
         backend: Literal["jax-finufft", "nufftax"] = "nufftax",
         sampling_mode: Literal["average", "point"] = "average",
-        upsample_factor: int | float = 2.0,
+        upsample_factor: int | float | None = None,
         eps: float = 1e-6,
         shape: tuple[int, int] | None = None,
         options: dict[str, Any] = {},
@@ -556,12 +567,12 @@ class IndependentAtomProjection(
             projected volume at a pixel to be the average value of the
             underlying continuous function. If `'point'`, the volume at
             a pixel will be point sampled.
+            If `IndependentAtomVolume` is instantiated with real-space
+            gaussians, then error functions are used in
+            `sampling_mode = 'average'`.
         - `upsample_factor`:
             How much to upsample the grid on which atoms are spread onto.
-            See [`finufft`](https://finufft.readthedocs.io/en/latest/opts.html#options-parameters-cpu)
-            for documentation. If a 2-tuple is passed, `upsample_factor[0]` is
-            used for the forward pass and `upsample_factor[1]` is used for the
-            backward pass.
+            If equal to `None`, choose a default value at run-time.
         - `eps`:
             Controls speed / accuracy tradeoff.
             See [`finufft`](https://finufft.readthedocs.io/en/latest/opts.html#options-parameters-cpu)
@@ -590,7 +601,7 @@ class IndependentAtomProjection(
         self.backend = backend
         self.sampling_mode = sampling_mode
         self.shape = shape
-        self.upsample_factor = float(upsample_factor)
+        self.upsample_factor = None if upsample_factor is None else float(upsample_factor)
         self.eps = eps
         self.options = options
 
@@ -628,19 +639,26 @@ class IndependentAtomProjection(
             volume_representation.kernel_fns,
         )
         amplitudes = _standardize_amplitudes(volume_representation.amplitudes, positions)
-        # Check and modify kernels if using error functions
+        # Check if real or fourier and do any preprocessing
         is_real_space, kernel_fns = _standardize_kernel_fns(kernel_fns, spatial_dim=2)
+        # Upsample factor logic
         upsampfac, sampling_mode = self.upsample_factor, self.sampling_mode
+        if upsampfac is None:
+            upsampfac = 1.0 if (is_real_space and sampling_mode == "average") else 2.0
+        upsampfac = _find_exact_upsampfac(upsampfac, shape)
+        # Modify kernels if using error functions
         if is_real_space:
-            kernel_fns, sampling_mode, upsampfac = _maybe_gaussians_to_erf(
-                kernel_fns, pixel_size, sampling_mode, upsampfac
+            kernel_fns, sampling_mode = _maybe_use_erf(
+                kernel_fns,
+                pixel_size=pixel_size,
+                sampling_mode=sampling_mode,
+                upsampfac=upsampfac,
             )
         # Upsampled shape and pixel size
         if upsampfac > 1:
-            u = _find_exact_upsampfac(self.upsample_factor, shape)
             shape_u, pixel_size_u = (
-                (int(u * shape[0]), int(u * shape[1])),
-                pixel_size / u,
+                (int(upsampfac * shape[0]), int(upsampfac * shape[1])),
+                pixel_size / upsampfac,
             )
             frequency_grid = make_frequency_grid(
                 shape_u, pixel_size_u, outputs_rfftfreqs=False
@@ -679,8 +697,8 @@ class IndependentAtomProjection(
             projection_fft = projection_out
         # Average within a pixel size
         if sampling_mode == "average":
-            antialias_fn = FourierSinc(box_width=pixel_size)
-            projection_fft *= antialias_fn(frequency_grid)
+            box_fn = FourierSinc(box_width=pixel_size)
+            projection_fft *= box_fn(frequency_grid)
         # Downsample by extracting fourier modes
         if shape != shape_u:
             (indices_y, indices_x), fac = _build_extraction_mesh(
@@ -747,25 +765,27 @@ def _standardize_kernel_fns(
     return is_real_space, kernel_pytree
 
 
-def _maybe_gaussians_to_erf(
+def _maybe_use_erf(
     kernel_pytree: PyTree[RealGaussian],
     pixel_size: Float[Array, ""],
     sampling_mode: Literal["average", "point"],
     upsampfac: float,
-) -> tuple[PyTree[RealGaussian], Literal["average", "point"], float]:
+) -> tuple[PyTree[RealGaussian], Literal["average", "point"]]:
     """Modify gaussian kernels at runtime to the error function."""
     if sampling_mode == "average":
-        return (
-            jax.tree.map(
-                lambda x: _make_erf(x, pixel_size),
-                kernel_pytree,
-                is_leaf=lambda x: isinstance(x, AbstractRealOperator),
-            ),
-            "point",
-            1.0,
-        )
+        if upsampfac == 1.0:
+            return (
+                jax.tree.map(
+                    lambda x: _make_erf(x, pixel_size),
+                    kernel_pytree,
+                    is_leaf=lambda x: isinstance(x, AbstractRealOperator),
+                ),
+                "point",
+            )
+        else:
+            return kernel_pytree, "average"
     else:
-        return (kernel_pytree, "point", upsampfac)
+        return (kernel_pytree, "point")
 
 
 def project_impl(
