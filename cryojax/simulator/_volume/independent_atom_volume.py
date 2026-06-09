@@ -16,6 +16,7 @@ from ..._internal import error_if_not_positive
 from ...constants import (
     LobatoScatteringFactorParameters,
     PengScatteringFactorParameters,
+    b_factor_to_variance,
 )
 from ...jax_util import FloatLike, NDArrayLike
 from ...ndimage import (
@@ -160,7 +161,7 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
     """  # noqa: E501
 
     positions: PyTree[Float[Array, "_ 3"]]
-    kernel_fns: PyTree[AbstractFourierOperator] | PyTree[AbstractRealOperator]
+    kernel_fns: PyTree[AbstractFourierOperator] | PyTree[RealGaussian]
     amplitudes: PyTree[Inexact[Array, " _"]] | None
 
     is_frame_rotation: ClassVar[bool] = False
@@ -168,9 +169,7 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
     def __init__(
         self,
         positions: PyTree[Float[NDArrayLike, "_ 3"], "T"],
-        kernel_fns: (
-            PyTree[AbstractFourierOperator, "T"] | PyTree[AbstractRealOperator, "T"]
-        ),
+        kernel_fns: (PyTree[AbstractFourierOperator, "T"] | PyTree[RealGaussian, "T"]),
         amplitudes: PyTree[Inexact[NDArrayLike, " _"], "T"] | None = None,
     ):
         """**Arguments:**
@@ -180,10 +179,12 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
         - `kernel_fns`:
             A pytree of functions with the same tree structure
             as `positions`, where each leaf is a
-            [`cryojax.ndimage.AbstractRealOperator`][] or a
+            [`cryojax.ndimage.RealGaussian`][] or a
             [`cryojax.ndimage.AbstractFourierOperator`][].
             Real-space represents the scattering potential, while
             fourier-space represents the scattering factor.
+            [`cryojax.ndimage.RealGaussian`][] classes may have
+            amplitudes and variances with a batch dimension.
         """
         if jax.tree.structure(positions) != jax.tree.structure(
             kernel_fns,
@@ -244,13 +245,31 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
         positions_by_element: tuple[Float[NDArrayLike, "_ 3"], ...],
         parameters: PengScatteringFactorParameters | LobatoScatteringFactorParameters,
         *,
+        outputs_real_space: bool = False,
         b_factor_by_element: FloatLike | tuple[FloatLike, ...] | None = None,
     ) -> Self:
         def make_kernel_fn(a, b, b_factor):
             if isinstance(parameters, PengScatteringFactorParameters):
-                return PengScatteringFactor(a, b, b_factor)
+                if outputs_real_space:
+                    b = b + jnp.asarray(b_factor)[None] if b_factor is not None else b
+                    return eqx.filter_vmap(
+                        lambda _a, _b: RealGaussian(
+                            amplitude=_a, variance=b_factor_to_variance(_b)
+                        )
+                    )(a, b)
+                else:
+                    return PengScatteringFactor(a, b, b_factor)
             elif isinstance(parameters, LobatoScatteringFactorParameters):
-                return LobatoScatteringFactor(a, b, b_factor)
+                if outputs_real_space:
+                    raise NotImplementedError(
+                        "`IndependentAtomVolume(..., parameters=..., "
+                        "outputs_real_space=True)` does not support "
+                        "`parameters = LobatoScatteringFactorParameters(...)`. "
+                        "Instead, use `PengScatteringFactorParameters` or set "
+                        "`outputs_real_space = False`."
+                    )
+                else:
+                    return LobatoScatteringFactor(a, b, b_factor)
             else:
                 raise ValueError(
                     "Unrecognized argument `parameters` when "
@@ -423,14 +442,14 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
         )
         amplitudes = _standardize_amplitudes(volume_representation.amplitudes, positions)
         # Check and modify kernels if using error functions
-        is_real_space = _check_kernel_fns(kernel_fns, spatial_dim=3)
+        is_real_space, kernel_fns = _standardize_kernel_fns(kernel_fns, spatial_dim=3)
         upsampfac, sampling_mode = self.upsample_factor, self.sampling_mode
         if is_real_space:
             kernel_fns, sampling_mode, upsampfac = _maybe_gaussians_to_erf(
                 kernel_fns, self.voxel_size, sampling_mode, upsampfac
             )
         # Upsampling arguments
-        if self.upsample_factor > 1:
+        if upsampfac > 1:
             u = _find_exact_upsampfac(self.upsample_factor, self.shape)
             shape_u, voxel_size_u = (
                 (int(u * self.shape[0]), int(u * self.shape[1]), int(u * self.shape[2])),
@@ -610,14 +629,14 @@ class IndependentAtomProjection(
         )
         amplitudes = _standardize_amplitudes(volume_representation.amplitudes, positions)
         # Check and modify kernels if using error functions
-        is_real_space = _check_kernel_fns(kernel_fns, spatial_dim=2)
+        is_real_space, kernel_fns = _standardize_kernel_fns(kernel_fns, spatial_dim=2)
         upsampfac, sampling_mode = self.upsample_factor, self.sampling_mode
         if is_real_space:
             kernel_fns, sampling_mode, upsampfac = _maybe_gaussians_to_erf(
                 kernel_fns, pixel_size, sampling_mode, upsampfac
             )
         # Upsampled shape and pixel size
-        if self.upsample_factor > 1:
+        if upsampfac > 1:
             u = _find_exact_upsampfac(self.upsample_factor, shape)
             shape_u, pixel_size_u = (
                 (int(u * shape[0]), int(u * shape[1])),
@@ -685,26 +704,27 @@ IndependentAtomProjection.__doc__ = f"""Integrate atomic parametrization of a vo
 "onto the exit plane from an `IndependentAtomVolume`. {_REAL_VS_FOURIER_DOC}"""
 
 
-def _check_kernel_fns(
-    kernel_pytree: PyTree[AbstractFourierOperator] | PyTree[AbstractRealOperator],
+def _standardize_kernel_fns(
+    kernel_pytree: PyTree[AbstractFourierOperator] | PyTree[RealGaussian],
     *,
     spatial_dim: int,
-) -> bool:
+) -> tuple[bool, PyTree[AbstractFourierOperator] | PyTree[RealGaussian]]:
     kernel_list = jax.tree.leaves(
         kernel_pytree,
         is_leaf=lambda x: isinstance(x, (AbstractFourierOperator, AbstractRealOperator)),
     )
-    if all(isinstance(kernel, AbstractRealOperator) for kernel in kernel_list):
+    if all(isinstance(kernel, RealGaussian) for kernel in kernel_list):
+        # Standardize gaussian kernels for computation
         is_real_space = True
-        for kernel in kernel_list:
-            if 1 not in kernel.spatial_dims:
-                raise ValueError(
-                    "Found that `IndependentAtomVolume.kernel_fns` were "
-                    "`AbstractRealOperator`s, but "
-                    "one or more kernel did not support 1-D arrays as input. "
-                    "The `AbstractRealOperator.spatial_dims` list must include `1` "
-                    "to indicate support for 1D arrays."
-                )
+        # ... pytree leaves have a batch dim
+        kernel_pytree = jax.tree.map(lambda x: jnp.atleast_1d(x), kernel_pytree)
+        # ... amplitude must be spread per dimension
+        replace_fn = lambda fn: eqx.tree_at(
+            lambda _fn: _fn.amplitude, fn, (fn.amplitude ** (1 / spatial_dim))
+        )
+        kernel_pytree = jax.tree.map(
+            replace_fn, kernel_pytree, is_leaf=lambda x: isinstance(x, RealGaussian)
+        )
     elif all(isinstance(kernel, AbstractFourierOperator) for kernel in kernel_list):
         is_real_space = False
         for kernel in kernel_list:
@@ -721,42 +741,36 @@ def _check_kernel_fns(
         raise ValueError(
             "Found that `IndependentAtomVolume.kernel_fns` was not a "
             "PyTree containing only `AbstractFourierOperator`s or "
-            "`AbstractRealOperator`s."
+            "`RealGaussian`s."
         )
 
-    return is_real_space
+    return is_real_space, kernel_pytree
 
 
 def _maybe_gaussians_to_erf(
-    kernel_pytree: PyTree[AbstractRealOperator],
+    kernel_pytree: PyTree[RealGaussian],
     pixel_size: Float[Array, ""],
     sampling_mode: Literal["average", "point"],
     upsampfac: float,
-) -> tuple[PyTree[AbstractRealOperator], Literal["average", "point"], float]:
+) -> tuple[PyTree[RealGaussian], Literal["average", "point"], float]:
     """Modify gaussian kernels at runtime to the error function."""
-    kernel_list = jax.tree.leaves(
-        kernel_pytree,
-        is_leaf=lambda x: isinstance(x, AbstractRealOperator),
-    )
-    if sampling_mode == "point":
-        return kernel_pytree, "point", upsampfac
+    if sampling_mode == "average":
+        return (
+            jax.tree.map(
+                lambda x: _make_erf(x, pixel_size),
+                kernel_pytree,
+                is_leaf=lambda x: isinstance(x, AbstractRealOperator),
+            ),
+            "point",
+            1.0,
+        )
     else:
-        if all(isinstance(kernel, RealGaussian) for kernel in kernel_list):
-            return (
-                jax.tree.map(
-                    lambda x: _IntegratedRealGaussian.from_gaussian(x, pixel_size),
-                    kernel_pytree,
-                    is_leaf=lambda x: isinstance(x, AbstractRealOperator),
-                ),
-                "point",
-                1.0,
-            )
-        return kernel_pytree, "average", upsampfac
+        return (kernel_pytree, "point", upsampfac)
 
 
 def project_impl(
     positions: PyTree[Float[Array, "_ 3"]],
-    kernel_fns: PyTree[AbstractRealOperator] | PyTree[AbstractFourierOperator],
+    kernel_fns: PyTree[RealGaussian] | PyTree[AbstractFourierOperator],
     amplitudes: PyTree[Inexact[Array, " _"]],
     *,
     is_real_space: bool,
@@ -791,16 +805,16 @@ def project_impl(
         (ny, nx) = _shape
         box_xy = _ps * jnp.asarray((nx, ny), dtype=float)
         xy = 2 * jnp.pi * _positions[:, :2] / box_xy
-        projection = spread_2d(
+        projection = _spread_2d(
+            kernel_fn=_kernel_fn,
+            pixel_size=_ps,
             x=xy[:, 0],
             y=xy[:, 1],
             c=_amplitudes.astype(float),
             nf1=dim,
             nf2=dim,
-            kernel_params=_make_nufftax_kernel(
-                _kernel_fn, image_dim=dim, pixel_size=_ps, nspread=nspread
-            ),
-            **options,
+            nspread=nspread,
+            options=options,
         )
         return projection
 
@@ -852,7 +866,7 @@ def project_impl(
 
 def render_impl(
     positions: PyTree[Float[Array, "_ 3"]],
-    kernel_fns: PyTree[AbstractRealOperator] | PyTree[AbstractFourierOperator],
+    kernel_fns: PyTree[RealGaussian] | PyTree[AbstractFourierOperator],
     amplitudes: PyTree[Inexact[Array, " _"]],
     *,
     is_real_space: bool,
@@ -887,20 +901,20 @@ def render_impl(
         (nz, ny, nx) = _shape
         box_xyz = _vs * jnp.asarray((nx, ny, nz), dtype=float)
         xyz = 2 * jnp.pi * _positions / box_xyz
-        projection = spread_3d(
+        rendering = _spread_3d(
+            kernel_fn=_kernel_fn,
+            voxel_size=_vs,
             x=xyz[:, 0],
             y=xyz[:, 1],
             z=xyz[:, 2],
             c=_amplitudes.astype(float),
-            nf1=_shape[2],
-            nf2=_shape[1],
-            nf3=_shape[0],
-            kernel_params=_make_nufftax_kernel(
-                _kernel_fn, image_dim=dim, pixel_size=_vs, nspread=nspread
-            ),
-            **options,
+            nf1=dim,
+            nf2=dim,
+            nf3=dim,
+            nspread=nspread,
+            options=options,
         )
-        return projection
+        return rendering
 
     def fourier_impl(
         _shape: tuple[int, int, int],
@@ -1040,6 +1054,50 @@ def _nufft3d1(
         )
 
 
+def _spread_3d(kernel_fn, voxel_size, x, y, z, c, nf1, nf2, nf3, *, nspread, options):
+    assert nf1 == nf2 == nf3
+    dim = nf1
+
+    @eqx.filter_vmap(in_axes=(eqx.if_array(0), None, None, None, None, None))
+    def spread_3d_impl(_kernel_fn, _voxel_size, _x, _y, _z, _c):
+        return spread_3d(
+            x=_x,
+            y=_y,
+            z=_z,
+            c=_c,
+            nf1=dim,
+            nf2=dim,
+            nf3=dim,
+            kernel_params=_make_nufftax_kernel(
+                _kernel_fn, image_dim=dim, pixel_size=_voxel_size, nspread=nspread
+            ),
+            **options,
+        )
+
+    return jnp.sum(spread_3d_impl(kernel_fn, voxel_size, x, y, z, c), axis=0)
+
+
+def _spread_2d(kernel_fn, pixel_size, x, y, c, nf1, nf2, *, nspread, options):
+    assert nf1 == nf2
+    dim = nf1
+
+    @eqx.filter_vmap(in_axes=(eqx.if_array(0), None, None, None, None))
+    def spread_2d_impl(_kernel_fn, _pixel_size, _x, _y, _c):
+        return spread_2d(
+            x=_x,
+            y=_y,
+            c=_c,
+            nf1=dim,
+            nf2=dim,
+            kernel_params=_make_nufftax_kernel(
+                _kernel_fn, image_dim=dim, pixel_size=_pixel_size, nspread=nspread
+            ),
+            **options,
+        )
+
+    return jnp.sum(spread_2d_impl(kernel_fn, pixel_size, x, y, c), axis=0)
+
+
 def _eps_to_nspread(eps: float) -> int:
     # FINUFFT heuristic for choosing `nspread` parameter
     # based on desired precision `eps`
@@ -1103,21 +1161,13 @@ def _make_nufftax_kernel(
     )
 
 
-class _IntegratedRealGaussian(AbstractRealOperator, strict=True):
+class _Erf(AbstractRealOperator, strict=True):
     amplitude: Float[Array, ""]
     variance: Float[Array, ""]
 
     pixel_size: Float[Array, ""]
 
     spatial_dims: ClassVar[list[int]] = [1]
-
-    @classmethod
-    def from_gaussian(cls, fn: RealGaussian, pixel_size: Float[Array, ""]):
-        return cls(
-            amplitude=fn.amplitude,
-            variance=fn.variance,
-            pixel_size=pixel_size,
-        )
 
     @override
     def __call__(self, coordinate_grid: Float[Array, " x_dim"]) -> Array:
@@ -1130,6 +1180,13 @@ class _IntegratedRealGaussian(AbstractRealOperator, strict=True):
             jsp.special.erf(scaling * right) - jsp.special.erf(scaling * left)
         )
         return self.amplitude * weight
+
+
+@eqx.filter_vmap(in_axes=(0, None))
+def _make_erf(gaussian: RealGaussian, pixel_size: Float[Array, ""]):
+    return _Erf(
+        amplitude=gaussian.amplitude, variance=gaussian.variance, pixel_size=pixel_size
+    )
 
 
 def _find_exact_upsampfac(input_upsampfac: float, dims: tuple[int, ...]) -> float:

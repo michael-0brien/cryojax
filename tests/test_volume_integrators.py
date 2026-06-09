@@ -113,7 +113,7 @@ def test_fft_atom_projection_exact(pdb_info, pixel_size, shape):
 def test_real_atom_projection_exact(pdb_info, pixel_size, shape):
     atom_positions, _, _ = pdb_info
     image_config = cxs.BasicImageConfig(shape, pixel_size, voltage_in_kilovolts=300.0)
-    amplitude, variance = 1.0, 20.0 / (8 * np.pi**2)
+    amplitude, variance = 0.75, 20.0 / (8 * np.pi**2)
     gaussian_volume, gaussian_integrator = (
         cxs.GaussianMixtureVolume(
             atom_positions, amplitudes=amplitude, variances=variance
@@ -125,15 +125,13 @@ def test_real_atom_projection_exact(pdb_info, pixel_size, shape):
             positions=atom_positions,
             kernel_fns=im.RealGaussian(amplitude=amplitude, variance=variance),
         ),
-        cxs.IndependentAtomProjection(
-            sampling_mode="average", eps=1e-12, upsample_factor=1.0
-        ),
+        cxs.IndependentAtomProjection(sampling_mode="average", eps=1e-12),
     )
     proj_by_gaussians = compute_projection(
         gaussian_volume, gaussian_integrator, image_config
     )
     proj_by_atom = compute_projection(atom_volume, atom_integrator, image_config)
-    # _plot_image_compare(proj_by_gaussians, proj_by_atom)
+
     np.testing.assert_allclose(proj_by_gaussians, proj_by_atom, atol=1e-5)
 
 
@@ -222,7 +220,45 @@ def test_fft_atom_projection_peng(pdb_info, pixel_size, shape, upsampfac):
         proj_by_atoms = compute_projection(atom_volume, atom_integrator, image_config)
         # print(proj_by_atoms.min())
         # _plot_image_compare(proj_by_gaussians, proj_by_atoms)
+        _plot_image_compare(proj_by_gaussians - proj_by_atoms, proj_by_atoms)
         np.testing.assert_allclose(proj_by_gaussians, proj_by_atoms, atol=5e-3)
+
+
+@pytest.mark.parametrize(
+    "pixel_size, shape",
+    (
+        (0.5, (64, 64)),
+        (0.5, (63, 63)),
+    ),
+)
+def test_real_atom_projection_peng(pdb_info, pixel_size, shape):
+    atom_positions, atom_ids, _ = pdb_info
+    positions_by_id, unique_atom_ids = split_atoms_by_element(atom_ids, atom_positions)
+    peng_parameters, peng_parameters_by_id = (
+        PengScatteringFactorParameters(atom_ids),
+        PengScatteringFactorParameters(unique_atom_ids),
+    )
+    gaussian_volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(
+        atom_positions,
+        peng_parameters,
+        extra_b_factors=10.0,
+    )
+    atom_volume = cxs.IndependentAtomVolume.from_tabulated_parameters(
+        positions_by_id,
+        peng_parameters_by_id,
+        b_factor_by_element=10.0,
+        outputs_real_space=True,
+    )
+    image_config = cxs.BasicImageConfig(shape, pixel_size, voltage_in_kilovolts=300.0)
+    # Check to make sure the implementations are identical, up to the
+    # nufft (don't include anti-aliasing)
+    gaussian_integrator = cxs.GaussianMixtureProjection(sampling_mode="average")
+    atom_integrator = cxs.IndependentAtomProjection(sampling_mode="average", eps=1e-10)
+    proj_by_gaussians = compute_projection(
+        gaussian_volume, gaussian_integrator, image_config
+    )
+    proj_by_atoms = compute_projection(atom_volume, atom_integrator, image_config)
+    np.testing.assert_allclose(proj_by_gaussians, proj_by_atoms, atol=5e-3)
 
 
 @pytest.mark.parametrize(
