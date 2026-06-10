@@ -302,7 +302,6 @@ _fourier_operators_common = [
     im.PeakedFourierGaussian(),
     im.FourierConstant(1.0),
     im.FourierSinc(),
-    im.FourierExp2D(),
     im.CustomFourierOperator(lambda _, a, b: a + b, 1.0, b=1.0),
     im.FourierDC(),
     im.FourierConstant(1.0) + im.FourierConstant(1.0),
@@ -318,7 +317,7 @@ _real_operators_common = [
 ]
 
 _fourier_operators_1d = _fourier_operators_common
-_fourier_operators_2d = _fourier_operators_common
+_fourier_operators_2d = [*_fourier_operators_common, im.FourierExp2D()]
 _fourier_operators_3d = _fourier_operators_common
 _real_operators_1d = [*_real_operators_common, im.RealGaussian(offset=1.0)]
 _real_operators_2d = [*_real_operators_common, im.RealGaussian(offset=(1.0, -1.0))]

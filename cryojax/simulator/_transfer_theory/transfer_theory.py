@@ -51,6 +51,17 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
         self.amplitude_contrast_ratio = jnp.asarray(amplitude_contrast_ratio, dtype=float)
         self.phase_shift = jnp.asarray(phase_shift, dtype=float)
 
+    def __check_init__(self):
+        if self.envelope is not None:
+            if 2 not in self.envelope.spatial_dims:
+                raise ValueError(
+                    "`ContrastTransferTheory.envelope` of type "
+                    f"`{self.envelope.__class__.__name__}` must support "
+                    "`spatial_dim = 2`, but found that "
+                    f"`{self.envelope.__class__.__name__}.spatial_dims = "
+                    f"{self.envelope.spatial_dims}`."
+                )
+
     def propagate_object(
         self,
         object_spectrum: (

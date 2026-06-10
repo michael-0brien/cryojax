@@ -73,13 +73,8 @@ class PengScatteringFactor(AbstractFourierOperator, strict=True):
         self.b = jnp.asarray(b, dtype=float)
         self.b_factor = None if b_factor is None else jnp.asarray(b_factor, dtype=float)
 
-    def __call__(
-        self,
-        frequency_grid: (
-            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
-        ),
-    ):
-        q_squared = jnp.sum(frequency_grid**2, axis=-1)
+    def __call__(self, frequencies: Float[Array, "... 2"] | Float[Array, "... 3"]):
+        q_squared = jnp.sum(frequencies**2, axis=-1)
         b_factor = 0.0 if self.b_factor is None else error_if_not_positive(self.b_factor)
         gaussian_fn = lambda _a, _b: _a * jnp.exp(-0.25 * (_b + b_factor) * q_squared)
         return jnp.sum(
@@ -106,11 +101,9 @@ class LobatoScatteringFactor(AbstractFourierOperator, strict=True):
 
     def __call__(
         self,
-        frequency_grid: (
-            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
-        ),
+        frequencies: Float[Array, "... 2"] | Float[Array, "... 3"],
     ):
-        q_squared = jnp.sum(frequency_grid**2, axis=-1)
+        q_squared = jnp.sum(frequencies**2, axis=-1)
         hydrogenic_fn = lambda _a, _b: (
             _a * (2 + _b * q_squared) / (1 + _b * q_squared) ** 2
         )
@@ -1190,11 +1183,11 @@ class _Erf(AbstractRealOperator, strict=True):
     spatial_dims: ClassVar[list[int]] = [1]
 
     @override
-    def __call__(self, coordinate_grid: Float[Array, " x_dim"]) -> Array:
+    def __call__(self, coordinates: Float[Array, " dim"]) -> Float[Array, " dim"]:
         scaling = 1.0 / jnp.sqrt(2 * self.variance)
         left, right = (
-            coordinate_grid - self.pixel_size / 2,
-            coordinate_grid + self.pixel_size / 2,
+            coordinates - self.pixel_size / 2,
+            coordinates + self.pixel_size / 2,
         )
         weight = (1 / (2 * self.pixel_size)) * (
             jsp.special.erf(scaling * right) - jsp.special.erf(scaling * left)

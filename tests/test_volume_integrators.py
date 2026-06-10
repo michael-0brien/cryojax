@@ -219,9 +219,6 @@ def test_fft_atom_projection_peng(pdb_info, pixel_size, shape, upsampfac):
             gaussian_volume, gaussian_integrator, image_config
         )
         proj_by_atoms = compute_projection(atom_volume, atom_integrator, image_config)
-        # print(proj_by_atoms.min())
-        # _plot_image_compare(proj_by_gaussians, proj_by_atoms)
-        _plot_image_compare(proj_by_gaussians - proj_by_atoms, proj_by_atoms)
         np.testing.assert_allclose(proj_by_gaussians, proj_by_atoms, atol=5e-3)
 
 
@@ -494,12 +491,12 @@ def make_spline(real_voxel_grid):
     )
 
 
-def _plot_image_compare(im1, im2):
-    from matplotlib import pyplot as plt
+# def _plot_image_compare(im1, im2):
+#     from matplotlib import pyplot as plt
 
-    fig, axes = plt.subplots(figsize=(9, 4), ncols=2, constrained_layout=True)
-    mappable1 = axes[0].imshow(im1)
-    mappable2 = axes[1].imshow(im2)
-    fig.colorbar(mappable1)
-    fig.colorbar(mappable2)
-    plt.show()
+#     fig, axes = plt.subplots(figsize=(9, 4), ncols=2, constrained_layout=True)
+#     mappable1 = axes[0].imshow(im1)
+#     mappable2 = axes[1].imshow(im2)
+#     fig.colorbar(mappable1)
+#     fig.colorbar(mappable2)
+#     plt.show()
