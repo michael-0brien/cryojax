@@ -79,7 +79,7 @@ class _SumRealOperator(AbstractRealOperator, strict=True):
 
     @override
     def __call__(self, coordinates: Float[Array, "..."]) -> Inexact[Array, "..."]:
-        return self.operator1(coordinates) * self.operator2(coordinates)
+        return self.operator1(coordinates) + self.operator2(coordinates)
 
     def __repr__(self):
         return f"{repr(self.operator1)} + {repr(self.operator2)}"
@@ -95,7 +95,7 @@ class _DiffRealOperator(AbstractRealOperator, strict=True):
 
     @override
     def __call__(self, coordinates: Float[Array, "..."]) -> Inexact[Array, "..."]:
-        return self.operator1(coordinates) * self.operator2(coordinates)
+        return self.operator1(coordinates) - self.operator2(coordinates)
 
     def __repr__(self):
         return f"{repr(self.operator1)} - {repr(self.operator2)}"
