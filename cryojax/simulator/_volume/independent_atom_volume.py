@@ -1,7 +1,7 @@
 import functools as ft
 import math
 from collections.abc import Sequence
-from typing import Any, ClassVar, Literal, Self, TypeVar
+from typing import Any, ClassVar, Literal, Self, TypeVar, cast
 from typing_extensions import override
 
 import equinox as eqx
@@ -11,6 +11,8 @@ import jax.scipy as jsp
 import nufftax
 from jaxtyping import Array, Float, Inexact, PyTree
 from nufftax.core import Kernel, spread_2d, spread_3d
+
+from cryojax.ndimage._operators._fourier_operator import FourierGaussian
 
 from ..._internal import error_if_not_positive
 from ...constants import (
@@ -28,6 +30,7 @@ from ...ndimage import (
     fftn,
     ifftn,
     irfftn,
+    make_1d_frequency_grid,
     make_frequency_grid,
     resize_with_crop_or_pad,
     rfftn,
@@ -434,14 +437,15 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
             volume_representation.kernel_fns,
         )
         amplitudes = _standardize_amplitudes(volume_representation.amplitudes, positions)
-        # Check and modify kernels if using error functions
         is_real_space, kernel_fns = _standardize_kernel_fns(kernel_fns, spatial_dim=3)
-        # Upsample factor logic
-        upsampfac, sampling_mode = self.upsample_factor, self.sampling_mode
-        if upsampfac is None:
-            upsampfac = 1.0 if (is_real_space and sampling_mode == "average") else 2.0
-        upsampfac = _find_exact_upsampfac(upsampfac, self.shape)
+        upsampfac = _standardize_upsampfac(
+            self.upsample_factor,
+            dims=self.shape,
+            sampling_mode=self.sampling_mode,
+            is_real_space=is_real_space,
+        )
         # Modify kernels if using error functions
+        sampling_mode = self.sampling_mode
         if is_real_space:
             kernel_fns, sampling_mode = _maybe_use_erf(
                 kernel_fns,
@@ -461,8 +465,9 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
             )
         else:
             shape_u, voxel_size_u = self.shape, self.voxel_size
-        frequency_grid = make_frequency_grid(
-            shape_u, voxel_size_u, outputs_rfftfreqs=False
+        frequencies_1d = tuple(
+            make_1d_frequency_grid(s, voxel_size_u, outputs_rfftfreqs=False)
+            for s in shape_u[::-1]
         )
         # Compute
         rendering_out = render_impl(
@@ -472,8 +477,8 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
             is_real_space=is_real_space,
             shape_u=shape_u,
             voxel_size_u=voxel_size_u,
+            frequencies_1d=frequencies_1d,
             backend=self.backend,
-            frequency_grid=frequency_grid,
             eps=self.eps,
             options=self.options,
         )
@@ -498,7 +503,7 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
         # Average within a pixel size
         if sampling_mode == "average":
             box_fn = FourierSinc(box_width=self.voxel_size)
-            rendering_fft *= box_fn(frequency_grid)
+            rendering_fft *= eval_separable_impl(box_fn, frequencies_1d)
         # Downsample by extracting fourier modes
         if self.shape != shape_u:
             (indices_z, indices_y, indices_x), fac = _build_extraction_mesh(
@@ -632,14 +637,15 @@ class IndependentAtomProjection(
             volume_representation.kernel_fns,
         )
         amplitudes = _standardize_amplitudes(volume_representation.amplitudes, positions)
-        # Check if real or fourier and do any preprocessing
         is_real_space, kernel_fns = _standardize_kernel_fns(kernel_fns, spatial_dim=2)
-        # Upsample factor logic
-        upsampfac, sampling_mode = self.upsample_factor, self.sampling_mode
-        if upsampfac is None:
-            upsampfac = 1.0 if (is_real_space and sampling_mode == "average") else 2.0
-        upsampfac = _find_exact_upsampfac(upsampfac, shape)
+        upsampfac = _standardize_upsampfac(
+            self.upsample_factor,
+            dims=shape,
+            sampling_mode=self.sampling_mode,
+            is_real_space=is_real_space,
+        )
         # Modify kernels if using error functions
+        sampling_mode = self.sampling_mode
         if is_real_space:
             kernel_fns, sampling_mode = _maybe_use_erf(
                 kernel_fns,
@@ -653,16 +659,12 @@ class IndependentAtomProjection(
                 (int(upsampfac * shape[0]), int(upsampfac * shape[1])),
                 pixel_size / upsampfac,
             )
-            frequency_grid = make_frequency_grid(
-                shape_u, pixel_size_u, outputs_rfftfreqs=False
-            )
         else:
             shape_u, pixel_size_u = shape, pixel_size
-            frequency_grid = (
-                image_config.get_frequency_grid(padding=True, physical=True, full=True)
-                if shape == image_config.padded_shape
-                else make_frequency_grid(shape, pixel_size, outputs_rfftfreqs=False)
-            )
+        frequencies_1d = tuple(
+            make_1d_frequency_grid(s, pixel_size_u, outputs_rfftfreqs=False)
+            for s in shape_u[::-1]
+        )
         # Compute projection
         projection_out = project_impl(
             positions,
@@ -671,8 +673,8 @@ class IndependentAtomProjection(
             is_real_space=is_real_space,
             shape_u=shape_u,
             pixel_size_u=pixel_size_u,
+            frequencies_1d=frequencies_1d,
             backend=self.backend,
-            frequency_grid=frequency_grid,
             eps=self.eps,
             options=self.options,
         )
@@ -691,7 +693,7 @@ class IndependentAtomProjection(
         # Average within a pixel size
         if sampling_mode == "average":
             box_fn = FourierSinc(box_width=pixel_size)
-            projection_fft *= box_fn(frequency_grid)
+            projection_fft *= eval_separable_impl(box_fn, frequencies_1d)
         # Downsample by extracting fourier modes
         if shape != shape_u:
             (indices_y, indices_x), fac = _build_extraction_mesh(
@@ -789,8 +791,8 @@ def project_impl(
     is_real_space: bool,
     shape_u: tuple[int, int],
     pixel_size_u: Float[Array, ""],
+    frequencies_1d: tuple[Array, ...],
     backend: Literal["jax-finufft", "nufftax"],
-    frequency_grid: Float[Array, "_ _ 2"],
     eps: float,
     options: dict[str, Any],
 ) -> Array:
@@ -798,6 +800,9 @@ def project_impl(
         (lambda x: isinstance(x, AbstractRealOperator))
         if is_real_space
         else (lambda x: isinstance(x, AbstractFourierOperator))
+    )
+    frequency_grid = _maybe_make_frequency_grid(
+        shape_u, pixel_size_u, is_real_space=is_real_space, kernel_fns=kernel_fns
     )
 
     def real_impl(
@@ -837,13 +842,14 @@ def project_impl(
         _positions: Float[Array, "_ 3"],
         _kernel_fn: AbstractFourierOperator,
         _amplitudes: Inexact[Array, " _"],
-        _frequency_grid: Array,
+        _f_1d: tuple[Array, ...],
+        _f_mesh: Array | None,
     ) -> Array:
         (ny, nx) = _shape
         box_xy = _ps * jnp.asarray((nx, ny))
         # Compute
         return (
-            _kernel_fn(_frequency_grid)
+            eval_kernel_impl(_kernel_fn, f_1d=_f_1d, f_mesh=_f_mesh)
             * jnp.fft.ifftshift(
                 _nufft2d1(
                     _shape,  # type: ignore
@@ -858,13 +864,22 @@ def project_impl(
         )
 
     if is_real_space:
-        project_impl, project_args = real_impl, ()
+        project_impl, args = real_impl, ()
     else:
-        project_impl, project_args = fourier_impl, (frequency_grid,)
+        project_impl, args = (
+            fourier_impl,
+            cast(
+                Any,
+                (
+                    frequencies_1d,
+                    frequency_grid,
+                ),
+            ),
+        )
 
     # Project and sum over kernels
     project_dispatch = lambda _positions, _kernel_fn, _amplitudes: project_impl(
-        shape_u, pixel_size_u, _positions, _kernel_fn, _amplitudes, *project_args
+        shape_u, pixel_size_u, _positions, _kernel_fn, _amplitudes, *args
     )
     projection_out = jax.tree.reduce(
         lambda x, y: x + y,
@@ -884,8 +899,8 @@ def render_impl(
     is_real_space: bool,
     shape_u: tuple[int, int, int],
     voxel_size_u: Float[Array, ""],
+    frequencies_1d: tuple[Array, ...],
     backend: Literal["jax-finufft", "nufftax"],
-    frequency_grid: Float[Array, "_ _ _ 3"],
     eps: float,
     options: dict[str, Any],
 ) -> Array:
@@ -893,6 +908,9 @@ def render_impl(
         (lambda x: isinstance(x, AbstractRealOperator))
         if is_real_space
         else (lambda x: isinstance(x, AbstractFourierOperator))
+    )
+    frequency_grid = _maybe_make_frequency_grid(
+        shape_u, voxel_size_u, is_real_space=is_real_space, kernel_fns=kernel_fns
     )
 
     def real_impl(
@@ -934,12 +952,13 @@ def render_impl(
         _positions: Float[Array, "_ 3"],
         _kernel_fn: AbstractFourierOperator,
         _amplitudes: Inexact[Array, " _"],
-        _frequency_grid: Array,
+        _f_1d: tuple[Array, ...],
+        _f_mesh: Array | None,
     ) -> Array:
         (nz, ny, nx) = _shape
         box_xyz = _vs * jnp.asarray((nx, ny, nz))
         # Compute
-        return _kernel_fn(_frequency_grid) * (
+        return eval_kernel_impl(_kernel_fn, f_1d=_f_1d, f_mesh=_f_mesh) * (
             jnp.fft.ifftshift(
                 _nufft3d1(
                     _shape,  # type: ignore
@@ -954,12 +973,12 @@ def render_impl(
         )
 
     if is_real_space:
-        render_impl, render_args = real_impl, ()
+        render_impl, args = real_impl, ()
     else:
-        render_impl, render_args = fourier_impl, (frequency_grid,)
+        render_impl, args = cast(Any, (fourier_impl, (frequencies_1d, frequency_grid)))
 
     render_dispatch = lambda _positions, _kernel_fn, _amplitudes: render_impl(
-        shape_u, voxel_size_u, _positions, _kernel_fn, _amplitudes, *render_args
+        shape_u, voxel_size_u, _positions, _kernel_fn, _amplitudes, *args
     )
     rendering_out = jax.tree.reduce(
         lambda x, y: x + y,
@@ -1215,12 +1234,20 @@ def _make_erf(gaussian: RealGaussian, pixel_size: Float[Array, ""]):
     )
 
 
-def _find_exact_upsampfac(input_upsampfac: float, dims: tuple[int, ...]) -> float:
+def _standardize_upsampfac(
+    upsampfac: float | None,
+    *,
+    dims: tuple[int, ...],
+    is_real_space: bool,
+    sampling_mode: Literal["point", "average"],
+) -> float:
     """Find the upsampfac that perfectly divides the upsampled
     image shape.
     """
+    if upsampfac is None:
+        upsampfac = 1.0 if (is_real_space and sampling_mode == "average") else 2.0
     gcd = ft.reduce(math.gcd, dims)
-    return round(gcd * input_upsampfac) / gcd
+    return round(gcd * upsampfac) / gcd
 
 
 def _prepare_real_to_fft(a: Array, *, outputs_rfft: bool, fftshifted: bool) -> Array:
@@ -1238,3 +1265,81 @@ def _prepare_fft_to_fft(f: Array, *, outputs_rfft: bool, fftshifted: bool) -> Ar
         return jnp.fft.fftshift(f, axes=(0, 1)) if fftshifted else f
     else:
         return jnp.fft.fftshift(f) if fftshifted else f
+
+
+def _is_separable(kernel_fn: AbstractFourierOperator):
+    return isinstance(kernel_fn, (FourierGaussian, PengScatteringFactor))
+
+
+def _maybe_make_frequency_grid(
+    shape: tuple[int, ...],
+    pixel_size: Float[Array, ""],
+    *,
+    is_real_space: bool,
+    kernel_fns: PyTree[AbstractFourierOperator],
+):
+    is_leaf = lambda x: isinstance(x, AbstractFourierOperator)
+    all_separable = jax.tree.reduce(
+        lambda x, y: x and y,
+        jax.tree.map(lambda x: _is_separable(x), kernel_fns, is_leaf=is_leaf),
+    )
+
+    if is_real_space:
+        frequency_grid = None
+    elif all_separable:
+        frequency_grid = None
+    else:
+        frequency_grid = make_frequency_grid(shape, pixel_size)
+
+    return frequency_grid
+
+
+def eval_kernel_impl(
+    kernel_fn: AbstractFourierOperator, *, f_1d: tuple[Array, ...], f_mesh: Array | None
+):
+    if isinstance(kernel_fn, FourierGaussian):
+        assert f_1d is not None
+        return eval_separable_impl(kernel_fn, f_1d)
+    elif isinstance(kernel_fn, PengScatteringFactor):
+        assert f_1d is not None
+        return eval_peng_impl(kernel_fn, f_1d)
+    else:
+        assert f_mesh is not None
+        return eval_non_separable_impl(kernel_fn, f_mesh)
+
+
+def eval_peng_impl(kernel_fn: PengScatteringFactor, frequencies_1d: tuple[Array, ...]):
+    a, b = kernel_fn.a, kernel_fn.b
+    if kernel_fn.b_factor is not None:
+        b = b + kernel_fn.b_factor[None]
+    # Split amplitude across dimensions so the separable product recovers the
+    # original: (a^(1/ndim))^ndim = a
+    make_gaussians = jax.vmap(lambda _a, _b: FourierGaussian(amplitude=_a, b_factor=_b))
+    eval_gaussians = jax.vmap(eval_separable_impl, in_axes=(0, None))
+    return jnp.sum(eval_gaussians(make_gaussians(a, b), frequencies_1d), axis=0)
+
+
+def eval_separable_impl(
+    kernel_fn: FourierGaussian | FourierSinc, frequencies_1d: tuple[Array, ...]
+):
+    ndim = len(frequencies_1d)
+    assert 1 in kernel_fn.spatial_dims and ndim in [2, 3]
+    if isinstance(kernel_fn, FourierGaussian):
+        kernel_fn = eqx.tree_at(
+            lambda x: x.amplitude, kernel_fn, replace_fn=lambda x: x ** (1 / ndim)
+        )
+    if len(frequencies_1d) == 2:
+        q_x, q_y = frequencies_1d
+        return kernel_fn(q_x)[None, :] * kernel_fn(q_y)[:, None]
+    else:
+        q_x, q_y, q_z = frequencies_1d
+        return (
+            kernel_fn(q_x)[None, None, :]
+            * kernel_fn(q_y)[None, :, None]
+            * kernel_fn(q_z)[:, None, None]
+        )
+
+
+def eval_non_separable_impl(kernel_fn: AbstractFourierOperator, frequency_grid: Array):
+    assert frequency_grid.shape[-1] in [2, 3]
+    return kernel_fn(frequency_grid)

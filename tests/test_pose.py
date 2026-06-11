@@ -2,6 +2,7 @@ import cryojax.simulator as cxs
 import jax.numpy as jnp
 import numpy as np
 import pytest
+from cryojax.ndimage import FourierPhaseShifts, make_frequency_grid
 from cryojax.rotations import SO3
 
 
@@ -13,6 +14,24 @@ def test_default_pose_arguments():
     np.testing.assert_allclose(
         euler.rotation.as_matrix(), axis_angle.rotation.as_matrix()
     )
+
+
+@pytest.mark.parametrize(
+    "tx, ty, shape, pixel_size",
+    [
+        (1.5, -2.3, (32, 32), 1.0),
+        (0.0, 4.1, (33, 32), 0.5),
+        (-3.0, 0.0, (32, 33), 2.0),
+    ],
+)
+def test_translation_operator_separable(tx, ty, shape, pixel_size):
+    pose = cxs.EulerAnglePose(tx, ty)
+    # New separable implementation
+    result = pose.compute_translation_operator(shape, jnp.asarray(pixel_size))
+    # Reference: evaluate FourierPhaseShifts on the full 2D rfft frequency grid
+    frequency_grid = make_frequency_grid(shape, pixel_size)
+    expected = FourierPhaseShifts(jnp.asarray([tx, ty]))(frequency_grid)
+    np.testing.assert_allclose(np.asarray(result), np.asarray(expected), atol=1e-6)
 
 
 def test_translation_agreement():

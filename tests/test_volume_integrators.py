@@ -219,6 +219,7 @@ def test_fft_atom_projection_peng(pdb_info, pixel_size, shape, upsampfac):
             gaussian_volume, gaussian_integrator, image_config
         )
         proj_by_atoms = compute_projection(atom_volume, atom_integrator, image_config)
+        # _plot_image_compare(proj_by_gaussians, proj_by_atoms)
         np.testing.assert_allclose(proj_by_gaussians, proj_by_atoms, atol=5e-3)
 
 
@@ -439,7 +440,7 @@ def test_analytic_vs_voxels_nopose(pdb_info, pixel_size, shape):
 #     plt.show()
 
 
-# @eqx.filter_jit
+@eqx.filter_jit
 def compute_projection(
     volume: cxs.AbstractVolumeRepresentation,
     integrator: cxs.AbstractVolumeIntegrator,
@@ -469,7 +470,8 @@ def compute_projection_at_pose(
         rotated_volume, image_config, outputs_real_space=False
     )
     translation_operator = pose.compute_translation_operator(
-        image_config.get_frequency_grid(padding=True, physical=True)
+        image_config.padded_shape,
+        image_config.pixel_size,
     )
     return im.crop_to_shape(
         im.irfftn(
@@ -543,12 +545,12 @@ def make_spline(real_voxel_grid):
     )
 
 
-# def _plot_image_compare(im1, im2):
-#     from matplotlib import pyplot as plt
+def _plot_image_compare(im1, im2):
+    from matplotlib import pyplot as plt
 
-#     fig, axes = plt.subplots(figsize=(9, 4), ncols=2, constrained_layout=True)
-#     mappable1 = axes[0].imshow(im1)
-#     mappable2 = axes[1].imshow(im2)
-#     fig.colorbar(mappable1)
-#     fig.colorbar(mappable2)
-#     plt.show()
+    fig, axes = plt.subplots(figsize=(9, 4), ncols=2, constrained_layout=True)
+    mappable1 = axes[0].imshow(im1)
+    mappable2 = axes[1].imshow(im2)
+    fig.colorbar(mappable1)
+    fig.colorbar(mappable2)
+    plt.show()
