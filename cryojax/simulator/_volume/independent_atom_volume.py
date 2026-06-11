@@ -851,7 +851,6 @@ def project_impl(
                     xy=2 * jnp.pi * _positions[:, :2] / box_xy,
                     backend=backend,
                     eps=eps,
-                    upsampfac=1.25,
                     options=options,
                 )
                 / _ps**2
@@ -948,7 +947,6 @@ def render_impl(
                     xyz=2 * jnp.pi * _positions / box_xyz,
                     backend=backend,
                     eps=eps,
-                    upsampfac=1.25,
                     options=options,
                 )
                 / _vs**3
@@ -987,9 +985,9 @@ def _nufft2d1(
     *,
     backend: Literal["jax-finufft", "nufftax"],
     eps: float,
-    upsampfac: float,
     options: dict[str, Any],
 ):
+    default_upsampfac = 1.25
     if backend == "jax-finufft":
         if jax_finufft is None:
             raise RuntimeError(
@@ -1002,12 +1000,22 @@ def _nufft2d1(
         opts = (
             options.pop("opts")
             if "opts" in options
-            else _make_jax_finufft_opts(upsampfac)
+            else _make_jax_finufft_opts(upsampfac=default_upsampfac)
         )
         return jax_finufft.nufft1(
-            shape, source, xy[:, 1], xy[:, 0], eps=eps, iflag=-1, opts=opts, **options
+            shape,
+            source,
+            xy[:, 1],
+            xy[:, 0],
+            eps=eps,
+            iflag=-1,
+            opts=opts,
+            **options,
         )
     else:
+        upsampfac = (
+            options.pop("upsampfac") if "upsampfac" in options else default_upsampfac
+        )
         return nufftax.nufft2d1(
             n_modes=shape[::-1],
             c=source,
@@ -1015,6 +1023,7 @@ def _nufft2d1(
             y=xy[:, 1],
             eps=eps,
             isign=-1,
+            upsampfac=upsampfac,
             **options,
         )
 
@@ -1026,9 +1035,9 @@ def _nufft3d1(
     *,
     backend: Literal["jax-finufft", "nufftax"],
     eps: float,
-    upsampfac: float,
     options: dict[str, Any],
 ):
+    default_upsampfac = 1.25
     if backend == "jax-finufft":
         if jax_finufft is None:
             raise RuntimeError(
@@ -1041,7 +1050,7 @@ def _nufft3d1(
         opts = (
             options.pop("opts")
             if "opts" in options
-            else _make_jax_finufft_opts(upsampfac)
+            else _make_jax_finufft_opts(upsampfac=default_upsampfac)
         )
         return jax_finufft.nufft1(
             shape,
@@ -1055,6 +1064,9 @@ def _nufft3d1(
             **options,
         )
     else:
+        upsampfac = (
+            options.pop("upsampfac") if "upsampfac" in options else default_upsampfac
+        )
         return nufftax.nufft3d1(
             n_modes=shape[::-1],
             c=source,
@@ -1063,6 +1075,7 @@ def _nufft3d1(
             z=xyz[:, 2],
             eps=eps,
             isign=-1,
+            upsampfac=upsampfac,
             **options,
         )
 

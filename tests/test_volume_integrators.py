@@ -484,6 +484,58 @@ def compute_projection_at_pose(
     )
 
 
+@pytest.mark.parametrize("upsampfac", (1.25, 2.0))
+def test_fft_atom_projection_custom_upsampfac(upsampfac):
+    """Smoke test: passing a custom upsampfac via options runs without error."""
+    positions = np.array([[0.0, 0.0, 0.0], [1.0, 0.5, -0.5]])
+    shape, pixel_size = (8, 8), 1.0
+    image_config = cxs.BasicImageConfig(shape, pixel_size, voltage_in_kilovolts=300.0)
+    atom_volume = cxs.IndependentAtomVolume(
+        positions=positions,
+        kernel_fns=im.FourierGaussian(amplitude=1.0, b_factor=100.0),
+    )
+    atom_integrator = cxs.IndependentAtomProjection(
+        backend="nufftax",
+        sampling_mode="point",
+        eps=1e-6,
+        options={"upsampfac": upsampfac},
+    )
+    result = atom_integrator.integrate(
+        atom_volume, image_config, outputs_real_space=False
+    )
+    assert result.shape == (shape[0], shape[1] // 2 + 1)
+
+
+@pytest.mark.parametrize("upsampfac", (1.25, 2.0))
+def test_fft_atom_projection_custom_upsampfac_jax_finufft(upsampfac):
+    """Smoke test: passing custom opts via options to jax-finufft runs without error."""
+    if jnufft is None:
+        pytest.skip("jax-finufft not installed")
+    from jax_finufft.options import NestedOpts, Opts
+
+    positions = np.array([[0.0, 0.0, 0.0], [1.0, 0.5, -0.5]])
+    shape, pixel_size = (8, 8), 1.0
+    image_config = cxs.BasicImageConfig(shape, pixel_size, voltage_in_kilovolts=300.0)
+    atom_volume = cxs.IndependentAtomVolume(
+        positions=positions,
+        kernel_fns=im.FourierGaussian(amplitude=1.0, b_factor=100.0),
+    )
+    opts = NestedOpts(
+        forward=Opts(upsampfac=upsampfac, gpu_upsampfac=upsampfac),
+        backward=Opts(upsampfac=upsampfac, gpu_upsampfac=upsampfac),
+    )
+    atom_integrator = cxs.IndependentAtomProjection(
+        backend="jax-finufft",
+        sampling_mode="point",
+        eps=1e-6,
+        options={"opts": opts},
+    )
+    result = atom_integrator.integrate(
+        atom_volume, image_config, outputs_real_space=False
+    )
+    assert result.shape == (shape[0], shape[1] // 2 + 1)
+
+
 @eqx.filter_jit
 def make_spline(real_voxel_grid):
     return cxs.FourierVoxelSplineVolume.from_real_voxel_grid(
