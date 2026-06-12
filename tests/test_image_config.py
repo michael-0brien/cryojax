@@ -33,7 +33,6 @@ def test_pad_scale_greater_than_one(cls_name, pad_scale):
     for s, p in zip(shape, cfg.padded_shape):
         assert p >= math.ceil(pad_scale * s)
         assert _is_smooth(p)
-        assert (s % 2) == (p % 2), "parity not preserved"
 
 
 @pytest.mark.parametrize("cls_name", ["BasicImageConfig", "DoseImageConfig"])

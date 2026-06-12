@@ -303,10 +303,13 @@ def _project_with_nufft(
     )
     # Get x and y coordinates
     coordinates_xy = coordinate_list[:, :2]
-    # Normalize coordinates betweeen -pi and pi
+    # Normalize coordinates to [-pi, pi) such that the center voxel (index N//2)
+    # maps to theta = 2*pi*(N//2)/N.  For even N this equals pi (same as before);
+    # for odd N it equals pi*(1 - 1/N).
     ny, nx = shape
-    box_xy = jnp.asarray((nx, ny))
-    coordinates_periodic = (2 * jnp.pi * coordinates_xy / box_xy) + jnp.pi
+    box_xy = jnp.asarray((nx, ny), dtype=float)
+    center_xy = jnp.asarray([nx // 2, ny // 2], dtype=float)
+    coordinates_periodic = 2 * jnp.pi * (coordinates_xy + center_xy) / box_xy
     # Unpack and compute
     x, y = coordinates_periodic[:, 0], coordinates_periodic[:, 1]
     if backend == "jax-finufft":

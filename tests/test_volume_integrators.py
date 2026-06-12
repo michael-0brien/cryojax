@@ -231,7 +231,6 @@ def test_fft_projection_peng(pdb_info, pixel_size, shape, upsampfac, eps):
             gaussian_volume, gaussian_integrator, image_config
         )
         proj_by_atoms = compute_projection(atom_volume, atom_integrator, image_config)
-        # _plot_image_compare(proj_by_gaussians, proj_by_atoms)
         np.testing.assert_allclose(proj_by_gaussians, proj_by_atoms, atol=5e-3)
 
 
@@ -269,6 +268,7 @@ def test_real_projection_peng_erf(pdb_info, pixel_size, shape):
         gaussian_volume, gaussian_integrator, image_config
     )
     proj_by_atoms = compute_projection(atom_volume, atom_integrator, image_config)
+    # _plot_image_compare(proj_by_gaussians, proj_by_atoms)
     np.testing.assert_allclose(proj_by_gaussians, proj_by_atoms, atol=1e-6)
 
 

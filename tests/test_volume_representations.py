@@ -213,7 +213,6 @@ def test_fourier_voxel_grid_pad_scale_produces_smooth_shape(pad_scale):
     for s, p in zip(shape, padded_shape):
         assert p >= math.ceil(pad_scale * s)
         assert _is_smooth(p)
-        assert (s % 2) == (p % 2), "parity not preserved"
 
 
 def test_fourier_voxel_grid_pad_scale_one_unchanged():

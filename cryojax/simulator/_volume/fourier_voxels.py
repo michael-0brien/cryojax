@@ -214,7 +214,7 @@ class FourierVoxelSplineVolume(AbstractFourierVoxelVolume, strict=True):
         # ... always pad to even size to avoid interpolation issues in
         # fourier slice extraction.
         padded_shape = query_efficient_grid_size(
-            real_voxel_grid.shape, pad_scale=pad_scale, match_parity=True
+            real_voxel_grid.shape, pad_scale=pad_scale
         )
         padded_real_voxel_grid = pad_to_shape(
             real_voxel_grid, padded_shape, mode=pad_mode

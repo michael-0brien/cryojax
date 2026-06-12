@@ -318,7 +318,7 @@ def _make_coordinates_or_frequencies_1d(
 ) -> Float[Array, " size"]:
     """One-dimensional coordinates in real or fourier space"""
     if outputs_real_space:
-        make_1d = lambda size, dx: dx * (jnp.arange(size, dtype=float) - size / 2)
+        make_1d = lambda size, dx: jnp.fft.fftshift(jnp.fft.fftfreq(size, 1 / dx) * size)
     else:
         if outputs_rfftfreqs is None:
             raise ValueError("Internal error in `cryojax.coordinates`.")

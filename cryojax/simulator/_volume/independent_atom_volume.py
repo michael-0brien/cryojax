@@ -461,6 +461,7 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
             amplitudes,
             is_real_space=is_real_space,
             shape_u=cast(tuple[int, int, int], shape_u),
+            shape_out=cast(tuple[int, int, int], self.shape),
             voxel_size_u=voxel_size_u,
             backend=self.backend,
             eps=self.eps,
@@ -647,6 +648,7 @@ class IndependentAtomProjection(
             is_real_space=is_real_space,
             shape_u=cast(tuple[int, int], shape_u),
             pixel_size_u=pixel_size_u,
+            shape_out=cast(tuple[int, int], shape),
             backend=self.backend,
             eps=self.eps,
             options=self.options,
@@ -765,6 +767,7 @@ def project_impl(
     is_real_space: bool,
     shape_u: tuple[int, int],
     pixel_size_u: Float[Array, ""],
+    shape_out: tuple[int, int],
     backend: Literal["jax-finufft", "nufftax"],
     eps: float,
     options: dict[str, Any],
@@ -801,6 +804,13 @@ def project_impl(
         )
         return projection
 
+    # Per-dimension NUFFT offset: 2*pi*(N//2)/N maps physical center (x=0) to
+    # integer pixel index N//2.  For even N this equals pi; for odd N it is
+    # pi*(1 - 1/N).  Must use the original output shape, not the upsampled one.
+    _nufft_offsets_2d = jnp.asarray(
+        [2 * jnp.pi * (s // 2) / s for s in shape_out[::-1][:2]]
+    )
+
     def fourier_impl(
         _shape: tuple[int, int],
         _ps: Float[Array, ""],
@@ -810,13 +820,18 @@ def project_impl(
         _f_1d: tuple[Array, ...],
         _f_mesh: Array | None,
     ) -> Array:
-        xy = _normalize_positions(_positions[:, :2], _shape, _ps)
+        # Scale positions onto the upsampled grid, then apply the shape_out-based
+        # center offset.  Do NOT apply the shape_u parity correction here: that
+        # correction is for the spread path; the NUFFT offset is entirely
+        # determined by shape_out regardless of the parity of shape_u.
+        _ns = jnp.asarray(_shape[::-1][:2], dtype=float)
+        xy = 2 * jnp.pi * _positions[:, :2] / (_ps * _ns) + _nufft_offsets_2d
         return (
             eval_kernel_impl(_kernel_fn, f_1d=_f_1d, f_mesh=_f_mesh)
             * _nufft2d1(
                 _shape,  # type: ignore
                 source=_amplitudes.astype(complex),
-                xy=xy + jnp.pi,
+                xy=xy,
                 backend=backend,
                 eps=eps,
                 options=options,
@@ -862,6 +877,7 @@ def render_impl(
     is_real_space: bool,
     shape_u: tuple[int, int, int],
     voxel_size_u: Float[Array, ""],
+    shape_out: tuple[int, int, int],
     backend: Literal["jax-finufft", "nufftax"],
     eps: float,
     options: dict[str, Any],
@@ -875,6 +891,8 @@ def render_impl(
         shape_u, voxel_size_u, is_real_space=is_real_space, kernel_fns=kernel_fns
     )
     frequencies_1d = make_frequencies_1d(shape_u, voxel_size_u, modeord=0)
+
+    _nufft_offsets_3d = jnp.asarray([2 * jnp.pi * (s // 2) / s for s in shape_out[::-1]])
 
     def real_impl(
         _shape: tuple[int, int, int],
@@ -909,13 +927,13 @@ def render_impl(
         _f_1d: tuple[Array, ...],
         _f_mesh: Array | None,
     ) -> Array:
-        xyz = _normalize_positions(_positions, _shape, _vs)
-        # Compute
+        _ns = jnp.asarray(_shape[::-1], dtype=float)
+        xyz = 2 * jnp.pi * _positions / (_vs * _ns) + _nufft_offsets_3d
         return eval_kernel_impl(_kernel_fn, f_1d=_f_1d, f_mesh=_f_mesh) * (
             _nufft3d1(
                 _shape,  # type: ignore
                 source=_amplitudes.astype(complex),
-                xyz=xyz + jnp.pi,
+                xyz=xyz,
                 backend=backend,
                 eps=eps,
                 options=options,
@@ -1314,5 +1332,12 @@ def _normalize_positions(
     shape: tuple[int, ...],
     pixel_size: Array,
 ) -> Array:
-    box_size = tuple(pixel_size * s for s in shape[::-1])
-    return 2 * jnp.pi * positions / jnp.asarray(box_size)
+    ndim = positions.shape[-1]
+    # shape is (z, y, x) or (y, x); reverse so first element is x
+    shape_spatial = shape[::-1][:ndim]
+    ns = jnp.asarray(shape_spatial, dtype=float)
+    # Center is at index N//2 for all N (RELION convention).
+    # For even N the offset is 0; for odd N it is -π/N so that x=0 lands
+    # exactly on pixel N//2 after fold_rescale.
+    offsets = jnp.pi * jnp.asarray([-(s % 2) / s for s in shape_spatial])
+    return 2 * jnp.pi * positions / (pixel_size * ns) + offsets

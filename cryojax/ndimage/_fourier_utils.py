@@ -179,7 +179,7 @@ def enforce_rfftn_self_conjugates(
 
 
 def query_efficient_grid_size(
-    shape: tuple[int, ...], pad_scale: float = 1.0, match_parity: bool = True
+    shape: tuple[int, ...], pad_scale: float = 1.0, match_parity: bool = False
 ) -> tuple[int, ...]:
     """Select an efficient grid size for FFT"""
 
