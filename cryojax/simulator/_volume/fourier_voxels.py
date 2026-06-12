@@ -226,7 +226,7 @@ class FourierVoxelSplineVolume(AbstractFourierVoxelVolume, strict=True):
         # fourier grid only on the half space. Fourier slice extraction
         # does not currently work if rfftn is used.
         fourier_voxel_grid = jnp.fft.fftshift(
-            make_fftshift_phase(padded_shape) * fftn(padded_real_voxel_grid)
+            fftn(jnp.fft.ifftshift(padded_real_voxel_grid))
         )
         # ... compute spline coefficients
         spline_coefficients = compute_spline_coefficients(fourier_voxel_grid)
