@@ -306,7 +306,7 @@ def _project_with_nufft(
     # Normalize coordinates betweeen -pi and pi
     ny, nx = shape
     box_xy = jnp.asarray((nx, ny))
-    coordinates_periodic = 2 * jnp.pi * coordinates_xy / box_xy
+    coordinates_periodic = (2 * jnp.pi * coordinates_xy / box_xy) + jnp.pi
     # Unpack and compute
     x, y = coordinates_periodic[:, 0], coordinates_periodic[:, 1]
     if backend == "jax-finufft":
@@ -323,17 +323,10 @@ def _project_with_nufft(
         )
     else:
         projection_fft = nufftax.nufft2d1(
-            n_modes=shape[::-1],
-            c=weights,
-            x=x,
-            y=y,
-            eps=eps,
-            isign=-1,
+            n_modes=shape[::-1], c=weights, x=x, y=y, eps=eps, isign=-1
         )
-    # Shift zero frequency component to corner
-    projection_fft = jnp.fft.ifftshift(projection_fft)
     # Convert to rfftn output
-    return convert_fftn_to_rfftn(projection_fft, mode="real")
+    return convert_fftn_to_rfftn(jnp.fft.ifftshift(projection_fft), mode="real")
 
 
 def _make_opts():
