@@ -193,6 +193,42 @@ def test_voxel_volume_loaders():
     assert isinstance(real_volume.coordinate_grid_in_pixels, Float[Array, "_ _ _ 3"])  # type: ignore
 
 
+def _is_smooth(n: int) -> bool:
+    for p in (2, 3, 5):
+        while n % p == 0:
+            n //= p
+    return n == 1
+
+
+@pytest.mark.parametrize("pad_scale", (1.5, 2.0))
+def test_fourier_voxel_grid_pad_scale_produces_smooth_shape(pad_scale):
+    import math
+
+    shape = (10, 10, 10)
+    real_voxel_grid = jnp.zeros(shape, dtype=float)
+    vol = cxs.FourierVoxelGridVolume.from_real_voxel_grid(
+        real_voxel_grid, pad_scale=pad_scale
+    )
+    padded_shape = vol.fourier_voxel_grid.shape
+    for s, p in zip(shape, padded_shape):
+        assert p >= math.ceil(pad_scale * s)
+        assert _is_smooth(p)
+        assert (s % 2) == (p % 2), "parity not preserved"
+
+
+def test_fourier_voxel_grid_pad_scale_one_unchanged():
+    shape = (10, 10, 10)
+    real_voxel_grid = jnp.zeros(shape, dtype=float)
+    vol = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid, pad_scale=1.0)
+    assert vol.fourier_voxel_grid.shape == shape
+
+
+def test_fourier_voxel_grid_pad_scale_less_than_one_raises():
+    real_voxel_grid = jnp.zeros((10, 10, 10), dtype=float)
+    with pytest.raises(ValueError, match="pad_scale"):
+        cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid, pad_scale=0.5)
+
+
 @pytest.mark.parametrize("pad_scale", (1, 1.1))
 def test_sinc_correction(sample_mrc_path, pad_scale):
     real_voxel_grid = read_array_from_mrc(sample_mrc_path)

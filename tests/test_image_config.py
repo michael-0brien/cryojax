@@ -1,6 +1,63 @@
+import math
+
 import cryojax.simulator as cxs
 import equinox as eqx
 import pytest
+
+
+def _is_smooth(n: int) -> bool:
+    for p in (2, 3, 5):
+        while n % p == 0:
+            n //= p
+    return n == 1
+
+
+@pytest.mark.parametrize("cls_name", ["BasicImageConfig", "DoseImageConfig"])
+def test_pad_scale_one_equals_shape(cls_name):
+    cls = getattr(cxs, cls_name)
+    shape = (64, 64)
+    extra = {"electron_dose": 20.0} if cls_name == "DoseImageConfig" else {}
+    cfg = cls(shape, pixel_size=1.0, voltage_in_kilovolts=300.0, pad_scale=1.0, **extra)
+    assert cfg.padded_shape == shape
+
+
+@pytest.mark.parametrize("cls_name", ["BasicImageConfig", "DoseImageConfig"])
+@pytest.mark.parametrize("pad_scale", [1.5, 2.0])
+def test_pad_scale_greater_than_one(cls_name, pad_scale):
+    cls = getattr(cxs, cls_name)
+    shape = (64, 64)
+    extra = {"electron_dose": 20.0} if cls_name == "DoseImageConfig" else {}
+    cfg = cls(
+        shape, pixel_size=1.0, voltage_in_kilovolts=300.0, pad_scale=pad_scale, **extra
+    )
+    for s, p in zip(shape, cfg.padded_shape):
+        assert p >= math.ceil(pad_scale * s)
+        assert _is_smooth(p)
+        assert (s % 2) == (p % 2), "parity not preserved"
+
+
+@pytest.mark.parametrize("cls_name", ["BasicImageConfig", "DoseImageConfig"])
+def test_explicit_padded_shape_overrides_pad_scale(cls_name):
+    cls = getattr(cxs, cls_name)
+    shape, padded_shape = (64, 64), (80, 80)
+    extra = {"electron_dose": 20.0} if cls_name == "DoseImageConfig" else {}
+    cfg = cls(
+        shape,
+        pixel_size=1.0,
+        voltage_in_kilovolts=300.0,
+        padded_shape=padded_shape,
+        pad_scale=1.5,
+        **extra,
+    )
+    assert cfg.padded_shape == padded_shape
+
+
+@pytest.mark.parametrize("cls_name", ["BasicImageConfig", "DoseImageConfig"])
+def test_pad_scale_less_than_one_raises(cls_name):
+    cls = getattr(cxs, cls_name)
+    extra = {"electron_dose": 20.0} if cls_name == "DoseImageConfig" else {}
+    with pytest.raises(ValueError, match="pad_scale"):
+        cls((64, 64), pixel_size=1.0, voltage_in_kilovolts=300.0, pad_scale=0.5, **extra)
 
 
 @pytest.mark.parametrize(
