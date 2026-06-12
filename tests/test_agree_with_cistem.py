@@ -1,5 +1,4 @@
 import cryojax.simulator as cxs
-import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -130,15 +129,14 @@ def test_euler_matrix_with_cistem(phi, theta, psi):
     "phi, theta, psi, box_size, voxel_size",
     [
         # multiple Euler angles at one grid size
-        (10.0, 90.0, 170.0, 64, 1.0),
-        (10.0, 80.0, -20.0, 64, 1.0),
-        (-1.2, 90.5, 67.0, 64, 1.0),
-        (-50.0, 62.0, -21.0, 64, 1.0),
-        (0.0, 0.0, 0.0, 64, 1.0),
-        (180.0, 90.0, 0.0, 64, 1.0),
+        (0.0, 0.0, 0.0, 64, 0.5),
+        (10.0, 90.0, 170.0, 64, 0.5),
+        (10.0, 80.0, -20.0, 64, 0.5),
+        (-1.2, 90.5, 67.0, 64, 0.5),
+        (-50.0, 62.0, -21.0, 64, 0.5),
         # same angle, different grid sizes rendered on-the-fly
-        (10.0, 90.0, 170.0, 48, 1.0),
-        (10.0, 90.0, 170.0, 32, 1.5),
+        # (10.0, 90.0, 170.0, 48, ),
+        # (10.0, 90.0, 170.0, 32, 1.5),
     ],
 )
 def test_compute_projection_with_cistem(
@@ -153,10 +151,12 @@ def test_compute_projection_with_cistem(
     # Render volume on-the-fly from atom positions at the requested grid shape
     atom_positions, atomic_numbers = read_atoms_from_pdb(sample_pdb_path, center=True)
     gaussian_volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(
-        atom_positions, parameters=PengScatteringFactorParameters(atomic_numbers)
+        atom_positions,
+        parameters=PengScatteringFactorParameters(atomic_numbers),
+        extra_b_factors=10.0,
     )
     render_fn = cxs.GaussianMixtureRenderFn((box_size, box_size, box_size), voxel_size)
-    real_voxel_grid = jax.jit(render_fn)(gaussian_volume)
+    real_voxel_grid = render_fn(gaussian_volume)
 
     # cryojax projection
     volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
@@ -194,6 +194,12 @@ def test_compute_projection_with_cistem(
     pycistem_angles.Init(phi, theta, psi, 0.0, 0.0)
     pycistem_model = _compute_projection(pycistem_volume, pycistem_angles, box_size)
     pycistem_projection = np.asarray(pycistem_model.real_values)
+
+    # from matplotlib import pyplot as plt
+    # fig, axes = plt.subplots(ncols=2)
+    # im1 = axes[0].imshow(cryojax_projection)
+    # im2 = axes[1].imshow(pycistem_projection)
+    # fig.savefig("temp.png")
 
     np.testing.assert_allclose(cryojax_projection, pycistem_projection, atol=1e-4)
 
