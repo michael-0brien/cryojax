@@ -1,6 +1,7 @@
 import math
 from typing import Literal
 
+import jax.numpy as jnp
 from jaxtyping import Array, Complex
 
 
@@ -38,15 +39,10 @@ def convert_fftn_to_rfftn(
     """
     shape = fftn_array.shape
     # Take upper half plane
-    kwargs = dict(mode="promise_in_bounds", indices_are_sorted=True, unique_indices=True)
     if fftn_array.ndim == 2:
-        rfftn_array = fftn_array.at[:, : shape[-1] // 2 + 1].get(
-            **kwargs  # pyright: ignore[reportArgumentType]
-        )
+        rfftn_array = fftn_array[:, : shape[-1] // 2 + 1]
     elif fftn_array.ndim == 3:
-        rfftn_array = fftn_array.at[:, :, : shape[-1] // 2 + 1].get(
-            **kwargs  # pyright: ignore[reportArgumentType]
-        )
+        rfftn_array = fftn_array[:, :, : shape[-1] // 2 + 1]
     else:
         raise NotImplementedError(
             "Only 2D and 3D arrays are supported "
@@ -107,13 +103,7 @@ def enforce_rfftn_self_conjugates(
     The modified `rfftn_array`, with self-conjugate components
     made real-valued.
     """
-    if mode == "zero":
-        replace_fn = lambda _: 0.0
-    elif mode == "one":
-        replace_fn = lambda _: 1.0
-    elif mode == "real":
-        replace_fn = lambda arr: arr.real
-    else:
+    if mode not in ("zero", "one", "real"):
         raise NotImplementedError(
             f"`mode = {mode}` not supported for function "
             "`enforce_rfftn_self_conjugates`. "
@@ -122,52 +112,42 @@ def enforce_rfftn_self_conjugates(
     if rfftn_array.ndim == 2:
         assert len(shape) == 2
         y_dim, x_dim = shape
-        if includes_dc:
-            rfftn_array = rfftn_array.at[0, 0].set(replace_fn(rfftn_array[0, 0]))
+        y_rows, x_cols = rfftn_array.shape
+        row_idx = jnp.arange(y_rows)
+        col_idx = jnp.arange(x_cols)
+        row_is_sc = row_idx == 0
         if y_dim % 2 == 0:
-            rfftn_array = rfftn_array.at[y_dim // 2, 0].set(
-                replace_fn(rfftn_array[y_dim // 2, 0])
-            )
+            row_is_sc = row_is_sc | (row_idx == y_dim // 2)
+        col_is_sc = col_idx == 0
         if x_dim % 2 == 0:
-            rfftn_array = rfftn_array.at[0, x_dim // 2].set(
-                replace_fn(rfftn_array[0, x_dim // 2])
-            )
-        if y_dim % 2 == 0 and x_dim % 2 == 0:
-            rfftn_array = rfftn_array.at[y_dim // 2, x_dim // 2].set(
-                replace_fn(rfftn_array[y_dim // 2, x_dim // 2])
-            )
+            col_is_sc = col_is_sc | (col_idx == x_dim // 2)
+        sc_mask = row_is_sc[:, None] & col_is_sc[None, :]
+        if not includes_dc:
+            sc_mask = sc_mask & ~((row_idx == 0)[:, None] & (col_idx == 0)[None, :])
     elif rfftn_array.ndim == 3:
         assert len(shape) == 3
         z_dim, y_dim, x_dim = shape
-        if includes_dc:
-            rfftn_array = rfftn_array.at[0, 0, 0].set(replace_fn(rfftn_array[0, 0, 0]))
+        z_slices, y_rows, x_cols = rfftn_array.shape
+        z_idx = jnp.arange(z_slices)
+        row_idx = jnp.arange(y_rows)
+        col_idx = jnp.arange(x_cols)
+        z_is_sc = z_idx == 0
         if z_dim % 2 == 0:
-            rfftn_array = rfftn_array.at[0, z_dim // 2, 0].set(
-                replace_fn(rfftn_array[0, z_dim // 2, 0])
-            )
+            z_is_sc = z_is_sc | (z_idx == z_dim // 2)
+        row_is_sc = row_idx == 0
         if y_dim % 2 == 0:
-            rfftn_array = rfftn_array.at[0, y_dim // 2, 0].set(
-                replace_fn(rfftn_array[0, y_dim // 2, 0])
-            )
+            row_is_sc = row_is_sc | (row_idx == y_dim // 2)
+        col_is_sc = col_idx == 0
         if x_dim % 2 == 0:
-            rfftn_array = rfftn_array.at[0, 0, x_dim // 2].set(
-                replace_fn(rfftn_array[0, 0, x_dim // 2])
-            )
-        if y_dim % 2 == 0 and x_dim % 2 == 0:
-            rfftn_array = rfftn_array.at[0, y_dim // 2, x_dim // 2].set(
-                replace_fn(rfftn_array[0, y_dim // 2, x_dim // 2])
-            )
-        if z_dim % 2 == 0 and x_dim % 2 == 0:
-            rfftn_array = rfftn_array.at[z_dim // 2, 0, x_dim // 2].set(
-                replace_fn(rfftn_array[z_dim // 2, 0, x_dim // 2])
-            )
-        if z_dim % 2 == 0 and y_dim % 2 == 0:
-            rfftn_array = rfftn_array.at[z_dim // 2, y_dim // 2, 0].set(
-                replace_fn(rfftn_array[z_dim // 2, y_dim // 2, 0])
-            )
-        if z_dim % 2 == 0 and y_dim % 2 == 0 and x_dim % 2 == 0:
-            rfftn_array = rfftn_array.at[z_dim // 2, y_dim // 2, x_dim // 2].set(
-                replace_fn(rfftn_array[z_dim // 2, y_dim // 2, x_dim // 2])
+            col_is_sc = col_is_sc | (col_idx == x_dim // 2)
+        sc_mask = (
+            z_is_sc[:, None, None] & row_is_sc[None, :, None] & col_is_sc[None, None, :]
+        )
+        if not includes_dc:
+            sc_mask = sc_mask & ~(
+                (z_idx == 0)[:, None, None]
+                & (row_idx == 0)[None, :, None]
+                & (col_idx == 0)[None, None, :]
             )
     else:
         raise NotImplementedError(
@@ -175,6 +155,12 @@ def enforce_rfftn_self_conjugates(
             "in function `enforce_rfftn_self_conjugates`. "
             f"Passed an array with `ndim = {rfftn_array.ndim}`."
         )
+    if mode == "zero":
+        rfftn_array = jnp.where(sc_mask, 0.0, rfftn_array)
+    elif mode == "one":
+        rfftn_array = jnp.where(sc_mask, 1.0, rfftn_array)
+    else:  # mode == "real"
+        rfftn_array = jnp.where(sc_mask, rfftn_array.real, rfftn_array)
     return rfftn_array
 
 
