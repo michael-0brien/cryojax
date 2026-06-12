@@ -142,7 +142,7 @@ class FourierVoxelGridVolume(AbstractFourierVoxelVolume, strict=True):
         # fourier grid only on the half space. Fourier slice extraction
         # does not currently work if rfftn is used.
         fourier_voxel_grid = jnp.fft.fftshift(
-            make_fftshift_phase(padded_shape) * fftn(padded_real_voxel_grid)
+            fftn(jnp.fft.ifftshift(padded_real_voxel_grid))
         )
         # ... create in-plane frequency slice on the half space
         frequency_slice = make_frequency_slice(
@@ -590,6 +590,9 @@ def _extract_surface_from_voxel_grid(
             fourier_voxel_grid, (k_z, k_y, k_x), interpolation_order, **kwargs
         )[0, :, :]
     # FFT shift and multiply by (-1)^k phase factors
-    surface = jnp.fft.ifftshift(make_fftshift_phase(surface.shape) * surface)
+    if N % 2 == 0:
+        surface = jnp.fft.ifftshift(make_fftshift_phase(surface.shape) * surface)
+    else:
+        surface = fftn(jnp.fft.fftshift(ifftn(jnp.fft.ifftshift(surface))))
 
     return surface
