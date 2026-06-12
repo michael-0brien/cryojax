@@ -119,10 +119,11 @@ class AbstractPose(Module, strict=True):
         grid of in-plane phase shifts $\\exp{(- 2 \\pi i (t_x q_x + t_y q_y))}$.
         """
         tx, ty = self.offset_in_angstroms[0], self.offset_in_angstroms[1]
-        q_x = make_1d_frequency_grid(shape[1], pixel_size, outputs_rfftfreqs=True)
-        q_y = make_1d_frequency_grid(shape[0], pixel_size, outputs_rfftfreqs=False)
-        phase_x = FourierPhaseShifts(tx)(q_x)
-        phase_y = FourierPhaseShifts(ty)(q_y)
+        q_x, q_y = (
+            make_1d_frequency_grid(shape[1], pixel_size, outputs_rfftfreqs=True),
+            make_1d_frequency_grid(shape[0], pixel_size, outputs_rfftfreqs=False),
+        )
+        phase_x, phase_y = (FourierPhaseShifts(tx)(q_x), FourierPhaseShifts(ty)(q_y))
         return phase_y[:, None] * phase_x[None, :]
 
     @cached_property

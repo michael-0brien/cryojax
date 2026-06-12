@@ -26,7 +26,7 @@ def ifftn(
     ift :
         Inverse fourier transform.
     """
-    ift = jnp.fft.fftshift(jnp.fft.ifftn(ft, s=s, axes=axes), axes=axes)
+    ift = jnp.fft.ifftn(ft, s=s, axes=axes)
 
     return ift
 
@@ -49,7 +49,7 @@ def fftn(
     ft :
         Fourier transform of array.
     """
-    ft = jnp.fft.fftn(jnp.fft.ifftshift(ift, axes=axes), s=s, axes=axes)
+    ft = jnp.fft.fftn(ift, s=s, axes=axes)
 
     return ft
 
@@ -72,7 +72,7 @@ def irfftn(
     ift :
         Inverse fourier transform.
     """
-    ift = jnp.fft.fftshift(jnp.fft.irfftn(ft, s=s, axes=axes), axes=axes)
+    ift = jnp.fft.irfftn(ft, s=s, axes=axes)
 
     return ift
 
@@ -94,6 +94,6 @@ def rfftn(
     ft :
         Fourier transform of array.
     """
-    ft = jnp.fft.rfftn(jnp.fft.ifftshift(ift, axes=axes), s=s, axes=axes)
+    ft = jnp.fft.rfftn(ift, axes=axes, s=s)
 
     return ft

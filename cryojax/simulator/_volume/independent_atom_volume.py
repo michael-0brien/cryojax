@@ -12,8 +12,6 @@ import nufftax
 from jaxtyping import Array, Float, Inexact, PyTree
 from nufftax.core import Kernel, spread_2d, spread_3d
 
-from cryojax.ndimage._operators._fourier_operator import FourierGaussian
-
 from ..._internal import error_if_not_positive
 from ...constants import (
     LobatoScatteringFactorParameters,
@@ -24,14 +22,15 @@ from ...jax_util import FloatLike, NDArrayLike
 from ...ndimage import (
     AbstractFourierOperator,
     AbstractRealOperator,
+    FourierGaussian,
     FourierSinc,
     RealGaussian,
     convert_fftn_to_rfftn,
     fftn,
     ifftn,
     irfftn,
-    make_1d_frequency_grid,
     make_frequency_grid,
+    query_efficient_grid_size,
     resize_with_crop_or_pad,
     rfftn,
 )
@@ -44,6 +43,7 @@ from .base_volume import (
     ProjectionArray,
     VoxelArray,
 )
+from .common import make_frequencies_1d
 
 
 try:
@@ -438,9 +438,10 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
         )
         amplitudes = _standardize_amplitudes(volume_representation.amplitudes, positions)
         is_real_space, kernel_fns = _standardize_kernel_fns(kernel_fns, spatial_dim=3)
-        upsampfac = _standardize_upsampfac(
-            self.upsample_factor,
-            dims=self.shape,
+        (shape_u, voxel_size_u), upsampfac = _prepare_upsample(
+            shape=self.shape,
+            pixel_size=self.voxel_size,
+            upsampfac=self.upsample_factor,
             sampling_mode=self.sampling_mode,
             is_real_space=is_real_space,
         )
@@ -453,31 +454,15 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
                 sampling_mode=sampling_mode,
                 upsampfac=upsampfac,
             )
-        # Upsampling arguments
-        if upsampfac > 1:
-            shape_u, voxel_size_u = (
-                (
-                    int(upsampfac * self.shape[0]),
-                    int(upsampfac * self.shape[1]),
-                    int(upsampfac * self.shape[2]),
-                ),
-                self.voxel_size / upsampfac,
-            )
-        else:
-            shape_u, voxel_size_u = self.shape, self.voxel_size
-        frequencies_1d = tuple(
-            make_1d_frequency_grid(s, voxel_size_u, outputs_rfftfreqs=False)
-            for s in shape_u[::-1]
-        )
         # Compute
         rendering_out = render_impl(
             positions,
             kernel_fns,
             amplitudes,
             is_real_space=is_real_space,
-            shape_u=shape_u,
+            shape_u=cast(tuple[int, int, int], shape_u),
+            shape_out=cast(tuple[int, int, int], self.shape),
             voxel_size_u=voxel_size_u,
-            frequencies_1d=frequencies_1d,
             backend=self.backend,
             eps=self.eps,
             options=self.options,
@@ -503,6 +488,7 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
         # Average within a pixel size
         if sampling_mode == "average":
             box_fn = FourierSinc(box_width=self.voxel_size)
+            frequencies_1d = make_frequencies_1d(shape_u, voxel_size_u, modeord=1)
             rendering_fft *= eval_separable_impl(box_fn, frequencies_1d)
         # Downsample by extracting fourier modes
         if self.shape != shape_u:
@@ -638,9 +624,10 @@ class IndependentAtomProjection(
         )
         amplitudes = _standardize_amplitudes(volume_representation.amplitudes, positions)
         is_real_space, kernel_fns = _standardize_kernel_fns(kernel_fns, spatial_dim=2)
-        upsampfac = _standardize_upsampfac(
-            self.upsample_factor,
-            dims=shape,
+        (shape_u, pixel_size_u), upsampfac = _prepare_upsample(
+            shape=shape,
+            pixel_size=pixel_size,
+            upsampfac=self.upsample_factor,
             sampling_mode=self.sampling_mode,
             is_real_space=is_real_space,
         )
@@ -653,27 +640,15 @@ class IndependentAtomProjection(
                 sampling_mode=sampling_mode,
                 upsampfac=upsampfac,
             )
-        # Upsampled shape and pixel size
-        if upsampfac > 1:
-            shape_u, pixel_size_u = (
-                (int(upsampfac * shape[0]), int(upsampfac * shape[1])),
-                pixel_size / upsampfac,
-            )
-        else:
-            shape_u, pixel_size_u = shape, pixel_size
-        frequencies_1d = tuple(
-            make_1d_frequency_grid(s, pixel_size_u, outputs_rfftfreqs=False)
-            for s in shape_u[::-1]
-        )
         # Compute projection
         projection_out = project_impl(
             positions,
             kernel_fns,
             amplitudes,
             is_real_space=is_real_space,
-            shape_u=shape_u,
+            shape_u=cast(tuple[int, int], shape_u),
             pixel_size_u=pixel_size_u,
-            frequencies_1d=frequencies_1d,
+            shape_out=cast(tuple[int, int], shape),
             backend=self.backend,
             eps=self.eps,
             options=self.options,
@@ -693,6 +668,7 @@ class IndependentAtomProjection(
         # Average within a pixel size
         if sampling_mode == "average":
             box_fn = FourierSinc(box_width=pixel_size)
+            frequencies_1d = make_frequencies_1d(shape_u, pixel_size_u, modeord=1)
             projection_fft *= eval_separable_impl(box_fn, frequencies_1d)
         # Downsample by extracting fourier modes
         if shape != shape_u:
@@ -791,7 +767,7 @@ def project_impl(
     is_real_space: bool,
     shape_u: tuple[int, int],
     pixel_size_u: Float[Array, ""],
-    frequencies_1d: tuple[Array, ...],
+    shape_out: tuple[int, int],
     backend: Literal["jax-finufft", "nufftax"],
     eps: float,
     options: dict[str, Any],
@@ -804,6 +780,7 @@ def project_impl(
     frequency_grid = _maybe_make_frequency_grid(
         shape_u, pixel_size_u, is_real_space=is_real_space, kernel_fns=kernel_fns
     )
+    frequencies_1d = make_frequencies_1d(shape_u, pixel_size_u, modeord=0)
 
     def real_impl(
         _shape: tuple[int, int],
@@ -812,29 +789,27 @@ def project_impl(
         _kernel_fn: AbstractRealOperator,
         _amplitudes: Inexact[Array, " _"],
     ) -> Array:
-        dim = _shape[0]
-        if not all(s == dim for s in _shape):
-            raise ValueError(
-                "`IndependentAtomProjection` for real-valued kernels "
-                "only supports rendering square images. Found a shape "
-                f"equal to {shape_u}."
-            )
         nspread = _eps_to_nspread(eps)
-        (ny, nx) = _shape
-        box_xy = _ps * jnp.asarray((nx, ny), dtype=float)
-        xy = 2 * jnp.pi * _positions[:, :2] / box_xy
+        xy = _normalize_positions(_positions[:, :2], _shape, _ps)
         projection = _spread_2d(
             kernel_fn=_kernel_fn,
             pixel_size=_ps,
             x=xy[:, 0],
             y=xy[:, 1],
             c=_amplitudes.astype(float),
-            nf1=dim,
-            nf2=dim,
+            nf1=_shape[1],
+            nf2=_shape[0],
             nspread=nspread,
             options=options,
         )
         return projection
+
+    # Per-dimension NUFFT offset: 2*pi*(N//2)/N maps physical center (x=0) to
+    # integer pixel index N//2.  For even N this equals pi; for odd N it is
+    # pi*(1 - 1/N).  Must use the original output shape, not the upsampled one.
+    _nufft_offsets_2d = jnp.asarray(
+        [2 * jnp.pi * (s // 2) / s for s in shape_out[::-1][:2]]
+    )
 
     def fourier_impl(
         _shape: tuple[int, int],
@@ -845,22 +820,23 @@ def project_impl(
         _f_1d: tuple[Array, ...],
         _f_mesh: Array | None,
     ) -> Array:
-        (ny, nx) = _shape
-        box_xy = _ps * jnp.asarray((nx, ny))
-        # Compute
+        # Scale positions onto the upsampled grid, then apply the shape_out-based
+        # center offset.  Do NOT apply the shape_u parity correction here: that
+        # correction is for the spread path; the NUFFT offset is entirely
+        # determined by shape_out regardless of the parity of shape_u.
+        _ns = jnp.asarray(_shape[::-1][:2], dtype=float)
+        xy = 2 * jnp.pi * _positions[:, :2] / (_ps * _ns) + _nufft_offsets_2d
         return (
             eval_kernel_impl(_kernel_fn, f_1d=_f_1d, f_mesh=_f_mesh)
-            * jnp.fft.ifftshift(
-                _nufft2d1(
-                    _shape,  # type: ignore
-                    source=_amplitudes.astype(complex),
-                    xy=2 * jnp.pi * _positions[:, :2] / box_xy,
-                    backend=backend,
-                    eps=eps,
-                    options=options,
-                )
-                / _ps**2
+            * _nufft2d1(
+                _shape,  # type: ignore
+                source=_amplitudes.astype(complex),
+                xy=xy,
+                backend=backend,
+                eps=eps,
+                options=options,
             )
+            / _ps**2
         )
 
     if is_real_space:
@@ -887,6 +863,8 @@ def project_impl(
             project_dispatch, positions, kernel_fns, amplitudes, is_leaf=is_leaf
         ),
     )
+    if not is_real_space:
+        projection_out = jnp.fft.ifftshift(projection_out)
 
     return projection_out
 
@@ -899,7 +877,7 @@ def render_impl(
     is_real_space: bool,
     shape_u: tuple[int, int, int],
     voxel_size_u: Float[Array, ""],
-    frequencies_1d: tuple[Array, ...],
+    shape_out: tuple[int, int, int],
     backend: Literal["jax-finufft", "nufftax"],
     eps: float,
     options: dict[str, Any],
@@ -912,6 +890,9 @@ def render_impl(
     frequency_grid = _maybe_make_frequency_grid(
         shape_u, voxel_size_u, is_real_space=is_real_space, kernel_fns=kernel_fns
     )
+    frequencies_1d = make_frequencies_1d(shape_u, voxel_size_u, modeord=0)
+
+    _nufft_offsets_3d = jnp.asarray([2 * jnp.pi * (s // 2) / s for s in shape_out[::-1]])
 
     def real_impl(
         _shape: tuple[int, int, int],
@@ -920,17 +901,8 @@ def render_impl(
         _kernel_fn: AbstractRealOperator,
         _amplitudes: Inexact[Array, " _"],
     ) -> Array:
-        dim = _shape[0]
-        if not all(s == dim for s in _shape):
-            raise ValueError(
-                "`IndependentAtomRenderFn` for real-valued kernels "
-                "only supports rendering square voxel arrays. Found a shape "
-                f"equal to {(_shape[0], _shape[1], _shape[2])}"
-            )
         nspread = _eps_to_nspread(eps)
-        (nz, ny, nx) = _shape
-        box_xyz = _vs * jnp.asarray((nx, ny, nz), dtype=float)
-        xyz = 2 * jnp.pi * _positions / box_xyz
+        xyz = _normalize_positions(_positions, _shape, _vs)
         rendering = _spread_3d(
             kernel_fn=_kernel_fn,
             voxel_size=_vs,
@@ -938,9 +910,9 @@ def render_impl(
             y=xyz[:, 1],
             z=xyz[:, 2],
             c=_amplitudes.astype(float),
-            nf1=dim,
-            nf2=dim,
-            nf3=dim,
+            nf1=_shape[2],
+            nf2=_shape[1],
+            nf3=_shape[0],
             nspread=nspread,
             options=options,
         )
@@ -955,35 +927,34 @@ def render_impl(
         _f_1d: tuple[Array, ...],
         _f_mesh: Array | None,
     ) -> Array:
-        (nz, ny, nx) = _shape
-        box_xyz = _vs * jnp.asarray((nx, ny, nz))
-        # Compute
+        _ns = jnp.asarray(_shape[::-1], dtype=float)
+        xyz = 2 * jnp.pi * _positions / (_vs * _ns) + _nufft_offsets_3d
         return eval_kernel_impl(_kernel_fn, f_1d=_f_1d, f_mesh=_f_mesh) * (
-            jnp.fft.ifftshift(
-                _nufft3d1(
-                    _shape,  # type: ignore
-                    source=_amplitudes.astype(complex),
-                    xyz=2 * jnp.pi * _positions / box_xyz,
-                    backend=backend,
-                    eps=eps,
-                    options=options,
-                )
-                / _vs**3
+            _nufft3d1(
+                _shape,  # type: ignore
+                source=_amplitudes.astype(complex),
+                xyz=xyz,
+                backend=backend,
+                eps=eps,
+                options=options,
             )
+            / _vs**3
         )
 
     if is_real_space:
-        render_impl, args = real_impl, ()
+        compute_fn, args = real_impl, ()
     else:
-        render_impl, args = cast(Any, (fourier_impl, (frequencies_1d, frequency_grid)))
+        compute_fn, args = cast(Any, (fourier_impl, (frequencies_1d, frequency_grid)))
 
-    render_dispatch = lambda _positions, _kernel_fn, _amplitudes: render_impl(
+    render_dispatch = lambda _positions, _kernel_fn, _amplitudes: compute_fn(
         shape_u, voxel_size_u, _positions, _kernel_fn, _amplitudes, *args
     )
     rendering_out = jax.tree.reduce(
         lambda x, y: x + y,
         jax.tree.map(render_dispatch, positions, kernel_fns, amplitudes, is_leaf=is_leaf),
     )
+    if not is_real_space:
+        rendering_out = jnp.fft.ifftshift(rendering_out)
 
     return rendering_out
 
@@ -1100,9 +1071,6 @@ def _nufft3d1(
 
 
 def _spread_3d(kernel_fn, voxel_size, x, y, z, c, nf1, nf2, nf3, *, nspread, options):
-    assert nf1 == nf2 == nf3
-    dim = nf1
-
     @eqx.filter_vmap(in_axes=(eqx.if_array(0), None, None, None, None, None))
     def spread_3d_impl(_kernel_fn, _voxel_size, _x, _y, _z, _c):
         return spread_3d(
@@ -1110,11 +1078,11 @@ def _spread_3d(kernel_fn, voxel_size, x, y, z, c, nf1, nf2, nf3, *, nspread, opt
             y=_y,
             z=_z,
             c=_c,
-            nf1=dim,
-            nf2=dim,
-            nf3=dim,
+            nf1=nf1,
+            nf2=nf2,
+            nf3=nf3,
             kernel_params=_make_nufftax_kernel(
-                _kernel_fn, image_dim=dim, pixel_size=_voxel_size, nspread=nspread
+                _kernel_fn, pixel_size=_voxel_size, nspread=nspread
             ),
             **options,
         )
@@ -1123,19 +1091,16 @@ def _spread_3d(kernel_fn, voxel_size, x, y, z, c, nf1, nf2, nf3, *, nspread, opt
 
 
 def _spread_2d(kernel_fn, pixel_size, x, y, c, nf1, nf2, *, nspread, options):
-    assert nf1 == nf2
-    dim = nf1
-
     @eqx.filter_vmap(in_axes=(eqx.if_array(0), None, None, None, None))
     def spread_2d_impl(_kernel_fn, _pixel_size, _x, _y, _c):
         return spread_2d(
             x=_x,
             y=_y,
             c=_c,
-            nf1=dim,
-            nf2=dim,
+            nf1=nf1,
+            nf2=nf2,
             kernel_params=_make_nufftax_kernel(
-                _kernel_fn, image_dim=dim, pixel_size=_pixel_size, nspread=nspread
+                _kernel_fn, pixel_size=_pixel_size, nspread=nspread
             ),
             **options,
         )
@@ -1145,17 +1110,16 @@ def _spread_2d(kernel_fn, pixel_size, x, y, c, nf1, nf2, *, nspread, options):
 
 def _eps_to_nspread(eps: float) -> int:
     # FINUFFT heuristic for choosing `nspread` parameter
-    # based on desired precision `eps`
-    max_nspread = 16
+    # based on desired precision `eps`. In this context it is
+    # used for spreading gaussians, so we let it be unbounded
     log_tol = -math.log10(max(eps, 1e-16))
-    return max(2, min(int(math.ceil(log_tol + 1)), max_nspread))
+    return max(2, int(math.ceil(log_tol + 1)))
 
 
 def _build_extraction_mesh(
     shape: tuple[int, ...], shape_ds: tuple[int, ...], *, modeord: int
 ):
     """Build indices to extract modes from FFT output."""
-
     assert len(shape) == len(shape_ds)
     assert len(shape) in [2, 3]
     mean_factor = math.prod(shape_ds) / math.prod(shape)
@@ -1195,14 +1159,12 @@ def _standardize_amplitudes(amplitudes: PyTree[Array] | None, positions: PyTree[
 def _make_nufftax_kernel(
     kernel_fn: AbstractRealOperator,
     *,
-    image_dim: int,
     pixel_size: Float[Array, ""],
     nspread: int,
 ):
-    offset = 0.5 if image_dim % 2 == 1 else 0.0
     return Kernel(
         nspread=nspread,
-        phi=lambda _z: eqx.filter_vmap(kernel_fn)(pixel_size * (_z + offset)),
+        phi=lambda _z: eqx.filter_vmap(kernel_fn)(pixel_size * _z),
     )
 
 
@@ -1234,20 +1196,40 @@ def _make_erf(gaussian: RealGaussian, pixel_size: Float[Array, ""]):
     )
 
 
-def _standardize_upsampfac(
+def _prepare_upsample(
+    shape: tuple[int, ...],
+    pixel_size: Float[Array, ""],
     upsampfac: float | None,
     *,
-    dims: tuple[int, ...],
     is_real_space: bool,
     sampling_mode: Literal["point", "average"],
-) -> float:
+) -> tuple[tuple[tuple[int, ...], Array], float]:
     """Find the upsampfac that perfectly divides the upsampled
     image shape.
     """
     if upsampfac is None:
         upsampfac = 1.0 if (is_real_space and sampling_mode == "average") else 2.0
-    gcd = ft.reduce(math.gcd, dims)
-    return round(gcd * upsampfac) / gcd
+    if upsampfac == 1.0:
+        return (shape, pixel_size), upsampfac
+    else:
+        dim = shape[0]
+        if not all(s == dim for s in shape):
+            # If rectangular image focus on accuracy. Make sure
+            # `upsampfac` is mapped directly onto a pixel size
+            # dilation
+            gcd = ft.reduce(math.gcd, shape)
+            upsampfac = round(gcd * upsampfac) / gcd
+            shape_u = tuple(s * upsampfac for s in shape)
+        else:
+            # Otherwise, find an efficient grid for FFTs close to
+            # the requested upsampfac and return the corrected upsampfac
+            shape_u = query_efficient_grid_size(shape, upsampfac, match_parity=False)
+            dim_u = shape_u[0]
+            upsampfac = dim_u / dim
+        return (
+            (tuple(int(upsampfac * s) for s in shape), pixel_size / upsampfac),
+            upsampfac,
+        )
 
 
 def _prepare_real_to_fft(a: Array, *, outputs_rfft: bool, fftshifted: bool) -> Array:
@@ -1289,7 +1271,7 @@ def _maybe_make_frequency_grid(
     elif all_separable:
         frequency_grid = None
     else:
-        frequency_grid = make_frequency_grid(shape, pixel_size)
+        frequency_grid = make_frequency_grid(shape, pixel_size, fftshifted=True)
 
     return frequency_grid
 
@@ -1343,3 +1325,19 @@ def eval_separable_impl(
 def eval_non_separable_impl(kernel_fn: AbstractFourierOperator, frequency_grid: Array):
     assert frequency_grid.shape[-1] in [2, 3]
     return kernel_fn(frequency_grid)
+
+
+def _normalize_positions(
+    positions: Array,
+    shape: tuple[int, ...],
+    pixel_size: Array,
+) -> Array:
+    ndim = positions.shape[-1]
+    # shape is (z, y, x) or (y, x); reverse so first element is x
+    shape_spatial = shape[::-1][:ndim]
+    ns = jnp.asarray(shape_spatial, dtype=float)
+    # Center is at index N//2 for all N (RELION convention).
+    # For even N the offset is 0; for odd N it is -π/N so that x=0 lands
+    # exactly on pixel N//2 after fold_rescale.
+    offsets = jnp.pi * jnp.asarray([-(s % 2) / s for s in shape_spatial])
+    return 2 * jnp.pi * positions / (pixel_size * ns) + offsets

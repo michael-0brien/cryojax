@@ -237,14 +237,14 @@ def _fft_ds_real_signal_to_shape(
     outputs_rfft: bool = True,
 ) -> Inexact[Array, "_ _"] | Inexact[Array, "_ _ _"]:
     # Forward Hartley Transform
-    hartley_array = jnp.fft.fftshift(fftn(image_or_volume))
+    hartley_array = jnp.fft.fftshift(fftn(jnp.fft.ifftshift(image_or_volume)))
     hartley_array = hartley_array.real - hartley_array.imag
 
     # Crop to the desired shape
     ds_array = crop_to_shape(hartley_array, downsampled_shape)
 
     # Inverse Hartley Transform
-    ds_array = jnp.fft.fftshift(fftn(ds_array))
+    ds_array = jnp.fft.fftshift(fftn(jnp.fft.ifftshift(ds_array)))
     ds_array /= ds_array.size
     ds_array = ds_array.real - ds_array.imag
 

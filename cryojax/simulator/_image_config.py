@@ -3,7 +3,7 @@
 import math
 import warnings
 from functools import cached_property
-from typing import Literal
+from typing import Literal, cast
 
 import equinox as eqx
 import equinox.internal as eqxi
@@ -18,7 +18,11 @@ from ..constants import (
     wavelength_from_kilovolts,
 )
 from ..jax_util import FloatLike
-from ..ndimage import make_coordinate_grid, make_frequency_grid
+from ..ndimage import (
+    make_coordinate_grid,
+    make_frequency_grid,
+    query_efficient_grid_size,
+)
 
 
 _get_deprecation_msg = lambda self, prop, func: (
@@ -548,6 +552,7 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
         voltage_in_kilovolts: FloatLike,
         *,
         padded_shape: tuple[int, int] | None = None,
+        pad_scale: float = 1.0,
         precompute_mode: Literal[
             "none", "rfft", "fft", "all", "compile_time_eval"
         ] = "none",
@@ -564,6 +569,12 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
         - `padded_shape`:
             The shape of the image after padding. By default, equal
             to `shape`.
+        - `pad_scale`:
+            A scale factor used to determine the `padded_shape`.
+            Used only if `padded_shape` is not directly provided.
+            Unless `pad_scale = 1.0`, it is only an approximation
+            of the resulting `padded_shape`. By default, a good
+            array size for FFT efficiency is chosen.
         - `precompute_mode`:
             How to pre-compute coordinate and frequency grids stored in
             the `image_config`. Options are
@@ -598,7 +609,7 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
             )
             padded_shape = pad_options["shape"]
         self.shape = shape
-        self.padded_shape = shape if padded_shape is None else padded_shape
+        self.padded_shape = _set_padded_shape(type(self), shape, padded_shape, pad_scale)
         # Finally, grid precompute
         if precompute_mode == "rfft":
             self.precomputed_grids = PrecomputedGrids(
@@ -641,6 +652,7 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
         electron_dose: FloatLike,
         *,
         padded_shape: tuple[int, int] | None = None,
+        pad_scale: float = 1.0,
         precompute_mode: Literal[
             "none", "rfft", "fft", "all", "compile_time_eval"
         ] = "none",
@@ -660,6 +672,12 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
         - `padded_shape`:
             The shape of the image after padding. By default, equal
             to `shape`.
+        - `pad_scale`:
+            A scale factor used to determine the `padded_shape`.
+            Used only if `padded_shape` is not directly provided.
+            Unless `pad_scale = 1.0`, it is only an approximation
+            of the resulting `padded_shape`. By default, a good
+            array size for FFT efficiency is chosen.
         - `precompute_mode`:
             How to pre-compute coordinate and frequency grids stored in
             the `image_config`. Options are
@@ -695,7 +713,7 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
             )
             padded_shape = pad_options["shape"]
         self.shape = shape
-        self.padded_shape = shape if padded_shape is None else padded_shape
+        self.padded_shape = _set_padded_shape(type(self), shape, padded_shape, pad_scale)
         # Finally, grid precompute
         if precompute_mode == "rfft":
             self.precomputed_grids = PrecomputedGrids(
@@ -739,3 +757,22 @@ def _safe_multiply_by_constant(
         grid = grid.at[:, s2 // 2, 0].multiply(constant)
         grid = grid.at[s1 // 2, :, 1].multiply(constant)
     return grid
+
+
+def _set_padded_shape(
+    cls, shape: tuple[int, int], padded_shape: tuple[int, int] | None, pad_scale: float
+):
+    if padded_shape is not None:
+        return padded_shape
+    elif pad_scale == 1.0:
+        return shape
+    elif pad_scale > 1.0:
+        return cast(
+            tuple[int, int],
+            query_efficient_grid_size(shape, pad_scale=pad_scale),
+        )
+    else:
+        raise ValueError(
+            f"Invalid value for `{cls.__name__}(..., pad_scale=...)`. "
+            f"This must be greater than `1.0`, but got value `{pad_scale}`."
+        )

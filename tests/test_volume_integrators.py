@@ -174,15 +174,27 @@ def test_fft_atom_projection_antialias(pdb_info, width, pixel_size, shape):
 
 
 @pytest.mark.parametrize(
-    "pixel_size, shape, upsampfac",
+    "pixel_size, shape, upsampfac, eps",
     (
-        (0.25, (134, 134), 2.62),
-        (0.25, (133, 133), 2),
-        (0.25, (134, 133), 3),
-        (0.25, (133, 133), 3),
+        (0.25, (134, 134), 2, 1e-5),
+        (0.25, (133, 133), 2, 1e-5),
+        (0.25, (134, 133), 2, 1e-5),
+        (0.25, (133, 134), 2, 1e-5),
+        (0.25, (134, 134), 3, 1e-5),
+        (0.25, (133, 133), 3, 1e-5),
+        (0.25, (134, 133), 3.0, 1e-5),
+        (0.25, (133, 134), 3.0, 1e-5),
+        (0.25, (134, 134), 2, 1e-6),
+        (0.25, (133, 133), 2, 1e-6),
+        (0.25, (134, 133), 2, 1e-6),
+        (0.25, (133, 134), 2, 1e-6),
+        (0.25, (134, 134), 3, 1e-6),
+        (0.25, (133, 133), 3, 1e-6),
+        (0.25, (134, 133), 3, 1e-6),
+        (0.25, (133, 134), 3, 1e-6),
     ),
 )
-def test_fft_atom_projection_peng(pdb_info, pixel_size, shape, upsampfac):
+def test_fft_projection_peng(pdb_info, pixel_size, shape, upsampfac, eps):
     for backend in ["jax-finufft", "nufftax"]:
         if jnufft is None and backend == "jax-finufft":
             continue
@@ -219,7 +231,6 @@ def test_fft_atom_projection_peng(pdb_info, pixel_size, shape, upsampfac):
             gaussian_volume, gaussian_integrator, image_config
         )
         proj_by_atoms = compute_projection(atom_volume, atom_integrator, image_config)
-        # _plot_image_compare(proj_by_gaussians, proj_by_atoms)
         np.testing.assert_allclose(proj_by_gaussians, proj_by_atoms, atol=5e-3)
 
 
@@ -228,9 +239,11 @@ def test_fft_atom_projection_peng(pdb_info, pixel_size, shape, upsampfac):
     (
         (0.5, (64, 64)),
         (0.5, (63, 63)),
+        (0.5, (64, 63)),
+        (0.5, (63, 64)),
     ),
 )
-def test_real_atom_projection_peng(pdb_info, pixel_size, shape):
+def test_real_projection_peng_erf(pdb_info, pixel_size, shape):
     atom_positions, atom_ids, _ = pdb_info
     positions_by_id, unique_atom_ids = split_atoms_by_element(atom_ids, atom_positions)
     peng_parameters, peng_parameters_by_id = (
@@ -240,35 +253,28 @@ def test_real_atom_projection_peng(pdb_info, pixel_size, shape):
     gaussian_volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(
         atom_positions,
         peng_parameters,
-        extra_b_factors=10.0,
     )
     atom_volume = cxs.IndependentAtomVolume.from_tabulated_parameters(
         positions_by_id,
         peng_parameters_by_id,
-        b_factor_by_element=10.0,
         use_real_space=True,
     )
     image_config = cxs.BasicImageConfig(shape, pixel_size, voltage_in_kilovolts=300.0)
     # Check to make sure the implementations are identical, up to the
     # nufft (don't include anti-aliasing)
     gaussian_integrator = cxs.GaussianMixtureProjection(sampling_mode="average")
-    atom_integrator = cxs.IndependentAtomProjection(sampling_mode="average", eps=1e-10)
+    atom_integrator = cxs.IndependentAtomProjection(sampling_mode="average", eps=1e-16)
     proj_by_gaussians = compute_projection(
         gaussian_volume, gaussian_integrator, image_config
     )
     proj_by_atoms = compute_projection(atom_volume, atom_integrator, image_config)
     # _plot_image_compare(proj_by_gaussians, proj_by_atoms)
-    np.testing.assert_allclose(proj_by_gaussians, proj_by_atoms, atol=5e-3)
+    np.testing.assert_allclose(proj_by_gaussians, proj_by_atoms, atol=1e-6)
 
 
 @pytest.mark.parametrize(
     "pixel_size, shape",
-    (
-        (1.0, (32, 32)),
-        (1.0, (31, 31)),
-        (1.0, (31, 32)),
-        (1.0, (32, 31)),
-    ),
+    ((1.0, (32, 32)), (1.0, (33, 33)), (1.0, (38, 38)), (1.0, (37, 37))),
 )
 def test_analytic_vs_voxels_nopose(pdb_info, pixel_size, shape):
     """
@@ -277,15 +283,9 @@ def test_analytic_vs_voxels_nopose(pdb_info, pixel_size, shape):
     """
     # Unpack PDB info
     atom_positions, atom_types, atom_properties = pdb_info
-    # Objects for imaging
-    image_config = cxs.BasicImageConfig(
-        shape,
-        pixel_size,
-        voltage_in_kilovolts=300.0,
-    )
     # Real vs fourier volumes
     dim = max(*shape)  # Make sure to use `padded_shape` here
-
+    image_config = cxs.BasicImageConfig(shape, pixel_size, voltage_in_kilovolts=300.0)
     peng_parameters = PengScatteringFactorParameters(atom_types)
     base_volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(
         atom_positions,
@@ -320,6 +320,9 @@ def test_analytic_vs_voxels_nopose(pdb_info, pixel_size, shape):
         projection_by_other_method = compute_projection(
             volume, projection_method, image_config
         )
+        # _plot_image_compare(
+        #     projection_by_gaussian_integration, projection_by_other_method
+        # )
         # fig, axes = plt.subplots(figsize=(12, 4), ncols=3)
         # axes[0].imshow(projection_by_gaussian_integration)
         # axes[1].imshow(projection_by_other_method)
