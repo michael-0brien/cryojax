@@ -334,6 +334,40 @@ def test_analytic_vs_voxels_nopose(pdb_info, pixel_size, shape):
 
 
 # @pytest.mark.parametrize(
+#     "euler_pose_params, pixel_size, dim",
+#     (
+#         ((0.0, 0.0, 0.0), 0.25, 128),
+#         ((10.0, 80.0, -20.0), 0.25, 128),
+#     ),
+# )
+# def test_fourier_slice(pdb_info, euler_pose_params, pixel_size, dim):
+#     atom_positions, atom_types, atom_properties = pdb_info
+#     image_config = cxs.BasicImageConfig(
+#         (dim, dim), pixel_size, voltage_in_kilovolts=300.0
+#     )
+#     peng_parameters = PengScatteringFactorParameters(atom_types)
+#     gaussian_volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(
+#         atom_positions,
+#         peng_parameters,
+#         extra_b_factors=atom_properties["b_factors"],
+#     )
+#     render_fn = cxs.GaussianMixtureRenderFn((dim, dim, dim), pixel_size)
+#     real_voxel_grid = render_fn(gaussian_volume)
+#     fourier_volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
+#     euler_pose = cxs.EulerAnglePose(
+#         phi_angle=euler_pose_params[0],
+#         theta_angle=euler_pose_params[1],
+#         psi_angle=euler_pose_params[2],
+#     )
+#     projection = compute_projection_at_pose(
+#         fourier_volume,
+#         cxs.FourierSliceExtraction(),
+#         euler_pose,
+#         image_config,
+#     )
+
+
+# @pytest.mark.parametrize(
 #     "pixel_size, shape, euler_pose_params",
 #     (
 #         (1.0, (32, 32), (2.5, -5.0, 0.0, 0.0, 0.0)),

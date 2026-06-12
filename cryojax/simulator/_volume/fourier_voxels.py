@@ -34,6 +34,7 @@ from .base_volume import (
     EwaldSphereArray,
     ProjectionArray,
 )
+from .common import make_fftshift_phase
 
 
 class AbstractFourierVoxelVolume(AbstractVoxelVolume, strict=True):
@@ -73,6 +74,7 @@ class FourierVoxelGridVolume(AbstractFourierVoxelVolume, strict=True):
         - `frequency_slice_in_pixels`:
             The frequency slice coordinate system.
         """
+        # Multiply by phase correction for interpolation logic
         self.fourier_voxel_grid = jnp.asarray(fourier_voxel_grid, dtype=complex)
         self.frequency_slice_in_pixels = jnp.asarray(
             frequency_slice_in_pixels, dtype=float
@@ -139,13 +141,14 @@ class FourierVoxelGridVolume(AbstractFourierVoxelVolume, strict=True):
         # Load grid and coordinates. For now, do not store the
         # fourier grid only on the half space. Fourier slice extraction
         # does not currently work if rfftn is used.
-        fourier_voxel_grid_with_zero_in_corner = fftn(padded_real_voxel_grid)
-        # ... store the grid with the zero frequency component in the center
-        fourier_voxel_grid = jnp.fft.fftshift(fourier_voxel_grid_with_zero_in_corner)
+        fourier_voxel_grid = jnp.fft.fftshift(
+            make_fftshift_phase(padded_shape) * fftn(padded_real_voxel_grid)
+        )
         # ... create in-plane frequency slice on the half space
         frequency_slice = make_frequency_slice(
             cast(tuple[int, int], padded_real_voxel_grid.shape[:-1]),
             outputs_rfftfreqs=False,
+            fftshifted=True,
         )
 
         return cls(fourier_voxel_grid, frequency_slice)
@@ -222,15 +225,16 @@ class FourierVoxelSplineVolume(AbstractFourierVoxelVolume, strict=True):
         # Load grid and coordinates. For now, do not store the
         # fourier grid only on the half space. Fourier slice extraction
         # does not currently work if rfftn is used.
-        fourier_voxel_grid_with_zero_in_corner = fftn(padded_real_voxel_grid)
-        # ... store the grid with the zero frequency component in the center
-        fourier_voxel_grid = jnp.fft.fftshift(fourier_voxel_grid_with_zero_in_corner)
+        fourier_voxel_grid = jnp.fft.fftshift(
+            make_fftshift_phase(padded_shape) * fftn(padded_real_voxel_grid)
+        )
         # ... compute spline coefficients
         spline_coefficients = compute_spline_coefficients(fourier_voxel_grid)
         # ... create in-plane frequency slice on the half space
         frequency_slice = make_frequency_slice(
             cast(tuple[int, int], padded_real_voxel_grid.shape[:-1]),
             outputs_rfftfreqs=False,
+            fftshifted=True,
         )
 
         return cls(spline_coefficients, frequency_slice)
@@ -585,7 +589,7 @@ def _extract_surface_from_voxel_grid(
         surface = map_coordinates(
             fourier_voxel_grid, (k_z, k_y, k_x), interpolation_order, **kwargs
         )[0, :, :]
-    # Shift zero frequency component to corner
-    surface = jnp.fft.ifftshift(surface)
+    # FFT shift and multiply by (-1)^k phase factors
+    surface = jnp.fft.ifftshift(make_fftshift_phase(surface.shape) * surface)
 
     return surface
