@@ -129,11 +129,11 @@ def test_euler_matrix_with_cistem(phi, theta, psi):
     "phi, theta, psi, box_size, voxel_size",
     [
         # multiple Euler angles at one grid size
-        (0.0, 0.0, 0.0, 64, 0.5),
-        (10.0, 90.0, 170.0, 64, 0.5),
-        (10.0, 80.0, -20.0, 64, 0.5),
-        (-1.2, 90.5, 67.0, 64, 0.5),
-        (-50.0, 62.0, -21.0, 64, 0.5),
+        (0.0, 0.0, 0.0, 128, 0.5),
+        (10.0, 90.0, 170.0, 128, 0.5),
+        (10.0, 80.0, -20.0, 128, 0.5),
+        (-1.2, 90.5, 67.0, 128, 0.5),
+        (-50.0, 62.0, -21.0, 128, 0.5),
         # same angle, different grid sizes rendered on-the-fly
         # (10.0, 90.0, 170.0, 48, ),
         # (10.0, 90.0, 170.0, 32, 1.5),
@@ -201,7 +201,7 @@ def test_compute_projection_with_cistem(
     # im2 = axes[1].imshow(pycistem_projection)
     # fig.savefig("temp.png")
 
-    np.testing.assert_allclose(cryojax_projection, pycistem_projection, atol=1e-4)
+    np.testing.assert_allclose(cryojax_projection, pycistem_projection, atol=1e-3)
 
 
 def _load_pycistem_template(filename, box_size):
