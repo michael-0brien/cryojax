@@ -1,11 +1,10 @@
-import warnings
-
 import cryojax.simulator as cxs
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from cryojax.constants import wavelength_from_kilovolts
-from cryojax.io import read_array_from_mrc
+from cryojax.constants import PengScatteringFactorParameters, wavelength_from_kilovolts
+from cryojax.io import read_atoms_from_pdb, write_volume_to_mrc
 from cryojax.ndimage import (
     cartesian_to_polar,
     compute_binned_powerspectrum,
@@ -20,12 +19,17 @@ try:
 except ModuleNotFoundError:
     cistemCTF, AnglesAndShifts, Image = None, None, None
 
-PYCISTEM_WARNING_MESAGE = (
-    "Testing against cisTEM is not running because `pycistem` was not "
-    "found. Note that `pycistem` cannot be installed on non-linux OS."
+_PYCISTEM_SKIP_REASON = (
+    "pycistem not installed (Linux-only wheels; "
+    "install the version pinned in pyproject.toml to run these tests)"
+)
+
+_skip_without_pycistem = pytest.mark.skipif(
+    AnglesAndShifts is None, reason=_PYCISTEM_SKIP_REASON
 )
 
 
+@_skip_without_pycistem
 @pytest.mark.parametrize(
     "defocus1,defocus2,asti_angle,kV,cs,ac,pixel_size",
     [
@@ -44,50 +48,50 @@ def test_ctf_with_cistem(defocus1, defocus2, asti_angle, kV, cs, ac, pixel_size)
     """Test CTF model against cisTEM.
 
     Modified from https://github.com/jojoelfe/contrasttransferfunction"""
-    if cistemCTF is not None:
-        shape = (512, 512)
-        freqs = make_frequency_grid(shape, pixel_size)
-        k_sqr, theta = cartesian_to_polar(freqs, square=True)
-        # Compute cryojax CTF
-        optics = AstigmaticCTF(
-            defocus_in_angstroms=(defocus1 + defocus2) / 2,
-            astigmatism_in_angstroms=defocus1 - defocus2,
-            astigmatism_angle=asti_angle,
-            spherical_aberration_in_mm=cs,
+    shape = (512, 512)
+    freqs = make_frequency_grid(shape, pixel_size)
+    k_sqr, theta = cartesian_to_polar(freqs, square=True)
+    # Compute cryojax CTF
+    optics = AstigmaticCTF(
+        defocus_in_angstroms=(defocus1 + defocus2) / 2,
+        astigmatism_in_angstroms=defocus1 - defocus2,
+        astigmatism_angle=asti_angle,
+        spherical_aberration_in_mm=cs,
+    )
+    ctf = jnp.array(
+        optics(
+            freqs,
+            wavelength_in_angstroms=wavelength_from_kilovolts(kV),
+            amplitude_contrast_ratio=ac,
         )
-        ctf = jnp.array(
-            optics(
-                freqs,
-                wavelength_in_angstroms=wavelength_from_kilovolts(kV),
-                amplitude_contrast_ratio=ac,
-            )
-        )
-        # Compute cisTEM CTF
-        cisTEM_optics = cistemCTF(
-            kV=kV,
-            cs=cs,
-            ac=ac,
-            defocus1=defocus1,
-            defocus2=defocus2,
-            astig_angle=asti_angle,
-            pixel_size=pixel_size,
-        )
-        cisTEM_ctf = np.vectorize(
-            lambda k_sqr, theta: cisTEM_optics.Evaluate(k_sqr, theta)
-        )(k_sqr.ravel() * pixel_size**2, theta.ravel()).reshape(freqs.shape[0:2])
-        # cisTEM_ctf[0, 0] = 0.0
+    )
+    # Compute cisTEM CTF
+    assert cistemCTF is not None
+    cisTEM_optics = cistemCTF(
+        kV=kV,
+        cs=cs,
+        ac=ac,
+        defocus1=defocus1,
+        defocus2=defocus2,
+        astig_angle=asti_angle,
+        pixel_size=pixel_size,
+    )
+    cisTEM_ctf = np.vectorize(lambda k_sqr, theta: cisTEM_optics.Evaluate(k_sqr, theta))(
+        k_sqr.ravel() * pixel_size**2, theta.ravel()
+    ).reshape(freqs.shape[0:2])
+    # cisTEM_ctf[0, 0] = 0.0
 
-        # Compute cryojax and cisTEM power spectrum
-        radial_freqs = jnp.linalg.norm(freqs, axis=-1)
-        spectrum1D, _ = compute_binned_powerspectrum(
-            ctf, radial_freqs, pixel_size, maximum_frequency=1 / (2 * pixel_size)
-        )
-        cisTEM_spectrum1D, _ = compute_binned_powerspectrum(
-            cisTEM_ctf, radial_freqs, pixel_size, maximum_frequency=1 / (2 * pixel_size)
-        )
+    # Compute cryojax and cisTEM power spectrum
+    radial_freqs = jnp.linalg.norm(freqs, axis=-1)
+    spectrum1D, _ = compute_binned_powerspectrum(
+        ctf, radial_freqs, pixel_size, maximum_frequency=1 / (2 * pixel_size)
+    )
+    cisTEM_spectrum1D, _ = compute_binned_powerspectrum(
+        cisTEM_ctf, radial_freqs, pixel_size, maximum_frequency=1 / (2 * pixel_size)
+    )
 
-        np.testing.assert_allclose(ctf, cisTEM_ctf, atol=5e-2)
-        np.testing.assert_allclose(spectrum1D, cisTEM_spectrum1D, atol=5e-3)
+    np.testing.assert_allclose(ctf, cisTEM_ctf, atol=5e-2)
+    np.testing.assert_allclose(spectrum1D, cisTEM_spectrum1D, atol=5e-3)
 
 
 @pytest.mark.parametrize(
@@ -121,48 +125,77 @@ def test_euler_matrix_with_cistem(phi, theta, psi):
     np.testing.assert_allclose(pose.rotation.as_matrix(), matrix, atol=1e-12)
 
 
+@_skip_without_pycistem
 @pytest.mark.parametrize(
-    "phi, theta, psi",
-    [(10.0, 90.0, 170.0)],
+    "phi, theta, psi, box_size, voxel_size",
+    [
+        # multiple Euler angles at one grid size
+        (10.0, 90.0, 170.0, 64, 1.0),
+        (10.0, 80.0, -20.0, 64, 1.0),
+        (-1.2, 90.5, 67.0, 64, 1.0),
+        (-50.0, 62.0, -21.0, 64, 1.0),
+        (0.0, 0.0, 0.0, 64, 1.0),
+        (180.0, 90.0, 0.0, 64, 1.0),
+        # same angle, different grid sizes rendered on-the-fly
+        (10.0, 90.0, 170.0, 48, 1.0),
+        (10.0, 90.0, 170.0, 32, 1.5),
+    ],
 )
 def test_compute_projection_with_cistem(
     phi,
     theta,
     psi,
-    sample_mrc_path,
+    box_size,
+    voxel_size,
+    tmp_path,
+    sample_pdb_path,
 ):
-    if AnglesAndShifts is not None:
-        # cryojax
-        real_voxel_grid, voxel_size = read_array_from_mrc(
-            sample_mrc_path, loads_grid_spacing=True
-        )
-        volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
-        pose = cxs.EulerAnglePose(phi_angle=-phi, theta_angle=-theta, psi_angle=-psi)
-        projection_method = cxs.FourierSliceExtraction()
-        box_size = volume.shape[0]
-        image_config = cxs.BasicImageConfig((box_size, box_size), voxel_size, 300.0)
-        cryojax_projection = irfftn(
+    # Render volume on-the-fly from atom positions at the requested grid shape
+    atom_positions, atomic_numbers = read_atoms_from_pdb(sample_pdb_path, center=True)
+    gaussian_volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(
+        atom_positions, parameters=PengScatteringFactorParameters(atomic_numbers)
+    )
+    render_fn = cxs.GaussianMixtureRenderFn((box_size, box_size, box_size), voxel_size)
+    real_voxel_grid = jax.jit(render_fn)(gaussian_volume)
+
+    # cryojax projection
+    volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
+    pose = cxs.EulerAnglePose(phi_angle=-phi, theta_angle=-theta, psi_angle=-psi)
+    projection_method = cxs.FourierSliceExtraction()
+    image_config = cxs.BasicImageConfig((box_size, box_size), voxel_size, 300.0)
+
+    def project_impl(volume, pose, image_config):
+        return irfftn(
             (
                 projection_method.integrate(
                     volume.rotate_to_pose(pose), image_config, outputs_real_space=False
                 )
-                / voxel_size
+                / image_config.pixel_size
             )
             .at[0, 0]
             .set(0.0 + 0.0j)
             / np.sqrt(np.prod(image_config.shape)),
             s=image_config.padded_shape,
         )
-        # pycistem
-        pycistem_volume = _load_pycistem_template(sample_mrc_path, box_size)
-        pycistem_angles = AnglesAndShifts()
-        pycistem_angles.Init(phi, theta, psi, 0.0, 0.0)
-        pycistem_model = _compute_projection(pycistem_volume, pycistem_angles, box_size)
-        pycistem_projection = np.asarray(pycistem_model.real_values)
 
-        np.testing.assert_allclose(cryojax_projection, pycistem_projection, atol=1e-5)
-    else:
-        warnings.warn(PYCISTEM_WARNING_MESAGE)
+    cryojax_projection = project_impl(volume, pose, image_config)
+
+    # pycistem projection — write rendered grid to a temp MRC for loading
+    mrc_path = str(tmp_path / "volume.mrc")
+    write_volume_to_mrc(
+        np.array(real_voxel_grid, dtype=np.float32),
+        voxel_size,
+        mrc_path,
+        overwrite=True,
+    )
+    pycistem_volume = _load_pycistem_template(mrc_path, box_size)
+    assert AnglesAndShifts is not None
+    pycistem_angles = AnglesAndShifts()
+    pycistem_angles.Init(phi, theta, psi, 0.0, 0.0)
+    pycistem_model = _compute_projection(pycistem_volume, pycistem_angles, box_size)
+    pycistem_projection = np.asarray(pycistem_model.real_values)
+
+    np.testing.assert_allclose(cryojax_projection, pycistem_projection, atol=1e-4)
 
 
 def _load_pycistem_template(filename, box_size):
