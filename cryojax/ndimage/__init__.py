@@ -35,6 +35,7 @@ from ._fourier_statistics import (
 from ._fourier_utils import (
     convert_fftn_to_rfftn as convert_fftn_to_rfftn,
     enforce_rfftn_self_conjugates as enforce_rfftn_self_conjugates,
+    make_fftshift_phase as make_fftshift_phase,
     query_efficient_grid_size as query_efficient_grid_size,
 )
 from ._map_coordinates import (

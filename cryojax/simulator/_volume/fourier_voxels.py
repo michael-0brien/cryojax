@@ -18,6 +18,7 @@ from ...ndimage import (
     ifftn,
     irfftn,
     make_coordinate_grid,
+    make_fftshift_phase,
     make_frequency_slice,
     map_coordinates,
     map_coordinates_spline,
@@ -34,7 +35,6 @@ from .base_volume import (
     EwaldSphereArray,
     ProjectionArray,
 )
-from .common import make_fftshift_phase
 
 
 class AbstractFourierVoxelVolume(AbstractVoxelVolume, strict=True):
