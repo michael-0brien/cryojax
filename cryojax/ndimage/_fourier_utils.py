@@ -165,7 +165,7 @@ def enforce_rfftn_self_conjugates(
 
 
 def query_efficient_grid_size(
-    shape: tuple[int, ...], pad_scale: float = 1.0, even_parity: bool = False
+    shape: tuple[int, ...], pad_scale: float = 1.0, only_even: bool = False
 ) -> tuple[int, ...]:
     """Select an efficient grid size for FFT"""
 
@@ -179,7 +179,7 @@ def query_efficient_grid_size(
             return x == 1
 
         candidate = nf
-        while not (is_smooth(candidate) and (not even_parity or candidate % 2 == 0)):
+        while not (is_smooth(candidate) and (not only_even or candidate % 2 == 0)):
             candidate += 1
         return candidate
 

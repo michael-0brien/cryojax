@@ -315,8 +315,8 @@ def test_query_efficient_grid_size_with_pad_scale(shape, pad_scale):
 @pytest.mark.parametrize(
     "shape", [(10, 10), (11, 11), (10, 11), (10, 10, 10), (11, 13, 15), (242, 242)]
 )
-def test_query_efficient_grid_size_even_parity(shape):
-    result = im.query_efficient_grid_size(shape, pad_scale=1.0, even_parity=True)
+def test_query_efficient_grid_size_only_even(shape):
+    result = im.query_efficient_grid_size(shape, pad_scale=1.0, only_even=True)
     for r in result:
         assert r % 2 == 0, f"expected even result, got {r}"
 
@@ -325,7 +325,7 @@ def test_query_efficient_grid_size_no_parity_constraint():
     import math
 
     shape, pad_scale = (11, 13), 1.5
-    result = im.query_efficient_grid_size(shape, pad_scale=pad_scale, even_parity=False)
+    result = im.query_efficient_grid_size(shape, pad_scale=pad_scale, only_even=False)
     for s, r in zip(shape, result):
         assert _is_smooth(r)
         assert r >= math.ceil(pad_scale * s)
