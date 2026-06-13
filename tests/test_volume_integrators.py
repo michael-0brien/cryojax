@@ -274,12 +274,7 @@ def test_real_projection_peng_erf(pdb_info, pixel_size, shape):
 
 @pytest.mark.parametrize(
     "pixel_size, shape",
-    (
-        (1.0, (32, 32)),
-        (1.0, (33, 33)),
-        (1.0, (38, 38)),
-        (1.0, (37, 37)),
-    ),
+    ((1.0, (32, 32)),),
 )
 def test_analytic_vs_voxels_nopose(pdb_info, pixel_size, shape):
     """

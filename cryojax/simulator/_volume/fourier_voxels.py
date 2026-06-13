@@ -42,6 +42,14 @@ class AbstractFourierVoxelVolume(AbstractVoxelVolume, strict=True):
 
     frequency_slice_in_pixels: eqx.AbstractVar[Float[Array, "1 dim dim 3"]]
 
+    def __check_init__(self):
+        if any(s % 2 == 1 for s in self.shape):
+            raise ValueError(
+                f"`{type(self).__name__}` does not support odd voxel map dimensions, "
+                f"but got a voxel map with shape `{self.shape}`. Please pass "
+                "a voxel map with even dimensions."
+            )
+
     @override
     def rotate_to_pose(self, pose: AbstractPose) -> Self:
         """Return a new volume with a rotated `frequency_slice_in_pixels`."""
@@ -143,7 +151,7 @@ class FourierVoxelGridVolume(AbstractFourierVoxelVolume, strict=True):
         # fourier grid only on the half space. Fourier slice extraction
         # does not currently work if rfftn is used.
         fourier_voxel_grid = jnp.fft.fftshift(
-            fftn(jnp.fft.ifftshift(padded_real_voxel_grid))
+            make_fftshift_phase(padded_shape) * fftn(padded_real_voxel_grid)
         )
         # ... create in-plane frequency slice on the half space
         frequency_slice = make_frequency_slice(
@@ -227,7 +235,7 @@ class FourierVoxelSplineVolume(AbstractFourierVoxelVolume, strict=True):
         # fourier grid only on the half space. Fourier slice extraction
         # does not currently work if rfftn is used.
         fourier_voxel_grid = jnp.fft.fftshift(
-            fftn(jnp.fft.ifftshift(padded_real_voxel_grid))
+            make_fftshift_phase(padded_shape) * fftn(padded_real_voxel_grid)
         )
         # ... compute spline coefficients
         spline_coefficients = compute_spline_coefficients(fourier_voxel_grid)
@@ -591,9 +599,6 @@ def _extract_surface_from_voxel_grid(
             fourier_voxel_grid, (k_z, k_y, k_x), interpolation_order, **kwargs
         )[0, :, :]
     # FFT shift and multiply by (-1)^k phase factors
-    if N % 2 == 0:
-        surface = jnp.fft.ifftshift(make_fftshift_phase(surface.shape) * surface)
-    else:
-        surface = fftn(jnp.fft.fftshift(ifftn(jnp.fft.ifftshift(surface))))
+    surface = jnp.fft.ifftshift(make_fftshift_phase(surface.shape) * surface)
 
     return surface
