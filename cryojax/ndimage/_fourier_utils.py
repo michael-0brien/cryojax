@@ -165,32 +165,25 @@ def enforce_rfftn_self_conjugates(
 
 
 def query_efficient_grid_size(
-    shape: tuple[int, ...], pad_scale: float = 1.0, match_parity: bool = False
+    shape: tuple[int, ...], pad_scale: float = 1.0, even_parity: bool = False
 ) -> tuple[int, ...]:
     """Select an efficient grid size for FFT"""
 
-    if match_parity:
-        is_same_parity = lambda n1, n2: (n1 % 2) == (n2 % 2)
-    else:
-        is_same_parity = lambda *_: True
-
     padded_shape = tuple(int(math.ceil(pad_scale * s)) for s in shape)
 
-    def next_smooth_int(n: int, nf: int) -> int:
-        # Check if n is already smooth
+    def next_smooth_int(nf: int) -> int:
         def is_smooth(x):
             for p in [2, 3, 5]:
                 while x % p == 0:
                     x //= p
             return x == 1
 
-        # Find next smooth number
         candidate = nf
-        while not (is_smooth(candidate) and is_same_parity(n, candidate)):
+        while not (is_smooth(candidate) and (not even_parity or candidate % 2 == 0)):
             candidate += 1
         return candidate
 
-    return tuple(next_smooth_int(n, nf) for n, nf in zip(shape, padded_shape))
+    return tuple(next_smooth_int(nf) for nf in padded_shape)
 
 
 def make_fftshift_phase(

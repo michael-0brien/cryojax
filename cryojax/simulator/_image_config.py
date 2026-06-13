@@ -775,7 +775,7 @@ def _set_padded_shape(
     elif pad_scale > 1.0:
         return cast(
             tuple[int, int],
-            query_efficient_grid_size(shape, pad_scale=pad_scale, match_parity=True),
+            query_efficient_grid_size(shape, pad_scale=pad_scale, even_parity=True),
         )
     else:
         raise ValueError(
