@@ -846,27 +846,68 @@ def _make_gmm_voxel_scene(pdb_info):
             1e-2,
         ),
         (
-            cxs.FourierVoxelSplineVolume,
-            cxs.FourierSliceExtraction(),
-            1e-5,
-        ),
-        (
             cxs.RealVoxelCloudVolume,
             cxs.RealVoxelProjection(eps=1e-16, backend="nufftax"),
             1e-10,
         ),
     ],
-    ids=["fourier_grid", "fourier_spline", "real_cloud_nufftax"],
+    ids=["fourier_grid", "real_cloud_nufftax"],
 )
-def test_gaussian_vs_voxels_nopose(pdb_info, volume_cls, integrator, tol):
-    """Voxel-based projection must agree with analytic GMM projection at identity pose."""
+@pytest.mark.parametrize(
+    "pose",
+    [
+        cxs.EulerAnglePose(phi_angle=0.0, theta_angle=0.0, psi_angle=0.0),
+        cxs.EulerAnglePose(phi_angle=0.0, theta_angle=90.0, psi_angle=0.0),
+        cxs.EulerAnglePose(phi_angle=0.0, theta_angle=90.0, psi_angle=90.0),
+    ],
+    ids=["theta0_psi0", "theta90_psi0", "theta90_psi90"],
+)
+def test_pose_convention_exact_angles(pdb_info, pose, volume_cls, integrator, tol):
+    """Voxel-based projection must agree with analytic GMM projection at poses
+    where Fourier-slice interpolation is exact (theta=90, phi=0).
+
+    At theta=90 the extracted frequency slice lies exactly on a Cartesian grid
+    plane, so no interpolation error is introduced.  Using an asymmetric PDB
+    molecule, a wrong pose convention would shift the tilted projection
+    significantly, making this a sensitive cross-method convention check at
+    the same tolerances as the identity-pose test.
+    """
     gmm_volume, real_voxel_grid, image_config = _make_gmm_voxel_scene(pdb_info)
     gmm_integrator = cxs.GaussianMixtureProjection(sampling_mode="average")
     volume = volume_cls.from_real_voxel_grid(real_voxel_grid)
-    proj_ref = _compute_projection(gmm_volume, gmm_integrator, image_config)
-    proj = _compute_projection(volume, integrator, image_config)
+    proj_ref = _compute_projection(
+        gmm_volume.rotate_to_pose(pose), gmm_integrator, image_config
+    )
+    proj = _compute_projection(volume.rotate_to_pose(pose), integrator, image_config)
 
     np.testing.assert_allclose(proj_ref, proj, atol=tol)
+
+
+@pytest.mark.parametrize(
+    "pose",
+    [
+        cxs.EulerAnglePose(phi_angle=0.0, theta_angle=90.0, psi_angle=0.0),
+        cxs.EulerAnglePose(phi_angle=0.0, theta_angle=90.0, psi_angle=90.0),
+    ],
+    ids=["theta90_psi0", "theta90_psi90"],
+)
+def test_spline_agrees_with_grid_at_exact_angles(
+    fourier_grid_volume, fourier_spline_volume, image_config, pose
+):
+    """Spline projection must agree with grid (bilinear) Fourier-slice extraction
+    at poses where the frequency slice lies exactly on Cartesian grid planes.
+
+    Uses the simple single-Gaussian fixtures to keep runtime low.
+    """
+    proj_grid = np.array(
+        _compute_projection(fourier_grid_volume.rotate_to_pose(pose), _FSE, image_config)
+    )
+    proj_spline = np.array(
+        _compute_projection(
+            fourier_spline_volume.rotate_to_pose(pose), _FSE, image_config
+        )
+    )
+    np.testing.assert_allclose(proj_spline, proj_grid, atol=1e-4)
 
 
 @pytest.mark.skipif(jnufft is None, reason="jax-finufft not installed")
