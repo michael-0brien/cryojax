@@ -582,12 +582,12 @@ def make_spline(real_voxel_grid):
     )
 
 
-def _plot_image_compare(im1, im2):
-    from matplotlib import pyplot as plt
+# def _plot_image_compare(im1, im2):
+#     from matplotlib import pyplot as plt
 
-    fig, axes = plt.subplots(figsize=(9, 4), ncols=2, constrained_layout=True)
-    mappable1 = axes[0].imshow(im1)
-    mappable2 = axes[1].imshow(im2)
-    fig.colorbar(mappable1)
-    fig.colorbar(mappable2)
-    plt.show()
+#     fig, axes = plt.subplots(figsize=(9, 4), ncols=2, constrained_layout=True)
+#     mappable1 = axes[0].imshow(im1)
+#     mappable2 = axes[1].imshow(im2)
+#     fig.colorbar(mappable1)
+#     fig.colorbar(mappable2)
+#     plt.show()

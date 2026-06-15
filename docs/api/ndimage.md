@@ -179,13 +179,6 @@ This documentation is a collection of functions used to work with coordinate sys
                 - get
                 - __call__
 
-::: cryojax.ndimage.SincCorrectionMask
-        options:
-            members:
-                - __init__
-                - get
-                - __call__
-
 
 **Other real-space operations**
 
