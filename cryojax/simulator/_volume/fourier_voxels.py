@@ -298,7 +298,6 @@ class FourierSliceExtraction(
 
     outputs_integral: bool
     out_of_bounds_mode: str
-    fill_value: complex
 
     outputs_ewald_sphere: ClassVar[bool] = False
 
