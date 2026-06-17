@@ -3,7 +3,7 @@ Real voxel-based representations of a volume.
 """
 
 import math
-from typing import Any, ClassVar, Self, cast
+from typing import ClassVar, Self, cast
 from typing_extensions import override
 
 import equinox as eqx
@@ -18,11 +18,12 @@ from .base_volume import AbstractVolumeIntegrator, AbstractVoxelVolume, Projecti
 
 
 try:
-    import jax_finufft as jnufft
+    from jax_finufft import nufft1
+    from jax_finufft.options import NestedOpts, Opts
 
     JAX_FINUFFT_IMPORT_ERROR = None
 except ModuleNotFoundError as err:
-    jnufft = None
+    nufft1, Opts, NestedOpts = None, None, None
     JAX_FINUFFT_IMPORT_ERROR = err
 
 
@@ -212,23 +213,17 @@ class RealVoxelProjection(
     """Integrate points onto the exit plane using non-uniform FFTs."""
 
     eps: float
-    opts: Any
 
     outputs_ewald_sphere: ClassVar[bool] = False
 
-    def __init__(self, *, eps: float = 1e-6, opts: Any = None):
+    def __init__(self, *, eps: float = 1e-6):
         """**Arguments:**
 
         - `eps`:
-            See [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft)
-            for documentation.
-        - `opts`:
-            A `jax_finufft.options.Opts` or `jax_finufft.options.NestedOpts`
-            dataclass.
-            See [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft)
+            See [`nufftax`](https://github.com/GragasLab/nufftax)
             for documentation.
         """
-        if jnufft is None:
+        if nufft1 is None:
             raise RuntimeError(
                 "Tried to use the `RealVoxelProjection` "
                 "class, but `jax-finufft` is not installed. "
@@ -236,7 +231,6 @@ class RealVoxelProjection(
                 "for installation instructions."
             ) from JAX_FINUFFT_IMPORT_ERROR
         self.eps = eps
-        self.opts = opts
 
     @override
     def integrate(
@@ -274,7 +268,6 @@ class RealVoxelProjection(
             volume_representation.coordinate_list_in_pixels,
             image_config.padded_shape,
             eps=self.eps,
-            opts=self.opts,
         )
         # Scale by voxel size for units
         fourier_projection *= image_config.pixel_size
@@ -285,8 +278,8 @@ class RealVoxelProjection(
         )
 
 
-def _project_with_nufft(weights, coordinate_list, shape, eps=1e-6, opts=None):
-    assert jnufft is not None
+def _project_with_nufft(weights, coordinate_list, shape, eps=1e-6):
+    assert nufft1 is not None
     weights, coordinate_list = (
         jnp.asarray(weights, dtype=complex),
         jnp.asarray(coordinate_list, dtype=float),
@@ -299,8 +292,19 @@ def _project_with_nufft(weights, coordinate_list, shape, eps=1e-6, opts=None):
     coordinates_periodic = 2 * jnp.pi * coordinates_xy / box_xy
     # Unpack and compute
     x, y = coordinates_periodic[:, 0], coordinates_periodic[:, 1]
-    fourier_projection = jnufft.nufft1(shape, weights, y, x, eps=eps, opts=opts, iflag=-1)
+    fourier_projection = nufft1(
+        shape, weights, y, x, eps=eps, iflag=-1, opts=_make_opts()
+    )
     # Shift zero frequency component to corner
     fourier_projection = jnp.fft.ifftshift(fourier_projection)
     # Convert to rfftn output
     return convert_fftn_to_rfftn(fourier_projection, mode="real")
+
+
+def _make_opts():
+    assert NestedOpts is not None
+    assert Opts is not None
+    return NestedOpts(
+        forward=Opts(upsampfac=1.25, gpu_upsampfac=1.25),
+        backward=Opts(upsampfac=1.25, gpu_upsampfac=1.25),
+    )

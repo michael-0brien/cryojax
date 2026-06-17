@@ -143,7 +143,7 @@ def run(n_iterations, num_images, path_to_pdb):
                 pose,
                 transfer_theory,
                 atom_volume,
-                cxs.FFTAtomProjection(eps=1e-16),
+                cxs.IndependentAtomProjection(eps=1e-16),
             )
             fft_image.block_until_ready()
         end_time = time()
@@ -160,7 +160,7 @@ def run(n_iterations, num_images, path_to_pdb):
             pose,
             transfer_theory,
             atom_volume,
-            cxs.FFTAtomProjection(eps=1e-16),
+            cxs.IndependentAtomProjection(eps=1e-16),
         )
         fft_image.block_until_ready()
         end_time = time()

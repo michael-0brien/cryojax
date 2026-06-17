@@ -1,17 +1,22 @@
-from collections.abc import Sequence
-from typing import Any, ClassVar, Literal, Self, TypeVar
+from collections.abc import Callable, Sequence
+from typing import ClassVar, Literal, Self, TypeVar
 from typing_extensions import override
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, Float, PyTree
+from jaxtyping import Array, Complex, Float, PyTree
 
 from ..._internal import error_if_not_positive
-from ...constants import LobatoScatteringFactorParameters, PengScatteringFactorParameters
+from ...constants import (
+    LobatoScatteringFactorParameters,
+    PengScatteringFactorParameters,
+    b_factor_to_variance,
+)
 from ...jax_util import FloatLike, NDArrayLike
 from ...ndimage import (
     AbstractFourierOperator,
+    AbstractRealOperator,
     FourierSinc,
     block_reduce_downsample,
     convert_fftn_to_rfftn,
@@ -33,22 +38,64 @@ from .base_volume import (
 
 
 try:
-    import jax_finufft as jnufft
-    from jax_finufft.options import NestedOpts, Opts, unpack_opts
+    from jax_finufft import nufft1
+    from jax_finufft.options import NestedOpts, Opts
 
     JAX_FINUFFT_IMPORT_ERROR = None
 except ModuleNotFoundError as err:
-    jnufft, Opts, NestedOpts, unpack_opts = None, None, None, None
+    nufft1, Opts, NestedOpts = None, None, None
     JAX_FINUFFT_IMPORT_ERROR = err
 
 
 T = TypeVar("T")
 
 
+class PengScatteringPotential(AbstractRealOperator, strict=True):
+    a: Float[Array, " n"]
+    b: Float[Array, " n"]
+    b_factor: Float[Array, ""] | None
+
+    spatial_dims: ClassVar[list[int]] = [1, 2, 3]
+
+    def __init__(
+        self,
+        a: Float[NDArrayLike, " n"],
+        b: Float[NDArrayLike, " n"],
+        b_factor: FloatLike | None = None,
+    ):
+        self.a = jnp.asarray(a, dtype=float)
+        self.b = jnp.asarray(b, dtype=float)
+        self.b_factor = None if b_factor is None else jnp.asarray(b_factor, dtype=float)
+
+    def __call__(
+        self,
+        coordinate_grid: (
+            Float[Array, " x_dim"]
+            | Float[Array, "y_dim x_dim 2"]
+            | Float[Array, "z_dim y_dim x_dim 3"]
+        ),
+    ):
+        ndim = 1 if coordinate_grid.ndim == 1 else coordinate_grid.ndim - 1
+        if ndim == 1:
+            r_squared = coordinate_grid**2
+        else:
+            r_squared = jnp.sum(coordinate_grid**2, axis=-1)
+        b_factor = 0.0 if self.b_factor is None else error_if_not_positive(self.b_factor)
+        variances = b_factor_to_variance(
+            (error_if_not_positive(self.b) + b_factor) / (8 * jnp.pi**2)
+        )
+        gaussian_fn = lambda _amp, _var: (
+            (_amp / (2 * jnp.pi * _var) ** (ndim / 2)) * jnp.exp(-r_squared / (2 * _var))
+        )
+        return jnp.sum(jax.vmap(gaussian_fn)(self.a, variances), axis=0)
+
+
 class PengScatteringFactor(AbstractFourierOperator, strict=True):
     a: Float[Array, " n"]
     b: Float[Array, " n"]
     b_factor: Float[Array, ""] | None
+
+    spatial_dims: ClassVar[list[int]] = [2, 3]
 
     def __init__(
         self,
@@ -78,6 +125,8 @@ class LobatoScatteringFactor(AbstractFourierOperator, strict=True):
     a: Float[Array, " n"]
     b: Float[Array, " n"]
     b_factor: Float[Array, ""] | None
+
+    spatial_dims: ClassVar[list[int]] = [2, 3]
 
     def __init__(
         self,
@@ -120,11 +169,11 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
         positions = ... # load atom positions
         b_factor = ...  # ... and a B-factor
         volume = cxs.IndependentAtomVolume(
-            positions=positions, scattering_factors=im.FourierGaussian(b_factor=b_factor)
+            positions=positions, kernel_fns=im.FourierGaussian(b_factor=b_factor)
         )
         ```
 
-    The arguments `positions` and `scattering_factors` may also be
+    The arguments `positions` and `kernel_fns` may also be
     pytrees of arrays and scattering factors, where each tree leaf represents
     a different atom type.
 
@@ -137,7 +186,7 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
         b_factor_1, b_factor_2 = ...
         volume = cxs.IndependentAtomVolume(
             positions=(positions_1, positions_2),
-            scattering_factors=(im.FourierGaussian(b_factor=b_factor_1), im.FourierGaussian(b_factor=b_factor_2))
+            kernel_fns=(im.FourierGaussian(b_factor=b_factor_1), im.FourierGaussian(b_factor=b_factor_2))
         )
         ```
 
@@ -146,35 +195,42 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
     """  # noqa: E501
 
     positions: PyTree[Float[Array, "_ 3"]]
-    scattering_factors: PyTree[AbstractFourierOperator]
+    kernel_fns: PyTree[AbstractFourierOperator] | PyTree[AbstractRealOperator]
 
     is_frame_rotation: ClassVar[bool] = False
 
     def __init__(
         self,
         positions: PyTree[Float[NDArrayLike, "_ 3"], "T"],
-        scattering_factors: PyTree[AbstractFourierOperator, "T"],
+        kernel_fns: (
+            PyTree[AbstractFourierOperator, "T"] | PyTree[AbstractRealOperator, "T"]
+        ),
     ):
         """**Arguments:**
 
         - `positions`:
             A pytree of atom positions.
-        - `scattering_factors`:
-            A pytree of scattering factors with the same tree structure
+        - `kernel_fns`:
+            A pytree of functions with the same tree structure
             as `positions`, where each leaf is a
+            [`cryojax.ndimage.AbstractRealOperator`][] or a
             [`cryojax.ndimage.AbstractFourierOperator`][].
+            Real-space represents the scattering potential, while
+            fourier-space represents the scattering factor.
         """
         if jax.tree.structure(positions) != jax.tree.structure(
-            scattering_factors,
-            is_leaf=lambda x: isinstance(x, AbstractFourierOperator),
+            kernel_fns,
+            is_leaf=lambda x: isinstance(
+                x, (AbstractFourierOperator, AbstractRealOperator)
+            ),
         ):
             raise ValueError(
                 "When instantiating an `IndependentAtomVolume`, found "
                 "that the pytree structures of `positions` and "
-                "`scattering_factors` were not equal."
+                "`kernel_fns` were not equal."
             )
         self.positions = jax.tree.map(lambda x: jnp.asarray(x, dtype=float), positions)
-        self.scattering_factors = scattering_factors
+        self.kernel_fns = kernel_fns
 
     @override
     def rotate_to_pose(self, pose: AbstractPose) -> Self:
@@ -210,12 +266,25 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
         parameters: PengScatteringFactorParameters | LobatoScatteringFactorParameters,
         *,
         b_factor_by_element: FloatLike | tuple[FloatLike, ...] | None = None,
+        outputs_real_space: bool = False,
     ) -> Self:
-        def make_scattering_factor(a, b, b_factor):
+        def make_kernel_fn(a, b, b_factor):
             if isinstance(parameters, PengScatteringFactorParameters):
-                return PengScatteringFactor(a, b, b_factor)
+                if outputs_real_space:
+                    return PengScatteringPotential(a, b, b_factor)
+                else:
+                    return PengScatteringFactor(a, b, b_factor)
             elif isinstance(parameters, LobatoScatteringFactorParameters):
-                return LobatoScatteringFactor(a, b, b_factor)
+                if outputs_real_space:
+                    raise NotImplementedError(
+                        "`IndependentAtomVolume(..., parameters=..., "
+                        "outputs_real_space=True)` does not support "
+                        "`parameters = LobatoScatteringFactorParameters(...)`. "
+                        "Instead, use `PengScatteringFactorParameters` or set "
+                        "`outputs_real_space = False`."
+                    )
+                else:
+                    return LobatoScatteringFactor(a, b, b_factor)
             else:
                 raise ValueError(
                     "Unrecognized argument `parameters` when "
@@ -250,39 +319,49 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
                 b_factor_by_element = tuple(
                     b_factor_by_element for _ in range(n_elements)
                 )
-            scattering_factors_by_element = tuple(
-                make_scattering_factor(a_i, b_i, b_factor)
+            kernel_fns_by_element = tuple(
+                make_kernel_fn(a_i, b_i, b_factor)
                 for a_i, b_i, b_factor in zip(
                     parameters.a, parameters.b, b_factor_by_element
                 )
             )
         else:
-            scattering_factors_by_element = tuple(
-                make_scattering_factor(a_i, b_i, b_factor=None)
+            kernel_fns_by_element = tuple(
+                make_kernel_fn(a_i, b_i, b_factor=None)
                 for a_i, b_i in zip(parameters.a, parameters.b)
             )
-        return cls(positions_by_element, scattering_factors_by_element)
+        return cls(positions_by_element, kernel_fns_by_element)
 
 
-class FFTAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True):
-    """Render a voxel grid using non-uniform FFTs and convolution."""
+_REAL_VS_FOURIER_DOC = """The underlying algorithm depends on if
+`IndependentAtomVolume.kernel_fns` are in real-space or
+fourier-space via the [`cryojax.ndimage.AbstractFourierOperator`][]
+or [`cryojax.ndimage.AbstractRealOperator`][] classes.
 
+- If [`cryojax.ndimage.AbstractFourierOperator`][]:
+    Use non-uniform FFTs and convolution. This is good
+    when kernels span at least a couple pixels.
+- If [`cryojax.ndimage.AbstractRealOperator`][]:
+    Directly spread atoms into a volume. This should be
+    preferred in most cases.
+"""
+
+
+class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True):
     shape: tuple[int, int, int]
     voxel_size: Float[Array, ""]
-    frequency_grid: Float[Array, "_ _ _ 3"] | None
     sampling_mode: Literal["average", "point"]
+    upsample_factor: tuple[float, float]
     eps: float
-    opts: Any
 
     def __init__(
         self,
         shape: tuple[int, int, int],
         voxel_size: FloatLike,
         *,
-        frequency_grid: Float[Array, "_ _ _ 3"] | None = None,
         sampling_mode: Literal["average", "point"] = "average",
+        upsample_factor: int | float | tuple[float, float] = 2.0,
         eps: float = 1e-6,
-        opts: Any = None,
     ):
         """**Arguments:**
 
@@ -290,47 +369,34 @@ class FFTAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True
             The shape of the resulting voxel grid.
         - `voxel_size`:
             The voxel size of the resulting voxel grid.
-        - `frequency_grid`:
-            An optional frequency grid for rendering the
-            volume. If `None`, compute on the fly. The grid
-            should be in inverse angstroms and have the zero
-            frequency component in the center, i.e.
-
-            ```python
-            frequency_grid = jnp.fft.fftshift(
-                make_frequency_grid(shape, voxel_size, outputs_rfft=False),
-                axes=(0, 1, 2),
-            )
-            ```
-
         - `sampling_mode`:
             If `'average'`, convolve with a box function to sample the
             projected volume at a pixel to be the average value of the
             underlying continuous function. If `'point'`, the volume at
             a pixel will be point sampled.
+        - `upsample_factor`:
+            How much to upsample the grid on which atoms are spread onto.
+            See [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft)
+            for documentation. If a 2-tuple is passed, `upsample_factor[0]` is
+            used for the forward pass and `upsample_factor[1]` is used for the
+            backward pass.
         - `eps`:
+            Controls speed / accuracy tradeoff.
             See [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft)
             for documentation.
-        - `opts`:
-            A `jax_finufft.options.Opts` or `jax_finufft.options.NestedOpts`
-            dataclass.
-            See [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft)
-            for documentation. If passing these advanced options, do not change
-            `modeord=False` for both the forward and the backward pass.
         """
         if sampling_mode not in ["average", "point"]:
             raise ValueError(
-                "`sampling_mode` in `FFTAtomRenderFn` "
+                "`sampling_mode` in `IndependentAtomRenderFn` "
                 "must be either 'average' for averaging within a "
                 "pixel or 'point' for point sampling. Got "
                 f"`sampling_mode = {sampling_mode}`."
             )
         self.shape = shape
         self.voxel_size = jnp.asarray(voxel_size, dtype=float)
-        self.frequency_grid = frequency_grid
         self.sampling_mode = sampling_mode
+        self.upsample_factor = _standardize_upsampfac(upsample_factor)
         self.eps = eps
-        self.opts = opts
 
     @override
     def __call__(
@@ -358,68 +424,39 @@ class FFTAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True
             component is in the corner. Does nothing if
             `outputs_real_space = True`.
         """
-        voxel_size = error_if_not_positive(self.voxel_size)
-        if self.frequency_grid is None:
-            frequency_grid = jnp.fft.fftshift(
-                make_frequency_grid(self.shape, voxel_size, outputs_rfftfreqs=False),
-                axes=(0, 1, 2),
-            )
-        else:
-            frequency_grid = self.frequency_grid
-        proj_kernel = lambda pos, kernel: _render_with_nufft(
-            self.shape,
-            voxel_size,
-            pos,
-            kernel,
-            frequency_grid,
+        frequency_grid = jnp.fft.fftshift(
+            make_frequency_grid(self.shape, self.voxel_size, outputs_rfftfreqs=False),
+            axes=(0, 1, 2),
+        )
+        return render_impl(
+            volume_representation.positions,
+            volume_representation.kernel_fns,
+            shape=self.shape,
+            voxel_size=error_if_not_positive(self.voxel_size),
+            frequency_grid=frequency_grid,
+            sampling_mode=self.sampling_mode,
             eps=self.eps,
-            opts=self.opts,
+            upsampfac=self.upsample_factor,
+            outputs_real_space=outputs_real_space,
+            outputs_rfft=outputs_rfft,
+            fftshifted=fftshifted,
         )
-        # Compute projection over atom types
-        fourier_voxel_grid = jax.tree.reduce(
-            lambda x, y: x + y,
-            jax.tree.map(
-                proj_kernel,
-                volume_representation.positions,
-                volume_representation.scattering_factors,
-                is_leaf=lambda x: isinstance(x, AbstractFourierOperator),
-            ),
-        )
-        if self.sampling_mode == "average":
-            antialias_fn = FourierSinc(box_width=voxel_size)
-            fourier_voxel_grid *= antialias_fn(frequency_grid)
-
-        if outputs_real_space:
-            return ifftn(jnp.fft.ifftshift(fourier_voxel_grid)).real
-        else:
-            if outputs_rfft:
-                fourier_voxel_grid = convert_fftn_to_rfftn(
-                    jnp.fft.ifftshift(fourier_voxel_grid), mode="real"
-                )
-                if fftshifted:
-                    return jnp.fft.fftshift(fourier_voxel_grid, axes=(0, 1))
-                else:
-                    return fourier_voxel_grid
-            else:
-                if fftshifted:
-                    return fourier_voxel_grid
-                else:
-                    return jnp.fft.ifftshift(fourier_voxel_grid)
 
 
-class FFTAtomProjection(
+IndependentAtomRenderFn.__doc__ = (
+    f"""Render a voxel grid from an `IndependentAtomVolume`. {_REAL_VS_FOURIER_DOC}"""
+)
+
+
+class IndependentAtomProjection(
     AbstractVolumeIntegrator[IndependentAtomVolume],
     strict=True,
 ):
-    """Integrate atomic parametrization of a volume onto
-    the exit plane using non-uniform FFTs plus convolution.
-    """
-
     sampling_mode: Literal["average", "point"]
-    upsample_factor: int | None
-    shape: tuple[int, int] | None
+    upsample_factor: tuple[float, float]
+    block_size: int
     eps: float
-    opts: Any
+    shape: tuple[int, int] | None
 
     outputs_ewald_sphere: ClassVar[bool] = False
 
@@ -427,10 +464,10 @@ class FFTAtomProjection(
         self,
         *,
         sampling_mode: Literal["average", "point"] = "average",
-        upsample_factor: int | None = None,
-        shape: tuple[int, int] | None = None,
+        block_size: int = 1,
+        upsample_factor: float | tuple[float, float] = 2.0,
         eps: float = 1e-6,
-        opts: Any = None,
+        shape: tuple[int, int] | None = None,
     ):
         """**Arguments:**
 
@@ -439,45 +476,37 @@ class FFTAtomProjection(
             projected volume at a pixel to be the average value of the
             underlying continuous function. If `'point'`, the volume at
             a pixel will be point sampled.
-        - `upsample_factor`:
-            If provided, first compute an upsampled version of the
-            image at pixel size `image_config.pixel_size / upsample_factor`.
-            Then, downsample with `cryojax.ndimage.block_reduce_downsample`
+        - `block_size`:
+            If provided, first compute an image at `voxel_size / block_size`.
+            Then, call [`cryojax.ndimage.block_reduce_downsample`][]
             to locally average to the correct pixel size. This is useful
             for reducing aliasing.
+        - `upsample_factor`:
+            How much to upsample the grid on which atoms are spread onto.
+            See [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft)
+            for documentation. If a 2-tuple is passed, `upsample_factor[0]` is
+            used for the forward pass and `upsample_factor[1]` is used for the
+            backward pass.
+        - `eps`:
+            Controls speed / accuracy tradeoff.
+            See [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft)
+            for documentation.
         - `shape`:
             If given, first compute the image at `shape`, then
             pad or crop to `image_config.padded_shape`.
-        - `eps`:
-            See [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft)
-            for documentation.
-        - `opts`:
-            A `jax_finufft.options.Opts` or `jax_finufft.options.NestedOpts`
-            dataclass. These provide advanced options for controlling the
-            behavior of the non-uniform FFT (
-            see [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft)
-            for documentation). If passing these advanced options, do not change
-            `modeord=False` for both the forward and the backward pass.
         """
-        if jnufft is None:
-            raise RuntimeError(
-                "Tried to use the `FFTAtomProjection` "
-                "class, but `jax-finufft` is not installed. "
-                "See https://github.com/flatironinstitute/jax-finufft "
-                "for installation instructions."
-            ) from JAX_FINUFFT_IMPORT_ERROR
         if sampling_mode not in ["average", "point"]:
             raise ValueError(
-                "`sampling_mode` in `FFTAtomProjection` "
+                "`sampling_mode` in `IndependentAtomProjection` "
                 "must be either 'average' for averaging within a "
                 "pixel or 'point' for point sampling. Got "
                 f"`sampling_mode = {sampling_mode}`."
             )
         self.sampling_mode = sampling_mode
-        self.upsample_factor = upsample_factor
+        self.block_size = block_size
         self.shape = shape
+        self.upsample_factor = _standardize_upsampfac(upsample_factor)
         self.eps = eps
-        self.opts = opts
 
     @override
     def integrate(
@@ -504,184 +533,368 @@ class FFTAtomProjection(
         The volume projection in real or Fourier space at the
         `AbstractImageConfig.padded_shape` and the `image_config.pixel_size`.
         """  # noqa: E501
-        u = self.upsample_factor
+        # Prepare arguments
         pixel_size = image_config.pixel_size
         shape = image_config.padded_shape if self.shape is None else self.shape
-        if u is None:
-            shape_u, pixel_size_u = shape, pixel_size
-        else:
-            shape_u, pixel_size_u = (u * shape[0], u * shape[1]), pixel_size / u
-        if shape_u == image_config.padded_shape:
-            frequency_grid = image_config.get_frequency_grid(
-                padding=True, physical=True, full=True
+        if self.block_size > 1:
+            shape_u, pixel_size_u = (
+                (self.block_size * shape[0], self.block_size * shape[1]),
+                pixel_size / self.block_size,
             )
-        else:
             frequency_grid = make_frequency_grid(
                 shape_u, pixel_size_u, outputs_rfftfreqs=False
             )
-        proj_kernel = lambda pos, kernel: _project_with_nufft(
-            shape_u,
-            pixel_size_u,
-            pos,
-            kernel,
-            frequency_grid,
-            eps=self.eps,
-            opts=self.opts,
-        )
-        # Compute projection over atom types
-        fourier_projection = jax.tree.reduce(
-            lambda x, y: x + y,
-            jax.tree.map(
-                proj_kernel,
-                volume_representation.positions,
-                volume_representation.scattering_factors,
-                is_leaf=lambda x: isinstance(x, AbstractFourierOperator),
-            ),
-        )
-        # Apply anti-aliasing filter
-        if self.sampling_mode == "average":
-            antialias_fn = FourierSinc(box_width=pixel_size_u)
-            fourier_projection *= antialias_fn(frequency_grid)
-        # If upsample factor is even, need subpixel center correction
-        if u is not None and u % 2 == 0:
-            fourier_projection = _apply_subpixel_shift(
-                shape,
-                fourier_projection,
-                pixel_size_u * frequency_grid,
-                u,
-            )
-        # Shift zero frequency component to corner and convert to
-        # rfft
-        fourier_projection = convert_fftn_to_rfftn(fourier_projection, mode="real")
-        if self.shape is None:
-            if u is None:
-                return (
-                    irfftn(fourier_projection, s=shape)
-                    if outputs_real_space
-                    else fourier_projection
-                )
-            else:
-                projection = _block_average(irfftn(fourier_projection, s=shape_u), u)
-                return projection if outputs_real_space else rfftn(projection)
         else:
-            projection = irfftn(fourier_projection, s=shape_u)
-            if u is not None:
-                projection = _block_average(projection, u)
-            projection = resize_with_crop_or_pad(projection, image_config.padded_shape)
+            shape_u, pixel_size_u = shape, pixel_size
+            frequency_grid = (
+                image_config.get_frequency_grid(padding=True, physical=True, full=True)
+                if shape == image_config.padded_shape
+                else make_frequency_grid(shape, pixel_size, outputs_rfftfreqs=False)
+            )
+        # Compute projection
+        return project_impl(
+            volume_representation.positions,
+            volume_representation.kernel_fns,
+            shape=shape_u,
+            pixel_size=pixel_size_u,
+            frequency_grid=frequency_grid,
+            sampling_mode=self.sampling_mode,
+            eps=self.eps,
+            upsampfac=self.upsample_factor,
+            block_size=self.block_size,
+            output_shape=image_config.padded_shape,
+            outputs_real_space=outputs_real_space,
+        )
+
+
+IndependentAtomProjection.__doc__ = f"""Integrate atomic parametrization of a volume "
+"onto the exit plane from an `IndependentAtomVolume`. {_REAL_VS_FOURIER_DOC}"""
+
+
+def _standardize_upsampfac(
+    upsample_factor: int | float | tuple[float, float],
+) -> tuple[float, float]:
+    if isinstance(upsample_factor, (float, int)):
+        u = float(upsample_factor)
+        return (u, u)
+    else:
+        u = tuple(float(fac) for fac in upsample_factor)
+        assert len(u) == 2
+        return u
+
+
+def _check_kernel_fns(
+    kernel_pytree: PyTree[AbstractFourierOperator] | PyTree[AbstractRealOperator],
+) -> tuple[bool, Callable]:
+    kernel_list = jax.tree.leaves(
+        kernel_pytree,
+        is_leaf=lambda x: isinstance(x, (AbstractFourierOperator, AbstractRealOperator)),
+    )
+    if all(isinstance(kernel, AbstractRealOperator) for kernel in kernel_list):
+        is_real_space = True
+        is_leaf = lambda x: isinstance(x, AbstractRealOperator)
+    elif all(isinstance(kernel, AbstractFourierOperator) for kernel in kernel_list):
+        is_real_space = False
+        is_leaf = lambda x: isinstance(x, AbstractFourierOperator)
+    else:
+        raise ValueError(
+            "Found that `IndependentAtomVolume.kernel_fns` was not a "
+            "PyTree containing only `AbstractFourierOperator`s or "
+            "`AbstractRealOperator`s."
+        )
+    return is_real_space, is_leaf
+
+
+def _project_postprocess(
+    projection_out: Complex[Array, "_ _"],
+    *,
+    is_real_space: bool,
+    compute_shape: tuple[int, int],
+    pixel_size: Float[Array, ""],
+    frequency_grid: Float[Array, "_ _ 2"],
+    sampling_mode: Literal["average", "point"],
+    block_size: int,
+    output_shape: tuple[int, int],
+    outputs_real_space: bool,
+) -> Complex[Array, "_ _"]:
+    reduce_shape = tuple(s // block_size for s in projection_out.shape)
+    assert len(reduce_shape) == 2
+    if is_real_space:
+        raise NotImplementedError()
+    else:
+        projection_fft = projection_out
+        if sampling_mode == "average":
+            antialias_fn = FourierSinc(box_width=pixel_size)
+            projection_fft *= antialias_fn(frequency_grid)
+        if block_size % 2 == 0:
+            projection_fft = _phase_shift_correct(
+                projection_fft,
+                block_size=block_size,
+                target_shape=reduce_shape,
+                pixel_size=pixel_size,
+                frequency_grid=frequency_grid,
+            )
+        projection_fft = convert_fftn_to_rfftn(projection_fft, mode="real")
+        # Block average and return
+        block_average_fn = lambda x, factor: (
+            block_reduce_downsample(x, factor, jax.lax.add, center_correct=False)
+            / factor**x.ndim
+        )
+        if output_shape == reduce_shape:
+            if block_size > 1:
+                projection = block_average_fn(
+                    irfftn(projection_fft, s=compute_shape), block_size
+                )
+                return projection if outputs_real_space else rfftn(projection)
+            else:
+                return (
+                    irfftn(projection_fft, s=output_shape)
+                    if outputs_real_space
+                    else projection_fft
+                )
+        else:
+            projection = irfftn(projection_fft, s=compute_shape)
+            if block_size > 1:
+                projection = block_average_fn(projection, block_size)
+            projection = resize_with_crop_or_pad(projection, output_shape)
             return projection if outputs_real_space else rfftn(projection)
 
 
-_get_modeord_msg = lambda _fwd_or_bwd, t_or_f, _cls: (
-    f"Manually passed `opts` as `{_cls}(..., opts=...)`, "
-    f"but found that the `modeord` property was not equal to "
-    f"`{t_or_f}` on the {_fwd_or_bwd} pass. Setting `modeord={t_or_f}` is "
-    f"required for correct behavior of `{_cls}`, i.e. "
-    f"`opts = NestedOpts({_fwd_or_bwd}=Opts(modeord={t_or_f}, ...), ...) "
-    f"See the `jax-finufft` documentation for more information."
-)
+def project_impl(
+    positions: PyTree[Float[Array, "_ 3"]],
+    kernel_fns: PyTree[AbstractRealOperator] | PyTree[AbstractFourierOperator],
+    *,
+    shape: tuple[int, int],
+    pixel_size: Float[Array, ""],
+    frequency_grid: Float[Array, "_ _ 2"],
+    sampling_mode: Literal["average", "point"],
+    eps: float,
+    upsampfac: tuple[float, float],
+    block_size: int,
+    output_shape: tuple[int, int],
+    outputs_real_space: bool,
+) -> Array:
 
+    is_real_space, is_leaf = _check_kernel_fns(kernel_fns)
 
-def _render_with_nufft(shape, ps, pos, kernel, freqs, eps=1e-6, opts=None):
-    assert jnufft is not None
-    assert Opts is not None
-    assert NestedOpts is not None
-    assert unpack_opts is not None
-    # Get x and y coordinates
-    # Normalize coordinates betweeen -pi and pi
-    nz, ny, nx = shape
-    box_xyz = ps * jnp.asarray((nx, ny, nz))
-    pos_periodic = 2 * jnp.pi * pos / box_xyz
-    # Unpack
-    x, y, z = pos_periodic[:, 0], pos_periodic[:, 1], pos_periodic[:, 2]
-    n_atoms = x.size
-    volume_element = ps**3
-    # Compute
-    fourier_projection = kernel(freqs) * (
-        jnufft.nufft1(
-            shape,
-            jnp.full((n_atoms,), 1.0 + 0.0j),
-            z,
-            y,
-            x,
-            eps=eps,
-            opts=opts,
-            iflag=-1,
+    def real_impl(
+        _shape: tuple[int, int],
+        _ps: Float[Array, ""],
+        _positions: Float[Array, "_ 3"],
+        _kernel_fn: AbstractRealOperator,
+    ) -> Array:
+        raise NotImplementedError(
+            "Projections in real-space using the `IndependentAtomProjection` is not yet "
+            "implemented."
         )
-        / volume_element
+
+    def fourier_impl(
+        _shape: tuple[int, int],
+        _ps: Float[Array, ""],
+        _positions: Float[Array, "_ 3"],
+        _kernel_fn: AbstractFourierOperator,
+        _frequency_grid: Array,
+    ) -> Array:
+        if nufft1 is None:
+            raise RuntimeError(
+                "Tried to use the `IndependentAtomProjection` "
+                "class, but `jax-finufft` is not installed. "
+                "See https://github.com/flatironinstitute/jax-finufft "
+                "for installation instructions."
+            ) from JAX_FINUFFT_IMPORT_ERROR
+        (ny, nx), num_atoms = _shape, _positions.shape[0]
+        box_xy = _ps * jnp.asarray((nx, ny))
+        xy = 2 * jnp.pi * _positions[:, :2] / box_xy
+        # Compute
+        return _kernel_fn(_frequency_grid) * jnp.fft.ifftshift(
+            nufft1(
+                _shape,  # type: ignore
+                jnp.full((num_atoms,), 1.0 + 0.0j),
+                xy[:, 1],
+                xy[:, 0],
+                eps=eps,
+                iflag=-1,
+                opts=_make_opts(upsampfac),
+            )
+            / _ps**2
+        )
+
+    if is_real_space:
+        project_impl, project_args = real_impl, ()
+    else:
+        project_impl, project_args = fourier_impl, (frequency_grid,)
+
+    # Project and sum over kernels
+    project_dispatch = lambda _positions, _kernel_fn: project_impl(
+        shape, pixel_size, _positions, _kernel_fn, *project_args
     )
-    if opts is not None:
-        opts_fwd, opts_bwd = (
-            unpack_opts(opts, finufft_type=1, forward=True),
-            unpack_opts(opts, finufft_type=1, forward=False),
-        )
-        if opts_fwd.modeord:
-            raise ValueError(_get_modeord_msg("forward", False, "FFTAtomRenderFn"))
-        if opts_bwd.modeord:
-            raise ValueError(_get_modeord_msg("backward", False, "FFTAtomRenderFn"))
-
-    return fourier_projection
-
-
-def _project_with_nufft(shape, ps, pos, kernel, freqs, eps=1e-6, opts=None):
-    assert jnufft is not None
-    assert Opts is not None
-    assert NestedOpts is not None
-    assert unpack_opts is not None
-    # Get x and y coordinates
-    positions_xy = pos[:, :2]
-    # Normalize coordinates betweeen -pi and pi
-    ny, nx = shape
-    box_xy = ps * jnp.asarray((nx, ny))
-    positions_periodic = 2 * jnp.pi * positions_xy / box_xy
-    # Unpack
-    x, y = positions_periodic[:, 0], positions_periodic[:, 1]
-    n_atoms = x.size
-    area_element = ps**2
-    # Compute
-    fourier_projection = kernel(freqs) * jnp.fft.ifftshift(
-        jnufft.nufft1(
-            shape,
-            jnp.full((n_atoms,), 1.0 + 0.0j),
-            y,
-            x,
-            eps=eps,
-            opts=opts,
-            iflag=-1,
-        )
-        / area_element
+    projection_out = jax.tree.reduce(
+        lambda x, y: x + y,
+        jax.tree.map(project_dispatch, positions, kernel_fns, is_leaf=is_leaf),
     )
-    if opts is not None:
-        opts_fwd, opts_bwd = (
-            unpack_opts(opts, finufft_type=1, forward=True),
-            unpack_opts(opts, finufft_type=1, forward=False),
-        )
-        if opts_fwd.modeord:
-            raise ValueError(_get_modeord_msg("forward", False, "FFTAtomProjection"))
-        if opts_bwd.modeord:
-            raise ValueError(_get_modeord_msg("backward", False, "FFTAtomProjection"))
-
-    return fourier_projection
-
-
-def _block_average(x, factor):
-    return (
-        block_reduce_downsample(x, factor, jax.lax.add, center_correct=False)
-        / factor**x.ndim
+    return _project_postprocess(
+        projection_out,
+        is_real_space=is_real_space,
+        compute_shape=shape,
+        pixel_size=pixel_size,
+        frequency_grid=frequency_grid,
+        sampling_mode=sampling_mode,
+        block_size=block_size,
+        output_shape=output_shape,
+        outputs_real_space=outputs_real_space,
     )
 
 
-def _apply_subpixel_shift(target_shape, fourier_image, frequency_grid, k):
+def _render_postprocess(
+    render_fft: Complex[Array, "_ _ _"],
+    voxel_size: Float[Array, ""],
+    *,
+    is_real_space: bool,
+    frequency_grid: Float[Array, "_ _ _ 3"],
+    sampling_mode: Literal["average", "point"],
+    outputs_real_space: bool,
+    outputs_rfft: bool,
+    fftshifted: bool,
+) -> Complex[Array, "_ _ _"]:
+    if is_real_space:
+        raise NotImplementedError()
+    else:
+        if sampling_mode == "average":
+            antialias_fn = FourierSinc(box_width=voxel_size)
+            render_fft *= antialias_fn(frequency_grid)
+        if outputs_real_space:
+            return ifftn(jnp.fft.ifftshift(render_fft)).real
+        else:
+            if outputs_rfft:
+                render_fft = convert_fftn_to_rfftn(
+                    jnp.fft.ifftshift(render_fft), mode="real"
+                )
+                if fftshifted:
+                    return jnp.fft.fftshift(render_fft, axes=(0, 1))
+                else:
+                    return render_fft
+            else:
+                if fftshifted:
+                    return render_fft
+                else:
+                    return jnp.fft.ifftshift(render_fft)
+
+
+def render_impl(
+    positions: PyTree[Float[Array, "_ 3"]],
+    kernel_fns: PyTree[AbstractRealOperator] | PyTree[AbstractFourierOperator],
+    *,
+    shape: tuple[int, int, int],
+    voxel_size: Float[Array, ""],
+    frequency_grid: Float[Array, "_ _ _ 3"],
+    sampling_mode: Literal["average", "point"],
+    eps: float,
+    upsampfac: tuple[float, float],
+    outputs_real_space: bool,
+    outputs_rfft: bool,
+    fftshifted: bool,
+) -> Array:
+
+    is_real_space, is_leaf = _check_kernel_fns(kernel_fns)
+
+    def real_impl(
+        _shape: tuple[int, int, int],
+        _vs: Float[Array, ""],
+        _positions: Float[Array, "_ 3"],
+        _kernel_fn: AbstractRealOperator,
+    ) -> Array:
+        raise NotImplementedError(
+            "Rendering in real-space using the `IndependentAtomRenderFn` is not yet "
+            "implemented."
+        )
+
+    def fourier_impl(
+        _shape: tuple[int, int, int],
+        _vs: Float[Array, ""],
+        _positions: Float[Array, "_ 3"],
+        _kernel_fn: AbstractFourierOperator,
+        _frequency_grid: Array,
+    ) -> Array:
+        if nufft1 is None:
+            raise RuntimeError(
+                "Tried to use the `IndependentAtomRenderFn` "
+                "class, but `jax-finufft` is not installed. "
+                "See https://github.com/flatironinstitute/jax-finufft "
+                "for installation instructions."
+            ) from JAX_FINUFFT_IMPORT_ERROR
+        (nz, ny, nx), num_atoms = _shape, _positions.shape[0]
+        box_xyz = _vs * jnp.asarray((nx, ny, nz))
+        xyz = 2 * jnp.pi * _positions / box_xyz
+        # Compute
+        return _kernel_fn(_frequency_grid) * (
+            nufft1(
+                _shape,  # type: ignore
+                jnp.full((num_atoms,), 1.0 + 0.0j),
+                xyz[:, 2],
+                xyz[:, 1],
+                xyz[:, 0],
+                eps=eps,
+                iflag=-1,
+                opts=_make_opts(upsampfac),
+            )
+            / _vs**3
+        )
+
+    if is_real_space:
+        render_impl, render_args = real_impl, ()
+    else:
+        render_impl, render_args = fourier_impl, (frequency_grid,)
+
+    render_dispatch = lambda _positions, _kernel_fn: render_impl(
+        shape, voxel_size, _positions, _kernel_fn, *render_args
+    )
+    render_fft = jax.tree.reduce(
+        lambda x, y: x + y,
+        jax.tree.map(render_dispatch, positions, kernel_fns, is_leaf=is_leaf),
+    )
+
+    return _render_postprocess(
+        render_fft,
+        is_real_space=is_real_space,
+        voxel_size=voxel_size,
+        frequency_grid=frequency_grid,
+        sampling_mode=sampling_mode,
+        outputs_real_space=outputs_real_space,
+        outputs_rfft=outputs_rfft,
+        fftshifted=fftshifted,
+    )
+
+
+def _phase_shift_correct(
+    projection_fft: Array,
+    *,
+    block_size: int,
+    target_shape: tuple[int, int],
+    pixel_size: Array,
+    frequency_grid: Array,
+):
     if len(set(target_shape)) > 1:
         raise NotImplementedError(
-            "Even `upsample_factor` and non-square image shape not "
-            f"supported in `FFTAtomProjection`. Got `upsample_factor = {k}` "
+            "Even `block_size` and non-square images not "
+            "supported in `IndependentAtomProjection`. "
+            f"Got `block_size = {block_size}` "
             f"and `shape = {target_shape}`."
         )
     dim = target_shape[0]
     if dim % 2 == 0:
-        shift = jnp.full((2,), (k - 1) / 2)
+        shift = jnp.full((2,), (block_size - 1) / 2)
     else:
         shift = jnp.full((2,), -0.5)
     return (
-        jnp.exp(-1.0j * (2 * jnp.pi * jnp.matmul(frequency_grid, shift))) * fourier_image
+        jnp.exp(-1.0j * (2 * jnp.pi * jnp.matmul(frequency_grid, pixel_size * shift)))
+        * projection_fft
+    )
+
+
+def _make_opts(upsampfac: tuple[float, float]):
+    assert NestedOpts is not None
+    assert Opts is not None
+    return NestedOpts(
+        forward=Opts(upsampfac=upsampfac[0], gpu_upsampfac=upsampfac[0]),
+        backward=Opts(upsampfac=upsampfac[1], gpu_upsampfac=upsampfac[1]),
     )
