@@ -43,8 +43,3 @@ def sample_waterbox_pdb():
 @pytest.fixture
 def peng_parameters_path():
     return os.path.join(os.path.dirname(__file__), "data", "peng1996_params.npy")
-
-
-@pytest.fixture
-def lobato_parameters_path():
-    return os.path.join(os.path.dirname(__file__), "data", "lobato2014_params.npy")
