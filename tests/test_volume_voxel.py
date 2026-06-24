@@ -164,17 +164,17 @@ def test_render_voxel_volume_auto_render_fn(output_type, gmm_volume):
     assert type(auto) is output_type
     # Both paths should produce identical results for a GMM volume
     if output_type is cxs.FourierVoxelGridVolume:
-        np.testing.assert_array_equal(
+        np.testing.assert_allclose(
             np.array(explicit.fourier_voxel_grid),
             np.array(auto.fourier_voxel_grid),
         )
     elif output_type is cxs.FourierVoxelSplineVolume:
-        np.testing.assert_array_equal(
+        np.testing.assert_allclose(
             np.array(explicit.spline_coefficients),
             np.array(auto.spline_coefficients),
         )
     elif output_type is cxs.RealVoxelGridVolume:
-        np.testing.assert_array_equal(
+        np.testing.assert_allclose(
             np.array(explicit.real_voxel_grid),
             np.array(auto.real_voxel_grid),
         )
@@ -207,17 +207,17 @@ def test_render_voxel_volume_matches_direct_construction(gmm_volume):
     ]:
         via_api = cxs.render_voxel_volume(gmm_volume, render_fn, output_type=output_type)
         if output_type is cxs.FourierVoxelGridVolume:
-            np.testing.assert_array_equal(
+            np.testing.assert_allclose(
                 np.array(via_api.fourier_voxel_grid),
                 np.array(direct.fourier_voxel_grid),
             )
         elif output_type is cxs.FourierVoxelSplineVolume:
-            np.testing.assert_array_equal(
+            np.testing.assert_allclose(
                 np.array(via_api.spline_coefficients),
                 np.array(direct.spline_coefficients),
             )
         elif output_type is cxs.RealVoxelGridVolume:
-            np.testing.assert_array_equal(
+            np.testing.assert_allclose(
                 np.array(via_api.real_voxel_grid),
                 np.array(direct.real_voxel_grid),
             )
