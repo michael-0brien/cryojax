@@ -478,7 +478,7 @@ def test_grid_from_fourier_voxel_grid_matches_from_real(gmm_volume, image_config
     vol_real = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_grid)
     vol_fourier = cxs.FourierVoxelGridVolume.from_fourier_voxel_grid(im.fftn(real_grid))
     err = float(_max_abs_error(vol_real, vol_fourier, _FSE, _FSE, image_config))
-    assert err == 0.0
+    assert np.isclose(err, 0.0)
 
 
 def test_spline_from_fourier_voxel_grid_matches_from_real(gmm_volume, image_config):
@@ -488,7 +488,7 @@ def test_spline_from_fourier_voxel_grid_matches_from_real(gmm_volume, image_conf
     vol_real = cxs.FourierVoxelSplineVolume.from_real_voxel_grid(real_grid)
     vol_fourier = cxs.FourierVoxelSplineVolume.from_fourier_voxel_grid(im.fftn(real_grid))
     err = float(_max_abs_error(vol_real, vol_fourier, _FSE, _FSE, image_config))
-    assert err == 0.0
+    assert np.isclose(err, 0.0)
 
 
 # ── in-plane phi rotation: DC coefficient conserved ──────────────────────────
