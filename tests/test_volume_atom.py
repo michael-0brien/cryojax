@@ -8,8 +8,6 @@ Tests demand precise numerical agreement between implementations and between
 the two NUFFT backends (nufftax and jax-finufft).
 """
 
-from typing import Literal
-
 import cryojax.ndimage as im
 import cryojax.simulator as cxs
 import equinox as eqx
@@ -18,7 +16,6 @@ import numpy as np
 import pytest
 from cryojax.atom_util import split_atoms_by_element
 from cryojax.constants import (
-    LobatoScatteringFactorParameters,
     PengScatteringFactorParameters,
     check_atomic_numbers_supported,
 )
@@ -107,7 +104,7 @@ def compute_projection_at_pose(
 # ── tabulated volume loading ──────────────────────────────────────────────────
 
 
-@pytest.mark.parametrize("tabulation", ("peng", "lobato"))
+@pytest.mark.parametrize("tabulation", ("peng",))
 def test_load_atom_volume(tabulation, sample_pdb_path: str):
     import pathlib
 
@@ -145,9 +142,7 @@ def test_load_atom_volume(tabulation, sample_pdb_path: str):
 # ── scattering factor parameters ──────────────────────────────────────────────
 
 
-def test_scattering_factor_parameters_correct(
-    peng_parameters_path, lobato_parameters_path
-):
+def test_scattering_factor_parameters_correct(peng_parameters_path):
     from cryojax.constants._scattering_factor_parameters import _SUPPORTED_ATOMIC_NUMBERS
 
     atomic_numbers = np.asarray(_SUPPORTED_ATOMIC_NUMBERS)
@@ -159,34 +154,15 @@ def test_scattering_factor_parameters_correct(
     np.testing.assert_equal(a1, a2)
     np.testing.assert_equal(b1, b2)
 
-    params = LobatoScatteringFactorParameters(atomic_numbers)
-    a1, b1 = params.a, params.b
-    lobato_table = np.load(lobato_parameters_path)
-    a2, b2 = lobato_table[:, atomic_numbers, :]
-    np.testing.assert_equal(a1, a2)
-    np.testing.assert_equal(b1, b2)
 
-
-def test_compare_hydrogen_scattering_factor():
-    shape, pixel_size = (32, 32), 1.0
-    frequencies = im.make_frequency_grid(shape, pixel_size)
-    hydrogen_id = np.asarray([1], dtype=int)
-    p = PengScatteringFactorParameters(hydrogen_id)
-    l = LobatoScatteringFactorParameters(hydrogen_id)
-    p_fac = cxs.PengScatteringFactor(p.a[0], p.b[0])
-    l_fac = cxs.LobatoScatteringFactor(l.a[0], l.b[0])
-    np.testing.assert_allclose(p_fac(frequencies), l_fac(frequencies), atol=1e-3)
-
-
-@pytest.mark.parametrize("tabulation", ("peng", "lobato"))
-def test_invalid_atomic_numbers(tabulation):
+def test_invalid_atomic_numbers():
     bad_nan = np.asarray([2, 6])
-    params_nan = _make_scattering_parameters(bad_nan, tabulation)
+    params_nan = PengScatteringFactorParameters(bad_nan)
     assert np.any(np.isnan(params_nan.a))
     assert np.any(np.isnan(params_nan.b))
     bad_oob = np.asarray([1, 31])
     with pytest.raises(IndexError):
-        _make_scattering_parameters(bad_oob, tabulation)
+        PengScatteringFactorParameters(bad_oob)
     with pytest.raises(ValueError):
         check_atomic_numbers_supported(bad_nan)
     with pytest.raises(ValueError):
@@ -822,16 +798,3 @@ def test_fft_atom_render_custom_upsampfac_jax_finufft(upsampfac):
     )
     result = render_fn(atom_volume, outputs_real_space=True)
     assert result.shape == shape
-
-
-# ── helpers ───────────────────────────────────────────────────────────────────
-
-
-def _make_scattering_parameters(
-    atomic_numbers: np.ndarray, tabulation: Literal["peng", "lobato"]
-):
-    return (
-        PengScatteringFactorParameters(atomic_numbers)
-        if tabulation == "peng"
-        else LobatoScatteringFactorParameters(atomic_numbers)
-    )

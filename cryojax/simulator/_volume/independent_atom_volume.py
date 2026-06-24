@@ -12,9 +12,7 @@ import nufftax
 from jaxtyping import Array, Float, Inexact, PyTree
 from nufftax.core import Kernel, spread_2d, spread_3d
 
-from ..._internal import error_if_not_positive
 from ...constants import (
-    LobatoScatteringFactorParameters,
     PengScatteringFactorParameters,
     b_factor_to_variance,
 )
@@ -29,7 +27,6 @@ from ...ndimage import (
     fftn,
     ifftn,
     irfftn,
-    make_frequency_grid,
     query_efficient_grid_size,
     resize_with_crop_or_pad,
     rfftn,
@@ -57,65 +54,6 @@ except ModuleNotFoundError as err:
 
 
 T = TypeVar("T")
-
-
-class PengScatteringFactor(AbstractFourierOperator, strict=True):
-    a: Float[Array, " n"]
-    b: Float[Array, " n"]
-    b_factor: Float[Array, ""] | None = None
-
-    spatial_dims: ClassVar[list[int]] = [2, 3]
-
-    def __init__(
-        self,
-        a: Float[NDArrayLike, " n"],
-        b: Float[NDArrayLike, " n"],
-        b_factor: FloatLike | None = None,
-    ):
-        self.a = jnp.asarray(a, dtype=float)
-        self.b = jnp.asarray(b, dtype=float)
-        self.b_factor = None if b_factor is None else jnp.asarray(b_factor, dtype=float)
-
-    def __call__(self, frequencies: Float[Array, "... 2"] | Float[Array, "... 3"]):
-        q_squared = jnp.sum(frequencies**2, axis=-1)
-        b_factor = 0.0 if self.b_factor is None else error_if_not_positive(self.b_factor)
-        gaussian_fn = lambda _a, _b: _a * jnp.exp(-0.25 * (_b + b_factor) * q_squared)
-        return jnp.sum(
-            jax.vmap(gaussian_fn)(self.a, error_if_not_positive(self.b)), axis=0
-        )
-
-
-class LobatoScatteringFactor(AbstractFourierOperator, strict=True):
-    a: Float[Array, " n"]
-    b: Float[Array, " n"]
-    b_factor: Float[Array, ""] | None = None
-
-    spatial_dims: ClassVar[list[int]] = [2, 3]
-
-    def __init__(
-        self,
-        a: Float[NDArrayLike, " n"],
-        b: Float[NDArrayLike, " n"],
-        b_factor: FloatLike | None = None,
-    ):
-        self.a = jnp.asarray(a, dtype=float)
-        self.b = jnp.asarray(b, dtype=float)
-        self.b_factor = None if b_factor is None else jnp.asarray(b_factor, dtype=float)
-
-    def __call__(
-        self,
-        frequencies: Float[Array, "... 2"] | Float[Array, "... 3"],
-    ):
-        q_squared = jnp.sum(frequencies**2, axis=-1)
-        hydrogenic_fn = lambda _a, _b: (
-            _a * (2 + _b * q_squared) / (1 + _b * q_squared) ** 2
-        )
-        scattering_factor = jnp.sum(jax.vmap(hydrogenic_fn)(self.a, self.b), axis=0)
-        if self.b_factor is not None:
-            scattering_factor *= jnp.exp(
-                -0.25 * error_if_not_positive(self.b_factor) * q_squared
-            )
-        return scattering_factor
 
 
 class IndependentAtomVolume(AbstractAtomVolume, strict=True):
@@ -157,7 +95,7 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
     """  # noqa: E501
 
     positions: PyTree[Float[Array, "_ 3"]]
-    kernel_fns: PyTree[AbstractFourierOperator] | PyTree[RealGaussian]
+    kernel_fns: PyTree[FourierGaussian] | PyTree[RealGaussian]
     amplitudes: PyTree[Inexact[Array, " _"]] | None
 
     is_frame_rotation: ClassVar[bool] = False
@@ -165,7 +103,7 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
     def __init__(
         self,
         positions: PyTree[Float[NDArrayLike, "_ 3"], "T"],
-        kernel_fns: (PyTree[AbstractFourierOperator, "T"] | PyTree[RealGaussian, "T"]),
+        kernel_fns: (PyTree[FourierGaussian, "T"] | PyTree[RealGaussian, "T"]),
         amplitudes: PyTree[Inexact[NDArrayLike, " _"], "T"] | None = None,
     ):
         """**Arguments:**
@@ -176,11 +114,12 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
             A pytree of functions with the same tree structure
             as `positions`, where each leaf is a
             [`cryojax.ndimage.RealGaussian`][] or a
-            [`cryojax.ndimage.AbstractFourierOperator`][].
+            [`cryojax.ndimage.FourierGaussian`][].
             Real-space represents the scattering potential, while
             fourier-space represents the scattering factor.
-            [`cryojax.ndimage.RealGaussian`][] classes may have
-            amplitudes and variances with a batch dimension.
+            These classes may have
+            amplitudes and variances/b-factors with a batch dimension
+            to simulate form factors.
         """
         if jax.tree.structure(positions) != jax.tree.structure(
             kernel_fns,
@@ -239,40 +178,30 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
     def from_tabulated_parameters(
         cls,
         positions_by_element: tuple[Float[NDArrayLike, "_ 3"], ...],
-        parameters: PengScatteringFactorParameters | LobatoScatteringFactorParameters,
+        parameters: PengScatteringFactorParameters,
         *,
         use_real_space: bool = False,
         b_factor_by_element: FloatLike | tuple[FloatLike, ...] | None = None,
     ) -> Self:
         def make_kernel_fn(a, b, b_factor):
             if isinstance(parameters, PengScatteringFactorParameters):
+                b = b + jnp.asarray(b_factor)[None] if b_factor is not None else b
                 if use_real_space:
-                    b = b + jnp.asarray(b_factor)[None] if b_factor is not None else b
+                    var = b_factor_to_variance(b)
                     return eqx.filter_vmap(
-                        lambda _a, _b: RealGaussian(
-                            amplitude=_a, variance=b_factor_to_variance(_b)
-                        )
+                        lambda _a, _var: RealGaussian(amplitude=_a, variance=_var)
+                    )(a, var)
+                else:
+                    return eqx.filter_vmap(
+                        lambda _a, _b: FourierGaussian(amplitude=_a, b_factor=_b)
                     )(a, b)
-                else:
-                    return PengScatteringFactor(a, b, b_factor)
-            elif isinstance(parameters, LobatoScatteringFactorParameters):
-                if use_real_space:
-                    raise NotImplementedError(
-                        "`IndependentAtomVolume(..., parameters=..., "
-                        "use_real_space=True)` does not support "
-                        "`parameters = LobatoScatteringFactorParameters(...)`. "
-                        "Instead, use `PengScatteringFactorParameters` or set "
-                        "`use_real_space = False`."
-                    )
-                else:
-                    return LobatoScatteringFactor(a, b, b_factor)
             else:
                 raise ValueError(
                     "Unrecognized argument `parameters` when "
                     "calling `IndependentAtomVolume.from_tabulated_parameters`. "
-                    "Should be either `cryojax.constants.PengScatteringFactorParameters` "
-                    "or `cryojax.constants.LobatoScatteringFactorParameters`, but got "
-                    f"type {parameters.__class__.__name__}."
+                    "This should be type "
+                    "`cryojax.constants.PengScatteringFactorParameters`, "
+                    f"but got type {parameters.__class__.__name__}."
                 )
 
         n_elements = len(positions_by_element)
@@ -316,13 +245,13 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
 
 _REAL_VS_FOURIER_DOC = """The underlying algorithm depends on if
 `IndependentAtomVolume.kernel_fns` are in real-space or
-fourier-space via the [`cryojax.ndimage.AbstractFourierOperator`][]
-or [`cryojax.ndimage.AbstractRealOperator`][] classes.
+fourier-space via the [`cryojax.ndimage.FourierGaussian`][]
+or [`cryojax.ndimage.RealGaussian`][] classes.
 
-- If [`cryojax.ndimage.AbstractFourierOperator`][]:
+- If [`cryojax.ndimage.FourierGaussian`][]:
     Use non-uniform FFTs and convolution. This is good
     when kernels span at least a couple pixels.
-- If [`cryojax.ndimage.AbstractRealOperator`][]:
+- If [`cryojax.ndimage.RealGaussian`][]:
     Directly spread atoms into a volume. This should be
     preferred in most cases.
 """
@@ -694,17 +623,14 @@ IndependentAtomProjection.__doc__ = f"""Integrate atomic parametrization of a vo
 
 
 def _standardize_kernel_fns(
-    kernel_pytree: PyTree[AbstractFourierOperator] | PyTree[RealGaussian],
-    *,
-    spatial_dim: int,
-) -> tuple[bool, PyTree[AbstractFourierOperator] | PyTree[RealGaussian]]:
+    kernel_pytree: PyTree[FourierGaussian] | PyTree[RealGaussian], *, spatial_dim: int
+) -> tuple[bool, PyTree[FourierGaussian] | PyTree[RealGaussian]]:
     kernel_list = jax.tree.leaves(
         kernel_pytree,
         is_leaf=lambda x: isinstance(x, (AbstractFourierOperator, AbstractRealOperator)),
     )
-    if all(isinstance(kernel, RealGaussian) for kernel in kernel_list):
+    if all(isinstance(kernel, (FourierGaussian, RealGaussian)) for kernel in kernel_list):
         # Standardize gaussian kernels for computation
-        is_real_space = True
         # ... pytree leaves have a batch dim
         kernel_pytree = jax.tree.map(lambda x: jnp.atleast_1d(x), kernel_pytree)
         # ... amplitude must be spread per dimension
@@ -712,26 +638,17 @@ def _standardize_kernel_fns(
             lambda _fn: _fn.amplitude, fn, (fn.amplitude ** (1 / spatial_dim))
         )
         kernel_pytree = jax.tree.map(
-            replace_fn, kernel_pytree, is_leaf=lambda x: isinstance(x, RealGaussian)
+            replace_fn,
+            kernel_pytree,
+            is_leaf=lambda x: isinstance(x, (RealGaussian, FourierGaussian)),
         )
-    elif all(isinstance(kernel, AbstractFourierOperator) for kernel in kernel_list):
-        is_real_space = False
-        for kernel in kernel_list:
-            if spatial_dim not in kernel.spatial_dims:
-                raise ValueError(
-                    "Found that `IndependentAtomVolume.kernel_fns` were "
-                    "`AbstractFourierOperator`s, but "
-                    f"one or more kernel did not support {spatial_dim}-D arrays as "
-                    "input. The `AbstractFourierOperator.spatial_dims` list must "
-                    f"include `{spatial_dim}` to indicate support for {spatial_dim}-D "
-                    "arrays."
-                )
     else:
         raise ValueError(
             "Found that `IndependentAtomVolume.kernel_fns` was not a "
-            "PyTree containing only `AbstractFourierOperator`s or "
+            "PyTree containing only `FourierGaussian`s or "
             "`RealGaussian`s."
         )
+    is_real_space = True if isinstance(kernel_list[0], RealGaussian) else False
 
     return is_real_space, kernel_pytree
 
@@ -749,7 +666,7 @@ def _maybe_use_erf(
                 jax.tree.map(
                     lambda x: _make_erf(x, pixel_size),
                     kernel_pytree,
-                    is_leaf=lambda x: isinstance(x, AbstractRealOperator),
+                    is_leaf=lambda x: isinstance(x, RealGaussian),
                 ),
                 "point",
             )
@@ -776,9 +693,6 @@ def project_impl(
         (lambda x: isinstance(x, AbstractRealOperator))
         if is_real_space
         else (lambda x: isinstance(x, AbstractFourierOperator))
-    )
-    frequency_grid = _maybe_make_frequency_grid(
-        shape_u, pixel_size_u, is_real_space=is_real_space, kernel_fns=kernel_fns
     )
     frequencies_1d = make_frequencies_1d(shape_u, pixel_size_u, modeord=0)
 
@@ -815,10 +729,9 @@ def project_impl(
         _shape: tuple[int, int],
         _ps: Float[Array, ""],
         _positions: Float[Array, "_ 3"],
-        _kernel_fn: AbstractFourierOperator,
+        _kernel_fn: FourierGaussian,
         _amplitudes: Inexact[Array, " _"],
         _f_1d: tuple[Array, ...],
-        _f_mesh: Array | None,
     ) -> Array:
         # Scale positions onto the upsampled grid, then apply the shape_out-based
         # center offset.  Do NOT apply the shape_u parity correction here: that
@@ -827,7 +740,7 @@ def project_impl(
         _ns = jnp.asarray(_shape[::-1][:2], dtype=float)
         xy = 2 * jnp.pi * _positions[:, :2] / (_ps * _ns) + _nufft_offsets_2d
         return (
-            eval_kernel_impl(_kernel_fn, f_1d=_f_1d, f_mesh=_f_mesh)
+            eval_kernel_impl(_kernel_fn, _f_1d)
             * _nufft2d1(
                 _shape,  # type: ignore
                 source=_amplitudes.astype(complex),
@@ -842,16 +755,7 @@ def project_impl(
     if is_real_space:
         project_impl, args = real_impl, ()
     else:
-        project_impl, args = (
-            fourier_impl,
-            cast(
-                Any,
-                (
-                    frequencies_1d,
-                    frequency_grid,
-                ),
-            ),
-        )
+        project_impl, args = (fourier_impl, cast(Any, (frequencies_1d,)))
 
     # Project and sum over kernels
     project_dispatch = lambda _positions, _kernel_fn, _amplitudes: project_impl(
@@ -887,9 +791,6 @@ def render_impl(
         if is_real_space
         else (lambda x: isinstance(x, AbstractFourierOperator))
     )
-    frequency_grid = _maybe_make_frequency_grid(
-        shape_u, voxel_size_u, is_real_space=is_real_space, kernel_fns=kernel_fns
-    )
     frequencies_1d = make_frequencies_1d(shape_u, voxel_size_u, modeord=0)
 
     _nufft_offsets_3d = jnp.asarray([2 * jnp.pi * (s // 2) / s for s in shape_out[::-1]])
@@ -922,14 +823,13 @@ def render_impl(
         _shape: tuple[int, int, int],
         _vs: Float[Array, ""],
         _positions: Float[Array, "_ 3"],
-        _kernel_fn: AbstractFourierOperator,
+        _kernel_fn: FourierGaussian,
         _amplitudes: Inexact[Array, " _"],
         _f_1d: tuple[Array, ...],
-        _f_mesh: Array | None,
     ) -> Array:
         _ns = jnp.asarray(_shape[::-1], dtype=float)
         xyz = 2 * jnp.pi * _positions / (_vs * _ns) + _nufft_offsets_3d
-        return eval_kernel_impl(_kernel_fn, f_1d=_f_1d, f_mesh=_f_mesh) * (
+        return eval_kernel_impl(_kernel_fn, _f_1d) * (
             _nufft3d1(
                 _shape,  # type: ignore
                 source=_amplitudes.astype(complex),
@@ -944,7 +844,7 @@ def render_impl(
     if is_real_space:
         compute_fn, args = real_impl, ()
     else:
-        compute_fn, args = cast(Any, (fourier_impl, (frequencies_1d, frequency_grid)))
+        compute_fn, args = cast(Any, (fourier_impl, (frequencies_1d,)))
 
     render_dispatch = lambda _positions, _kernel_fn, _amplitudes: compute_fn(
         shape_u, voxel_size_u, _positions, _kernel_fn, _amplitudes, *args
@@ -1007,7 +907,7 @@ def _nufft2d1(
             options.pop("upsampfac") if "upsampfac" in options else default_upsampfac
         )
         return nufftax.nufft2d1(
-            n_modes=shape[::-1],
+            n_modes=shape[::-1],  # type: ignore
             c=source,
             x=xy[:, 0],
             y=xy[:, 1],
@@ -1058,7 +958,7 @@ def _nufft3d1(
             options.pop("upsampfac") if "upsampfac" in options else default_upsampfac
         )
         return nufftax.nufft3d1(
-            n_modes=shape[::-1],
+            n_modes=shape[::-1],  # type: ignore
             c=source,
             x=xyz[:, 0],
             y=xyz[:, 1],
@@ -1249,53 +1149,8 @@ def _prepare_fft_to_fft(f: Array, *, outputs_rfft: bool, fftshifted: bool) -> Ar
         return jnp.fft.fftshift(f) if fftshifted else f
 
 
-def _is_separable(kernel_fn: AbstractFourierOperator):
-    return isinstance(kernel_fn, (FourierGaussian, PengScatteringFactor))
-
-
-def _maybe_make_frequency_grid(
-    shape: tuple[int, ...],
-    pixel_size: Float[Array, ""],
-    *,
-    is_real_space: bool,
-    kernel_fns: PyTree[AbstractFourierOperator],
-):
-    is_leaf = lambda x: isinstance(x, AbstractFourierOperator)
-    all_separable = jax.tree.reduce(
-        lambda x, y: x and y,
-        jax.tree.map(lambda x: _is_separable(x), kernel_fns, is_leaf=is_leaf),
-    )
-
-    if is_real_space:
-        frequency_grid = None
-    elif all_separable:
-        frequency_grid = None
-    else:
-        frequency_grid = make_frequency_grid(shape, pixel_size, fftshifted=True)
-
-    return frequency_grid
-
-
-def eval_kernel_impl(
-    kernel_fn: AbstractFourierOperator, *, f_1d: tuple[Array, ...], f_mesh: Array | None
-):
-    if isinstance(kernel_fn, FourierGaussian):
-        assert f_1d is not None
-        return eval_separable_impl(kernel_fn, f_1d)
-    elif isinstance(kernel_fn, PengScatteringFactor):
-        assert f_1d is not None
-        return eval_peng_impl(kernel_fn, f_1d)
-    else:
-        assert f_mesh is not None
-        return eval_non_separable_impl(kernel_fn, f_mesh)
-
-
-def eval_peng_impl(kernel_fn: PengScatteringFactor, frequencies_1d: tuple[Array, ...]):
-    a, b = kernel_fn.a, kernel_fn.b
-    if kernel_fn.b_factor is not None:
-        b = b + kernel_fn.b_factor[None]
-    # Split amplitude across dimensions so the separable product recovers the
-    # original: (a^(1/ndim))^ndim = a
+def eval_kernel_impl(kernel_fn: FourierGaussian, frequencies_1d: tuple[Array, ...]):
+    a, b = kernel_fn.amplitude, kernel_fn.b_factor
     make_gaussians = jax.vmap(lambda _a, _b: FourierGaussian(amplitude=_a, b_factor=_b))
     eval_gaussians = jax.vmap(eval_separable_impl, in_axes=(0, None))
     return jnp.sum(eval_gaussians(make_gaussians(a, b), frequencies_1d), axis=0)
@@ -1306,10 +1161,6 @@ def eval_separable_impl(
 ):
     ndim = len(frequencies_1d)
     assert 1 in kernel_fn.spatial_dims and ndim in [2, 3]
-    if isinstance(kernel_fn, FourierGaussian):
-        kernel_fn = eqx.tree_at(
-            lambda x: x.amplitude, kernel_fn, replace_fn=lambda x: x ** (1 / ndim)
-        )
     if len(frequencies_1d) == 2:
         q_x, q_y = frequencies_1d
         return kernel_fn(q_x)[None, :] * kernel_fn(q_y)[:, None]
@@ -1320,11 +1171,6 @@ def eval_separable_impl(
             * kernel_fn(q_y)[None, :, None]
             * kernel_fn(q_z)[:, None, None]
         )
-
-
-def eval_non_separable_impl(kernel_fn: AbstractFourierOperator, frequency_grid: Array):
-    assert frequency_grid.shape[-1] in [2, 3]
-    return kernel_fn(frequency_grid)
 
 
 def _normalize_positions(
