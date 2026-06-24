@@ -35,14 +35,12 @@ def basic_config(voxel_volume, voxel_size):
 
 def test_mask_2d_running():
     classes = [
-        im.SincCorrectionMask,
         im.SquareCosineMask,
         im.CircularCosineMask,
         im.Cylindrical2DCosineMask,
         im.Rectangular2DCosineMask,
     ]
     kwargs = [
-        dict(),
         dict(side_length=5, rolloff_width=2),
         dict(radius=5, rolloff_width=2),
         dict(radius=5, rolloff_width=2, length=5, rotation_angle=2.0),
@@ -57,9 +55,8 @@ def test_mask_2d_running():
 
 
 def test_mask_3d_running():
-    classes = [im.SincCorrectionMask, im.SphericalCosineMask, im.Rectangular3DCosineMask]
+    classes = [im.SphericalCosineMask, im.Rectangular3DCosineMask]
     kwargs = [
-        dict(),
         dict(radius=5, rolloff_width=2),
         dict(x_width=5, y_width=5, z_width=5, rolloff_width=2),
     ]

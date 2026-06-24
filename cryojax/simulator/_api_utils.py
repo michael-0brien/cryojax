@@ -12,12 +12,7 @@ from ..atom_util import split_atoms_by_element
 from ..constants import LobatoScatteringFactorParameters, PengScatteringFactorParameters
 from ..io import mmdf_to_atoms
 from ..jax_util import NDArrayLike
-from ..ndimage import (
-    AbstractImageTransform,
-    compute_spline_coefficients,
-    make_coordinate_grid,
-    make_frequency_slice,
-)
+from ..ndimage import AbstractImageTransform, make_coordinate_grid
 from ._detector import AbstractDetector
 from ._image_config import AbstractImageConfig, DoseImageConfig
 from ._image_model import (
@@ -616,16 +611,13 @@ def render_voxel_volume(
             f"`render_fn.shape = {render_fn.shape}`."
         )
     if output_type == FourierVoxelGridVolume or output_type == FourierVoxelSplineVolume:
-        dim = render_fn.shape[0]
-        frequency_slice = make_frequency_slice((dim, dim), outputs_rfftfreqs=False)
         fourier_voxel_grid = render_fn(
-            atom_volume, outputs_real_space=False, outputs_rfft=False, fftshifted=True
+            atom_volume, outputs_real_space=False, outputs_rfft=False
         )
         if output_type == FourierVoxelGridVolume:
-            return FourierVoxelGridVolume(fourier_voxel_grid, frequency_slice)
+            return FourierVoxelGridVolume.from_fourier_voxel_grid(fourier_voxel_grid)
         else:
-            spline_coefficients = compute_spline_coefficients(fourier_voxel_grid)
-            return FourierVoxelSplineVolume(spline_coefficients, frequency_slice)
+            return FourierVoxelSplineVolume.from_fourier_voxel_grid(fourier_voxel_grid)
     elif output_type == RealVoxelGridVolume or output_type == RealVoxelCloudVolume:
         coordinate_grid = make_coordinate_grid(render_fn.shape)
         real_voxel_grid = render_fn(atom_volume, outputs_real_space=True)

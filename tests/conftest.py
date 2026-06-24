@@ -2,11 +2,17 @@ import os
 
 import jax
 import pytest
+from cryojax.io import read_atoms_from_pdb
 
 
 # jax.config.update("jax_numpy_dtype_promotion", "strict")
 # jax.config.update("jax_numpy_rank_promotion", "raise")
 jax.config.update("jax_enable_x64", True)
+
+
+@pytest.fixture
+def pdb_info(sample_pdb_path):
+    return read_atoms_from_pdb(sample_pdb_path, center=True, loads_properties=True)
 
 
 @pytest.fixture

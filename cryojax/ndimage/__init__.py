@@ -87,7 +87,6 @@ from ._transforms import (
     Rectangular3DCosineMask as Rectangular3DCosineMask,
     RotateFFT as RotateFFT,
     ScaleImage as ScaleImage,
-    SincCorrectionMask as SincCorrectionMask,
     SphericalCosineMask as SphericalCosineMask,
     SquareCosineMask as SquareCosineMask,
     WhiteningFilter as WhiteningFilter,
