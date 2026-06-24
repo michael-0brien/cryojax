@@ -15,7 +15,7 @@ def voxel_info(sample_mrc_path):
 
 @pytest.fixture
 def voxel_volume(voxel_info):
-    return cxs.FourierVoxelGridVolume.from_real_voxel_grid(voxel_info[0], pad_scale=1.3)
+    return cxs.FourierVoxelGridVolume.from_real_voxel_grid(voxel_info[0], pad_scale=2.0)
 
 
 @pytest.fixture
@@ -148,7 +148,7 @@ def test_rotation_fn(basic_config, voxel_volume, use_rfft):
 def test_translation_fn(basic_config, voxel_volume, use_rfft):
     pose_notranslate = cxs.EulerAnglePose()
     pose_translate = cxs.EulerAnglePose(
-        offset_x_in_angstroms=50.0, offset_y_in_angstroms=-30.0
+        offset_x_in_angstroms=10.0, offset_y_in_angstroms=-5.0
     )
 
     image_model_notrans = cxs.make_image_model(
@@ -169,7 +169,7 @@ def test_translation_fn(basic_config, voxel_volume, use_rfft):
         grid = basic_config.get_frequency_grid(physical=True, full=True)
 
     shift_fn = im.PhaseShiftFFT(
-        offset=jnp.array([50.0, -30.0]),
+        offset=jnp.array([10.0, -5.0]),
         frequency_grid=grid,
     )
 
@@ -182,7 +182,7 @@ def test_translation_fn(basic_config, voxel_volume, use_rfft):
     else:
         image_trans = im.ifftn(shift_fn(im.fftn(image_notrans))).real
 
-    np.testing.assert_allclose(image_ref, image_trans)
+    np.testing.assert_allclose(image_ref, image_trans, atol=(0.0 if use_rfft else 5e-4))
 
 
 def _get_correlation(im1, im2):

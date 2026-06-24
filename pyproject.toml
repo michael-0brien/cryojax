@@ -22,6 +22,7 @@ dependencies = [
     "equinox>=0.11.0",
     "jaxtyping>=0.2.23",
     "lineax",
+    "nufftax>=0.6.0",
     "mrcfile",
     "starfile",
     "pandas",

@@ -22,6 +22,7 @@ from ...ndimage import (
     map_coordinates,
     map_coordinates_spline,
     pad_to_shape,
+    query_efficient_grid_size,
     resize_with_crop_or_pad,
     rfftn,
 )
@@ -110,17 +111,27 @@ class FourierVoxelGridVolume(AbstractFourierVoxelVolume, strict=True):
         # Cast to jax array
         real_voxel_grid = jnp.asarray(real_voxel_grid, dtype=float)
         # Pad template
-        if pad_scale < 1.0:
+        if isinstance(pad_scale, float) and pad_scale < 1.0:
             raise ValueError("`pad_scale` must be greater than 1.0")
         # ... always pad to even size to avoid interpolation issues in
         # fourier slice extraction.
-        padded_shape = cast(
-            tuple[int, int, int],
-            tuple([int(s * pad_scale) for s in real_voxel_grid.shape]),
-        )
-        padded_real_voxel_grid = pad_to_shape(
-            real_voxel_grid, padded_shape, mode=pad_mode
-        )
+        if pad_scale == 1.0:
+            padded_shape = real_voxel_grid.shape
+            padded_real_voxel_grid = real_voxel_grid
+        elif pad_scale > 1.0:
+            padded_shape = query_efficient_grid_size(
+                real_voxel_grid.shape,
+                pad_scale=pad_scale,
+            )
+            padded_real_voxel_grid = pad_to_shape(
+                real_voxel_grid, padded_shape, mode=pad_mode
+            )
+        else:
+            raise ValueError(
+                "Invalid value for "
+                "`FourierVoxelGridVolume.from_real_voxel_grid(..., pad_scale=...)`. "
+                f"This must be greater than `1.0`, but got value `{pad_scale}`."
+            )
         if sinc_correction:
             coordinate_grid = make_coordinate_grid(padded_shape)
             correction_mask = SincCorrectionMask(coordinate_grid)
@@ -202,9 +213,8 @@ class FourierVoxelSplineVolume(AbstractFourierVoxelVolume, strict=True):
             raise ValueError("`pad_scale` must be greater than 1.0")
         # ... always pad to even size to avoid interpolation issues in
         # fourier slice extraction.
-        padded_shape = cast(
-            tuple[int, int, int],
-            tuple([int(s * pad_scale) for s in real_voxel_grid.shape]),
+        padded_shape = query_efficient_grid_size(
+            real_voxel_grid.shape, pad_scale=pad_scale
         )
         padded_real_voxel_grid = pad_to_shape(
             real_voxel_grid, padded_shape, mode=pad_mode

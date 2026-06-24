@@ -1,3 +1,4 @@
+import math
 from typing import Literal
 
 from jaxtyping import Array, Complex
@@ -175,3 +176,69 @@ def enforce_rfftn_self_conjugates(
             f"Passed an array with `ndim = {rfftn_array.ndim}`."
         )
     return rfftn_array
+
+
+def query_efficient_grid_size(
+    shape: tuple[int, ...], pad_scale: float = 1.0, match_parity: bool = False
+) -> tuple[int, ...]:
+    """Select an efficient grid size for FFT"""
+
+    if match_parity:
+        is_same_parity = lambda n1, n2: (n1 % 2) == (n2 % 2)
+    else:
+        is_same_parity = lambda *_: True
+
+    padded_shape = tuple(int(math.ceil(pad_scale * s)) for s in shape)
+
+    def next_smooth_int(n: int, nf: int) -> int:
+        # Check if n is already smooth
+        def is_smooth(x):
+            for p in [2, 3, 5]:
+                while x % p == 0:
+                    x //= p
+            return x == 1
+
+        # Find next smooth number
+        candidate = nf
+        while not (is_smooth(candidate) and is_same_parity(n, candidate)):
+            candidate += 1
+        return candidate
+
+    return tuple(next_smooth_int(n, nf) for n, nf in zip(shape, padded_shape))
+
+
+# def _make_fftshift_phase(
+#     shape: tuple[int, ...],
+#     axes: tuple[int, ...] | None = None,
+# ) -> Array:
+#     """Build the `(-1)^(k1+k2+...)` sign pattern for the full (non-real) FFT.
+
+#     Multiplying `jnp.fft.fftn(x)` by this pattern gives the same result as
+#     `jnp.fft.fftn(jnp.fft.ifftshift(x))`, so the output has DC at corner
+#     (modeord=0 convention). Then `jnp.fft.fftshift` moves DC back to center
+#     if needed for storage.
+
+#     Only exact for even-sized dimensions.
+
+#     **Arguments:**
+
+#     - `shape`: shape of the FFT output array (same as input when s=None).
+#     - `axes`: axes to include; defaults to all axes.
+
+#     **Returns:**
+
+#     Broadcastable ±1 array with the same number of dimensions as `shape`.
+#     """
+#     ndim = len(shape)
+#     if axes is None:
+#         axes = tuple(range(ndim))
+#     else:
+#         axes = tuple(ax % ndim for ax in axes)
+#     phase = jnp.ones(())
+#     for ax in axes:
+#         n = shape[ax]
+#         p = jnp.where(jnp.arange(n) % 2 == 0, 1.0, -1.0)
+#         reshape = [1] * ndim
+#         reshape[ax] = n
+#         phase = phase * p.reshape(reshape)
+#     return phase

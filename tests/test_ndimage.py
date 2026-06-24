@@ -18,7 +18,7 @@ def test_downsample_preserves_sum(shape, downsample_factor):
     upsampled_shape = tuple(downsample_factor * s for s in shape)
     rng_key = jr.key(seed=1234)
     upsampled_image = 2.0 + 1.0 * jr.normal(rng_key, upsampled_shape)
-    image = im.fourier_crop_downsample(upsampled_image, downsample_factor)
+    image = im.fourier_crop_to_shape(upsampled_image, shape)
     np.testing.assert_allclose(image.sum(), upsampled_image.sum())
 
 
@@ -276,6 +276,61 @@ def test_frc_fsc_jit(shape):
 #     np.testing.assert_allclose(crop_1, crop_2)
 
 
+#
+# query_efficient_grid_size
+#
+def _is_smooth(n: int) -> bool:
+    for p in (2, 3, 5):
+        while n % p == 0:
+            n //= p
+    return n == 1
+
+
+@pytest.mark.parametrize(
+    "shape",
+    [(10, 10), (11, 11), (13, 17), (100, 100), (10, 10, 10), (11, 13, 17)],
+)
+def test_query_efficient_grid_size_no_padding(shape):
+    result = im.query_efficient_grid_size(shape)
+    assert len(result) == len(shape)
+    for s, r in zip(shape, result):
+        assert r >= s
+        assert _is_smooth(r)
+
+
+@pytest.mark.parametrize(
+    "shape, pad_scale",
+    [((10, 10), 1.5), ((11, 11), 2.0), ((13, 17), 1.25), ((10, 10, 10), 1.5)],
+)
+def test_query_efficient_grid_size_with_pad_scale(shape, pad_scale):
+    import math
+
+    result = im.query_efficient_grid_size(shape, pad_scale=pad_scale)
+    assert len(result) == len(shape)
+    for s, r in zip(shape, result):
+        assert r >= math.ceil(pad_scale * s)
+        assert _is_smooth(r)
+
+
+@pytest.mark.parametrize(
+    "shape", [(10, 10), (11, 11), (10, 11), (10, 10, 10), (11, 13, 15)]
+)
+def test_query_efficient_grid_size_preserves_parity(shape):
+    result = im.query_efficient_grid_size(shape, pad_scale=1.5, match_parity=True)
+    for s, r in zip(shape, result):
+        assert (s % 2) == (r % 2), f"parity mismatch: shape dim {s}, result dim {r}"
+
+
+def test_query_efficient_grid_size_no_parity_constraint():
+    import math
+
+    shape, pad_scale = (11, 13), 1.5
+    result = im.query_efficient_grid_size(shape, pad_scale=pad_scale, match_parity=False)
+    for s, r in zip(shape, result):
+        assert _is_smooth(r)
+        assert r >= math.ceil(pad_scale * s)
+
+
 def test_operators_instantiate():
     frequency_grid_1d = im.make_1d_frequency_grid(10)
     frequency_grid_2d = im.make_frequency_grid((10, 10))
@@ -302,7 +357,6 @@ _fourier_operators_common = [
     im.PeakedFourierGaussian(),
     im.FourierConstant(1.0),
     im.FourierSinc(),
-    im.FourierExp2D(),
     im.CustomFourierOperator(lambda _, a, b: a + b, 1.0, b=1.0),
     im.FourierDC(),
     im.FourierConstant(1.0) + im.FourierConstant(1.0),
@@ -318,7 +372,7 @@ _real_operators_common = [
 ]
 
 _fourier_operators_1d = _fourier_operators_common
-_fourier_operators_2d = _fourier_operators_common
+_fourier_operators_2d = [*_fourier_operators_common, im.FourierExp2D()]
 _fourier_operators_3d = _fourier_operators_common
 _real_operators_1d = [*_real_operators_common, im.RealGaussian(offset=1.0)]
 _real_operators_2d = [*_real_operators_common, im.RealGaussian(offset=(1.0, -1.0))]

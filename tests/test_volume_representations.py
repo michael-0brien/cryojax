@@ -193,6 +193,41 @@ def test_voxel_volume_loaders():
     assert isinstance(real_volume.coordinate_grid_in_pixels, Float[Array, "_ _ _ 3"])  # type: ignore
 
 
+def _is_smooth(n: int) -> bool:
+    for p in (2, 3, 5):
+        while n % p == 0:
+            n //= p
+    return n == 1
+
+
+@pytest.mark.parametrize("pad_scale", (1.5, 2.0))
+def test_fourier_voxel_grid_pad_scale_produces_smooth_shape(pad_scale):
+    import math
+
+    shape = (10, 10, 10)
+    real_voxel_grid = jnp.zeros(shape, dtype=float)
+    vol = cxs.FourierVoxelGridVolume.from_real_voxel_grid(
+        real_voxel_grid, pad_scale=pad_scale
+    )
+    padded_shape = vol.fourier_voxel_grid.shape
+    for s, p in zip(shape, padded_shape):
+        assert p >= math.ceil(pad_scale * s)
+        assert _is_smooth(p)
+
+
+def test_fourier_voxel_grid_pad_scale_one_unchanged():
+    shape = (10, 10, 10)
+    real_voxel_grid = jnp.zeros(shape, dtype=float)
+    vol = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid, pad_scale=1.0)
+    assert vol.fourier_voxel_grid.shape == shape
+
+
+def test_fourier_voxel_grid_pad_scale_less_than_one_raises():
+    real_voxel_grid = jnp.zeros((10, 10, 10), dtype=float)
+    with pytest.raises(ValueError, match="pad_scale"):
+        cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid, pad_scale=0.5)
+
+
 @pytest.mark.parametrize("pad_scale", (1, 1.1))
 def test_sinc_correction(sample_mrc_path, pad_scale):
     real_voxel_grid = read_array_from_mrc(sample_mrc_path)
@@ -317,10 +352,23 @@ def test_render_options(pdb_info):
 
 @pytest.mark.parametrize(
     "width, voxel_size, shape",
-    ((1.0, 0.5, (64, 64, 64)), (1.0, 0.5, (63, 63, 63))),
+    (
+        (1.0, 0.5, (64, 64, 64)),
+        (1.0, 0.5, (63, 63, 63)),
+        (1.0, 0.5, (64, 64, 64)),
+        (1.0, 0.5, (63, 63, 63)),
+    ),
 )
 def test_fft_atom_render(pdb_info, width, voxel_size, shape):
-    if jnufft is not None:
+    for backend in ["jax-finufft", "nufftax"]:
+        if jnufft is None and backend == "jax-finufft":
+            warnings.warn(
+                "Could not test rendering method `IndependentAtomRenderFn`, "
+                "with backend `'jax-finufft'` mostly likely because it is "
+                "not installed. "
+                f"Error traceback is:\n{JAX_FINUFFT_IMPORT_ERROR}"
+            )
+            continue
         atom_positions, _, _ = pdb_info
         gaussian_volume = cxs.GaussianMixtureVolume(
             atom_positions,
@@ -334,17 +382,16 @@ def test_fft_atom_render(pdb_info, width, voxel_size, shape):
             ),
         )
         gaussian_render_fn = cxs.GaussianMixtureRenderFn(shape, voxel_size)
-        atom_render_fn = cxs.IndependentAtomRenderFn(shape, voxel_size, eps=1e-10)
+        atom_render_fn = cxs.IndependentAtomRenderFn(
+            shape,
+            voxel_size,
+            eps=1e-10,
+            backend=backend,  # type: ignore
+        )
         voxels_by_gaussians = gaussian_render_fn(gaussian_volume)
         voxels_by_atoms = atom_render_fn(atom_volume)
 
         np.testing.assert_allclose(voxels_by_gaussians, voxels_by_atoms, atol=1e-8)
-    else:
-        warnings.warn(
-            "Could not test rendering method `IndependentAtomRenderFn`, "
-            "most likely because `jax_finufft` is not installed. "
-            f"Error traceback is:\n{JAX_FINUFFT_IMPORT_ERROR}"
-        )
 
 
 #
@@ -581,6 +628,54 @@ def test_gmm_shape():
         == gmm2.amplitudes.shape
         == (n_atoms, n_gaussians)
     )
+
+
+@pytest.mark.parametrize("upsampfac", (1.25, 2.0))
+def test_fft_atom_render_custom_upsampfac(upsampfac):
+    """Smoke test: passing a custom upsampfac via options runs without error."""
+    positions = np.array([[0.0, 0.0, 0.0], [1.0, 0.5, -0.5]])
+    shape, voxel_size = (8, 8, 8), 1.0
+    atom_volume = cxs.IndependentAtomVolume(
+        positions=positions,
+        kernel_fns=im.FourierGaussian(amplitude=1.0, b_factor=100.0),
+    )
+    render_fn = cxs.IndependentAtomRenderFn(
+        shape,
+        voxel_size,
+        backend="nufftax",
+        eps=1e-6,
+        options={"upsampfac": upsampfac},
+    )
+    result = render_fn(atom_volume, outputs_real_space=True)
+    assert result.shape == shape
+
+
+@pytest.mark.parametrize("upsampfac", (1.25, 2.0))
+def test_fft_atom_render_custom_upsampfac_jax_finufft(upsampfac):
+    """Smoke test: passing custom opts via options to jax-finufft runs without error."""
+    if jnufft is None:
+        pytest.skip("jax-finufft not installed")
+    from jax_finufft.options import NestedOpts, Opts
+
+    positions = np.array([[0.0, 0.0, 0.0], [1.0, 0.5, -0.5]])
+    shape, voxel_size = (8, 8, 8), 1.0
+    atom_volume = cxs.IndependentAtomVolume(
+        positions=positions,
+        kernel_fns=im.FourierGaussian(amplitude=1.0, b_factor=100.0),
+    )
+    opts = NestedOpts(
+        forward=Opts(upsampfac=upsampfac, gpu_upsampfac=upsampfac),
+        backward=Opts(upsampfac=upsampfac, gpu_upsampfac=upsampfac),
+    )
+    render_fn = cxs.IndependentAtomRenderFn(
+        shape,
+        voxel_size,
+        backend="jax-finufft",
+        eps=1e-6,
+        options={"opts": opts},
+    )
+    result = render_fn(atom_volume, outputs_real_space=True)
+    assert result.shape == shape
 
 
 def _make_scattering_parameters(

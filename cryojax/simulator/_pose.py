@@ -15,7 +15,11 @@ from equinox import AbstractVar, Module
 from jaxtyping import Array, Complex, Float
 
 from ..jax_util import FloatLike, NDArrayLike
-from ..ndimage import FourierPhaseShifts, enforce_rfftn_self_conjugates
+from ..ndimage import (
+    FourierPhaseShifts,
+    enforce_rfftn_self_conjugates,
+    make_1d_frequency_grid,
+)
 from ..rotations import SO3, convert_quaternion_to_euler_angles
 
 
@@ -96,24 +100,31 @@ class AbstractPose(Module, strict=True):
         return fourier_image * translation_operator
 
     def compute_translation_operator(
-        self, frequency_grid_in_angstroms: Float[Array, "y_dim x_dim 2"]
-    ) -> Complex[Array, "y_dim x_dim"]:
-        """Compute the phase shifts from the in-plane translation,
-        given a frequency grid coordinate system.
+        self,
+        shape: tuple[int, int],
+        pixel_size: Float[Array, ""],
+    ) -> Complex[Array, "y_dim x_dim//2+1"]:
+        """Compute the phase shifts from the in-plane translation.
 
         **Arguments:**
 
-        - `frequency_grid_in_angstroms`:
-            A grid of in-plane frequency coordinates $(q_x, q_y)$
+        - `shape`:
+            The real-space image shape $(N_y, N_x)$.
+        - `pixel_size`:
+            The pixel size in Angstroms.
 
         **Returns:**
 
         From the vector $(t_x, t_y)$ (given by `self.offset_in_angstroms`), returns the
         grid of in-plane phase shifts $\\exp{(- 2 \\pi i (t_x q_x + t_y q_y))}$.
         """
-        xy = self.offset_in_angstroms[0:2]
-        compute_fn = FourierPhaseShifts(xy)
-        return compute_fn(frequency_grid_in_angstroms)
+        tx, ty = self.offset_in_angstroms[0], self.offset_in_angstroms[1]
+        q_x, q_y = (
+            make_1d_frequency_grid(shape[1], pixel_size, outputs_rfftfreqs=True),
+            make_1d_frequency_grid(shape[0], pixel_size, outputs_rfftfreqs=False),
+        )
+        phase_x, phase_y = (FourierPhaseShifts(tx)(q_x), FourierPhaseShifts(ty)(q_y))
+        return phase_y[:, None] * phase_x[None, :]
 
     @cached_property
     def offset_x_in_angstroms(self) -> Float[Array, "..."]:
