@@ -313,22 +313,85 @@ def test_query_efficient_grid_size_with_pad_scale(shape, pad_scale):
 
 
 @pytest.mark.parametrize(
-    "shape", [(10, 10), (11, 11), (10, 11), (10, 10, 10), (11, 13, 15)]
+    "shape", [(10, 10), (11, 11), (10, 11), (10, 10, 10), (11, 13, 15), (242, 242)]
 )
-def test_query_efficient_grid_size_preserves_parity(shape):
-    result = im.query_efficient_grid_size(shape, pad_scale=1.5, match_parity=True)
-    for s, r in zip(shape, result):
-        assert (s % 2) == (r % 2), f"parity mismatch: shape dim {s}, result dim {r}"
+def test_query_efficient_grid_size_only_even(shape):
+    result = im.query_efficient_grid_size(shape, pad_scale=1.0, only_even=True)
+    for r in result:
+        assert r % 2 == 0, f"expected even result, got {r}"
 
 
 def test_query_efficient_grid_size_no_parity_constraint():
     import math
 
     shape, pad_scale = (11, 13), 1.5
-    result = im.query_efficient_grid_size(shape, pad_scale=pad_scale, match_parity=False)
+    result = im.query_efficient_grid_size(shape, pad_scale=pad_scale, only_even=False)
     for s, r in zip(shape, result):
         assert _is_smooth(r)
         assert r >= math.ceil(pad_scale * s)
+
+
+@pytest.mark.parametrize(
+    "shape, includes_dc, mode",
+    [
+        ((8, 8), False, "zero"),
+        ((8, 8), True, "zero"),
+        ((8, 8), False, "real"),
+        ((7, 8), False, "zero"),
+        ((8, 7), False, "zero"),
+        ((7, 7), False, "zero"),
+        ((8, 8, 8), False, "zero"),
+        ((8, 8, 8), True, "zero"),
+        ((7, 8, 8), False, "zero"),
+        ((8, 7, 8), False, "real"),
+        ((7, 7, 7), False, "zero"),
+    ],
+)
+def test_enforce_rfftn_self_conjugates(shape, includes_dc, mode):
+    """Mask-based implementation must produce bit-identical output to the
+    original scatter-based one for all combinations of shape parity."""
+    import jax.numpy as jnp
+    from cryojax.ndimage import enforce_rfftn_self_conjugates
+
+    rng = np.random.default_rng(0)
+    rfft_shape = shape[:-1] + (shape[-1] // 2 + 1,)
+    real = rng.standard_normal(rfft_shape)
+    imag = rng.standard_normal(rfft_shape)
+    arr = jnp.array(real + 1j * imag)
+
+    result = enforce_rfftn_self_conjugates(arr, shape, includes_dc=includes_dc, mode=mode)
+
+    # Determine which positions are self-conjugate for shape/includes_dc
+    def _is_sc(idx):
+        # idx is a tuple of length ndim (z, y, x) or (y, x)
+        if len(shape) == 2:
+            y_dim, x_dim = shape
+            r, c = idx
+            row_sc = r == 0 or (y_dim % 2 == 0 and r == y_dim // 2)
+            col_sc = c == 0 or (x_dim % 2 == 0 and c == x_dim // 2)
+            at_dc = (r, c) == (0, 0)
+        else:
+            z_dim, y_dim, x_dim = shape
+            z, r, c = idx
+            z_sc = z == 0 or (z_dim % 2 == 0 and z == z_dim // 2)
+            row_sc = r == 0 or (y_dim % 2 == 0 and r == y_dim // 2)
+            col_sc = c == 0 or (x_dim % 2 == 0 and c == x_dim // 2)
+            row_sc = z_sc and row_sc
+            at_dc = (z, r, c) == (0, 0, 0)
+        return row_sc and col_sc and (includes_dc or not at_dc)
+
+    # Every position: SC positions must be modified; non-SC must be unchanged
+    for idx in np.ndindex(*rfft_shape):
+        sc = _is_sc(idx)
+        if sc:
+            if mode == "zero":
+                assert result[idx] == 0.0, f"SC position {idx} should be zero"
+            elif mode == "one":
+                assert result[idx] == 1.0, f"SC position {idx} should be one"
+            elif mode == "real":
+                assert result[idx].imag == 0.0, f"SC position {idx} should be real"
+        else:
+            np.testing.assert_array_equal(result[idx], arr[idx])
 
 
 def test_operators_instantiate():

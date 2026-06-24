@@ -1223,7 +1223,7 @@ def _prepare_upsample(
         else:
             # Otherwise, find an efficient grid for FFTs close to
             # the requested upsampfac and return the corrected upsampfac
-            shape_u = query_efficient_grid_size(shape, upsampfac, match_parity=False)
+            shape_u = query_efficient_grid_size(shape, upsampfac)
             dim_u = shape_u[0]
             upsampfac = dim_u / dim
         return (

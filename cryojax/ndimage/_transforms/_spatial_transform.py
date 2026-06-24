@@ -7,7 +7,7 @@ from jaxtyping import Array, Complex, Float
 
 from ...jax_util import FloatLike, NDArrayLike
 from ...rotations import SO2
-from .._fourier_utils import enforce_rfftn_self_conjugates
+from .._fourier_utils import enforce_rfftn_self_conjugates, make_fftshift_phase
 from .._map_coordinates import map_coordinates
 from .._operators import FourierPhaseShifts
 from ._base_transform import AbstractImageTransform
@@ -205,9 +205,16 @@ class RotateFFT(AbstractImageTransform, strict=True):
                 "but that of the `frequency_grid` was "
                 f"{self.frequency_grid.shape}."
             )
+        dim = image.shape[0]
+        if dim % 2 == 1:
+            raise ValueError(
+                "Only even parity images are supported in `RotateFFT`. Got "
+                f"an image of shape `{image.shape}`."
+            )
         shift_axes = (0,) if self.is_rfft else (0, 1)
         # Shift images and grid so that zero is in center
-        fourier_image = image
+        factors = make_fftshift_phase((dim, dim), outputs_rfft=self.is_rfft)
+        fourier_image = factors * image
         fourier_image_c = jnp.fft.fftshift(fourier_image, axes=shift_axes)
         frequency_grid_c = jnp.fft.fftshift(self.frequency_grid, axes=shift_axes)
         # Rotate the grid
@@ -229,7 +236,7 @@ class RotateFFT(AbstractImageTransform, strict=True):
             rotated_image = enforce_rfftn_self_conjugates(
                 rotated_image, (dim, dim), includes_dc=True, mode="real"
             )
-        return rotated_image
+        return factors * rotated_image
 
 
 def _get_rotation_matrix(angle, convention):

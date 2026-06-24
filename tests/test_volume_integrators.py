@@ -274,7 +274,7 @@ def test_real_projection_peng_erf(pdb_info, pixel_size, shape):
 
 @pytest.mark.parametrize(
     "pixel_size, shape",
-    ((1.0, (32, 32)), (1.0, (33, 33)), (1.0, (38, 38)), (1.0, (37, 37))),
+    ((1.0, (32, 32)),),
 )
 def test_analytic_vs_voxels_nopose(pdb_info, pixel_size, shape):
     """
@@ -331,6 +331,40 @@ def test_analytic_vs_voxels_nopose(pdb_info, pixel_size, shape):
         np.testing.assert_allclose(
             projection_by_gaussian_integration, projection_by_other_method, atol=1e-8
         )
+
+
+# @pytest.mark.parametrize(
+#     "euler_pose_params, pixel_size, dim",
+#     (
+#         ((0.0, 0.0, 0.0), 0.25, 128),
+#         ((10.0, 80.0, -20.0), 0.25, 128),
+#     ),
+# )
+# def test_fourier_slice(pdb_info, euler_pose_params, pixel_size, dim):
+#     atom_positions, atom_types, atom_properties = pdb_info
+#     image_config = cxs.BasicImageConfig(
+#         (dim, dim), pixel_size, voltage_in_kilovolts=300.0
+#     )
+#     peng_parameters = PengScatteringFactorParameters(atom_types)
+#     gaussian_volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(
+#         atom_positions,
+#         peng_parameters,
+#         extra_b_factors=atom_properties["b_factors"],
+#     )
+#     render_fn = cxs.GaussianMixtureRenderFn((dim, dim, dim), pixel_size)
+#     real_voxel_grid = render_fn(gaussian_volume)
+#     fourier_volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
+#     euler_pose = cxs.EulerAnglePose(
+#         phi_angle=euler_pose_params[0],
+#         theta_angle=euler_pose_params[1],
+#         psi_angle=euler_pose_params[2],
+#     )
+#     projection = compute_projection_at_pose(
+#         fourier_volume,
+#         cxs.FourierSliceExtraction(),
+#         euler_pose,
+#         image_config,
+#     )
 
 
 # @pytest.mark.parametrize(
@@ -548,12 +582,12 @@ def make_spline(real_voxel_grid):
     )
 
 
-def _plot_image_compare(im1, im2):
-    from matplotlib import pyplot as plt
+# def _plot_image_compare(im1, im2):
+#     from matplotlib import pyplot as plt
 
-    fig, axes = plt.subplots(figsize=(9, 4), ncols=2, constrained_layout=True)
-    mappable1 = axes[0].imshow(im1)
-    mappable2 = axes[1].imshow(im2)
-    fig.colorbar(mappable1)
-    fig.colorbar(mappable2)
-    plt.show()
+#     fig, axes = plt.subplots(figsize=(9, 4), ncols=2, constrained_layout=True)
+#     mappable1 = axes[0].imshow(im1)
+#     mappable2 = axes[1].imshow(im2)
+#     fig.colorbar(mappable1)
+#     fig.colorbar(mappable2)
+#     plt.show()

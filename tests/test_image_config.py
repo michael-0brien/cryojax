@@ -115,6 +115,27 @@ def test_precompute(padded_shape, precompute_mode):
         ) is precomputed_grids.get(real_space=False, padding=False, full=True)
 
 
+@pytest.mark.parametrize("shape", [(10, 10), (11, 11), (10, 11), (11, 10)])
+def test_pixel_size_gradient_no_nan(shape):
+    """Gradient of the radial norm of physical grids w.r.t. pixel_size must be finite."""
+    import equinox as eqx
+    import jax.numpy as jnp
+
+    def radial_norm_sum(pixel_size):
+        cfg = cxs.BasicImageConfig(
+            shape, pixel_size=pixel_size, voltage_in_kilovolts=300.0
+        )
+        coord = cfg.get_coordinate_grid(physical=True)
+        freq = cfg.get_frequency_grid(physical=True)
+        return jnp.sum(jnp.linalg.norm(coord, axis=-1)) + jnp.sum(
+            jnp.linalg.norm(freq, axis=-1)
+        )
+
+    ps = jnp.array(1.5)
+    grad = eqx.filter_grad(radial_norm_sum)(ps)
+    assert jnp.isfinite(grad), f"NaN/Inf gradient for shape {shape}: {grad}"
+
+
 def test_compile_time_eval():
     c = cxs.BasicImageConfig(
         (5, 5),

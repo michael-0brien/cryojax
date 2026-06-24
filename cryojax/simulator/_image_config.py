@@ -740,23 +740,29 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
 def _safe_multiply_by_constant(
     grid: Float[Array, "y_dim x_dim 2"], constant: Float[Array, ""], is_fft_grid: bool
 ) -> Float[Array, "y_dim x_dim 2"]:
-    """Multiplies a coordinate grid by a constant in a
-    safe way for gradient computation.
+    """Multiply a coordinate grid by a constant, keeping zero-valued
+    components independent of `constant` so that gradients through
+    `jnp.linalg.norm(grid, axis=-1)` remain finite at the origin.
 
-    If we naively wrote `grid * constant`, when we
-    take gradients with respect to pixel size there will be a
-    term `sqrt(grid * constant)` that needs to be differentiated.
-    This is undefined at locations where the grid is equal to zero.
+    For an FFT frequency grid (DC at corner): the x-component is zero in
+    column 0 and the y-component is zero in row 0; those entries are left
+    untouched.  For a real-space coordinate grid (center at N//2): the
+    x-component is zero in the center column and the y-component is zero
+    in the center row; those entries are left untouched.
     """
+    y_dim, x_dim = grid.shape[0], grid.shape[1]
+    row_idx = jnp.arange(y_dim)
+    col_idx = jnp.arange(x_dim)
     if is_fft_grid:
-        grid = grid.at[:, 1:, 0].multiply(constant)
-        grid = grid.at[1:, :, 1].multiply(constant)
-
+        scale_x = jnp.where(col_idx > 0, constant, 1.0)
+        scale_y = jnp.where(row_idx > 0, constant, 1.0)
     else:
-        s1, s2 = grid.shape[0], grid.shape[1]
-        grid = grid.at[:, s2 // 2, 0].multiply(constant)
-        grid = grid.at[s1 // 2, :, 1].multiply(constant)
-    return grid
+        scale_x = jnp.where(col_idx != x_dim // 2, constant, 1.0)
+        scale_y = jnp.where(row_idx != y_dim // 2, constant, 1.0)
+    return jnp.stack(
+        [grid[..., 0] * scale_x[None, :], grid[..., 1] * scale_y[:, None]],
+        axis=-1,
+    )
 
 
 def _set_padded_shape(
@@ -769,7 +775,7 @@ def _set_padded_shape(
     elif pad_scale > 1.0:
         return cast(
             tuple[int, int],
-            query_efficient_grid_size(shape, pad_scale=pad_scale),
+            query_efficient_grid_size(shape, pad_scale=pad_scale, only_even=True),
         )
     else:
         raise ValueError(
