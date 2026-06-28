@@ -6,12 +6,10 @@ adapted from `mdtraj`.
 import os
 import pathlib
 import typing
-import warnings
 from copy import copy
 from typing import Any, Literal, TypedDict, overload
 from xml.etree import ElementTree
 
-import equinox.internal as eqxi
 import jax
 import mdtraj
 import mmdf
@@ -38,7 +36,6 @@ def read_atoms_from_pdb(
     filename: str | pathlib.Path,
     *,
     loads_properties: Literal[False],
-    loads_b_factors: bool = False,
     center: bool = True,
     selection_string: str = "all",
     model_index: int | None = None,
@@ -53,7 +50,6 @@ def read_atoms_from_pdb(  # type: ignore
     filename: str | pathlib.Path,
     *,
     loads_properties: Literal[True],
-    loads_b_factors: bool = False,
     center: bool = True,
     selection_string: str = "all",
     model_index: int | None = None,
@@ -72,7 +68,6 @@ def read_atoms_from_pdb(
     filename: str | pathlib.Path,
     *,
     loads_properties: bool = False,
-    loads_b_factors: bool = False,
     center: bool = True,
     selection_string: str = "all",
     model_index: int | None = None,
@@ -82,12 +77,10 @@ def read_atoms_from_pdb(
 ) -> tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, "... n_atoms"]]: ...
 
 
-@eqxi.doc_remove_args("loads_b_factors")
 def read_atoms_from_pdb(
     filename: str | pathlib.Path,
     *,
     loads_properties: bool = False,
-    loads_b_factors: bool = False,
     center: bool = True,
     selection_string: str = "all",
     model_index: int | None = None,
@@ -165,7 +158,6 @@ def read_atoms_from_pdb(
     return mmdf_to_atoms(
         df,
         loads_properties=loads_properties,
-        loads_b_factors=loads_b_factors,
         center=center,
         selection_string=selection_string,
         model_index=model_index,
@@ -180,7 +172,6 @@ def mmdf_to_atoms(
     df: pd.DataFrame,
     *,
     loads_properties: Literal[False],
-    loads_b_factors: bool = False,
     center: bool = True,
     selection_string: str = "all",
     model_index: int | None = None,
@@ -195,7 +186,6 @@ def mmdf_to_atoms(  # type: ignore
     df: pd.DataFrame,
     *,
     loads_properties: Literal[True],
-    loads_b_factors: bool = False,
     center: bool = True,
     selection_string: str = "all",
     model_index: int | None = None,
@@ -214,7 +204,6 @@ def mmdf_to_atoms(
     df: pd.DataFrame,
     *,
     loads_properties: bool = False,
-    loads_b_factors: bool = False,
     center: bool = True,
     selection_string: str = "all",
     model_index: int | None = None,
@@ -228,7 +217,6 @@ def mmdf_to_atoms(
     df: pd.DataFrame,
     *,
     loads_properties: bool = False,
-    loads_b_factors: bool = False,
     center: bool = True,
     selection_string: str = "all",
     model_index: int | None = None,
@@ -284,21 +272,12 @@ def mmdf_to_atoms(
         atom_positions = center_atom_positions(atom_positions, atom_masses, atom_axis=1)
     # Return, without leading dimensions if there is only one structure
     atom_positions = atom_positions[0] if atom_positions.shape[0] == 1 else atom_positions
-    if loads_properties or loads_b_factors:
+    if loads_properties:
         # Optionally return atom properties
         atom_properties = jax.tree.map(
             lambda arr: arr[0] if arr.shape[0] == 1 else arr, atom_properties
         )
-        if loads_b_factors:
-            warnings.warn(
-                "`loads_b_factor` option is deprecated and will be removed in "
-                "cryoJAX 0.6.0. Use `loads_properties` instead.",
-                category=FutureWarning,
-                stacklevel=2,
-            )
-            return atom_positions, atomic_numbers, atom_properties["b_factors"]
-        else:
-            return atom_positions, atomic_numbers, atom_properties
+        return atom_positions, atomic_numbers, atom_properties
     else:
         return atom_positions, atomic_numbers
 

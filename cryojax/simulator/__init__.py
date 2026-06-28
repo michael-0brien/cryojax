@@ -1,5 +1,3 @@
-# Deprecation warnings
-import warnings as _warnings
 from typing import Any as _Any
 
 from ._api_utils import (
@@ -77,79 +75,31 @@ from ._volume import (
 )
 
 
+_REMOVED = {
+    "AberratedAstigmaticCTF": "AstigmaticCTF",
+    "CTF": "AstigmaticCTF",
+    "NufftProjection": "RealVoxelProjection",
+    "PengAtomicVolume": "GaussianMixtureVolume",
+    "UncorrelatedGaussianNoiseModel": "GaussianWhiteNoiseModel",
+    "CorrelatedGaussianNoiseModel": "GaussianColoredNoiseModel",
+    "DiscreteStructuralEnsemble": None,
+}
+_MOVED = {
+    "PengScatteringFactorParameters": "cryojax.constants",
+}
+
+
 def __getattr__(name: str) -> _Any:
-    # Future deprecations
-    if name == "AberratedAstigmaticCTF":
-        _warnings.warn(
-            "'AberratedAstigmaticCTF' is deprecated and will be removed in "
-            "cryoJAX 0.6.0. Use 'AstigmaticCTF' instead.",
-            category=FutureWarning,
-            stacklevel=2,
+    if name in _REMOVED:
+        replacement = _REMOVED[name]
+        if replacement is not None:
+            raise AttributeError(
+                f"'{name}' was removed in cryoJAX 0.6.0. Use '{replacement}' instead."
+            )
+        raise AttributeError(f"'{name}' was removed in cryoJAX 0.6.0.")
+    if name in _MOVED:
+        raise AttributeError(
+            f"'{name}' was removed from `cryojax.simulator` in cryoJAX 0.6.0. "
+            f"Use `{_MOVED[name]}.{name}` instead."
         )
-        return AstigmaticCTF
-    if name == "CTF":
-        _warnings.warn(
-            "Alias 'CTF' is deprecated and will be removed in "
-            "cryoJAX 0.6.0. Use 'AstigmaticCTF' instead.",
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        return AstigmaticCTF
-    if name == "NufftProjection":
-        _warnings.warn(
-            "'NufftProjection' is deprecated and will be removed in "
-            "cryoJAX 0.6.0. Use 'RealVoxelProjection' instead.",
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        return RealVoxelProjection
-    if name == "PengScatteringFactorParameters":
-        _warnings.warn(
-            "'PengScatteringFactorParameters' has been moved to `cryojax.constants` "
-            "will be removed from `cryojax.simulator` in "
-            "cryoJAX 0.6.0.",
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        from ..constants import PengScatteringFactorParameters
-
-        return PengScatteringFactorParameters
-    if name == "PengAtomicVolume":
-        _warnings.warn(
-            "'PengAtomicVolume' is deprecated and will be removed in "
-            "cryoJAX 0.6.0. To achieve identical functionality, use "
-            "`GaussianMixtureVolume.from_tabulated_parameters`. "
-            "This is a breaking change if you are "
-            "directly using `PengAtomicVolume.__init__`.",
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        return GaussianMixtureVolume
-    if name == "UncorrelatedGaussianNoiseModel":
-        _warnings.warn(
-            "'UncorrelatedGaussianNoiseModel' is deprecated and "
-            "will be removed in cryoJAX 0.6.0. Instead, use "
-            "'GaussianWhiteNoiseModel'.",
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        return GaussianWhiteNoiseModel
-    if name == "CorrelatedGaussianNoiseModel":
-        _warnings.warn(
-            "'CorrelatedGaussianNoiseModel' is deprecated and "
-            "will be removed in cryoJAX 0.6.0. Instead, use "
-            "'GaussianColoredNoiseModel'.",
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        return GaussianColoredNoiseModel
-    # Deprecated in previous versions
-    if name == "DiscreteStructuralEnsemble":
-        raise ImportError(
-            "'DiscreteStructuralEnsemble' was deprecated in cryoJAX 0.5.0. "
-            "To achieve similar functionality, see the examples section "
-            "of the documentation: "
-            "https://michael-0brien.github.io/cryojax/examples/simulate-relion-dataset/.",
-        )
-
     raise AttributeError(f"cannot import name '{name}' from 'cryojax.simulator'")

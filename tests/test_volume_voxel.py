@@ -796,7 +796,6 @@ def test_z_plane_batched_vs_non_batched_loop_agreement(
     atom_positions, atom_types = read_atoms_from_pdb(
         sample_pdb_path,
         center=True,
-        loads_b_factors=False,
         selection_string="not element H",
     )
     atom_volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(
