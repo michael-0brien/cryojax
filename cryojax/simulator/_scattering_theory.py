@@ -155,7 +155,7 @@ class WeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
         contrast_spectrum = self.transfer_theory.propagate_object(  # noqa: E501
             object_spectrum,
             image_config,
-            input_is_ewald_sphere=self.volume_integrator.outputs_ewald_sphere,
+            is_ewald_sphere=self.volume_integrator.outputs_ewald_sphere,
             defocus_offset=defocus_offset,
         )
 
@@ -182,11 +182,12 @@ class WeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
         return intensity_spectrum
 
 
-class StrongPhaseScatteringTheory(AbstractWaveScatteringTheory, strict=True):
-    """Scattering theory for strong phase objects. This is analogous to
-    a Moliere high-energy approximation in high-energy physics.
+class RytovScatteringTheory(AbstractWaveScatteringTheory, strict=True):
+    """Scattering theory for a weakly scattering object with significant phase
+    shifts. This is based on what is called the Rytov approximation to the
+    underlying wave equation.
 
-    This is the simplest model for multiple scattering events.
+    This is the simplest model for multiple scattering through the specimen.
 
     !!! info
         Unlike in the weak-phase approximation, it is not possible to absorb a model
@@ -262,14 +263,4 @@ def _compute_complex_potential(
     amplitude_contrast_ratio: Float[Array, ""] | float,
 ) -> Complex[Array, "y_dim x_dim"]:
     ac = amplitude_contrast_ratio
-    if jnp.iscomplexobj(in_plane_potential):
-        raise NotImplementedError(
-            "You may have tried to use a `StrongPhaseScatteringTheory` "
-            "together with an Ewald sphere method for simulating images. "
-            "This is not implemented!"
-        )
-        # return jnp.sqrt(1.0 - ac**2) * integrated_potential.real + 1.0j * (
-        #     integrated_potential.imag + ac * integrated_potential.real
-        # )
-    else:
-        return (jnp.sqrt(1.0 - ac**2) + 1.0j * ac) * in_plane_potential
+    return (jnp.sqrt(1.0 - ac**2) + 1.0j * ac) * in_plane_potential

@@ -59,7 +59,7 @@ def test_scattering_theories_no_pose(
         atom_potential,
         pose,
         instrument_config,
-        cxs.StrongPhaseScatteringTheory(
+        cxs.RytovScatteringTheory(
             cxs.GaussianMixtureProjection(sampling_mode="average"),
             cxs.WaveTransferTheory(ctf),
             amplitude_contrast_ratio=ac,
@@ -138,7 +138,7 @@ def test_scattering_theories_pose(
         atom_potential,
         pose,
         instrument_config,
-        cxs.StrongPhaseScatteringTheory(
+        cxs.RytovScatteringTheory(
             cxs.GaussianMixtureProjection(sampling_mode="average"),
             cxs.WaveTransferTheory(ctf),
             amplitude_contrast_ratio=ac,

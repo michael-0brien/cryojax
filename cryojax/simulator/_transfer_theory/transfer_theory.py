@@ -77,7 +77,7 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
         image_config: AbstractImageConfig,
         *,
         defocus_offset: FloatLike | None = None,
-        input_is_ewald_sphere: bool = False,
+        is_ewald_sphere: bool = False,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         """Apply the CTF directly to the phase shifts in the exit plane.
 
@@ -88,7 +88,7 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
             below it.
         - `image_config`:
             The configuration of the resulting image.
-        - `input_is_ewald_sphere`:
+        - `is_ewald_sphere`:
             If `False`, the `object_spectrum` is a projection
             approximation and is therefore the fourier transform of a real-valued
             array. If `True`, `object_spectrum` is extracted from
@@ -100,7 +100,7 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
         """
         amplitude_contrast_ratio = error_if_not_fractional(self.amplitude_contrast_ratio)
         frequency_grid = image_config.get_frequency_grid(padding=True, physical=True)
-        if not input_is_ewald_sphere:
+        if not is_ewald_sphere:
             # Compute the CTF, including additional phase shifts
             ctf_array = self.ctf(
                 frequency_grid,

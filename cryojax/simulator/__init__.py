@@ -41,7 +41,7 @@ from ._pose import (
 from ._scattering_theory import (
     AbstractScatteringTheory as AbstractScatteringTheory,
     AbstractWaveScatteringTheory as AbstractWaveScatteringTheory,
-    StrongPhaseScatteringTheory as StrongPhaseScatteringTheory,
+    RytovScatteringTheory as RytovScatteringTheory,
     WeakPhaseScatteringTheory as WeakPhaseScatteringTheory,
 )
 from ._transfer_theory import (
