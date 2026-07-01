@@ -50,6 +50,7 @@ except ModuleNotFoundError as err:
 
 _FSE = cxs.FourierSliceExtraction()
 _FSE_NO_SCALE = cxs.FourierSliceExtraction(outputs_integral=False)
+_ESE = cxs.EwaldSphereExtraction()
 _GMM_INTEGRATOR = cxs.GaussianMixtureProjection(sampling_mode="average")
 
 
@@ -466,6 +467,160 @@ def test_grid_vs_spline_theta90_phi0(
         )
     )
     assert err < 1e-6
+
+
+# ── EwaldSphereExtraction high-voltage limit ──────────────────────────────────
+
+
+def test_ewald_sphere_high_voltage_limit_grid(fourier_grid_volume, image_config):
+    """At sufficiently high voltage, the Ewald sphere curvature vanishes and
+    `EwaldSphereExtraction` must reduce to `FourierSliceExtraction`.
+    """
+    high_voltage_config = cxs.BasicImageConfig(
+        image_config.shape,
+        pixel_size=image_config.pixel_size,
+        voltage_in_kilovolts=1e6,
+    )
+    err = float(
+        _max_abs_error(
+            fourier_grid_volume, fourier_grid_volume, _FSE, _ESE, high_voltage_config
+        )
+    )
+    assert err < 5e-5
+
+
+def test_ewald_sphere_high_voltage_limit_spline(fourier_spline_volume, image_config):
+    """Same high-voltage limit check for the spline-interpolated volume."""
+    high_voltage_config = cxs.BasicImageConfig(
+        image_config.shape,
+        pixel_size=image_config.pixel_size,
+        voltage_in_kilovolts=1e6,
+    )
+    err = float(
+        _max_abs_error(
+            fourier_spline_volume,
+            fourier_spline_volume,
+            _FSE,
+            _ESE,
+            high_voltage_config,
+        )
+    )
+    assert err < 5e-5
+
+
+# ── EwaldSphereExtraction vs analytic ground truth ────────────────────────────
+#
+# A gaussian mixture has a closed-form 3D fourier transform,
+#     hat_V(q) = sum_i a_i * exp(-2 pi^2 sigma_i^2 |q|^2) * exp(-2 pi i q . r_i),
+# evaluated here directly on the curved Ewald sphere surface (paraxial
+# approximation q_z = wavelength / 2 * |q_parallel|^2, valid at identity pose
+# where the beam axis is exactly z), independent of the voxel grid entirely.
+#
+# A variance of 4 A^2 (sigma=2 px) is used, rather than sigma=1 px used
+# elsewhere in this module, so the 32^3 voxel grid resolves the gaussians
+# well; narrower gaussians expose ordinary grid-rendering aliasing unrelated
+# to Ewald curvature.
+
+_TWO_ATOM_POSITIONS = np.array([[0.0, 0.0, 0.0], [3.0, -2.0, 1.5]])
+_TWO_ATOM_AMPLITUDES = np.array([1.0, 1.3])
+_TWO_ATOM_VARIANCES = np.array([4.0, 4.0])
+
+
+def _gaussian_mixture_fourier_transform(
+    positions: Float[Array, "n 3"],
+    amplitudes: Float[Array, " n"],
+    variances: Float[Array, " n"],
+    frequencies_in_angstroms: Float[Array, "... 3"],
+) -> Array:
+    """Closed-form 3D fourier transform of a mixture of isotropic gaussians,
+    evaluated at arbitrary frequency coordinates (in inverse angstroms).
+    """
+    q_squared = jnp.sum(frequencies_in_angstroms**2, axis=-1)
+    transform = jnp.zeros(q_squared.shape, dtype=complex)
+    for position, amplitude, variance in zip(positions, amplitudes, variances):
+        phase = -2j * jnp.pi * jnp.sum(frequencies_in_angstroms * position, axis=-1)
+        transform = transform + amplitude * jnp.exp(
+            -2 * jnp.pi**2 * variance * q_squared
+        ) * jnp.exp(phase)
+    return transform
+
+
+def _ewald_sphere_analytic_ground_truth(volume, voltage_in_kilovolts: float) -> Array:
+    config = cxs.BasicImageConfig(
+        volume.frequency_slice_in_pixels.shape[1:3],
+        pixel_size=1.0,
+        voltage_in_kilovolts=voltage_in_kilovolts,
+    )
+    wavelength = config.wavelength_in_angstroms
+    # Curved Ewald sphere frequency coordinates (paraxial approximation, at
+    # identity pose the beam/projection axis is exactly z).
+    q_at_slice = volume.frequency_slice_in_pixels[0]
+    q_parallel_squared = jnp.sum(q_at_slice[..., :2] ** 2, axis=-1)
+    q_z_curvature = 0.5 * wavelength * q_parallel_squared
+    q_at_surface = q_at_slice.at[..., 2].add(q_z_curvature)
+
+    transform = _gaussian_mixture_fourier_transform(
+        _TWO_ATOM_POSITIONS, _TWO_ATOM_AMPLITUDES, _TWO_ATOM_VARIANCES, q_at_surface
+    )
+    # cryojax's real-space convention puts the origin at array index N // 2,
+    # so any analytic transform evaluated at raw (corner-indexed) frequency
+    # coordinates must pick up the corresponding (-1)^k checkerboard phase.
+    checkerboard_phase = im.make_fftshift_phase(transform.shape)
+    return jnp.fft.ifftshift(checkerboard_phase * transform)
+
+
+@pytest.fixture(scope="module")
+def two_atom_grid_volume():
+    volume = cxs.GaussianMixtureVolume(
+        _TWO_ATOM_POSITIONS,
+        amplitudes=_TWO_ATOM_AMPLITUDES,
+        variances=_TWO_ATOM_VARIANCES,
+    )
+    render_fn = cxs.GaussianMixtureRenderFn((32, 32, 32), voxel_size=1.0)
+    return cxs.FourierVoxelGridVolume.from_real_voxel_grid(render_fn(volume))
+
+
+@pytest.fixture(scope="module")
+def two_atom_spline_volume():
+    volume = cxs.GaussianMixtureVolume(
+        _TWO_ATOM_POSITIONS,
+        amplitudes=_TWO_ATOM_AMPLITUDES,
+        variances=_TWO_ATOM_VARIANCES,
+    )
+    render_fn = cxs.GaussianMixtureRenderFn((32, 32, 32), voxel_size=1.0)
+    return cxs.FourierVoxelSplineVolume.from_real_voxel_grid(render_fn(volume))
+
+
+def test_ewald_sphere_matches_analytic_ground_truth_grid(two_atom_grid_volume):
+    """`EwaldSphereExtraction` must agree with the closed-form gaussian mixture
+    fourier transform evaluated directly on the curved Ewald sphere surface.
+    """
+    voltage_in_kilovolts = 60.0  # low voltage: large, easily-detectable curvature
+    config = cxs.BasicImageConfig(
+        (32, 32), pixel_size=1.0, voltage_in_kilovolts=voltage_in_kilovolts
+    )
+    ese_fourier = _ESE.integrate(two_atom_grid_volume, config, outputs_real_space=False)
+    analytic = _ewald_sphere_analytic_ground_truth(
+        two_atom_grid_volume, voltage_in_kilovolts
+    )
+    err = float(jnp.max(jnp.abs(ese_fourier - analytic)))
+    peak = float(jnp.max(jnp.abs(ese_fourier)))
+    assert err < 0.02 * peak
+
+
+def test_ewald_sphere_matches_analytic_ground_truth_spline(two_atom_spline_volume):
+    """Same analytic ground truth check for the spline-interpolated volume."""
+    voltage_in_kilovolts = 60.0
+    config = cxs.BasicImageConfig(
+        (32, 32), pixel_size=1.0, voltage_in_kilovolts=voltage_in_kilovolts
+    )
+    ese_fourier = _ESE.integrate(two_atom_spline_volume, config, outputs_real_space=False)
+    analytic = _ewald_sphere_analytic_ground_truth(
+        two_atom_spline_volume, voltage_in_kilovolts
+    )
+    err = float(jnp.max(jnp.abs(ese_fourier - analytic)))
+    peak = float(jnp.max(jnp.abs(ese_fourier)))
+    assert err < 0.02 * peak
 
 
 # ── from_fourier_voxel_grid constructor equivalence ───────────────────────────

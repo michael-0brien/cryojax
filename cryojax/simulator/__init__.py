@@ -60,6 +60,7 @@ from ._volume import (
     AbstractVoxelVolume as AbstractVoxelVolume,
     AutoVolumeProjection as AutoVolumeProjection,
     AutoVolumeRenderFn as AutoVolumeRenderFn,
+    EwaldSphereExtraction as EwaldSphereExtraction,
     FourierSliceExtraction as FourierSliceExtraction,
     FourierVoxelGridVolume as FourierVoxelGridVolume,
     FourierVoxelSplineVolume as FourierVoxelSplineVolume,
