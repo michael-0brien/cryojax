@@ -195,7 +195,7 @@ class RytovScatteringTheory(AbstractWaveScatteringTheory, strict=True):
         Instead, it is necessary to compute a complex scattering potential, where the
         imaginary part captures inelastic scattering.
 
-        In particular, given a projected electrostatic potential $\\u(x, y)$, the
+        In particular, given a projected electrostatic potential $u(x, y)$, the
         complex potential $\\phi(x, y)$ for amplitude contrast ratio $\\alpha$ is
 
         $$\\phi(x, y) = \\sqrt{1 - \\alpha^2} \\ u(x, y) + i \\alpha \\ u(x, y).$$
