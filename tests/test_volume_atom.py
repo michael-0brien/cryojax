@@ -512,6 +512,45 @@ class TestRenderGMMToVoxelsWithSpreadingBackend:
             assert jnp.all(jnp.isfinite(g))
 
 
+# ── GaussianMixture*: n_batches agreement (dense and spread backends) ────────
+
+
+@pytest.mark.parametrize("n_batches", (1, 2, 3))
+@pytest.mark.parametrize("eps", (None, 1e-10))
+def test_gmm_projection_n_batches_agreement(toy_gaussian_cloud, eps, n_batches):
+    atom_positions, ff_a, ff_b, n_voxels_per_side, voxel_size = toy_gaussian_cloud
+    n_pixels_per_side = n_voxels_per_side[:2]
+
+    atomic_volume = cxs.GaussianMixtureVolume(
+        atom_positions, ff_a, ff_b / (8.0 * jnp.pi**2)
+    )
+    image_config = cxs.BasicImageConfig(
+        shape=n_pixels_per_side, pixel_size=voxel_size, voltage_in_kilovolts=300.0
+    )
+    reference = cxs.GaussianMixtureProjection(eps=eps).integrate(
+        atomic_volume, image_config, outputs_real_space=True
+    )
+    batched = cxs.GaussianMixtureProjection(eps=eps, n_batches=n_batches).integrate(
+        atomic_volume, image_config, outputs_real_space=True
+    )
+    assert jnp.allclose(reference, batched, atol=1e-6)
+
+
+@pytest.mark.parametrize("n_batches", (1, 2, 3))
+@pytest.mark.parametrize("eps", (None, 1e-10))
+def test_gmm_render_n_batches_agreement(toy_gaussian_cloud, eps, n_batches):
+    atom_positions, ff_a, ff_b, n_voxels_per_side, voxel_size = toy_gaussian_cloud
+
+    gmm_volume = cxs.GaussianMixtureVolume(atom_positions, ff_a, ff_b / (8.0 * jnp.pi**2))
+    reference = cxs.GaussianMixtureRenderFn(n_voxels_per_side, voxel_size, eps=eps)(
+        gmm_volume
+    )
+    batched = cxs.GaussianMixtureRenderFn(
+        n_voxels_per_side, voxel_size, eps=eps, n_batches=n_batches
+    )(gmm_volume)
+    assert jnp.allclose(reference, batched, atol=1e-6)
+
+
 # ── IndependentAtomVolume: bad instantiation ──────────────────────────────────
 
 

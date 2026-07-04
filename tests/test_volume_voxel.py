@@ -938,13 +938,8 @@ def test_compute_rectangular_voxel_grid(sample_pdb_path):
     assert voxels.shape == shape
 
 
-@pytest.mark.parametrize(
-    "batch_size, n_batches",
-    ((1, 1), (2, 1), (3, 1), (1, 2), (1, 3), (2, 2)),
-)
-def test_z_plane_batched_vs_non_batched_loop_agreement(
-    sample_pdb_path, batch_size, n_batches
-):
+@pytest.mark.parametrize("n_batches", (1, 2, 3))
+def test_atom_batched_vs_non_batched_loop_agreement(sample_pdb_path, n_batches):
     shape = (128, 128, 128)
     voxel_size = 0.5
 
@@ -960,9 +955,7 @@ def test_z_plane_batched_vs_non_batched_loop_agreement(
     render_fn = cxs.GaussianMixtureRenderFn(shape, voxel_size)
     voxels = render_fn(atom_volume)
     batched_render_fn = cxs.GaussianMixtureRenderFn(
-        shape,
-        voxel_size,
-        batch_options=dict(batch_size=batch_size, n_batches=n_batches),
+        shape, voxel_size, n_batches=n_batches
     )
     voxels_with_batching = batched_render_fn(atom_volume)
     np.testing.assert_allclose(voxels, voxels_with_batching)
