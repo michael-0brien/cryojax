@@ -5,6 +5,8 @@ import jax.random as jr
 import numpy as np
 import pytest
 from cryojax.ndimage import make_frequency_grid, make_radial_frequency_grid
+from cryojax.ndimage._spread import spread_2d, spread_3d
+from jax.test_util import check_grads
 
 
 #
@@ -440,3 +442,107 @@ _fourier_operators_3d = _fourier_operators_common
 _real_operators_1d = [*_real_operators_common, im.RealGaussian(offset=1.0)]
 _real_operators_2d = [*_real_operators_common, im.RealGaussian(offset=(1.0, -1.0))]
 _real_operators_3d = [*_real_operators_common, im.RealGaussian(offset=(1.0, -1.0, 0.0))]
+
+
+# ── _spread.py: custom VJP ────────────────────────────────────────────────────
+#
+# Minimal, focused tests of `spread_2d`/`spread_3d` in isolation
+# (finite-difference checks of the custom VJP rule), independent of the full
+# `GaussianMixtureVolume`/`IndependentAtomVolume` machinery that calls them.
+
+
+@pytest.fixture
+def points_2d():
+    # `spread_2d` takes physical-unit positions (`0` at the real-space
+    # center, grid index `n // 2`) and normalizes internally; scale the raw
+    # offsets by `pixel_size` so the resulting grid-index footprint matches
+    # what it was before that normalization moved inside `spread_2d`.
+    key = jax.random.PRNGKey(0)
+    m = 5
+    ny, nx = 12, 11
+    pixel_size = jnp.asarray(1.3)
+    x = jax.random.uniform(key, (m,), minval=-3, maxval=3) * pixel_size
+    y = (
+        jax.random.uniform(jax.random.fold_in(key, 1), (m,), minval=-3, maxval=3)
+        * pixel_size
+    )
+    amplitude = jax.random.normal(jax.random.fold_in(key, 2), (m,)) * 2 + 3
+    variance = jnp.abs(jax.random.normal(jax.random.fold_in(key, 3), (m,))) * 0.3 + 0.4
+    return x, y, amplitude, variance, pixel_size, (ny, nx)
+
+
+@pytest.fixture
+def points_3d():
+    key = jax.random.PRNGKey(1)
+    m = 5
+    nz, ny, nx = 9, 10, 11
+    voxel_size = jnp.asarray(1.1)
+    x = jax.random.uniform(key, (m,), minval=-3, maxval=3) * voxel_size
+    y = (
+        jax.random.uniform(jax.random.fold_in(key, 1), (m,), minval=-3, maxval=3)
+        * voxel_size
+    )
+    z = (
+        jax.random.uniform(jax.random.fold_in(key, 2), (m,), minval=-3, maxval=3)
+        * voxel_size
+    )
+    amplitude = jax.random.normal(jax.random.fold_in(key, 3), (m,)) * 2 + 3
+    variance = jnp.abs(jax.random.normal(jax.random.fold_in(key, 4), (m,))) * 0.3 + 0.4
+    return x, y, z, amplitude, variance, voxel_size, (nz, ny, nx)
+
+
+@pytest.mark.parametrize("use_erf", [False, True])
+@pytest.mark.parametrize("scalar_variance", [False, True])
+def test_spread_2d_custom_vjp(points_2d, use_erf, scalar_variance):
+    x, y, amplitude, variance, pixel_size, shape = points_2d
+    if scalar_variance:
+        variance = variance[0]
+    n_spread = 9
+
+    fn = lambda x, y, amplitude, variance, pixel_size: spread_2d(
+        x,
+        y,
+        amplitude,
+        variance,
+        shape,
+        pixel_size=pixel_size,
+        n_spread=n_spread,
+        use_erf=use_erf,
+    )
+    check_grads(
+        fn,
+        (x, y, amplitude, variance, pixel_size),
+        order=1,
+        modes=["rev"],
+        atol=1e-4,
+        rtol=1e-4,
+    )
+
+
+@pytest.mark.parametrize("use_erf", [False, True])
+@pytest.mark.parametrize("scalar_variance", [False, True])
+def test_spread_3d_custom_vjp(points_3d, use_erf, scalar_variance):
+    x, y, z, amplitude, variance, voxel_size, shape = points_3d
+    if scalar_variance:
+        variance = variance[0]
+    n_spread = 9
+
+    fn = lambda x, y, z, amplitude, variance, voxel_size: spread_3d(
+        x,
+        y,
+        z,
+        amplitude,
+        variance,
+        shape,
+        voxel_size=voxel_size,
+        n_spread=n_spread,
+        use_erf=use_erf,
+    )
+    check_grads(
+        fn,
+        (x, y, z, amplitude, variance, voxel_size),
+        order=1,
+        modes=["rev"],
+        atol=1e-4,
+        rtol=1e-4,
+    )

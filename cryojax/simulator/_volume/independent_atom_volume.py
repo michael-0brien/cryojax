@@ -28,6 +28,8 @@ from ...ndimage import (
     query_efficient_grid_size,
     resize_with_crop_or_pad,
     rfftn,
+    spread_2d,
+    spread_3d,
 )
 from .._image_config import AbstractImageConfig
 from .._pose import AbstractPose
@@ -38,13 +40,7 @@ from .base_volume import (
     ProjectionArray,
     VoxelArray,
 )
-from .common import (
-    make_frequencies_1d,
-    normalize_positions_to_grid,
-    nspread_to_eps,
-    spread_2d as _grid_spread_2d,
-    spread_3d as _grid_spread_3d,
-)
+from .common import make_frequencies_1d, nspread_to_eps
 
 
 try:
@@ -253,10 +249,10 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
     shape: tuple[int, int, int]
     voxel_size: Float[Array, ""]
 
-    backend: Literal["nufftax", "jax-finufft"]
     sampling_mode: Literal["average", "point"]
     upsample_factor: float | None
     n_spread: int
+    backend: Literal["nufftax", "jax-finufft"]
     options: dict[str, Any]
 
     def __init__(
@@ -264,10 +260,10 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
         shape: tuple[int, int, int],
         voxel_size: FloatLike,
         *,
-        backend: Literal["nufftax", "jax-finufft"] = "nufftax",
         sampling_mode: Literal["average", "point"] = "average",
         upsample_factor: int | float | None = None,
         n_spread: int = 7,
+        backend: Literal["nufftax", "jax-finufft"] = "nufftax",
         options: dict[str, Any] = {},
     ):
         """**Arguments:**
@@ -276,15 +272,6 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
             The shape of the resulting voxel grid.
         - `voxel_size`:
             The voxel size of the resulting voxel grid.
-        - `backend`:
-            The backend for non-uniform FFT computation. This is either
-            [`nufftax`](https://github.com/GragasLab/nufftax/tree/custom-kernel-spread)
-            for a pure-JAX implementation of the
-            [`finufft`](https://finufft.readthedocs.io) algorithm,
-            or [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft) for
-            calling `finufft` directly via `jax.ffi`.
-            Used only when `IndependentAtomVolume.kernel_fns` are type
-            `AbstractFourierOperator`.
         - `sampling_mode`:
             If `'average'`, convolve with a box function to sample the
             projected volume at a pixel to be the average value of the
@@ -304,7 +291,17 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
             translated into an `eps` precision for the underlying non-uniform
             FFT implementation (see
             [`finufft`](https://finufft.readthedocs.io/en/latest/opts.html#options-parameters-cpu)).
-        - `options`:
+        - `backend` (fourier only):
+            The backend for non-uniform FFT computation. This is either
+            [`nufftax`](https://github.com/GragasLab/nufftax/tree/custom-kernel-spread)
+            for a pure-JAX implementation of the
+            [`finufft`](https://finufft.readthedocs.io) algorithm,
+            or [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft) for
+            calling `finufft` directly via `jax.ffi`.
+            Used only when `IndependentAtomVolume.kernel_fns` are
+            [`cryojax.ndimage.FourierGaussian`][]; unused (and has no effect)
+            for real-space kernels.
+        - `options` (fourier only):
             A dictionary of options for advanced usage. This is passed directly to the underlying
             non-uniform FFT implementation if kernels are in fourier-space. Unused if kernels are
             in real-space.
@@ -324,10 +321,10 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
             )
         self.shape = shape
         self.voxel_size = jnp.asarray(voxel_size, dtype=float)
-        self.backend = backend
         self.sampling_mode = sampling_mode
         self.upsample_factor = None if upsample_factor is None else float(upsample_factor)
         self.n_spread = n_spread
+        self.backend = backend
         self.options = options
 
     @override
@@ -375,7 +372,7 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
         if is_real_space:
             use_erf, sampling_mode = _resolve_erf_sampling(sampling_mode, upsampfac)
         # Compute
-        rendering_out = render_impl(
+        rendering_out = _render_impl(
             positions,
             kernel_fns,
             is_real_space=is_real_space,
@@ -409,7 +406,7 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
         if sampling_mode == "average":
             box_fn = FourierSinc(box_width=self.voxel_size)
             frequencies_1d = make_frequencies_1d(shape_u, voxel_size_u, modeord=1)
-            rendering_fft *= eval_separable_impl(box_fn, frequencies_1d)
+            rendering_fft *= _eval_separable_impl(box_fn, frequencies_1d)
         # Downsample by extracting fourier modes
         if self.shape != shape_u:
             (indices_z, indices_y, indices_x), fac = _build_extraction_mesh(
@@ -436,11 +433,11 @@ class IndependentAtomProjection(
     AbstractVolumeIntegrator[IndependentAtomVolume],
     strict=True,
 ):
-    backend: Literal["nufftax", "jax-finufft"]
     sampling_mode: Literal["average", "point"]
     upsample_factor: float | None
     n_spread: int
     shape: tuple[int, int] | None
+    backend: Literal["nufftax", "jax-finufft"]
     options: dict[str, Any]
 
     outputs_ewald_sphere: ClassVar[bool] = False
@@ -448,24 +445,15 @@ class IndependentAtomProjection(
     def __init__(
         self,
         *,
-        backend: Literal["jax-finufft", "nufftax"] = "nufftax",
         sampling_mode: Literal["average", "point"] = "average",
         upsample_factor: int | float | None = None,
         n_spread: int = 7,
         shape: tuple[int, int] | None = None,
+        backend: Literal["jax-finufft", "nufftax"] = "nufftax",
         options: dict[str, Any] = {},
     ):
         """**Arguments:**
 
-        - `backend`:
-            The backend for non-uniform FFT computation. This is either
-            [`nufftax`](https://github.com/GragasLab/nufftax/tree/custom-kernel-spread)
-            for a pure-JAX implementation of the
-            [`finufft`](https://finufft.readthedocs.io) algorithm,
-            or [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft) for
-            calling `finufft` directly via `jax.ffi`.
-            Used only when `IndependentAtomVolume.kernel_fns` are type
-            `AbstractFourierOperator`.
         - `sampling_mode`:
             If `'average'`, convolve with a box function to sample the
             projected volume at a pixel to be the average value of the
@@ -488,7 +476,17 @@ class IndependentAtomProjection(
         - `shape`:
             If given, first compute the image at `shape`, then
             pad or crop to `image_config.padded_shape`.
-        - `options`:
+        - `backend` (fourier only):
+            The backend for non-uniform FFT computation. This is either
+            [`nufftax`](https://github.com/GragasLab/nufftax/tree/custom-kernel-spread)
+            for a pure-JAX implementation of the
+            [`finufft`](https://finufft.readthedocs.io) algorithm,
+            or [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft) for
+            calling `finufft` directly via `jax.ffi`.
+            Used only when `IndependentAtomVolume.kernel_fns` are
+            [`cryojax.ndimage.FourierGaussian`][]; unused (and has no effect)
+            for real-space kernels.
+        - `options` (fourier only):
             A dictionary of options for advanced usage. This is passed directly to the underlying
             non-uniform FFT implementation if kernels are in fourier-space. Unused if kernels are
             in real-space.
@@ -502,15 +500,15 @@ class IndependentAtomProjection(
             )
         if backend not in ["jax-finufft", "nufftax"]:
             raise ValueError(
-                "`backend` in `IndependentAtomRenderFn` "
+                "`backend` in `IndependentAtomProjection` "
                 "must be either 'jax-finufft' or 'nufftax'. Got "
                 f"`backend = {backend}`."
             )
-        self.backend = backend
         self.sampling_mode = sampling_mode
         self.shape = shape
         self.upsample_factor = None if upsample_factor is None else float(upsample_factor)
         self.n_spread = n_spread
+        self.backend = backend
         self.options = options
 
     @override
@@ -560,7 +558,7 @@ class IndependentAtomProjection(
         if is_real_space:
             use_erf, sampling_mode = _resolve_erf_sampling(sampling_mode, upsampfac)
         # Compute projection
-        projection_out = project_impl(
+        projection_out = _project_impl(
             positions,
             kernel_fns,
             is_real_space=is_real_space,
@@ -588,7 +586,7 @@ class IndependentAtomProjection(
         if sampling_mode == "average":
             box_fn = FourierSinc(box_width=pixel_size)
             frequencies_1d = make_frequencies_1d(shape_u, pixel_size_u, modeord=1)
-            projection_fft *= eval_separable_impl(box_fn, frequencies_1d)
+            projection_fft *= _eval_separable_impl(box_fn, frequencies_1d)
         # Downsample by extracting fourier modes
         if shape != shape_u:
             (indices_y, indices_x), fac = _build_extraction_mesh(
@@ -667,7 +665,7 @@ def _resolve_erf_sampling(
     return False, sampling_mode
 
 
-def project_impl(
+def _project_impl(
     positions: PyTree[Float[Array, "_ 3"]],
     kernel_fns: PyTree[RealGaussian] | PyTree[AbstractFourierOperator],
     *,
@@ -696,15 +694,14 @@ def project_impl(
         _positions: Float[Array, "_ 3"],
         _kernel_fn: AbstractRealOperator,
     ) -> Array:
-        xy = normalize_positions_to_grid(_positions[:, :2], _shape, _ps)
-        projection = _spread_2d(
+        projection = _spread_2d_impl(
             kernel_fn=_kernel_fn,
             pixel_size=_ps,
-            x=xy[:, 0],
-            y=xy[:, 1],
+            x=_positions[:, 0],
+            y=_positions[:, 1],
             c=jnp.ones(_positions.shape[0]),
             shape=(_shape[0], _shape[1]),
-            nspread=n_spread,
+            n_spread=n_spread,
             use_erf=use_erf,
         )
         return projection
@@ -730,7 +727,7 @@ def project_impl(
         _ns = jnp.asarray(_shape[::-1][:2], dtype=float)
         xy = 2 * jnp.pi * _positions[:, :2] / (_ps * _ns) + _nufft_offsets_2d
         return (
-            eval_kernel_impl(_kernel_fn, _f_1d)
+            _eval_kernel_impl(_kernel_fn, _f_1d)
             * _nufft2d1(
                 _shape,  # type: ignore
                 source=jnp.ones(_positions.shape[0], dtype=complex),
@@ -761,7 +758,7 @@ def project_impl(
     return projection_out
 
 
-def render_impl(
+def _render_impl(
     positions: PyTree[Float[Array, "_ 3"]],
     kernel_fns: PyTree[RealGaussian] | PyTree[AbstractFourierOperator],
     *,
@@ -769,9 +766,9 @@ def render_impl(
     shape_u: tuple[int, int, int],
     voxel_size_u: Float[Array, ""],
     shape_out: tuple[int, int, int],
-    backend: Literal["jax-finufft", "nufftax"],
     n_spread: int,
     use_erf: bool,
+    backend: Literal["jax-finufft", "nufftax"],
     options: dict[str, Any],
 ) -> Array:
     is_leaf = (
@@ -792,16 +789,15 @@ def render_impl(
         _positions: Float[Array, "_ 3"],
         _kernel_fn: AbstractRealOperator,
     ) -> Array:
-        xyz = normalize_positions_to_grid(_positions, _shape, _vs)
-        rendering = _spread_3d(
+        rendering = _spread_3d_impl(
             kernel_fn=_kernel_fn,
             voxel_size=_vs,
-            x=xyz[:, 0],
-            y=xyz[:, 1],
-            z=xyz[:, 2],
+            x=_positions[:, 0],
+            y=_positions[:, 1],
+            z=_positions[:, 2],
             c=jnp.ones(_positions.shape[0]),
             shape=_shape,
-            nspread=n_spread,
+            n_spread=n_spread,
             use_erf=use_erf,
         )
         return rendering
@@ -815,7 +811,7 @@ def render_impl(
     ) -> Array:
         _ns = jnp.asarray(_shape[::-1], dtype=float)
         xyz = 2 * jnp.pi * _positions / (_vs * _ns) + _nufft_offsets_3d
-        return eval_kernel_impl(_kernel_fn, _f_1d) * (
+        return _eval_kernel_impl(_kernel_fn, _f_1d) * (
             _nufft3d1(
                 _shape,  # type: ignore
                 source=jnp.ones(_positions.shape[0], dtype=complex),
@@ -843,6 +839,30 @@ def render_impl(
         rendering_out = jnp.fft.ifftshift(rendering_out)
 
     return rendering_out
+
+
+def _eval_kernel_impl(kernel_fn: FourierGaussian, frequencies_1d: tuple[Array, ...]):
+    a, b = kernel_fn.amplitude, kernel_fn.b_factor
+    make_gaussians = jax.vmap(lambda _a, _b: FourierGaussian(amplitude=_a, b_factor=_b))
+    eval_gaussians = jax.vmap(_eval_separable_impl, in_axes=(0, None))
+    return jnp.sum(eval_gaussians(make_gaussians(a, b), frequencies_1d), axis=0)
+
+
+def _eval_separable_impl(
+    kernel_fn: FourierGaussian | FourierSinc, frequencies_1d: tuple[Array, ...]
+):
+    ndim = len(frequencies_1d)
+    assert 1 in kernel_fn.spatial_dims and ndim in [2, 3]
+    if len(frequencies_1d) == 2:
+        q_x, q_y = frequencies_1d
+        return kernel_fn(q_x)[None, :] * kernel_fn(q_y)[:, None]
+    else:
+        q_x, q_y, q_z = frequencies_1d
+        return (
+            kernel_fn(q_x)[None, None, :]
+            * kernel_fn(q_y)[None, :, None]
+            * kernel_fn(q_z)[:, None, None]
+        )
 
 
 def _make_jax_finufft_opts(upsampfac: float):
@@ -956,39 +976,39 @@ def _nufft3d1(
         )
 
 
-def _spread_3d(kernel_fn, voxel_size, x, y, z, c, shape, *, nspread, use_erf):
+def _spread_3d_impl(kernel_fn, voxel_size, x, y, z, c, shape, *, n_spread, use_erf):
     # `kernel_fn.amplitude`/`.variance` carry a batch dimension over the
     # (possibly several) gaussian components of this pytree leaf (e.g. the
     # 5-gaussian Peng decomposition). Unlike the fourier-space path, no
     # amplitude root-splitting is needed here (see `_standardize_kernel_fns`).
     def spread_one(_amplitude, _variance):
-        return _grid_spread_3d(
+        return spread_3d(
             x,
             y,
             z,
             c * _amplitude,
+            _variance,
             shape,
-            variance=_variance,
             voxel_size=voxel_size,
-            nspread=nspread,
+            n_spread=n_spread,
             use_erf=use_erf,
         )
 
     return jnp.sum(jax.vmap(spread_one)(kernel_fn.amplitude, kernel_fn.variance), axis=0)
 
 
-def _spread_2d(kernel_fn, pixel_size, x, y, c, shape, *, nspread, use_erf):
-    # See `_spread_3d` for why `kernel_fn.amplitude`/`.variance` carry a batch
+def _spread_2d_impl(kernel_fn, pixel_size, x, y, c, shape, *, n_spread, use_erf):
+    # See `_spread_3d_impl` for why `kernel_fn.amplitude`/`.variance` carry a batch
     # dimension.
     def spread_one(_amplitude, _variance):
-        return _grid_spread_2d(
+        return spread_2d(
             x,
             y,
             c * _amplitude,
+            _variance,
             shape,
-            variance=_variance,
             pixel_size=pixel_size,
-            nspread=nspread,
+            n_spread=n_spread,
             use_erf=use_erf,
         )
 
@@ -1076,27 +1096,3 @@ def _prepare_fft_to_fft(f: Array, *, outputs_rfft: bool, fftshifted: bool) -> Ar
         return jnp.fft.fftshift(f, axes=(0, 1)) if fftshifted else f
     else:
         return jnp.fft.fftshift(f) if fftshifted else f
-
-
-def eval_kernel_impl(kernel_fn: FourierGaussian, frequencies_1d: tuple[Array, ...]):
-    a, b = kernel_fn.amplitude, kernel_fn.b_factor
-    make_gaussians = jax.vmap(lambda _a, _b: FourierGaussian(amplitude=_a, b_factor=_b))
-    eval_gaussians = jax.vmap(eval_separable_impl, in_axes=(0, None))
-    return jnp.sum(eval_gaussians(make_gaussians(a, b), frequencies_1d), axis=0)
-
-
-def eval_separable_impl(
-    kernel_fn: FourierGaussian | FourierSinc, frequencies_1d: tuple[Array, ...]
-):
-    ndim = len(frequencies_1d)
-    assert 1 in kernel_fn.spatial_dims and ndim in [2, 3]
-    if len(frequencies_1d) == 2:
-        q_x, q_y = frequencies_1d
-        return kernel_fn(q_x)[None, :] * kernel_fn(q_y)[:, None]
-    else:
-        q_x, q_y, q_z = frequencies_1d
-        return (
-            kernel_fn(q_x)[None, None, :]
-            * kernel_fn(q_y)[None, :, None]
-            * kernel_fn(q_z)[:, None, None]
-        )

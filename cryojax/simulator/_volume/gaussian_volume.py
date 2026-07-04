@@ -4,12 +4,20 @@ from typing_extensions import override
 import equinox as eqx
 import jax
 import jax.numpy as jnp
+import jax.scipy as jsp
 from jaxtyping import Array, Float, PyTree
 
 from ..._internal import error_if_not_positive
 from ...constants import PengScatteringFactorParameters, b_factor_to_variance
 from ...jax_util import FloatLike, NDArrayLike, filter_bscan
-from ...ndimage import fftn, make_1d_coordinate_grid, resize_with_crop_or_pad, rfftn
+from ...ndimage import (
+    fftn,
+    make_1d_coordinate_grid,
+    resize_with_crop_or_pad,
+    rfftn,
+    spread_2d,
+    spread_3d,
+)
 from .._image_config import AbstractImageConfig
 from .._pose import AbstractPose
 from .base_volume import (
@@ -18,13 +26,6 @@ from .base_volume import (
     AbstractVolumeRenderFn,
     ProjectionArray,
     VoxelArray,
-)
-from .common import (
-    _erf_shape_and_grad,
-    _gaussian_shape_and_grad,
-    normalize_positions_to_grid,
-    spread_2d as _grid_spread_2d,
-    spread_3d as _grid_spread_3d,
 )
 
 
@@ -538,6 +539,19 @@ def _sum_over_atom_batches(
     return total
 
 
+def _gaussian_weight(r: Array, variance: Array) -> Array:
+    """Normalized isotropic Gaussian marginal at physical offset `r`."""
+    return jnp.exp(-0.5 * r**2 / variance) / jnp.sqrt(2 * jnp.pi * variance)
+
+
+def _erf_weight(r: Array, variance: Array, width: Float[Array, ""]) -> Array:
+    """Average of `_gaussian_weight` over a pixel/voxel of `width` centered at
+    physical offset `r`."""
+    scaling = 1.0 / jnp.sqrt(2 * variance)
+    left, right = scaling * (r - width / 2), scaling * (r + width / 2)
+    return (jsp.special.erf(right) - jsp.special.erf(left)) / (2 * width)
+
+
 def _dense_axis_values(
     grid: Float[Array, " dim"],
     positions_1d: Float[Array, " n_positions"],
@@ -551,12 +565,7 @@ def _dense_axis_values(
     component."""
     r = grid[:, None, None] - positions_1d[None, :, None]
     variance = variance[None, :, :]
-    values, _ = (
-        _erf_shape_and_grad(r, variance, width)
-        if use_erf
-        else _gaussian_shape_and_grad(r, variance)
-    )
-    return values
+    return _erf_weight(r, variance, width) if use_erf else _gaussian_weight(r, variance)
 
 
 #
@@ -614,28 +623,27 @@ def _gaussians_to_projection_spread(
     amplitudes: Float[Array, "n_positions n_gaussians"],
     variances: Float[Array, "n_positions n_gaussians"],
     use_erf: bool,
-    nspread: int,
+    n_spread: int,
     n_batches: int,
     context: str,
 ) -> Float[Array, "dim_y dim_x"]:
-    """Spread each gaussian component directly onto the `nspread` nearest
+    """Spread each gaussian component directly onto the `n_spread` nearest
     grid points (see `cryojax.simulator._volume.common`), rather than
     evaluating dense gaussian integrals over the whole grid.
     """
-    xy = normalize_positions_to_grid(positions[:, :2], shape, pixel_size)
 
     def kernel_fn(xs):
-        _xy, _amplitudes, _variances = xs
+        _positions, _amplitudes, _variances = xs
 
         def spread_one_gaussian(_amplitude, _variance):
-            return _grid_spread_2d(
-                _xy[:, 0],
-                _xy[:, 1],
+            return spread_2d(
+                _positions[:, 0],
+                _positions[:, 1],
                 _amplitude,
+                _variance,
                 shape,
-                variance=_variance,
                 pixel_size=pixel_size,
-                nspread=nspread,
+                n_spread=n_spread,
                 use_erf=use_erf,
             )
 
@@ -645,7 +653,7 @@ def _gaussians_to_projection_spread(
         return jnp.sum(contributions, axis=0)
 
     return _sum_over_atom_batches(
-        kernel_fn, (xy, amplitudes, variances), n_batches, shape, context=context
+        kernel_fn, (positions, amplitudes, variances), n_batches, shape, context=context
     )
 
 
@@ -712,29 +720,28 @@ def _gaussians_to_real_voxels_spread(
     positions: Float[Array, "n_positions 3"],
     amplitudes: Float[Array, "n_positions n_gaussians"],
     variances: Float[Array, "n_positions n_gaussians"],
-    nspread: int,
+    n_spread: int,
     n_batches: int,
     context: str,
 ) -> Float[Array, "{shape[0]} {shape[1]} {shape[2]}"]:
-    """Spread each gaussian component directly onto the `nspread` nearest
+    """Spread each gaussian component directly onto the `n_spread` nearest
     grid points (see `cryojax.simulator._volume.common`), rather than
     evaluating dense gaussian integrals over the whole grid.
     """
-    xyz = normalize_positions_to_grid(positions, shape, voxel_size)
 
     def kernel_fn(xs):
-        _xyz, _amplitudes, _variances = xs
+        _positions, _amplitudes, _variances = xs
 
         def spread_one_gaussian(_amplitude, _variance):
-            return _grid_spread_3d(
-                _xyz[:, 0],
-                _xyz[:, 1],
-                _xyz[:, 2],
+            return spread_3d(
+                _positions[:, 0],
+                _positions[:, 1],
+                _positions[:, 2],
                 _amplitude,
+                _variance,
                 shape,
-                variance=_variance,
                 voxel_size=voxel_size,
-                nspread=nspread,
+                n_spread=n_spread,
                 use_erf=True,
             )
 
@@ -744,5 +751,5 @@ def _gaussians_to_real_voxels_spread(
         return jnp.sum(contributions, axis=0)
 
     return _sum_over_atom_batches(
-        kernel_fn, (xyz, amplitudes, variances), n_batches, shape, context=context
+        kernel_fn, (positions, amplitudes, variances), n_batches, shape, context=context
     )

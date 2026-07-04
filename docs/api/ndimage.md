@@ -301,3 +301,11 @@ This documentation is a collection of functions used to work with coordinate sys
 ::: cryojax.ndimage.map_coordinates_spline
 
 ::: cryojax.ndimage.compute_spline_coefficients
+
+### Spreading
+
+::: cryojax.ndimage.spread_2d
+
+::: cryojax.ndimage.spread_3d
+
+::: cryojax.ndimage.variance_to_nspread

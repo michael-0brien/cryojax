@@ -71,6 +71,11 @@ from ._radial_average import (
 from ._rescale_pixel_size import (
     rescale_pixel_size as rescale_pixel_size,
 )
+from ._spread import (
+    spread_2d as spread_2d,
+    spread_3d as spread_3d,
+    variance_to_nspread as variance_to_nspread,
+)
 from ._transforms import (
     AbstractFilter as AbstractFilter,
     AbstractImageTransform as AbstractImageTransform,

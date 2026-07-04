@@ -21,12 +21,10 @@ from cryojax.constants import (
     check_atomic_numbers_supported,
 )
 from cryojax.ndimage import make_coordinate_grid
-from cryojax.simulator._volume.common import spread_2d, spread_3d
-from jax.test_util import check_grads
 from jaxtyping import Array
 
 
-# `tests/conftest.py` also does this, but the custom-VJP finite-difference
+# `tests/conftest.py` also does this, but the precise numerical agreement
 # checks below need float64 even if this module is imported/run standalone,
 # without pytest loading `conftest.py` first.
 jax.config.update("jax_enable_x64", True)
@@ -528,7 +526,7 @@ class TestRenderGMMToVoxelsWithSpreadingBackend:
 
 
 @pytest.mark.parametrize("n_batches", (1, 2, 3))
-@pytest.mark.parametrize("n_spread", (None, 11))
+@pytest.mark.parametrize("n_spread", (None, 9))
 def test_gmm_projection_n_batches_agreement(toy_gaussian_cloud, n_spread, n_batches):
     atom_positions, ff_a, ff_b, n_voxels_per_side, voxel_size = toy_gaussian_cloud
     n_pixels_per_side = n_voxels_per_side[:2]
@@ -549,7 +547,7 @@ def test_gmm_projection_n_batches_agreement(toy_gaussian_cloud, n_spread, n_batc
 
 
 @pytest.mark.parametrize("n_batches", (1, 2, 3))
-@pytest.mark.parametrize("n_spread", (None, 11))
+@pytest.mark.parametrize("n_spread", (None, 9))
 def test_gmm_render_n_batches_agreement(toy_gaussian_cloud, n_spread, n_batches):
     atom_positions, ff_a, ff_b, n_voxels_per_side, voxel_size = toy_gaussian_cloud
 
@@ -574,7 +572,7 @@ def test_gmm_render_n_batches_agreement(toy_gaussian_cloud, n_spread, n_batches)
 
 
 @pytest.mark.parametrize("n", (10, 11))
-@pytest.mark.parametrize("n_spread", (None, 11))
+@pytest.mark.parametrize("n_spread", (None, 9))
 def test_gmm_projection_peak_at_box_center(n, n_spread):
     shape = (n, n)
     pixel_size = 1.0
@@ -587,7 +585,7 @@ def test_gmm_projection_peak_at_box_center(n, n_spread):
 
 
 @pytest.mark.parametrize("n", (10, 11))
-@pytest.mark.parametrize("n_spread", (None, 11))
+@pytest.mark.parametrize("n_spread", (None, 9))
 def test_gmm_render_peak_at_box_center(n, n_spread):
     shape = (n, n, n)
     voxel_size = 1.0
@@ -1104,98 +1102,3 @@ def test_fft_atom_render_custom_upsampfac_jax_finufft(upsampfac):
     )
     result = render_fn(atom_volume, outputs_real_space=True)
     assert result.shape == shape
-
-
-# ── common.py spreading backend: custom VJP ──────────────────────────────────
-#
-# Minimal, focused tests of `spread_2d`/`spread_3d` in isolation
-# (finite-difference checks of the custom VJP rule), independent of the full
-# `GaussianMixtureVolume`/`IndependentAtomVolume` machinery that calls them.
-
-
-@pytest.fixture
-def points_2d():
-    key = jax.random.PRNGKey(0)
-    m = 5
-    ny, nx = 12, 11
-    x = jax.random.uniform(key, (m,), minval=-3, maxval=3) + nx // 2
-    y = (
-        jax.random.uniform(jax.random.fold_in(key, 1), (m,), minval=-3, maxval=3)
-        + ny // 2
-    )
-    c = jax.random.normal(jax.random.fold_in(key, 2), (m,)) * 2 + 3
-    variance = jnp.abs(jax.random.normal(jax.random.fold_in(key, 3), (m,))) * 0.3 + 0.4
-    pixel_size = jnp.asarray(1.3)
-    return x, y, c, variance, pixel_size, (ny, nx)
-
-
-@pytest.fixture
-def points_3d():
-    key = jax.random.PRNGKey(1)
-    m = 5
-    nz, ny, nx = 9, 10, 11
-    x = jax.random.uniform(key, (m,), minval=-3, maxval=3) + nx // 2
-    y = (
-        jax.random.uniform(jax.random.fold_in(key, 1), (m,), minval=-3, maxval=3)
-        + ny // 2
-    )
-    z = (
-        jax.random.uniform(jax.random.fold_in(key, 2), (m,), minval=-3, maxval=3)
-        + nz // 2
-    )
-    c = jax.random.normal(jax.random.fold_in(key, 3), (m,)) * 2 + 3
-    variance = jnp.abs(jax.random.normal(jax.random.fold_in(key, 4), (m,))) * 0.3 + 0.4
-    voxel_size = jnp.asarray(1.1)
-    return x, y, z, c, variance, voxel_size, (nz, ny, nx)
-
-
-@pytest.mark.parametrize("use_erf", [False, True])
-@pytest.mark.parametrize("scalar_variance", [False, True])
-def test_spread_2d_custom_vjp(points_2d, use_erf, scalar_variance):
-    x, y, c, variance, pixel_size, shape = points_2d
-    if scalar_variance:
-        variance = variance[0]
-    nspread = 9
-
-    fn = lambda x, y, c, variance, pixel_size: spread_2d(
-        x,
-        y,
-        c,
-        shape,
-        variance=variance,
-        pixel_size=pixel_size,
-        nspread=nspread,
-        use_erf=use_erf,
-    )
-    check_grads(
-        fn, (x, y, c, variance, pixel_size), order=1, modes=["rev"], atol=1e-4, rtol=1e-4
-    )
-
-
-@pytest.mark.parametrize("use_erf", [False, True])
-@pytest.mark.parametrize("scalar_variance", [False, True])
-def test_spread_3d_custom_vjp(points_3d, use_erf, scalar_variance):
-    x, y, z, c, variance, voxel_size, shape = points_3d
-    if scalar_variance:
-        variance = variance[0]
-    nspread = 9
-
-    fn = lambda x, y, z, c, variance, voxel_size: spread_3d(
-        x,
-        y,
-        z,
-        c,
-        shape,
-        variance=variance,
-        voxel_size=voxel_size,
-        nspread=nspread,
-        use_erf=use_erf,
-    )
-    check_grads(
-        fn,
-        (x, y, z, c, variance, voxel_size),
-        order=1,
-        modes=["rev"],
-        atol=1e-4,
-        rtol=1e-4,
-    )
