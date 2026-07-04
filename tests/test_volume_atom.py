@@ -11,6 +11,7 @@ the two NUFFT backends (nufftax and jax-finufft).
 import cryojax.ndimage as im
 import cryojax.simulator as cxs
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -20,7 +21,15 @@ from cryojax.constants import (
     check_atomic_numbers_supported,
 )
 from cryojax.ndimage import make_coordinate_grid
+from cryojax.simulator._volume.common import eps_to_nspread, spread_2d, spread_3d
+from jax.test_util import check_grads
 from jaxtyping import Array
+
+
+# `tests/conftest.py` also does this, but the custom-VJP finite-difference
+# checks below need float64 even if this module is imported/run standalone,
+# without pytest loading `conftest.py` first.
+jax.config.update("jax_enable_x64", True)
 
 
 try:
@@ -292,6 +301,111 @@ class TestIntegrateGMMToPixels:
         assert jnp.isclose(integral, jnp.sum(ff_a))
 
 
+class TestIntegrateGMMToPixelsWithSpreadingBackend:
+    """Same checks as `TestIntegrateGMMToPixels`, but for `eps is not None`,
+    which routes through the `common.spread_2d` spreading backend instead of
+    the dense gaussian-integral backend.
+    """
+
+    @pytest.mark.parametrize("sampling_mode", ["average", "point"])
+    @pytest.mark.parametrize("largest_atom", range(0, 3))
+    def test_maxima_are_in_right_positions(
+        self, toy_gaussian_cloud, largest_atom, sampling_mode
+    ):
+        atom_positions, ff_a, ff_b, n_voxels_per_side, voxel_size = toy_gaussian_cloud
+        n_pixels_per_side = n_voxels_per_side[:2]
+        ff_a = ff_a.at[largest_atom].add(1.0)
+        coordinate_grid = make_coordinate_grid(n_pixels_per_side, voxel_size)
+
+        atomic_volume = cxs.GaussianMixtureVolume(
+            atom_positions, ff_a, ff_b / (8.0 * jnp.pi**2)
+        )
+        image_config = cxs.BasicImageConfig(
+            shape=n_pixels_per_side,
+            pixel_size=voxel_size,
+            voltage_in_kilovolts=300.0,
+        )
+        integrator = cxs.GaussianMixtureProjection(sampling_mode=sampling_mode, eps=1e-10)
+        projection = im.irfftn(integrator.integrate(atomic_volume, image_config))
+
+        maximum_index = jnp.argmax(projection)
+        maximum_position = coordinate_grid.reshape(-1, 2)[maximum_index]
+        assert jnp.allclose(maximum_position, atom_positions[largest_atom][:2])
+
+    @pytest.mark.parametrize("sampling_mode", ["average", "point"])
+    def test_integral_is_correct(self, toy_gaussian_cloud, sampling_mode):
+        atom_positions, ff_a, ff_b, n_voxels_per_side, voxel_size = toy_gaussian_cloud
+        n_pixels_per_side = n_voxels_per_side[:2]
+
+        atomic_volume = cxs.GaussianMixtureVolume(
+            atom_positions, ff_a, ff_b / (8.0 * jnp.pi**2)
+        )
+        image_config = cxs.BasicImageConfig(
+            shape=n_pixels_per_side,
+            pixel_size=voxel_size,
+            voltage_in_kilovolts=300.0,
+        )
+        integrator = cxs.GaussianMixtureProjection(sampling_mode=sampling_mode, eps=1e-10)
+        projection = im.irfftn(integrator.integrate(atomic_volume, image_config))
+
+        integral = jnp.sum(projection) * voxel_size**2
+        assert jnp.isclose(integral, jnp.sum(ff_a), atol=1e-4)
+
+    @pytest.mark.parametrize("sampling_mode", ["average", "point"])
+    def test_agrees_with_dense_backend(self, toy_gaussian_cloud, sampling_mode):
+        """The spreading backend (`eps` set) should closely agree with the
+        dense gaussian-integral backend (`eps=None`) for a high-accuracy `eps`.
+        """
+        atom_positions, ff_a, ff_b, n_voxels_per_side, voxel_size = toy_gaussian_cloud
+        n_pixels_per_side = n_voxels_per_side[:2]
+
+        atomic_volume = cxs.GaussianMixtureVolume(
+            atom_positions, ff_a, ff_b / (8.0 * jnp.pi**2)
+        )
+        image_config = cxs.BasicImageConfig(
+            shape=n_pixels_per_side,
+            pixel_size=voxel_size,
+            voltage_in_kilovolts=300.0,
+        )
+        dense_integrator = cxs.GaussianMixtureProjection(sampling_mode=sampling_mode)
+        spread_integrator = cxs.GaussianMixtureProjection(
+            sampling_mode=sampling_mode, eps=1e-12
+        )
+        dense_projection = dense_integrator.integrate(
+            atomic_volume, image_config, outputs_real_space=True
+        )
+        spread_projection = spread_integrator.integrate(
+            atomic_volume, image_config, outputs_real_space=True
+        )
+
+        assert jnp.allclose(dense_projection, spread_projection, atol=1e-4, rtol=1e-4)
+
+    @pytest.mark.parametrize("sampling_mode", ["average", "point"])
+    def test_gradients_are_finite(self, toy_gaussian_cloud, sampling_mode):
+        """Gradients through the spreading backend w.r.t. positions,
+        amplitudes, and variances must be finite (regression check for the
+        custom VJP rule in `common.py`)."""
+        atom_positions, ff_a, ff_b, n_voxels_per_side, voxel_size = toy_gaussian_cloud
+        n_pixels_per_side = n_voxels_per_side[:2]
+        image_config = cxs.BasicImageConfig(
+            shape=n_pixels_per_side,
+            pixel_size=voxel_size,
+            voltage_in_kilovolts=300.0,
+        )
+        integrator = cxs.GaussianMixtureProjection(sampling_mode=sampling_mode, eps=1e-10)
+
+        def loss(positions, amplitudes, variances):
+            volume = cxs.GaussianMixtureVolume(positions, amplitudes, variances)
+            projection = integrator.integrate(volume, image_config)
+            return jnp.sum(jnp.abs(projection) ** 2)
+
+        grads = jax.grad(loss, argnums=(0, 1, 2))(
+            atom_positions, ff_a, ff_b / (8.0 * jnp.pi**2)
+        )
+        for g in grads:
+            assert jnp.all(jnp.isfinite(g))
+
+
 # ── GaussianMixtureRenderFn ───────────────────────────────────────────────────
 
 
@@ -325,6 +439,77 @@ class TestRenderGMMToVoxels:
 
         integral = jnp.sum(real_voxel_grid) * voxel_size**3
         assert jnp.isclose(integral, jnp.sum(ff_a))
+
+
+class TestRenderGMMToVoxelsWithSpreadingBackend:
+    """Same checks as `TestRenderGMMToVoxels`, but for `eps is not None`, which
+    routes through the `common.spread_3d` spreading backend instead of the
+    dense gaussian-integral backend.
+    """
+
+    @pytest.mark.parametrize("largest_atom", range(0, 3))
+    def test_maxima_are_in_right_positions(self, toy_gaussian_cloud, largest_atom):
+        atom_positions, ff_a, ff_b, n_voxels_per_side, voxel_size = toy_gaussian_cloud
+        ff_a = ff_a.at[largest_atom].add(1.0)
+
+        gmm_volume = cxs.GaussianMixtureVolume(
+            atom_positions, ff_a, ff_b / (8 * jnp.pi**2)
+        )
+        render_fn = cxs.GaussianMixtureRenderFn(n_voxels_per_side, voxel_size, eps=1e-10)
+        real_voxel_grid = render_fn(gmm_volume)
+        coordinate_grid = make_coordinate_grid(n_voxels_per_side, voxel_size)
+
+        maximum_index = jnp.argmax(real_voxel_grid)
+        maximum_position = coordinate_grid.reshape(-1, 3)[maximum_index]
+        assert jnp.allclose(maximum_position, atom_positions[largest_atom])
+
+    def test_integral_is_correct(self, toy_gaussian_cloud):
+        atom_positions, ff_a, ff_b, n_voxels_per_side, voxel_size = toy_gaussian_cloud
+
+        gmm_volume = cxs.GaussianMixtureVolume(
+            atom_positions, ff_a, ff_b / (8 * jnp.pi**2)
+        )
+        render_fn = cxs.GaussianMixtureRenderFn(n_voxels_per_side, voxel_size, eps=1e-10)
+        real_voxel_grid = render_fn(gmm_volume)
+
+        integral = jnp.sum(real_voxel_grid) * voxel_size**3
+        assert jnp.isclose(integral, jnp.sum(ff_a), atol=1e-4)
+
+    def test_agrees_with_dense_backend(self, toy_gaussian_cloud):
+        """The spreading backend (`eps` set) should closely agree with the
+        dense gaussian-integral backend (`eps=None`) for a high-accuracy `eps`.
+        """
+        atom_positions, ff_a, ff_b, n_voxels_per_side, voxel_size = toy_gaussian_cloud
+
+        gmm_volume = cxs.GaussianMixtureVolume(
+            atom_positions, ff_a, ff_b / (8 * jnp.pi**2)
+        )
+        dense_render_fn = cxs.GaussianMixtureRenderFn(n_voxels_per_side, voxel_size)
+        spread_render_fn = cxs.GaussianMixtureRenderFn(
+            n_voxels_per_side, voxel_size, eps=1e-12
+        )
+        dense_voxel_grid = dense_render_fn(gmm_volume)
+        spread_voxel_grid = spread_render_fn(gmm_volume)
+
+        assert jnp.allclose(dense_voxel_grid, spread_voxel_grid, atol=1e-4, rtol=1e-4)
+
+    def test_gradients_are_finite(self, toy_gaussian_cloud):
+        """Gradients through the spreading backend w.r.t. positions,
+        amplitudes, and variances must be finite (regression check for the
+        custom VJP rule in `common.py`)."""
+        atom_positions, ff_a, ff_b, n_voxels_per_side, voxel_size = toy_gaussian_cloud
+        render_fn = cxs.GaussianMixtureRenderFn(n_voxels_per_side, voxel_size, eps=1e-10)
+
+        def loss(positions, amplitudes, variances):
+            volume = cxs.GaussianMixtureVolume(positions, amplitudes, variances)
+            real_voxel_grid = render_fn(volume)
+            return jnp.sum(real_voxel_grid**2)
+
+        grads = jax.grad(loss, argnums=(0, 1, 2))(
+            atom_positions, ff_a, ff_b / (8.0 * jnp.pi**2)
+        )
+        for g in grads:
+            assert jnp.all(jnp.isfinite(g))
 
 
 # ── IndependentAtomVolume: bad instantiation ──────────────────────────────────
@@ -798,3 +983,98 @@ def test_fft_atom_render_custom_upsampfac_jax_finufft(upsampfac):
     )
     result = render_fn(atom_volume, outputs_real_space=True)
     assert result.shape == shape
+
+
+# ── common.py spreading backend: custom VJP ──────────────────────────────────
+#
+# Minimal, focused tests of `spread_2d`/`spread_3d` in isolation
+# (finite-difference checks of the custom VJP rule), independent of the full
+# `GaussianMixtureVolume`/`IndependentAtomVolume` machinery that calls them.
+
+
+@pytest.fixture
+def points_2d():
+    key = jax.random.PRNGKey(0)
+    m = 5
+    ny, nx = 12, 11
+    x = jax.random.uniform(key, (m,), minval=-3, maxval=3) + nx // 2
+    y = (
+        jax.random.uniform(jax.random.fold_in(key, 1), (m,), minval=-3, maxval=3)
+        + ny // 2
+    )
+    c = jax.random.normal(jax.random.fold_in(key, 2), (m,)) * 2 + 3
+    variance = jnp.abs(jax.random.normal(jax.random.fold_in(key, 3), (m,))) * 0.3 + 0.4
+    pixel_size = jnp.asarray(1.3)
+    return x, y, c, variance, pixel_size, (ny, nx)
+
+
+@pytest.fixture
+def points_3d():
+    key = jax.random.PRNGKey(1)
+    m = 5
+    nz, ny, nx = 9, 10, 11
+    x = jax.random.uniform(key, (m,), minval=-3, maxval=3) + nx // 2
+    y = (
+        jax.random.uniform(jax.random.fold_in(key, 1), (m,), minval=-3, maxval=3)
+        + ny // 2
+    )
+    z = (
+        jax.random.uniform(jax.random.fold_in(key, 2), (m,), minval=-3, maxval=3)
+        + nz // 2
+    )
+    c = jax.random.normal(jax.random.fold_in(key, 3), (m,)) * 2 + 3
+    variance = jnp.abs(jax.random.normal(jax.random.fold_in(key, 4), (m,))) * 0.3 + 0.4
+    voxel_size = jnp.asarray(1.1)
+    return x, y, z, c, variance, voxel_size, (nz, ny, nx)
+
+
+@pytest.mark.parametrize("use_erf", [False, True])
+@pytest.mark.parametrize("scalar_variance", [False, True])
+def test_spread_2d_custom_vjp(points_2d, use_erf, scalar_variance):
+    x, y, c, variance, pixel_size, shape = points_2d
+    if scalar_variance:
+        variance = variance[0]
+    nspread = eps_to_nspread(1e-8)
+
+    fn = lambda x, y, c, variance, pixel_size: spread_2d(
+        x,
+        y,
+        c,
+        shape,
+        variance=variance,
+        pixel_size=pixel_size,
+        nspread=nspread,
+        use_erf=use_erf,
+    )
+    check_grads(
+        fn, (x, y, c, variance, pixel_size), order=1, modes=["rev"], atol=1e-4, rtol=1e-4
+    )
+
+
+@pytest.mark.parametrize("use_erf", [False, True])
+@pytest.mark.parametrize("scalar_variance", [False, True])
+def test_spread_3d_custom_vjp(points_3d, use_erf, scalar_variance):
+    x, y, z, c, variance, voxel_size, shape = points_3d
+    if scalar_variance:
+        variance = variance[0]
+    nspread = eps_to_nspread(1e-8)
+
+    fn = lambda x, y, z, c, variance, voxel_size: spread_3d(
+        x,
+        y,
+        z,
+        c,
+        shape,
+        variance=variance,
+        voxel_size=voxel_size,
+        nspread=nspread,
+        use_erf=use_erf,
+    )
+    check_grads(
+        fn,
+        (x, y, z, c, variance, voxel_size),
+        order=1,
+        modes=["rev"],
+        atol=1e-4,
+        rtol=1e-4,
+    )

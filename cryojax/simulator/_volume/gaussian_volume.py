@@ -25,6 +25,12 @@ from .base_volume import (
     ProjectionArray,
     VoxelArray,
 )
+from .common import (
+    eps_to_nspread,
+    normalize_positions_to_grid,
+    spread_2d as _grid_spread_2d,
+    spread_3d as _grid_spread_3d,
+)
 
 
 class BatchOptions(TypedDict):
@@ -224,6 +230,7 @@ class GaussianMixtureProjection(
     sampling_mode: Literal["average", "point"]
     shape: tuple[int, int] | None
     n_batches: int
+    eps: float | None
 
     outputs_ewald_sphere: ClassVar[bool] = False
 
@@ -234,6 +241,7 @@ class GaussianMixtureProjection(
         shape: tuple[int, int] | None = None,
         sampling_mode: Literal["average", "point"] = "average",
         n_batches: int = 1,
+        eps: float | None = None,
     ):
         """**Arguments:**
 
@@ -251,6 +259,12 @@ class GaussianMixtureProjection(
             used to evaluate the projection. By default, `n_batches = 1`,
             which computes a projection for all positions at once.
             This is useful to decrease GPU memory usage.
+        - `eps`:
+            If `None` (default), compute the projection with dense gaussian
+            integrals evaluated over the whole grid. If a `float`, instead
+            directly spread each gaussian onto only the `nspread` nearest grid
+            points (chosen from `eps`, trading accuracy for speed), using the
+            same backend as [`cryojax.simulator.IndependentAtomProjection`][].
         """  # noqa: E501
         if upsampling_factor is not None:
             raise ValueError(
@@ -268,6 +282,7 @@ class GaussianMixtureProjection(
         self.shape = shape
         self.sampling_mode = sampling_mode
         self.n_batches = n_batches
+        self.eps = eps
 
     @override
     def integrate(
@@ -299,20 +314,30 @@ class GaussianMixtureProjection(
         # Grab the gaussian amplitudes and widths
         positions = volume_representation.positions
         amplitudes = volume_representation.amplitudes
-        b_factors = variance_to_b_factor(
-            error_if_not_positive(volume_representation.variances)
-        )
-        # Compute the projection
+        variances = error_if_not_positive(volume_representation.variances)
         use_erf = True if self.sampling_mode == "average" else False
-        projection_integral = _gaussians_to_projection(
-            shape,
-            pixel_size,
-            positions,
-            amplitudes,
-            b_factors,
-            use_erf,
-            self.n_batches,
-        )
+        # Compute the projection
+        if self.eps is None:
+            b_factors = variance_to_b_factor(variances)
+            projection_integral = _gaussians_to_projection(
+                shape,
+                pixel_size,
+                positions,
+                amplitudes,
+                b_factors,
+                use_erf,
+                self.n_batches,
+            )
+        else:
+            projection_integral = _gaussians_to_projection_via_spreading(
+                shape,
+                pixel_size,
+                positions,
+                amplitudes,
+                variances,
+                use_erf,
+                self.eps,
+            )
         if self.shape is None:
             return (
                 projection_integral if outputs_real_space else rfftn(projection_integral)
@@ -372,6 +397,7 @@ class GaussianMixtureRenderFn(AbstractVolumeRenderFn[GaussianMixtureVolume], str
     voxel_size: Float[Array, ""]
 
     batch_options: BatchOptions
+    eps: float | None
 
     def __init__(
         self,
@@ -379,6 +405,7 @@ class GaussianMixtureRenderFn(AbstractVolumeRenderFn[GaussianMixtureVolume], str
         voxel_size: FloatLike,
         *,
         batch_options: dict[str, Any] = {},
+        eps: float | None = None,
     ):
         """**Arguments:**
 
@@ -397,10 +424,18 @@ class GaussianMixtureRenderFn(AbstractVolumeRenderFn[GaussianMixtureVolume], str
                 where the iteration is taken over groups of atoms.
                 This is useful if `batch_size = 1`
                 and GPU memory is exhausted. By default, `1`.
+        - `eps`:
+            If `None` (default), render the voxel grid with dense gaussian
+            integrals evaluated over the whole grid. If a `float`, instead
+            directly spread each gaussian onto only the `nspread` nearest grid
+            points (chosen from `eps`, trading accuracy for speed), using the
+            same backend as [`cryojax.simulator.IndependentAtomRenderFn`][].
+            `batch_options` is unused in this case.
         """
         self.shape = shape
         self.voxel_size = jnp.asarray(voxel_size, dtype=float)
         self.batch_options = _dict_to_batch_options(batch_options)
+        self.eps = eps
 
     @override
     def __call__(
@@ -428,14 +463,26 @@ class GaussianMixtureRenderFn(AbstractVolumeRenderFn[GaussianMixtureVolume], str
             component is in the corner. Does nothing if
             `outputs_real_space = True`.
         """
-        real_voxel_grid = _gaussians_to_real_voxels(
-            self.shape,
-            error_if_not_positive(self.voxel_size),
-            volume_representation.positions,
-            volume_representation.amplitudes,
-            variance_to_b_factor(error_if_not_positive(volume_representation.variances)),
-            **self.batch_options,
-        )
+        voxel_size = error_if_not_positive(self.voxel_size)
+        variances = error_if_not_positive(volume_representation.variances)
+        if self.eps is None:
+            real_voxel_grid = _gaussians_to_real_voxels(
+                self.shape,
+                voxel_size,
+                volume_representation.positions,
+                volume_representation.amplitudes,
+                variance_to_b_factor(variances),
+                **self.batch_options,
+            )
+        else:
+            real_voxel_grid = _gaussians_to_real_voxels_via_spreading(
+                self.shape,
+                voxel_size,
+                volume_representation.positions,
+                volume_representation.amplitudes,
+                variances,
+                self.eps,
+            )
         if outputs_real_space:
             return real_voxel_grid
         else:
@@ -506,6 +553,38 @@ def _gaussians_to_projection(
             "integer greater than or equal to 1."
         )
     return projection
+
+
+def _gaussians_to_projection_via_spreading(
+    shape: tuple[int, int],
+    pixel_size: Float[Array, ""],
+    positions: Float[Array, "n_positions 3"],
+    a: Float[Array, "n_positions n_gaussians_per_position"],
+    variances: Float[Array, "n_positions n_gaussians_per_position"],
+    use_erf: bool,
+    eps: float,
+) -> Float[Array, "dim_y dim_x"]:
+    """Spread each gaussian component directly onto the `nspread` nearest
+    grid points (see `cryojax.simulator._volume.common`), rather than
+    evaluating dense gaussian integrals over the whole grid.
+    """
+    nspread = eps_to_nspread(eps)
+    xy = normalize_positions_to_grid(positions[:, :2], shape, pixel_size)
+
+    def spread_one_gaussian(_a, _variance):
+        return _grid_spread_2d(
+            xy[:, 0],
+            xy[:, 1],
+            _a,
+            shape,
+            variance=_variance,
+            pixel_size=pixel_size,
+            nspread=nspread,
+            use_erf=use_erf,
+        )
+
+    contributions = jax.vmap(spread_one_gaussian, in_axes=(1, 1))(a, variances)
+    return jnp.sum(contributions, axis=0)
 
 
 def _gaussians_to_projection_kernel(
@@ -676,6 +755,39 @@ def _gaussians_to_real_voxels(
         )
 
     return real_voxel_grid
+
+
+@eqx.filter_jit
+def _gaussians_to_real_voxels_via_spreading(
+    shape: tuple[int, int, int],
+    voxel_size: Float[Array, ""],
+    positions: Float[Array, "n_positions 3"],
+    amplitudes: Float[Array, "n_positions n_gaussians_per_position"],
+    variances: Float[Array, "n_positions n_gaussians_per_position"],
+    eps: float,
+) -> Float[Array, "{shape[0]} {shape[1]} {shape[2]}"]:
+    """Spread each gaussian component directly onto the `nspread` nearest
+    grid points (see `cryojax.simulator._volume.common`), rather than
+    evaluating dense gaussian integrals over the whole grid.
+    """
+    nspread = eps_to_nspread(eps)
+    xyz = normalize_positions_to_grid(positions, shape, voxel_size)
+
+    def spread_one_gaussian(_amplitude, _variance):
+        return _grid_spread_3d(
+            xyz[:, 0],
+            xyz[:, 1],
+            xyz[:, 2],
+            _amplitude,
+            shape,
+            variance=_variance,
+            voxel_size=voxel_size,
+            nspread=nspread,
+            use_erf=True,
+        )
+
+    contributions = jax.vmap(spread_one_gaussian, in_axes=(1, 1))(amplitudes, variances)
+    return jnp.sum(contributions, axis=0)
 
 
 def _gaussians_to_real_voxels_kernel(

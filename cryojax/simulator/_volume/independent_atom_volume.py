@@ -7,10 +7,8 @@ from typing_extensions import override
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-import jax.scipy as jsp
 import nufftax
 from jaxtyping import Array, Float, Inexact, PyTree
-from nufftax.core import Kernel, spread_2d, spread_3d
 
 from ...constants import (
     PengScatteringFactorParameters,
@@ -40,7 +38,13 @@ from .base_volume import (
     ProjectionArray,
     VoxelArray,
 )
-from .common import make_frequencies_1d
+from .common import (
+    eps_to_nspread,
+    make_frequencies_1d,
+    normalize_positions_to_grid,
+    spread_2d as _grid_spread_2d,
+    spread_3d as _grid_spread_3d,
+)
 
 
 try:
@@ -310,8 +314,8 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
             for documentation.
         - `options`:
             A dictionary of options for advanced usage. This is passed directly to the underlying
-            non-uniform FFT implementation if kernels are in fourier-space, or to the `nufftax`
-            spreading function if kernels are in real-space.
+            non-uniform FFT implementation if kernels are in fourier-space. Unused if kernels are
+            in real-space.
         """  # noqa: E501
         if sampling_mode not in ["average", "point"]:
             raise ValueError(
@@ -374,15 +378,11 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
             sampling_mode=self.sampling_mode,
             is_real_space=is_real_space,
         )
-        # Modify kernels if using error functions
+        # Decide whether to spread the pixel-averaged (erf) kernel directly
         sampling_mode = self.sampling_mode
+        use_erf = False
         if is_real_space:
-            kernel_fns, sampling_mode = _maybe_use_erf(
-                kernel_fns,
-                pixel_size=self.voxel_size,
-                sampling_mode=sampling_mode,
-                upsampfac=upsampfac,
-            )
+            use_erf, sampling_mode = _resolve_erf_sampling(sampling_mode, upsampfac)
         # Compute
         rendering_out = render_impl(
             positions,
@@ -394,6 +394,7 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
             voxel_size_u=voxel_size_u,
             backend=self.backend,
             eps=self.eps,
+            use_erf=use_erf,
             options=self.options,
         )
         if is_real_space:
@@ -495,8 +496,8 @@ class IndependentAtomProjection(
             pad or crop to `image_config.padded_shape`.
         - `options`:
             A dictionary of options for advanced usage. This is passed directly to the underlying
-            non-uniform FFT implementation if kernels are in fourier-space, or to the `nufftax`
-            spreading function if kernels are in real-space.
+            non-uniform FFT implementation if kernels are in fourier-space. Unused if kernels are
+            in real-space.
         """  # noqa: E501
         if sampling_mode not in ["average", "point"]:
             raise ValueError(
@@ -560,15 +561,11 @@ class IndependentAtomProjection(
             sampling_mode=self.sampling_mode,
             is_real_space=is_real_space,
         )
-        # Modify kernels if using error functions
+        # Decide whether to spread the pixel-averaged (erf) kernel directly
         sampling_mode = self.sampling_mode
+        use_erf = False
         if is_real_space:
-            kernel_fns, sampling_mode = _maybe_use_erf(
-                kernel_fns,
-                pixel_size=pixel_size,
-                sampling_mode=sampling_mode,
-                upsampfac=upsampfac,
-            )
+            use_erf, sampling_mode = _resolve_erf_sampling(sampling_mode, upsampfac)
         # Compute projection
         projection_out = project_impl(
             positions,
@@ -580,6 +577,7 @@ class IndependentAtomProjection(
             shape_out=cast(tuple[int, int], shape),
             backend=self.backend,
             eps=self.eps,
+            use_erf=use_erf,
             options=self.options,
         )
         if is_real_space:
@@ -653,27 +651,20 @@ def _standardize_kernel_fns(
     return is_real_space, kernel_pytree
 
 
-def _maybe_use_erf(
-    kernel_pytree: PyTree[RealGaussian],
-    pixel_size: Float[Array, ""],
+def _resolve_erf_sampling(
     sampling_mode: Literal["average", "point"],
     upsampfac: float,
-) -> tuple[PyTree[RealGaussian], Literal["average", "point"]]:
-    """Modify gaussian kernels at runtime to the error function."""
-    if sampling_mode == "average":
-        if upsampfac == 1.0:
-            return (
-                jax.tree.map(
-                    lambda x: _make_erf(x, pixel_size),
-                    kernel_pytree,
-                    is_leaf=lambda x: isinstance(x, RealGaussian),
-                ),
-                "point",
-            )
-        else:
-            return kernel_pytree, "average"
-    else:
-        return (kernel_pytree, "point")
+) -> tuple[bool, Literal["average", "point"]]:
+    """Decide whether to spread with the pixel-averaged (erf) Gaussian kernel.
+
+    When averaging without any upsampling, the exact average of the Gaussian
+    within a pixel can be spread directly (`use_erf=True`), which is
+    equivalent to (and cheaper than) spreading a point-sampled kernel and
+    then convolving with a box function in Fourier space.
+    """
+    if sampling_mode == "average" and upsampfac == 1.0:
+        return True, "point"
+    return False, sampling_mode
 
 
 def project_impl(
@@ -687,6 +678,7 @@ def project_impl(
     shape_out: tuple[int, int],
     backend: Literal["jax-finufft", "nufftax"],
     eps: float,
+    use_erf: bool,
     options: dict[str, Any],
 ) -> Array:
     is_leaf = (
@@ -703,18 +695,17 @@ def project_impl(
         _kernel_fn: AbstractRealOperator,
         _amplitudes: Inexact[Array, " _"],
     ) -> Array:
-        nspread = _eps_to_nspread(eps)
-        xy = _normalize_positions(_positions[:, :2], _shape, _ps)
+        nspread = eps_to_nspread(eps)
+        xy = normalize_positions_to_grid(_positions[:, :2], _shape, _ps)
         projection = _spread_2d(
             kernel_fn=_kernel_fn,
             pixel_size=_ps,
             x=xy[:, 0],
             y=xy[:, 1],
             c=_amplitudes.astype(float),
-            nf1=_shape[1],
-            nf2=_shape[0],
+            shape=(_shape[0], _shape[1]),
             nspread=nspread,
-            options=options,
+            use_erf=use_erf,
         )
         return projection
 
@@ -784,6 +775,7 @@ def render_impl(
     shape_out: tuple[int, int, int],
     backend: Literal["jax-finufft", "nufftax"],
     eps: float,
+    use_erf: bool,
     options: dict[str, Any],
 ) -> Array:
     is_leaf = (
@@ -802,8 +794,8 @@ def render_impl(
         _kernel_fn: AbstractRealOperator,
         _amplitudes: Inexact[Array, " _"],
     ) -> Array:
-        nspread = _eps_to_nspread(eps)
-        xyz = _normalize_positions(_positions, _shape, _vs)
+        nspread = eps_to_nspread(eps)
+        xyz = normalize_positions_to_grid(_positions, _shape, _vs)
         rendering = _spread_3d(
             kernel_fn=_kernel_fn,
             voxel_size=_vs,
@@ -811,11 +803,9 @@ def render_impl(
             y=xyz[:, 1],
             z=xyz[:, 2],
             c=_amplitudes.astype(float),
-            nf1=_shape[2],
-            nf2=_shape[1],
-            nf3=_shape[0],
+            shape=_shape,
             nspread=nspread,
-            options=options,
+            use_erf=use_erf,
         )
         return rendering
 
@@ -970,50 +960,48 @@ def _nufft3d1(
         )
 
 
-def _spread_3d(kernel_fn, voxel_size, x, y, z, c, nf1, nf2, nf3, *, nspread, options):
-    @eqx.filter_vmap(in_axes=(eqx.if_array(0), None, None, None, None, None))
-    def spread_3d_impl(_kernel_fn, _voxel_size, _x, _y, _z, _c):
-        return spread_3d(
-            x=_x,
-            y=_y,
-            z=_z,
-            c=_c,
-            nf1=nf1,
-            nf2=nf2,
-            nf3=nf3,
-            kernel_params=_make_nufftax_kernel(
-                _kernel_fn, pixel_size=_voxel_size, nspread=nspread
-            ),
-            **options,
+def _spread_3d(kernel_fn, voxel_size, x, y, z, c, shape, *, nspread, use_erf):
+    # `kernel_fn.amplitude`/`.variance` carry a batch dimension over the
+    # (possibly several) gaussian components of this pytree leaf (e.g. the
+    # 5-gaussian Peng decomposition); `_standardize_kernel_fns` has already
+    # taken the `spatial_dim`-th root of the amplitude so that multiplying
+    # together the per-axis kernel evaluations recovers the full amplitude.
+    full_amplitude = kernel_fn.amplitude**3
+
+    def spread_one(_amplitude, _variance):
+        return _grid_spread_3d(
+            x,
+            y,
+            z,
+            c * _amplitude,
+            shape,
+            variance=_variance,
+            voxel_size=voxel_size,
+            nspread=nspread,
+            use_erf=use_erf,
         )
 
-    return jnp.sum(spread_3d_impl(kernel_fn, voxel_size, x, y, z, c), axis=0)
+    return jnp.sum(jax.vmap(spread_one)(full_amplitude, kernel_fn.variance), axis=0)
 
 
-def _spread_2d(kernel_fn, pixel_size, x, y, c, nf1, nf2, *, nspread, options):
-    @eqx.filter_vmap(in_axes=(eqx.if_array(0), None, None, None, None))
-    def spread_2d_impl(_kernel_fn, _pixel_size, _x, _y, _c):
-        return spread_2d(
-            x=_x,
-            y=_y,
-            c=_c,
-            nf1=nf1,
-            nf2=nf2,
-            kernel_params=_make_nufftax_kernel(
-                _kernel_fn, pixel_size=_pixel_size, nspread=nspread
-            ),
-            **options,
+def _spread_2d(kernel_fn, pixel_size, x, y, c, shape, *, nspread, use_erf):
+    # See `_spread_3d` for why `kernel_fn.amplitude`/`.variance` carry a batch
+    # dimension and why the amplitude is un-rooted here.
+    full_amplitude = kernel_fn.amplitude**2
+
+    def spread_one(_amplitude, _variance):
+        return _grid_spread_2d(
+            x,
+            y,
+            c * _amplitude,
+            shape,
+            variance=_variance,
+            pixel_size=pixel_size,
+            nspread=nspread,
+            use_erf=use_erf,
         )
 
-    return jnp.sum(spread_2d_impl(kernel_fn, pixel_size, x, y, c), axis=0)
-
-
-def _eps_to_nspread(eps: float) -> int:
-    # FINUFFT heuristic for choosing `nspread` parameter
-    # based on desired precision `eps`. In this context it is
-    # used for spreading gaussians, so we let it be unbounded
-    log_tol = -math.log10(max(eps, 1e-16))
-    return max(2, int(math.ceil(log_tol + 1)))
+    return jnp.sum(jax.vmap(spread_one)(full_amplitude, kernel_fn.variance), axis=0)
 
 
 def _build_extraction_mesh(
@@ -1054,46 +1042,6 @@ def _standardize_amplitudes(amplitudes: PyTree[Array] | None, positions: PyTree[
         )
     else:
         return amplitudes
-
-
-def _make_nufftax_kernel(
-    kernel_fn: AbstractRealOperator,
-    *,
-    pixel_size: Float[Array, ""],
-    nspread: int,
-):
-    return Kernel(
-        nspread=nspread,
-        phi=lambda _z: eqx.filter_vmap(kernel_fn)(pixel_size * _z),
-    )
-
-
-class _Erf(AbstractRealOperator, strict=True):
-    amplitude: Float[Array, ""]
-    variance: Float[Array, ""]
-
-    pixel_size: Float[Array, ""]
-
-    spatial_dims: ClassVar[list[int]] = [1]
-
-    @override
-    def __call__(self, coordinates: Float[Array, " dim"]) -> Float[Array, " dim"]:
-        scaling = 1.0 / jnp.sqrt(2 * self.variance)
-        left, right = (
-            coordinates - self.pixel_size / 2,
-            coordinates + self.pixel_size / 2,
-        )
-        weight = (1 / (2 * self.pixel_size)) * (
-            jsp.special.erf(scaling * right) - jsp.special.erf(scaling * left)
-        )
-        return self.amplitude * weight
-
-
-@eqx.filter_vmap(in_axes=(0, None))
-def _make_erf(gaussian: RealGaussian, pixel_size: Float[Array, ""]):
-    return _Erf(
-        amplitude=gaussian.amplitude, variance=gaussian.variance, pixel_size=pixel_size
-    )
 
 
 def _prepare_upsample(
@@ -1171,19 +1119,3 @@ def eval_separable_impl(
             * kernel_fn(q_y)[None, :, None]
             * kernel_fn(q_z)[:, None, None]
         )
-
-
-def _normalize_positions(
-    positions: Array,
-    shape: tuple[int, ...],
-    pixel_size: Array,
-) -> Array:
-    ndim = positions.shape[-1]
-    # shape is (z, y, x) or (y, x); reverse so first element is x
-    shape_spatial = shape[::-1][:ndim]
-    ns = jnp.asarray(shape_spatial, dtype=float)
-    # Center is at index N//2 for all N (RELION convention).
-    # For even N the offset is 0; for odd N it is -π/N so that x=0 lands
-    # exactly on pixel N//2 after fold_rescale.
-    offsets = jnp.pi * jnp.asarray([-(s % 2) / s for s in shape_spatial])
-    return 2 * jnp.pi * positions / (pixel_size * ns) + offsets
