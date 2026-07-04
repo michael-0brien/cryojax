@@ -418,8 +418,7 @@ def load_tabulated_volume(
     - `tabulation`:
         Specifies which electron scattering factor tabulation to use.
         The only supported value current is `tabulation = 'peng'`.
-        See [`cryojax.constants.PengScatteringFactorParameters`][] and
-        [`cryojax.constants.LobatoScatteringFactorParameters`][]
+        See [`cryojax.constants.PengScatteringFactorParameters`][]
         for more information.
     - `include_b_factors`:
         If `True`, include PDB B-factors in the volume.
