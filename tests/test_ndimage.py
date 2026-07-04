@@ -5,7 +5,7 @@ import jax.random as jr
 import numpy as np
 import pytest
 from cryojax.ndimage import make_frequency_grid, make_radial_frequency_grid
-from cryojax.ndimage._spread import spread_2d, spread_3d
+from cryojax.ndimage._spread import spread_gaussians_2d, spread_gaussians_3d
 from jax.test_util import check_grads
 
 
@@ -499,7 +499,7 @@ def test_spread_2d_custom_vjp(points_2d, use_erf, scalar_variance):
         variance = variance[0]
     n_spread = 9
 
-    fn = lambda x, y, amplitude, variance, pixel_size: spread_2d(
+    fn = lambda x, y, amplitude, variance, pixel_size: spread_gaussians_2d(
         x,
         y,
         amplitude,
@@ -527,7 +527,7 @@ def test_spread_3d_custom_vjp(points_3d, use_erf, scalar_variance):
         variance = variance[0]
     n_spread = 9
 
-    fn = lambda x, y, z, amplitude, variance, voxel_size: spread_3d(
+    fn = lambda x, y, z, amplitude, variance, voxel_size: spread_gaussians_3d(
         x,
         y,
         z,

@@ -304,8 +304,8 @@ This documentation is a collection of functions used to work with coordinate sys
 
 ### Spreading
 
-::: cryojax.ndimage.spread_2d
+::: cryojax.ndimage.spread_gaussians_2d
 
-::: cryojax.ndimage.spread_3d
+::: cryojax.ndimage.spread_gaussians_3d
 
 ::: cryojax.ndimage.variance_to_nspread

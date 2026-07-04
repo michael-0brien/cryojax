@@ -28,8 +28,8 @@ from ...ndimage import (
     query_efficient_grid_size,
     resize_with_crop_or_pad,
     rfftn,
-    spread_2d,
-    spread_3d,
+    spread_gaussians_2d,
+    spread_gaussians_3d,
 )
 from .._image_config import AbstractImageConfig
 from .._pose import AbstractPose
@@ -982,7 +982,7 @@ def _spread_3d_impl(kernel_fn, voxel_size, x, y, z, c, shape, *, n_spread, use_e
     # 5-gaussian Peng decomposition). Unlike the fourier-space path, no
     # amplitude root-splitting is needed here (see `_standardize_kernel_fns`).
     def spread_one(_amplitude, _variance):
-        return spread_3d(
+        return spread_gaussians_3d(
             x,
             y,
             z,
@@ -1001,7 +1001,7 @@ def _spread_2d_impl(kernel_fn, pixel_size, x, y, c, shape, *, n_spread, use_erf)
     # See `_spread_3d_impl` for why `kernel_fn.amplitude`/`.variance` carry a batch
     # dimension.
     def spread_one(_amplitude, _variance):
-        return spread_2d(
+        return spread_gaussians_2d(
             x,
             y,
             c * _amplitude,

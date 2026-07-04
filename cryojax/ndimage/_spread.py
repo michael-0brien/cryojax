@@ -39,8 +39,8 @@ from ..jax_util import FloatLike, NDArrayLike
 # (normalized) kernel exactly once, regardless of dimensionality. `variance`
 # only shapes the kernel and is not otherwise special-cased.
 #
-# The public `spread_2d`/`spread_3d` take physical-unit positions `x`, `y`,
-# `z`: `x = 0` corresponds to grid index `n // 2` (the RELION real-space
+# The public `spread_gaussians_2d`/`spread_gaussians_3d` take physical-unit positions
+# `x`, `y`, `z`: `x = 0` corresponds to grid index `n // 2` (the RELION real-space
 # center convention used throughout cryojax), for both even and odd `n`.
 # Internally, positions are converted to grid-index units
 # (`_normalize_coord_to_grid`) and named `i`, `j`, `k` from that point on —
@@ -52,7 +52,7 @@ from ..jax_util import FloatLike, NDArrayLike
 # custom VJP rule itself are needed.
 
 
-def spread_2d(
+def spread_gaussians_2d(
     x: Float[Array, " M"],
     y: Float[Array, " M"],
     amplitude: Float[Array, " M"],
@@ -115,7 +115,7 @@ def spread_2d(
     return _spread_2d(i, j, amplitude, variance, pixel_size, ny, nx, n_spread, use_erf)
 
 
-def spread_3d(
+def spread_gaussians_3d(
     x: Float[Array, " M"],
     y: Float[Array, " M"],
     z: Float[Array, " M"],
@@ -189,8 +189,8 @@ def variance_to_nspread(
     n_sigma: float = 4.0,
 ) -> int:
     """Choose an `n_spread` sufficient to truncate the Gaussian kernel used by
-    [`cryojax.ndimage.spread_2d`][]/[`cryojax.ndimage.spread_3d`][] at
-    `n_sigma` standard deviations.
+    [`cryojax.ndimage.spread_gaussians_2d`][]/[`cryojax.ndimage.spread_gaussians_3d`][]
+    at `n_sigma` standard deviations.
 
     `n_spread` sets array shapes, so it must be a static value rather than
     depending on `variance` through tracing; call this ahead of time with
@@ -209,7 +209,7 @@ def variance_to_nspread(
 
     - `variance`:
         The variance (or per-point array of variances — the largest is
-        used) that will be passed to `spread_2d`/`spread_3d`.
+        used) that will be passed to `spread_gaussians_2d`/`spread_gaussians_3d`.
     - `pixel_size`:
         The pixel/voxel size of the grid `variance` will be spread onto.
     - `n_sigma`:

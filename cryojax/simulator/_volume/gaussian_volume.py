@@ -15,8 +15,8 @@ from ...ndimage import (
     make_1d_coordinate_grid,
     resize_with_crop_or_pad,
     rfftn,
-    spread_2d,
-    spread_3d,
+    spread_gaussians_2d,
+    spread_gaussians_3d,
 )
 from .._image_config import AbstractImageConfig
 from .._pose import AbstractPose
@@ -636,7 +636,7 @@ def _gaussians_to_projection_spread(
         _positions, _amplitudes, _variances = xs
 
         def spread_one_gaussian(_amplitude, _variance):
-            return spread_2d(
+            return spread_gaussians_2d(
                 _positions[:, 0],
                 _positions[:, 1],
                 _amplitude,
@@ -733,7 +733,7 @@ def _gaussians_to_real_voxels_spread(
         _positions, _amplitudes, _variances = xs
 
         def spread_one_gaussian(_amplitude, _variance):
-            return spread_3d(
+            return spread_gaussians_3d(
                 _positions[:, 0],
                 _positions[:, 1],
                 _positions[:, 2],
