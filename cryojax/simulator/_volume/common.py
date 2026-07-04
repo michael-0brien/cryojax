@@ -6,7 +6,6 @@ spreading, but specialized to the isotropic Gaussian (and pixel-averaged
 Gaussian) kernels used by `IndependentAtomVolume` and `GaussianMixtureVolume`.
 """
 
-import math
 from functools import partial
 
 import jax
@@ -61,10 +60,15 @@ def make_frequencies_1d(
 # NUFFT involved, so that intermediate representation is unnecessary.
 
 
-def eps_to_nspread(eps: float) -> int:
-    """FINUFFT-style heuristic mapping a precision `eps` to a kernel width."""
-    log_tol = -math.log10(max(eps, 1e-16))
-    return max(2, int(math.ceil(log_tol + 1)))
+def nspread_to_eps(n_spread: int) -> float:
+    """Inverse of the FINUFFT-style `eps -> nspread` heuristic used by
+    `nufftax`/`finufft` (`nspread = ceil(-log10(eps) + 1)`): the precision
+    `eps` that a FINUFFT-compatible NUFFT would resolve using a kernel width
+    of `n_spread`. Used to translate our own `n_spread` parameter into an
+    `eps` for NUFFT backends that only accept a precision, not a kernel
+    width, directly.
+    """
+    return 10.0 ** (1 - n_spread)
 
 
 def normalize_positions_to_grid(

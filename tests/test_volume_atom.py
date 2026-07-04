@@ -21,7 +21,7 @@ from cryojax.constants import (
     check_atomic_numbers_supported,
 )
 from cryojax.ndimage import make_coordinate_grid
-from cryojax.simulator._volume.common import eps_to_nspread, spread_2d, spread_3d
+from cryojax.simulator._volume.common import spread_2d, spread_3d
 from jax.test_util import check_grads
 from jaxtyping import Array
 
@@ -302,7 +302,7 @@ class TestIntegrateGMMToPixels:
 
 
 class TestIntegrateGMMToPixelsWithSpreadingBackend:
-    """Same checks as `TestIntegrateGMMToPixels`, but for `eps is not None`,
+    """Same checks as `TestIntegrateGMMToPixels`, but for `n_spread is not None`,
     which routes through the `common.spread_2d` spreading backend instead of
     the dense gaussian-integral backend.
     """
@@ -325,7 +325,9 @@ class TestIntegrateGMMToPixelsWithSpreadingBackend:
             pixel_size=voxel_size,
             voltage_in_kilovolts=300.0,
         )
-        integrator = cxs.GaussianMixtureProjection(sampling_mode=sampling_mode, eps=1e-10)
+        integrator = cxs.GaussianMixtureProjection(
+            sampling_mode=sampling_mode, n_spread=11
+        )
         projection = im.irfftn(integrator.integrate(atomic_volume, image_config))
 
         maximum_index = jnp.argmax(projection)
@@ -345,7 +347,9 @@ class TestIntegrateGMMToPixelsWithSpreadingBackend:
             pixel_size=voxel_size,
             voltage_in_kilovolts=300.0,
         )
-        integrator = cxs.GaussianMixtureProjection(sampling_mode=sampling_mode, eps=1e-10)
+        integrator = cxs.GaussianMixtureProjection(
+            sampling_mode=sampling_mode, n_spread=11
+        )
         projection = im.irfftn(integrator.integrate(atomic_volume, image_config))
 
         integral = jnp.sum(projection) * voxel_size**2
@@ -353,8 +357,8 @@ class TestIntegrateGMMToPixelsWithSpreadingBackend:
 
     @pytest.mark.parametrize("sampling_mode", ["average", "point"])
     def test_agrees_with_dense_backend(self, toy_gaussian_cloud, sampling_mode):
-        """The spreading backend (`eps` set) should closely agree with the
-        dense gaussian-integral backend (`eps=None`) for a high-accuracy `eps`.
+        """The spreading backend (`n_spread` set) should closely agree with the
+        dense gaussian-integral backend (`n_spread=None`) for a high `n_spread`.
         """
         atom_positions, ff_a, ff_b, n_voxels_per_side, voxel_size = toy_gaussian_cloud
         n_pixels_per_side = n_voxels_per_side[:2]
@@ -369,7 +373,7 @@ class TestIntegrateGMMToPixelsWithSpreadingBackend:
         )
         dense_integrator = cxs.GaussianMixtureProjection(sampling_mode=sampling_mode)
         spread_integrator = cxs.GaussianMixtureProjection(
-            sampling_mode=sampling_mode, eps=1e-12
+            sampling_mode=sampling_mode, n_spread=13
         )
         dense_projection = dense_integrator.integrate(
             atomic_volume, image_config, outputs_real_space=True
@@ -392,7 +396,9 @@ class TestIntegrateGMMToPixelsWithSpreadingBackend:
             pixel_size=voxel_size,
             voltage_in_kilovolts=300.0,
         )
-        integrator = cxs.GaussianMixtureProjection(sampling_mode=sampling_mode, eps=1e-10)
+        integrator = cxs.GaussianMixtureProjection(
+            sampling_mode=sampling_mode, n_spread=11
+        )
 
         def loss(positions, amplitudes, variances):
             volume = cxs.GaussianMixtureVolume(positions, amplitudes, variances)
@@ -442,7 +448,7 @@ class TestRenderGMMToVoxels:
 
 
 class TestRenderGMMToVoxelsWithSpreadingBackend:
-    """Same checks as `TestRenderGMMToVoxels`, but for `eps is not None`, which
+    """Same checks as `TestRenderGMMToVoxels`, but for `n_spread is not None`, which
     routes through the `common.spread_3d` spreading backend instead of the
     dense gaussian-integral backend.
     """
@@ -455,7 +461,9 @@ class TestRenderGMMToVoxelsWithSpreadingBackend:
         gmm_volume = cxs.GaussianMixtureVolume(
             atom_positions, ff_a, ff_b / (8 * jnp.pi**2)
         )
-        render_fn = cxs.GaussianMixtureRenderFn(n_voxels_per_side, voxel_size, eps=1e-10)
+        render_fn = cxs.GaussianMixtureRenderFn(
+            n_voxels_per_side, voxel_size, n_spread=11
+        )
         real_voxel_grid = render_fn(gmm_volume)
         coordinate_grid = make_coordinate_grid(n_voxels_per_side, voxel_size)
 
@@ -469,15 +477,17 @@ class TestRenderGMMToVoxelsWithSpreadingBackend:
         gmm_volume = cxs.GaussianMixtureVolume(
             atom_positions, ff_a, ff_b / (8 * jnp.pi**2)
         )
-        render_fn = cxs.GaussianMixtureRenderFn(n_voxels_per_side, voxel_size, eps=1e-10)
+        render_fn = cxs.GaussianMixtureRenderFn(
+            n_voxels_per_side, voxel_size, n_spread=11
+        )
         real_voxel_grid = render_fn(gmm_volume)
 
         integral = jnp.sum(real_voxel_grid) * voxel_size**3
         assert jnp.isclose(integral, jnp.sum(ff_a), atol=1e-4)
 
     def test_agrees_with_dense_backend(self, toy_gaussian_cloud):
-        """The spreading backend (`eps` set) should closely agree with the
-        dense gaussian-integral backend (`eps=None`) for a high-accuracy `eps`.
+        """The spreading backend (`n_spread` set) should closely agree with the
+        dense gaussian-integral backend (`n_spread=None`) for a high `n_spread`.
         """
         atom_positions, ff_a, ff_b, n_voxels_per_side, voxel_size = toy_gaussian_cloud
 
@@ -486,7 +496,7 @@ class TestRenderGMMToVoxelsWithSpreadingBackend:
         )
         dense_render_fn = cxs.GaussianMixtureRenderFn(n_voxels_per_side, voxel_size)
         spread_render_fn = cxs.GaussianMixtureRenderFn(
-            n_voxels_per_side, voxel_size, eps=1e-12
+            n_voxels_per_side, voxel_size, n_spread=13
         )
         dense_voxel_grid = dense_render_fn(gmm_volume)
         spread_voxel_grid = spread_render_fn(gmm_volume)
@@ -498,7 +508,9 @@ class TestRenderGMMToVoxelsWithSpreadingBackend:
         amplitudes, and variances must be finite (regression check for the
         custom VJP rule in `common.py`)."""
         atom_positions, ff_a, ff_b, n_voxels_per_side, voxel_size = toy_gaussian_cloud
-        render_fn = cxs.GaussianMixtureRenderFn(n_voxels_per_side, voxel_size, eps=1e-10)
+        render_fn = cxs.GaussianMixtureRenderFn(
+            n_voxels_per_side, voxel_size, n_spread=11
+        )
 
         def loss(positions, amplitudes, variances):
             volume = cxs.GaussianMixtureVolume(positions, amplitudes, variances)
@@ -516,8 +528,8 @@ class TestRenderGMMToVoxelsWithSpreadingBackend:
 
 
 @pytest.mark.parametrize("n_batches", (1, 2, 3))
-@pytest.mark.parametrize("eps", (None, 1e-10))
-def test_gmm_projection_n_batches_agreement(toy_gaussian_cloud, eps, n_batches):
+@pytest.mark.parametrize("n_spread", (None, 11))
+def test_gmm_projection_n_batches_agreement(toy_gaussian_cloud, n_spread, n_batches):
     atom_positions, ff_a, ff_b, n_voxels_per_side, voxel_size = toy_gaussian_cloud
     n_pixels_per_side = n_voxels_per_side[:2]
 
@@ -527,28 +539,96 @@ def test_gmm_projection_n_batches_agreement(toy_gaussian_cloud, eps, n_batches):
     image_config = cxs.BasicImageConfig(
         shape=n_pixels_per_side, pixel_size=voxel_size, voltage_in_kilovolts=300.0
     )
-    reference = cxs.GaussianMixtureProjection(eps=eps).integrate(
+    reference = cxs.GaussianMixtureProjection(n_spread=n_spread).integrate(
         atomic_volume, image_config, outputs_real_space=True
     )
-    batched = cxs.GaussianMixtureProjection(eps=eps, n_batches=n_batches).integrate(
-        atomic_volume, image_config, outputs_real_space=True
-    )
+    batched = cxs.GaussianMixtureProjection(
+        n_spread=n_spread, n_batches=n_batches
+    ).integrate(atomic_volume, image_config, outputs_real_space=True)
     assert jnp.allclose(reference, batched, atol=1e-6)
 
 
 @pytest.mark.parametrize("n_batches", (1, 2, 3))
-@pytest.mark.parametrize("eps", (None, 1e-10))
-def test_gmm_render_n_batches_agreement(toy_gaussian_cloud, eps, n_batches):
+@pytest.mark.parametrize("n_spread", (None, 11))
+def test_gmm_render_n_batches_agreement(toy_gaussian_cloud, n_spread, n_batches):
     atom_positions, ff_a, ff_b, n_voxels_per_side, voxel_size = toy_gaussian_cloud
 
     gmm_volume = cxs.GaussianMixtureVolume(atom_positions, ff_a, ff_b / (8.0 * jnp.pi**2))
-    reference = cxs.GaussianMixtureRenderFn(n_voxels_per_side, voxel_size, eps=eps)(
-        gmm_volume
-    )
+    reference = cxs.GaussianMixtureRenderFn(
+        n_voxels_per_side, voxel_size, n_spread=n_spread
+    )(gmm_volume)
     batched = cxs.GaussianMixtureRenderFn(
-        n_voxels_per_side, voxel_size, eps=eps, n_batches=n_batches
+        n_voxels_per_side, voxel_size, n_spread=n_spread, n_batches=n_batches
     )(gmm_volume)
     assert jnp.allclose(reference, batched, atol=1e-6)
+
+
+# ── explicit center-of-box parity check (even and odd grid sizes) ───────────
+#
+# `toy_gaussian_cloud` only exercises a fixed, even grid (128), so none of the
+# tests above actually verify the real-space-center-at-index-N//2 convention
+# (see `common.normalize_positions_to_grid`) for odd `N`. These tests check,
+# directly (not via cross-backend agreement, which could hide a shared bug),
+# that a single atom at the origin peaks at grid index `N // 2` for both
+# parities, across the dense and spreading backends of both volume types.
+
+
+@pytest.mark.parametrize("n", (10, 11))
+@pytest.mark.parametrize("n_spread", (None, 11))
+def test_gmm_projection_peak_at_box_center(n, n_spread):
+    shape = (n, n)
+    pixel_size = 1.0
+    volume = cxs.GaussianMixtureVolume(np.zeros((1, 3)), amplitudes=1.0, variances=0.1)
+    image_config = cxs.BasicImageConfig(shape, pixel_size, voltage_in_kilovolts=300.0)
+    integrator = cxs.GaussianMixtureProjection(sampling_mode="point", n_spread=n_spread)
+    projection = integrator.integrate(volume, image_config, outputs_real_space=True)
+    peak_index = tuple(int(i) for i in jnp.unravel_index(jnp.argmax(projection), shape))
+    assert peak_index == (n // 2, n // 2)
+
+
+@pytest.mark.parametrize("n", (10, 11))
+@pytest.mark.parametrize("n_spread", (None, 11))
+def test_gmm_render_peak_at_box_center(n, n_spread):
+    shape = (n, n, n)
+    voxel_size = 1.0
+    volume = cxs.GaussianMixtureVolume(np.zeros((1, 3)), amplitudes=1.0, variances=0.1)
+    render_fn = cxs.GaussianMixtureRenderFn(shape, voxel_size, n_spread=n_spread)
+    real_voxel_grid = render_fn(volume)
+    peak_index = tuple(
+        int(i) for i in jnp.unravel_index(jnp.argmax(real_voxel_grid), shape)
+    )
+    assert peak_index == (n // 2, n // 2, n // 2)
+
+
+@pytest.mark.parametrize("n", (10, 11))
+def test_independent_atom_real_space_projection_peak_at_box_center(n):
+    shape = (n, n)
+    pixel_size = 1.0
+    volume = cxs.IndependentAtomVolume(
+        positions=np.zeros((1, 3)),
+        kernel_fns=im.RealGaussian(amplitude=1.0, variance=0.1),
+    )
+    image_config = cxs.BasicImageConfig(shape, pixel_size, voltage_in_kilovolts=300.0)
+    integrator = cxs.IndependentAtomProjection(sampling_mode="point")
+    projection = integrator.integrate(volume, image_config, outputs_real_space=True)
+    peak_index = tuple(int(i) for i in jnp.unravel_index(jnp.argmax(projection), shape))
+    assert peak_index == (n // 2, n // 2)
+
+
+@pytest.mark.parametrize("n", (10, 11))
+def test_independent_atom_real_space_render_peak_at_box_center(n):
+    shape = (n, n, n)
+    voxel_size = 1.0
+    volume = cxs.IndependentAtomVolume(
+        positions=np.zeros((1, 3)),
+        kernel_fns=im.RealGaussian(amplitude=1.0, variance=0.1),
+    )
+    render_fn = cxs.IndependentAtomRenderFn(shape, voxel_size, sampling_mode="point")
+    real_voxel_grid = render_fn(volume, outputs_real_space=True)
+    peak_index = tuple(
+        int(i) for i in jnp.unravel_index(jnp.argmax(real_voxel_grid), shape)
+    )
+    assert peak_index == (n // 2, n // 2, n // 2)
 
 
 # ── IndependentAtomVolume: bad instantiation ──────────────────────────────────
@@ -597,7 +677,7 @@ def test_fft_atom_projection_exact(pdb_info, pixel_size, shape, backend):
     atom_integrator = cxs.IndependentAtomProjection(
         backend=backend,  # type: ignore
         sampling_mode="point",
-        eps=1e-10,
+        n_spread=11,
     )
     proj_by_gaussians = compute_projection(
         gaussian_volume, gaussian_integrator, image_config
@@ -617,14 +697,14 @@ def test_fft_atom_projection_exact_backends_agree(pdb_info, pixel_size, shape):
     proj_nufftax = compute_projection(
         atom_volume,
         cxs.IndependentAtomProjection(
-            backend="nufftax", sampling_mode="point", eps=1e-10
+            backend="nufftax", sampling_mode="point", n_spread=11
         ),
         image_config,
     )
     proj_jax_finufft = compute_projection(
         atom_volume,
         cxs.IndependentAtomProjection(
-            backend="jax-finufft", sampling_mode="point", eps=1e-10
+            backend="jax-finufft", sampling_mode="point", n_spread=11
         ),
         image_config,
     )
@@ -650,7 +730,7 @@ def test_real_atom_projection_exact(pdb_info, pixel_size, shape):
         positions=atom_positions,
         kernel_fns=im.RealGaussian(amplitude=amplitude, variance=variance),
     )
-    atom_integrator = cxs.IndependentAtomProjection(sampling_mode="average", eps=1e-12)
+    atom_integrator = cxs.IndependentAtomProjection(sampling_mode="average", n_spread=13)
     proj_by_gaussians = compute_projection(
         gaussian_volume, gaussian_integrator, image_config
     )
@@ -685,7 +765,7 @@ def test_fft_atom_projection_antialias(pdb_info, width, pixel_size, shape, backe
         _make_antialias_volumes(pdb_info, width, pixel_size, shape)
     )
     atom_integrator = cxs.IndependentAtomProjection(
-        eps=1e-10,
+        n_spread=11,
         backend=backend,  # type: ignore
         upsample_factor=2.0,
     )
@@ -708,13 +788,15 @@ def test_fft_atom_projection_antialias_backends_agree(pdb_info, width, pixel_siz
     )
     proj_nufftax = compute_projection(
         atom_volume,
-        cxs.IndependentAtomProjection(backend="nufftax", eps=1e-10, upsample_factor=2.0),
+        cxs.IndependentAtomProjection(
+            backend="nufftax", n_spread=11, upsample_factor=2.0
+        ),
         image_config,
     )
     proj_jax_finufft = compute_projection(
         atom_volume,
         cxs.IndependentAtomProjection(
-            backend="jax-finufft", eps=1e-10, upsample_factor=2.0
+            backend="jax-finufft", n_spread=11, upsample_factor=2.0
         ),
         image_config,
     )
@@ -770,7 +852,7 @@ def test_fft_projection_peng(pdb_info, pixel_size, shape, upsampfac, eps, backen
         backend=backend,  # type: ignore
         sampling_mode="average",
         upsample_factor=upsampfac,
-        eps=1e-10,
+        n_spread=11,
     )
     proj_by_gaussians = compute_projection(
         gaussian_volume, gaussian_integrator, image_config
@@ -797,7 +879,7 @@ def test_fft_projection_peng_backends_agree(pdb_info, pixel_size, shape, upsampf
             backend="nufftax",
             sampling_mode="average",
             upsample_factor=upsampfac,
-            eps=1e-10,
+            n_spread=11,
         ),
         image_config,
     )
@@ -807,7 +889,7 @@ def test_fft_projection_peng_backends_agree(pdb_info, pixel_size, shape, upsampf
             backend="jax-finufft",
             sampling_mode="average",
             upsample_factor=upsampfac,
-            eps=1e-10,
+            n_spread=11,
         ),
         image_config,
     )
@@ -836,7 +918,7 @@ def test_real_projection_peng_erf(pdb_info, pixel_size, shape):
     )
     image_config = cxs.BasicImageConfig(shape, pixel_size, voltage_in_kilovolts=300.0)
     gaussian_integrator = cxs.GaussianMixtureProjection(sampling_mode="average")
-    atom_integrator = cxs.IndependentAtomProjection(sampling_mode="average", eps=1e-16)
+    atom_integrator = cxs.IndependentAtomProjection(sampling_mode="average", n_spread=17)
     proj_by_gaussians = compute_projection(
         gaussian_volume, gaussian_integrator, image_config
     )
@@ -857,7 +939,7 @@ def test_fft_atom_projection_custom_upsampfac(upsampfac):
     atom_integrator = cxs.IndependentAtomProjection(
         backend="nufftax",
         sampling_mode="point",
-        eps=1e-6,
+        n_spread=7,
         options={"upsampfac": upsampfac},
     )
     result = atom_integrator.integrate(
@@ -886,7 +968,7 @@ def test_fft_atom_projection_custom_upsampfac_jax_finufft(upsampfac):
     atom_integrator = cxs.IndependentAtomProjection(
         backend="jax-finufft",
         sampling_mode="point",
-        eps=1e-6,
+        n_spread=7,
         options={"opts": opts},
     )
     result = atom_integrator.integrate(
@@ -924,7 +1006,7 @@ def test_fft_atom_render(pdb_info, width, voxel_size, shape, backend):
     atom_render_fn = cxs.IndependentAtomRenderFn(
         shape,
         voxel_size,
-        eps=1e-10,
+        n_spread=11,
         backend=backend,  # type: ignore
     )
     voxels_by_gaussians = gaussian_render_fn(gaussian_volume)
@@ -944,10 +1026,10 @@ def test_fft_atom_render_backends_agree(pdb_info, width, voxel_size, shape):
     """nufftax and jax-finufft must produce identical rendered voxel grids."""
     _, atom_volume = _make_render_volumes(pdb_info, width)
     voxels_nufftax = cxs.IndependentAtomRenderFn(
-        shape, voxel_size, eps=1e-10, backend="nufftax"
+        shape, voxel_size, n_spread=11, backend="nufftax"
     )(atom_volume)
     voxels_jax_finufft = cxs.IndependentAtomRenderFn(
-        shape, voxel_size, eps=1e-10, backend="jax-finufft"
+        shape, voxel_size, n_spread=11, backend="jax-finufft"
     )(atom_volume)
     np.testing.assert_allclose(voxels_nufftax, voxels_jax_finufft, atol=1e-6)
 
@@ -968,7 +1050,7 @@ def test_render_options(pdb_info):
             ),
         )
         volumes.append(atom_volume)  # type: ignore
-        render_fns.append(cxs.IndependentAtomRenderFn(shape, voxel_size, eps=1e-10))  # type: ignore
+        render_fns.append(cxs.IndependentAtomRenderFn(shape, voxel_size, n_spread=11))  # type: ignore
     for volume, render_fn in zip(volumes, render_fns):
         real_voxel_grid = render_fn(volume, outputs_real_space=True)
         assert real_voxel_grid.shape == shape
@@ -994,7 +1076,7 @@ def test_fft_atom_render_custom_upsampfac(upsampfac):
         shape,
         voxel_size,
         backend="nufftax",
-        eps=1e-6,
+        n_spread=7,
         options={"upsampfac": upsampfac},
     )
     result = render_fn(atom_volume, outputs_real_space=True)
@@ -1018,7 +1100,7 @@ def test_fft_atom_render_custom_upsampfac_jax_finufft(upsampfac):
         backward=Opts(upsampfac=upsampfac, gpu_upsampfac=upsampfac),
     )
     render_fn = cxs.IndependentAtomRenderFn(
-        shape, voxel_size, backend="jax-finufft", eps=1e-6, options={"opts": opts}
+        shape, voxel_size, backend="jax-finufft", n_spread=7, options={"opts": opts}
     )
     result = render_fn(atom_volume, outputs_real_space=True)
     assert result.shape == shape
@@ -1073,7 +1155,7 @@ def test_spread_2d_custom_vjp(points_2d, use_erf, scalar_variance):
     x, y, c, variance, pixel_size, shape = points_2d
     if scalar_variance:
         variance = variance[0]
-    nspread = eps_to_nspread(1e-8)
+    nspread = 9
 
     fn = lambda x, y, c, variance, pixel_size: spread_2d(
         x,
@@ -1096,7 +1178,7 @@ def test_spread_3d_custom_vjp(points_3d, use_erf, scalar_variance):
     x, y, z, c, variance, voxel_size, shape = points_3d
     if scalar_variance:
         variance = variance[0]
-    nspread = eps_to_nspread(1e-8)
+    nspread = 9
 
     fn = lambda x, y, z, c, variance, voxel_size: spread_3d(
         x,

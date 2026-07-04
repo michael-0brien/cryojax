@@ -8,7 +8,7 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import nufftax
-from jaxtyping import Array, Float, Inexact, PyTree
+from jaxtyping import Array, Float, PyTree
 
 from ...constants import (
     PengScatteringFactorParameters,
@@ -39,9 +39,9 @@ from .base_volume import (
     VoxelArray,
 )
 from .common import (
-    eps_to_nspread,
     make_frequencies_1d,
     normalize_positions_to_grid,
+    nspread_to_eps,
     spread_2d as _grid_spread_2d,
     spread_3d as _grid_spread_3d,
 )
@@ -100,7 +100,6 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
 
     positions: PyTree[Float[Array, "_ 3"]]
     kernel_fns: PyTree[FourierGaussian] | PyTree[RealGaussian]
-    amplitudes: PyTree[Inexact[Array, " _"]] | None
 
     is_frame_rotation: ClassVar[bool] = False
 
@@ -108,7 +107,6 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
         self,
         positions: PyTree[Float[NDArrayLike, "_ 3"], "T"],
         kernel_fns: (PyTree[FourierGaussian, "T"] | PyTree[RealGaussian, "T"]),
-        amplitudes: PyTree[Inexact[NDArrayLike, " _"], "T"] | None = None,
     ):
         """**Arguments:**
 
@@ -123,8 +121,10 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
             fourier-space represents the scattering factor.
             These classes may have
             amplitudes and variances/b-factors with a batch dimension
-            to simulate form factors.
-        """
+            to simulate form factors. To use a different amplitude for
+            each atom position, use [`cryojax.simulator.GaussianMixtureVolume`][]
+            instead.
+        """  # noqa: E501
         if jax.tree.structure(positions) != jax.tree.structure(
             kernel_fns,
             is_leaf=lambda x: isinstance(
@@ -138,18 +138,6 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
             )
         self.positions = jax.tree.map(lambda x: jnp.asarray(x, dtype=float), positions)
         self.kernel_fns = kernel_fns
-        if amplitudes is None:
-            self.amplitudes = None
-        else:
-            if jax.tree.structure(positions) != jax.tree.structure(amplitudes):
-                raise ValueError(
-                    "When instantiating an `IndependentAtomVolume`, found "
-                    "that the pytree structures of `positions` and "
-                    "`amplitudes` were not equal."
-                )
-            self.amplitudes = jax.tree.map(
-                lambda x: jnp.asarray(x, dtype=float), amplitudes
-            )
 
     @override
     def rotate_to_pose(self, pose: AbstractPose) -> Self:
@@ -268,7 +256,7 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
     backend: Literal["nufftax", "jax-finufft"]
     sampling_mode: Literal["average", "point"]
     upsample_factor: float | None
-    eps: float
+    n_spread: int
     options: dict[str, Any]
 
     def __init__(
@@ -279,7 +267,7 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
         backend: Literal["nufftax", "jax-finufft"] = "nufftax",
         sampling_mode: Literal["average", "point"] = "average",
         upsample_factor: int | float | None = None,
-        eps: float = 1e-6,
+        n_spread: int = 7,
         options: dict[str, Any] = {},
     ):
         """**Arguments:**
@@ -308,10 +296,14 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
         - `upsample_factor`:
             How much to upsample the grid on which atoms are spread onto.
             If equal to `None`, choose a default value at run-time.
-        - `eps`:
-            Controls speed / accuracy tradeoff.
-            See [`finufft`](https://finufft.readthedocs.io/en/latest/opts.html#options-parameters-cpu)
-            for documentation.
+        - `n_spread`:
+            The width (number of grid points, per dimension) of the kernel
+            used to spread/interpolate. Controls speed / accuracy tradeoff:
+            larger `n_spread` is more accurate but slower. If
+            `IndependentAtomVolume.kernel_fns` are in fourier-space, this is
+            translated into an `eps` precision for the underlying non-uniform
+            FFT implementation (see
+            [`finufft`](https://finufft.readthedocs.io/en/latest/opts.html#options-parameters-cpu)).
         - `options`:
             A dictionary of options for advanced usage. This is passed directly to the underlying
             non-uniform FFT implementation if kernels are in fourier-space. Unused if kernels are
@@ -335,7 +327,7 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
         self.backend = backend
         self.sampling_mode = sampling_mode
         self.upsample_factor = None if upsample_factor is None else float(upsample_factor)
-        self.eps = eps
+        self.n_spread = n_spread
         self.options = options
 
     @override
@@ -369,7 +361,6 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
             volume_representation.positions,
             volume_representation.kernel_fns,
         )
-        amplitudes = _standardize_amplitudes(volume_representation.amplitudes, positions)
         is_real_space, kernel_fns = _standardize_kernel_fns(kernel_fns, spatial_dim=3)
         (shape_u, voxel_size_u), upsampfac = _prepare_upsample(
             shape=self.shape,
@@ -387,13 +378,12 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
         rendering_out = render_impl(
             positions,
             kernel_fns,
-            amplitudes,
             is_real_space=is_real_space,
             shape_u=cast(tuple[int, int, int], shape_u),
             shape_out=cast(tuple[int, int, int], self.shape),
             voxel_size_u=voxel_size_u,
             backend=self.backend,
-            eps=self.eps,
+            n_spread=self.n_spread,
             use_erf=use_erf,
             options=self.options,
         )
@@ -449,7 +439,7 @@ class IndependentAtomProjection(
     backend: Literal["nufftax", "jax-finufft"]
     sampling_mode: Literal["average", "point"]
     upsample_factor: float | None
-    eps: float
+    n_spread: int
     shape: tuple[int, int] | None
     options: dict[str, Any]
 
@@ -461,7 +451,7 @@ class IndependentAtomProjection(
         backend: Literal["jax-finufft", "nufftax"] = "nufftax",
         sampling_mode: Literal["average", "point"] = "average",
         upsample_factor: int | float | None = None,
-        eps: float = 1e-6,
+        n_spread: int = 7,
         shape: tuple[int, int] | None = None,
         options: dict[str, Any] = {},
     ):
@@ -487,10 +477,14 @@ class IndependentAtomProjection(
         - `upsample_factor`:
             How much to upsample the grid on which atoms are spread onto.
             If equal to `None`, choose a default value at run-time.
-        - `eps`:
-            Controls speed / accuracy tradeoff.
-            See [`finufft`](https://finufft.readthedocs.io/en/latest/opts.html#options-parameters-cpu)
-            for documentation.
+        - `n_spread`:
+            The width (number of grid points, per dimension) of the kernel
+            used to spread/interpolate. Controls speed / accuracy tradeoff:
+            larger `n_spread` is more accurate but slower. If
+            `IndependentAtomVolume.kernel_fns` are in fourier-space, this is
+            translated into an `eps` precision for the underlying non-uniform
+            FFT implementation (see
+            [`finufft`](https://finufft.readthedocs.io/en/latest/opts.html#options-parameters-cpu)).
         - `shape`:
             If given, first compute the image at `shape`, then
             pad or crop to `image_config.padded_shape`.
@@ -516,7 +510,7 @@ class IndependentAtomProjection(
         self.sampling_mode = sampling_mode
         self.shape = shape
         self.upsample_factor = None if upsample_factor is None else float(upsample_factor)
-        self.eps = eps
+        self.n_spread = n_spread
         self.options = options
 
     @override
@@ -552,7 +546,6 @@ class IndependentAtomProjection(
             volume_representation.positions,
             volume_representation.kernel_fns,
         )
-        amplitudes = _standardize_amplitudes(volume_representation.amplitudes, positions)
         is_real_space, kernel_fns = _standardize_kernel_fns(kernel_fns, spatial_dim=2)
         (shape_u, pixel_size_u), upsampfac = _prepare_upsample(
             shape=shape,
@@ -570,13 +563,12 @@ class IndependentAtomProjection(
         projection_out = project_impl(
             positions,
             kernel_fns,
-            amplitudes,
             is_real_space=is_real_space,
             shape_u=cast(tuple[int, int], shape_u),
             pixel_size_u=pixel_size_u,
             shape_out=cast(tuple[int, int], shape),
             backend=self.backend,
-            eps=self.eps,
+            n_spread=self.n_spread,
             use_erf=use_erf,
             options=self.options,
         )
@@ -631,9 +623,17 @@ def _standardize_kernel_fns(
         # Standardize gaussian kernels for computation
         # ... pytree leaves have a batch dim
         kernel_pytree = jax.tree.map(lambda x: jnp.atleast_1d(x), kernel_pytree)
-        # ... amplitude must be spread per dimension
-        replace_fn = lambda fn: eqx.tree_at(
-            lambda _fn: _fn.amplitude, fn, (fn.amplitude ** (1 / spatial_dim))
+        # ... in fourier-space, `eval_separable_impl` embeds the kernel's
+        # amplitude once per axis (outer product), so it must be pre-split by
+        # the `spatial_dim`-th root to recover the correct total amplitude.
+        # In real-space, `common.spread_2d`/`spread_3d` fold the full
+        # amplitude into `c` exactly once, so no split is needed there.
+        replace_fn = lambda fn: (
+            eqx.tree_at(
+                lambda _fn: _fn.amplitude, fn, (fn.amplitude ** (1 / spatial_dim))
+            )
+            if isinstance(fn, FourierGaussian)
+            else fn
         )
         kernel_pytree = jax.tree.map(
             replace_fn,
@@ -670,14 +670,13 @@ def _resolve_erf_sampling(
 def project_impl(
     positions: PyTree[Float[Array, "_ 3"]],
     kernel_fns: PyTree[RealGaussian] | PyTree[AbstractFourierOperator],
-    amplitudes: PyTree[Inexact[Array, " _"]],
     *,
     is_real_space: bool,
     shape_u: tuple[int, int],
     pixel_size_u: Float[Array, ""],
     shape_out: tuple[int, int],
     backend: Literal["jax-finufft", "nufftax"],
-    eps: float,
+    n_spread: int,
     use_erf: bool,
     options: dict[str, Any],
 ) -> Array:
@@ -687,24 +686,25 @@ def project_impl(
         else (lambda x: isinstance(x, AbstractFourierOperator))
     )
     frequencies_1d = make_frequencies_1d(shape_u, pixel_size_u, modeord=0)
+    # The Fourier-space NUFFT backends (`nufftax`/`jax-finufft`) only accept a
+    # precision `eps`, not a kernel width directly.
+    eps = nspread_to_eps(n_spread)
 
     def real_impl(
         _shape: tuple[int, int],
         _ps: Float[Array, ""],
         _positions: Float[Array, "_ 3"],
         _kernel_fn: AbstractRealOperator,
-        _amplitudes: Inexact[Array, " _"],
     ) -> Array:
-        nspread = eps_to_nspread(eps)
         xy = normalize_positions_to_grid(_positions[:, :2], _shape, _ps)
         projection = _spread_2d(
             kernel_fn=_kernel_fn,
             pixel_size=_ps,
             x=xy[:, 0],
             y=xy[:, 1],
-            c=_amplitudes.astype(float),
+            c=jnp.ones(_positions.shape[0]),
             shape=(_shape[0], _shape[1]),
-            nspread=nspread,
+            nspread=n_spread,
             use_erf=use_erf,
         )
         return projection
@@ -721,7 +721,6 @@ def project_impl(
         _ps: Float[Array, ""],
         _positions: Float[Array, "_ 3"],
         _kernel_fn: FourierGaussian,
-        _amplitudes: Inexact[Array, " _"],
         _f_1d: tuple[Array, ...],
     ) -> Array:
         # Scale positions onto the upsampled grid, then apply the shape_out-based
@@ -734,7 +733,7 @@ def project_impl(
             eval_kernel_impl(_kernel_fn, _f_1d)
             * _nufft2d1(
                 _shape,  # type: ignore
-                source=_amplitudes.astype(complex),
+                source=jnp.ones(_positions.shape[0], dtype=complex),
                 xy=xy,
                 backend=backend,
                 eps=eps,
@@ -749,14 +748,12 @@ def project_impl(
         project_impl, args = (fourier_impl, cast(Any, (frequencies_1d,)))
 
     # Project and sum over kernels
-    project_dispatch = lambda _positions, _kernel_fn, _amplitudes: project_impl(
-        shape_u, pixel_size_u, _positions, _kernel_fn, _amplitudes, *args
+    project_dispatch = lambda _positions, _kernel_fn: project_impl(
+        shape_u, pixel_size_u, _positions, _kernel_fn, *args
     )
     projection_out = jax.tree.reduce(
         lambda x, y: x + y,
-        jax.tree.map(
-            project_dispatch, positions, kernel_fns, amplitudes, is_leaf=is_leaf
-        ),
+        jax.tree.map(project_dispatch, positions, kernel_fns, is_leaf=is_leaf),
     )
     if not is_real_space:
         projection_out = jnp.fft.ifftshift(projection_out)
@@ -767,14 +764,13 @@ def project_impl(
 def render_impl(
     positions: PyTree[Float[Array, "_ 3"]],
     kernel_fns: PyTree[RealGaussian] | PyTree[AbstractFourierOperator],
-    amplitudes: PyTree[Inexact[Array, " _"]],
     *,
     is_real_space: bool,
     shape_u: tuple[int, int, int],
     voxel_size_u: Float[Array, ""],
     shape_out: tuple[int, int, int],
     backend: Literal["jax-finufft", "nufftax"],
-    eps: float,
+    n_spread: int,
     use_erf: bool,
     options: dict[str, Any],
 ) -> Array:
@@ -784,6 +780,9 @@ def render_impl(
         else (lambda x: isinstance(x, AbstractFourierOperator))
     )
     frequencies_1d = make_frequencies_1d(shape_u, voxel_size_u, modeord=0)
+    # The Fourier-space NUFFT backends (`nufftax`/`jax-finufft`) only accept a
+    # precision `eps`, not a kernel width directly.
+    eps = nspread_to_eps(n_spread)
 
     _nufft_offsets_3d = jnp.asarray([2 * jnp.pi * (s // 2) / s for s in shape_out[::-1]])
 
@@ -792,9 +791,7 @@ def render_impl(
         _vs: Float[Array, ""],
         _positions: Float[Array, "_ 3"],
         _kernel_fn: AbstractRealOperator,
-        _amplitudes: Inexact[Array, " _"],
     ) -> Array:
-        nspread = eps_to_nspread(eps)
         xyz = normalize_positions_to_grid(_positions, _shape, _vs)
         rendering = _spread_3d(
             kernel_fn=_kernel_fn,
@@ -802,9 +799,9 @@ def render_impl(
             x=xyz[:, 0],
             y=xyz[:, 1],
             z=xyz[:, 2],
-            c=_amplitudes.astype(float),
+            c=jnp.ones(_positions.shape[0]),
             shape=_shape,
-            nspread=nspread,
+            nspread=n_spread,
             use_erf=use_erf,
         )
         return rendering
@@ -814,7 +811,6 @@ def render_impl(
         _vs: Float[Array, ""],
         _positions: Float[Array, "_ 3"],
         _kernel_fn: FourierGaussian,
-        _amplitudes: Inexact[Array, " _"],
         _f_1d: tuple[Array, ...],
     ) -> Array:
         _ns = jnp.asarray(_shape[::-1], dtype=float)
@@ -822,7 +818,7 @@ def render_impl(
         return eval_kernel_impl(_kernel_fn, _f_1d) * (
             _nufft3d1(
                 _shape,  # type: ignore
-                source=_amplitudes.astype(complex),
+                source=jnp.ones(_positions.shape[0], dtype=complex),
                 xyz=xyz,
                 backend=backend,
                 eps=eps,
@@ -836,12 +832,12 @@ def render_impl(
     else:
         compute_fn, args = cast(Any, (fourier_impl, (frequencies_1d,)))
 
-    render_dispatch = lambda _positions, _kernel_fn, _amplitudes: compute_fn(
-        shape_u, voxel_size_u, _positions, _kernel_fn, _amplitudes, *args
+    render_dispatch = lambda _positions, _kernel_fn: compute_fn(
+        shape_u, voxel_size_u, _positions, _kernel_fn, *args
     )
     rendering_out = jax.tree.reduce(
         lambda x, y: x + y,
-        jax.tree.map(render_dispatch, positions, kernel_fns, amplitudes, is_leaf=is_leaf),
+        jax.tree.map(render_dispatch, positions, kernel_fns, is_leaf=is_leaf),
     )
     if not is_real_space:
         rendering_out = jnp.fft.ifftshift(rendering_out)
@@ -963,11 +959,8 @@ def _nufft3d1(
 def _spread_3d(kernel_fn, voxel_size, x, y, z, c, shape, *, nspread, use_erf):
     # `kernel_fn.amplitude`/`.variance` carry a batch dimension over the
     # (possibly several) gaussian components of this pytree leaf (e.g. the
-    # 5-gaussian Peng decomposition); `_standardize_kernel_fns` has already
-    # taken the `spatial_dim`-th root of the amplitude so that multiplying
-    # together the per-axis kernel evaluations recovers the full amplitude.
-    full_amplitude = kernel_fn.amplitude**3
-
+    # 5-gaussian Peng decomposition). Unlike the fourier-space path, no
+    # amplitude root-splitting is needed here (see `_standardize_kernel_fns`).
     def spread_one(_amplitude, _variance):
         return _grid_spread_3d(
             x,
@@ -981,14 +974,12 @@ def _spread_3d(kernel_fn, voxel_size, x, y, z, c, shape, *, nspread, use_erf):
             use_erf=use_erf,
         )
 
-    return jnp.sum(jax.vmap(spread_one)(full_amplitude, kernel_fn.variance), axis=0)
+    return jnp.sum(jax.vmap(spread_one)(kernel_fn.amplitude, kernel_fn.variance), axis=0)
 
 
 def _spread_2d(kernel_fn, pixel_size, x, y, c, shape, *, nspread, use_erf):
     # See `_spread_3d` for why `kernel_fn.amplitude`/`.variance` carry a batch
-    # dimension and why the amplitude is un-rooted here.
-    full_amplitude = kernel_fn.amplitude**2
-
+    # dimension.
     def spread_one(_amplitude, _variance):
         return _grid_spread_2d(
             x,
@@ -1001,7 +992,7 @@ def _spread_2d(kernel_fn, pixel_size, x, y, c, shape, *, nspread, use_erf):
             use_erf=use_erf,
         )
 
-    return jnp.sum(jax.vmap(spread_one)(full_amplitude, kernel_fn.variance), axis=0)
+    return jnp.sum(jax.vmap(spread_one)(kernel_fn.amplitude, kernel_fn.variance), axis=0)
 
 
 def _build_extraction_mesh(
@@ -1032,16 +1023,6 @@ def _build_extraction_indices_1d(dim: int, dim_ds: int, *, modeord: int):
         indices = jnp.concatenate([idx_pos, idx_neg])
 
     return indices
-
-
-def _standardize_amplitudes(amplitudes: PyTree[Array] | None, positions: PyTree[Array]):
-    if amplitudes is None:
-        return jax.tree.map(
-            lambda x: jnp.ones((x.shape[0],), dtype=float),
-            positions,
-        )
-    else:
-        return amplitudes
 
 
 def _prepare_upsample(
