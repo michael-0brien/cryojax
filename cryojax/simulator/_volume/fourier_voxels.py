@@ -3,7 +3,7 @@ Fourier voxel-based representations of a volume.
 """
 
 import abc
-from typing import Any, ClassVar, Self, cast
+from typing import Any, ClassVar, Literal, Self, cast
 from typing_extensions import override
 
 import equinox as eqx
@@ -298,6 +298,7 @@ class FourierSliceExtraction(
 
     outputs_integral: bool
     out_of_bounds_mode: str
+    gather_mode: Literal["loop", "single_gather"]
 
     outputs_ewald_sphere: ClassVar[bool] = False
 
@@ -306,6 +307,7 @@ class FourierSliceExtraction(
         *,
         outputs_integral: bool = True,
         out_of_bounds_mode: str = "fill",
+        gather_mode: Literal["loop", "single_gather"] = "loop",
     ):
         """**Arguments:**
 
@@ -317,9 +319,17 @@ class FourierSliceExtraction(
         - `out_of_bounds_mode`:
             Specify how to handle out of bounds indexing. See
             `cryojax.ndimage.map_coordinates` for documentation.
+        - `gather_mode`:
+            Passed to `cryojax.ndimage.map_coordinates`/
+            `map_coordinates_spline`. Defaults to `"loop"` everywhere,
+            but for `FourierVoxelSplineVolume` `"single_gather"` is often
+            substantially faster and is usually worth trying first, falling
+            back to `"loop"` only if you hit GPU out-of-memory errors or are
+            working with very large batches.
         """
         self.outputs_integral = outputs_integral
         self.out_of_bounds_mode = out_of_bounds_mode
+        self.gather_mode = gather_mode
 
     @override
     def integrate(
@@ -354,13 +364,15 @@ class FourierSliceExtraction(
             fourier_projection = _extract_slice_spline(
                 volume_representation.spline_coefficients,
                 frequency_slice,
-                mode=self.out_of_bounds_mode,
+                out_of_bounds_mode=self.out_of_bounds_mode,
+                gather_mode=self.gather_mode,
             )
         elif isinstance(volume_representation, FourierVoxelGridVolume):
             fourier_projection = _extract_slice(
                 volume_representation.fourier_voxel_grid,
                 frequency_slice,
-                mode=self.out_of_bounds_mode,
+                out_of_bounds_mode=self.out_of_bounds_mode,
+                gather_mode=self.gather_mode,
             )
         else:
             raise ValueError(
@@ -401,6 +413,7 @@ class EwaldSphereExtraction(
 
     outputs_integral: bool
     out_of_bounds_mode: str
+    gather_mode: Literal["loop", "single_gather"]
 
     outputs_ewald_sphere: ClassVar[bool] = True
 
@@ -409,6 +422,7 @@ class EwaldSphereExtraction(
         *,
         outputs_integral: bool = True,
         out_of_bounds_mode: str = "fill",
+        gather_mode: Literal["loop", "single_gather"] = "loop",
     ):
         """**Arguments:**
 
@@ -420,9 +434,17 @@ class EwaldSphereExtraction(
         - `out_of_bounds_mode`:
             Specify how to handle out of bounds indexing. See
             `cryojax.ndimage.map_coordinates` for documentation.
+        - `gather_mode`:
+            Passed to `cryojax.ndimage.map_coordinates`/
+            `map_coordinates_spline`. Defaults to `"loop"` everywhere,
+            but for `FourierVoxelSplineVolume` `"single_gather"` is often
+            substantially faster and is usually worth trying first, falling
+            back to `"loop"` only if you hit GPU out-of-memory errors or are
+            working with very large batches.
         """
         self.outputs_integral = outputs_integral
         self.out_of_bounds_mode = out_of_bounds_mode
+        self.gather_mode = gather_mode
 
     @override
     def integrate(
@@ -462,7 +484,8 @@ class EwaldSphereExtraction(
                 frequency_slice,
                 image_config.pixel_size,
                 image_config.wavelength_in_angstroms,
-                mode=self.out_of_bounds_mode,
+                out_of_bounds_mode=self.out_of_bounds_mode,
+                gather_mode=self.gather_mode,
             )
         elif isinstance(volume_representation, FourierVoxelGridVolume):
             ewald_sphere_surface = _extract_ewald_sphere(
@@ -470,7 +493,8 @@ class EwaldSphereExtraction(
                 frequency_slice,
                 image_config.pixel_size,
                 image_config.wavelength_in_angstroms,
-                mode=self.out_of_bounds_mode,
+                out_of_bounds_mode=self.out_of_bounds_mode,
+                gather_mode=self.gather_mode,
             )
         else:
             raise ValueError(
