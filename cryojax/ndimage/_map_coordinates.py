@@ -8,7 +8,6 @@ This code was developed for the project [`dLux`](https://louisdesdoigts.github.i
 import functools
 import operator
 from collections.abc import Sequence
-from typing import Literal
 
 import jax.numpy as jnp
 import lineax as lx
@@ -21,7 +20,7 @@ def map_coordinates(
     coordinates: Sequence[Array],
     out_of_bounds_mode: str = "fill",
     fill_value: float | complex = 0.0,
-    gather_mode: Literal["loop", "single_gather"] = "loop",
+    unroll_gather: bool = True,
 ) -> Array:
     """
     Similar to `scipy.map_coordinates`, but diverges from the API. Always
@@ -47,13 +46,12 @@ def map_coordinates(
     - `fill_value`:
         The value used for out-of-bounds coordinates when
         `out_of_bounds_mode` is `"fill"`. Ignored for other modes.
-    - `gather_mode`:
+    - `unroll_gather`:
         See [`cryojax.ndimage.map_coordinates_spline`][] for a description of
-        `"loop"` vs `"single_gather"`. For linear interpolation, `"loop"`
-        (the default) was found to be as fast or faster than
-        `"single_gather"` across every batch size tested on GPU, so there is
-        little reason to change this unless benchmarking your own workload
-        says otherwise.
+        this argument. For linear interpolation, `True` (the default) was
+        found to be as fast or faster than `False` across every batch size
+        tested on GPU, so there is little reason to change this unless
+        benchmarking your own workload says otherwise.
 
     **Returns:**
 
@@ -65,7 +63,7 @@ def map_coordinates(
     _check_ndim(input_arr.ndim, coordinate_arrs)
     taps = [_linear_indices_and_weights(c) for c in coordinate_arrs]
     result = _interp_dispatch(
-        input_arr, taps, out_of_bounds_mode, fill_value, gather_mode
+        input_arr, taps, out_of_bounds_mode, fill_value, unroll_gather
     )
     if jnp.issubdtype(input_arr.dtype, jnp.integer):
         result = _round_half_away_from_zero(result)
@@ -77,11 +75,25 @@ def map_coordinates_spline(
     coordinates: Sequence[Array],
     out_of_bounds_mode: str = "fill",
     fill_value: float | complex = 0.0,
-    gather_mode: Literal["loop", "single_gather"] = "single_gather",
+    unroll_gather: bool = True,
 ) -> Array:
     """
     Similar to `scipy.map_coordinates`, but takes coefficients computed from
     [`cryojax.ndimage.compute_spline_coefficients`][] as input.
+
+    If you hit a GPU out-of-memory error, or are working with very large
+    batches of query points, try `unroll_gather=False`:
+
+    ```python
+    from cryojax.ndimage import compute_spline_coefficients, map_coordinates_spline
+
+    coefficients = compute_spline_coefficients(data)
+    result = map_coordinates_spline(coefficients, coordinates, unroll_gather=False)
+    ```
+
+    `unroll_gather=False` is often substantially faster too (several-fold,
+    occasionally much more, on GPU), so it is worth trying even outside of a
+    memory-constrained setting.
 
     **Arguments:**
 
@@ -103,28 +115,19 @@ def map_coordinates_spline(
     - `fill_value`:
         The value used for out-of-bounds coordinates when
         `out_of_bounds_mode` is `"fill"`. Ignored for other modes.
-    - `gather_mode`:
+    - `unroll_gather`:
         Cubic spline interpolation gathers a `4^ndim` neighborhood around
-        each query point (vs. `2^ndim` for linear). Two ways to compute
-        that:
-
-        - `"single_gather"` (the default): consolidate all `4^ndim` taps
-          into one gather call. Substantially faster in most cases tested
-          (often several-fold, occasionally much more, on GPU), but its
-          peak memory scales linearly with the number of query points
-          (batch size), since it materializes the full tap-combination
-          tensor at once -- at large batch sizes this speed advantage
-          shrinks (towards, but not below, parity in every case tested) and
-          peak memory can be several-fold higher than `"loop"` for the same
-          input.
-        - `"loop"`: gather one tap combination at a time and accumulate.
-          Never holds more than one tap's worth of gathered values at once,
-          so its memory footprint is much smaller and more predictable at
-          large batch sizes, at the cost of being substantially slower in
-          most cases tested.
-
-        If you hit GPU out-of-memory errors with the default, or are
-        working with very large batches of query points, try `"loop"`.
+        each query point (vs. `2^ndim` for linear). If `True` (the default),
+        this is done as an unrolled Python loop over the `4^ndim` tap
+        combinations, one gather call at a time -- never holding more than
+        one tap's worth of gathered values at once, so memory use is small
+        and predictable at large batch sizes, at the cost of being
+        substantially slower in most cases tested. If `False`, all taps are
+        consolidated into a single gather call instead, which is usually
+        faster but has peak memory that scales linearly with the number of
+        query points (it materializes the full tap-combination tensor at
+        once); at very large batch sizes this speed advantage shrinks
+        (towards, but not below, parity in every case tested).
 
     **Returns:**
 
@@ -136,7 +139,7 @@ def map_coordinates_spline(
     _check_ndim(coefficients_arr.ndim, coordinate_arrs)
     taps = [_cubic_indices_and_weights(c) for c in coordinate_arrs]
     return _interp_dispatch(
-        coefficients_arr, taps, out_of_bounds_mode, fill_value, gather_mode
+        coefficients_arr, taps, out_of_bounds_mode, fill_value, unroll_gather
     )
 
 
@@ -206,21 +209,17 @@ def _interp_dispatch(
     taps: Sequence[list[tuple[Array, ArrayLike]]],
     mode: str,
     fill_value: complex | float,
-    gather_mode: Literal["loop", "single_gather"],
+    unroll_gather: bool,
 ) -> Array:
     """Dispatch to the 2D/3D separable interpolator, using either the
-    `"loop"` or `"single_gather"` gather strategy (see
-    `map_coordinates_spline`'s `gather_mode` argument for the tradeoffs).
-    `taps` holds, per axis, the (index, weight) pairs of that axis's
-    interpolation kernel (2 taps for linear, 4 for cubic)."""
-    if gather_mode == "loop":
+    unrolled-loop or single-gather strategy (see `map_coordinates_spline`'s
+    `unroll_gather` argument for the tradeoffs). `taps` holds, per axis, the
+    (index, weight) pairs of that axis's interpolation kernel (2 taps for
+    linear, 4 for cubic)."""
+    if unroll_gather:
         impl_2d, impl_3d = _interp_2d_loop, _interp_3d_loop
-    elif gather_mode == "single_gather":
-        impl_2d, impl_3d = _interp_2d_single_gather, _interp_3d_single_gather
     else:
-        raise ValueError(
-            f"`gather_mode` must be 'loop' or 'single_gather', but got '{gather_mode}'."
-        )
+        impl_2d, impl_3d = _interp_2d_single_gather, _interp_3d_single_gather
     if len(taps) == 2:
         return impl_2d(array, taps[0], taps[1], mode, fill_value)
     else:
@@ -309,7 +308,7 @@ def _interp_2d_single_gather(
     time (as in `_interp_2d_loop`, to avoid ever forming the outer product
     of weights). Materializes an `(*array.shape, n_y, n_x)`-shaped gathered
     array all at once, so peak memory scales with the number of query
-    points -- see `map_coordinates_spline`'s `gather_mode` argument.
+    points -- see `map_coordinates_spline`'s `unroll_gather` argument.
     """
     iy = jnp.stack([i for i, _ in taps_y], axis=-1)  # (*S, n_y)
     wy = jnp.stack([w for _, w in taps_y], axis=-1)
