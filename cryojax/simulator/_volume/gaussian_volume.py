@@ -27,6 +27,7 @@ from .base_volume import (
     ProjectionArray,
     VoxelArray,
 )
+from .common import spread_and_sum_gaussian_components
 
 
 class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
@@ -57,26 +58,26 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
         ```
     """
 
-    positions: Float[Array, "n_positions 3"]
-    amplitudes: Float[Array, "n_positions n_gaussians"]
-    variances: Float[Array, " n_positions n_gaussians"]
+    positions: Float[Array, "M 3"]
+    amplitudes: Float[Array, "M K"]
+    variances: Float[Array, " M K"]
 
     is_frame_rotation: ClassVar[bool] = False
 
     def __init__(
         self,
-        positions: Float[NDArrayLike, "n_positions 3"],
+        positions: Float[NDArrayLike, "M 3"],
         amplitudes: (
             float
             | Float[NDArrayLike, ""]
-            | Float[NDArrayLike, " n_positions"]
-            | Float[NDArrayLike, "n_positions n_gaussians"]
+            | Float[NDArrayLike, " M"]
+            | Float[NDArrayLike, "M K"]
         ),
         variances: (
             float
             | Float[NDArrayLike, ""]
-            | Float[NDArrayLike, " n_positions"]
-            | Float[NDArrayLike, "n_positions n_gaussians"]
+            | Float[NDArrayLike, " M"]
+            | Float[NDArrayLike, "M K"]
         ),
     ):
         """**Arguments:**
@@ -91,28 +92,28 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
             The variance for each gaussian. This has units of angstroms
             squared.
         """
-        n_positions = positions.shape[0]
+        M = positions.shape[0]
         if isinstance(amplitudes, NDArrayLike):
             if amplitudes.ndim == 2:
-                n_gaussians = amplitudes.shape[-1]
+                K = amplitudes.shape[-1]
             elif amplitudes.ndim == 1:
-                n_gaussians = 1
+                K = 1
                 amplitudes = amplitudes[:, None]
             elif amplitudes.ndim == 0:
-                n_gaussians = 1
+                K = 1
                 amplitudes = amplitudes[None, None]
             else:
                 raise ValueError(
                     "Passed `amplitudes` to `GaussianMixtureVolume` "
                     f"with shape {amplitudes.shape}, but must be of "
-                    "shape `()`, `(n_positions,)`, or "
-                    "`(n_positions, n_gaussians)`."
+                    "shape `()`, `(M,)`, or "
+                    "`(M, K)`."
                 )
         else:
-            n_gaussians = 1
+            K = 1
         if isinstance(variances, NDArrayLike):
             if variances.ndim == 2:
-                n_gaussians = variances.shape[-1]
+                K = variances.shape[-1]
             elif variances.ndim == 1:
                 variances = variances[:, None]
             elif variances.ndim == 0:
@@ -121,17 +122,13 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
                 raise ValueError(
                     "Passed `variances` to `GaussianMixtureVolume` "
                     f"with shape {variances.shape}, but must be of "
-                    "shape `()`, `(n_positions,)`, or "
-                    "`(n_positions, n_gaussians)`."
+                    "shape `()`, `(M,)`, or "
+                    "`(M, K)`."
                 )
 
         self.positions = jnp.asarray(positions, dtype=float)
-        self.amplitudes = jnp.broadcast_to(
-            jnp.asarray(amplitudes, dtype=float), (n_positions, n_gaussians)
-        )
-        self.variances = jnp.broadcast_to(
-            jnp.asarray(variances, dtype=float), (n_positions, n_gaussians)
-        )
+        self.amplitudes = jnp.broadcast_to(jnp.asarray(amplitudes, dtype=float), (M, K))
+        self.variances = jnp.broadcast_to(jnp.asarray(variances, dtype=float), (M, K))
 
     def __check_init__(self):
         if not (
@@ -221,7 +218,7 @@ class GaussianMixtureProjection(
     sampling_mode: Literal["average", "point"]
     shape: tuple[int, int] | None
     n_batches: int
-    n_spread: int | None
+    n_spread: int | tuple[int, ...] | None
 
     outputs_ewald_sphere: ClassVar[bool] = False
 
@@ -232,7 +229,7 @@ class GaussianMixtureProjection(
         shape: tuple[int, int] | None = None,
         sampling_mode: Literal["average", "point"] = "average",
         n_batches: int = 1,
-        n_spread: int | None = None,
+        n_spread: int | tuple[int, ...] | None = None,
     ):
         """**Arguments:**
 
@@ -257,6 +254,16 @@ class GaussianMixtureProjection(
             directly spread each gaussian onto only the `n_spread` nearest
             grid points (per dimension), trading accuracy for speed, using the
             same backend as [`cryojax.simulator.IndependentAtomProjection`][].
+            If a `tuple` of `int`s (one value per gaussian component, i.e. of
+            length `GaussianMixtureVolume.amplitudes.shape[-1]`), spread each
+            gaussian component with its own width instead of one shared
+            width -- useful when a volume's gaussian components have widths
+            spanning an order of magnitude or more (e.g. X-ray/electron
+            scattering factors written as a sum of 5 gaussians), where a
+            single `n_spread` would either truncate the widest components or
+            waste computation spreading the narrowest ones too widely. See
+            [`cryojax.simulator.suggest_n_spread`][] to choose these values
+            from `volume_representation.variances`.
         """  # noqa: E501
         if upsampling_factor is not None:
             raise ValueError(
@@ -393,7 +400,7 @@ class GaussianMixtureRenderFn(AbstractVolumeRenderFn[GaussianMixtureVolume], str
     shape: tuple[int, int, int]
     voxel_size: Float[Array, ""]
     n_batches: int
-    n_spread: int | None
+    n_spread: int | tuple[int, ...] | None
 
     def __init__(
         self,
@@ -401,7 +408,7 @@ class GaussianMixtureRenderFn(AbstractVolumeRenderFn[GaussianMixtureVolume], str
         voxel_size: FloatLike,
         *,
         n_batches: int = 1,
-        n_spread: int | None = None,
+        n_spread: int | tuple[int, ...] | None = None,
     ):
         """**Arguments:**
 
@@ -421,6 +428,16 @@ class GaussianMixtureRenderFn(AbstractVolumeRenderFn[GaussianMixtureVolume], str
             directly spread each gaussian onto only the `n_spread` nearest
             grid points (per dimension), trading accuracy for speed, using
             the same backend as [`cryojax.simulator.IndependentAtomRenderFn`][].
+            If a `tuple` of `int`s (one value per gaussian component, i.e. of
+            length `GaussianMixtureVolume.amplitudes.shape[-1]`), spread each
+            gaussian component with its own width instead of one shared
+            width -- useful when a volume's gaussian components have widths
+            spanning an order of magnitude or more (e.g. X-ray/electron
+            scattering factors written as a sum of 5 gaussians), where a
+            single `n_spread` would either truncate the widest components or
+            waste computation spreading the narrowest ones too widely. See
+            [`cryojax.simulator.suggest_n_spread`][] to choose these values
+            from `volume_representation.variances`.
         """  # noqa: E501
         self.shape = shape
         self.voxel_size = jnp.asarray(voxel_size, dtype=float)
@@ -516,11 +533,11 @@ def _sum_over_atom_batches(
     *,
     context: str,
 ) -> Array:
-    n_positions = jax.tree.leaves(xs)[0].shape[0]
-    if n_batches > n_positions:
+    M = jax.tree.leaves(xs)[0].shape[0]
+    if n_batches > M:
         raise ValueError(
             f"{context}: `n_batches` must be an integer less than or equal "
-            f"to the number of positions, which is equal to {n_positions}. Got "
+            f"to the number of positions, which is equal to {M}. Got "
             f"`n_batches = {n_batches}`."
         )
     if n_batches < 1:
@@ -530,7 +547,7 @@ def _sum_over_atom_batches(
     if n_batches == 1:
         return kernel_fn(xs)
 
-    batch_size = n_positions // n_batches
+    batch_size = M // n_batches
 
     def f_scan(carry, xs_chunk):
         return carry + kernel_fn(xs_chunk), None
@@ -554,12 +571,12 @@ def _erf_weight(r: Array, variance: Array, width: Float[Array, ""]) -> Array:
 
 def _dense_axis_values(
     grid: Float[Array, " dim"],
-    positions_1d: Float[Array, " n_positions"],
-    variance: Float[Array, "n_positions n_gaussians"],
+    positions_1d: Float[Array, " M"],
+    variance: Float[Array, "M K"],
     width: Float[Array, ""],
     *,
     use_erf: bool,
-) -> Float[Array, "dim n_positions n_gaussians"]:
+) -> Float[Array, "dim M K"]:
     """Evaluate the normalized 1D marginal kernel (see `cryojax.simulator
     ._volume.common`) at every grid point, for every position and gaussian
     component."""
@@ -574,9 +591,9 @@ def _dense_axis_values(
 def _gaussians_to_projection_dense(
     shape: tuple[int, int],
     pixel_size: Float[Array, ""],
-    positions: Float[Array, "n_positions 3"],
-    amplitudes: Float[Array, "n_positions n_gaussians"],
-    variances: Float[Array, "n_positions n_gaussians"],
+    positions: Float[Array, "M 3"],
+    amplitudes: Float[Array, "M K"],
+    variances: Float[Array, "M K"],
     use_erf: bool,
     n_batches: int,
     context: str,
@@ -599,9 +616,9 @@ def _gaussians_to_projection_dense_kernel(
     grid_x: Float[Array, " dim_x"],
     grid_y: Float[Array, " dim_y"],
     pixel_size: Float[Array, ""],
-    positions: Float[Array, "n_positions 3"],
-    amplitudes: Float[Array, "n_positions n_gaussians"],
-    variances: Float[Array, "n_positions n_gaussians"],
+    positions: Float[Array, "M 3"],
+    amplitudes: Float[Array, "M K"],
+    variances: Float[Array, "M K"],
     use_erf: bool,
 ) -> Float[Array, "dim_y dim_x"]:
     values_x = amplitudes[None, :, :] * _dense_axis_values(
@@ -619,11 +636,11 @@ def _gaussians_to_projection_dense_kernel(
 def _gaussians_to_projection_spread(
     shape: tuple[int, int],
     pixel_size: Float[Array, ""],
-    positions: Float[Array, "n_positions 3"],
-    amplitudes: Float[Array, "n_positions n_gaussians"],
-    variances: Float[Array, "n_positions n_gaussians"],
+    positions: Float[Array, "M 3"],
+    amplitudes: Float[Array, "M K"],
+    variances: Float[Array, "M K"],
     use_erf: bool,
-    n_spread: int,
+    n_spread: int | tuple[int, ...],
     n_batches: int,
     context: str,
 ) -> Float[Array, "dim_y dim_x"]:
@@ -635,7 +652,7 @@ def _gaussians_to_projection_spread(
     def kernel_fn(xs):
         _positions, _amplitudes, _variances = xs
 
-        def spread_one_gaussian(_amplitude, _variance):
+        def spread_one_gaussian(_amplitude, _variance, _n_spread):
             return spread_gaussians_2d(
                 _positions[:, 0],
                 _positions[:, 1],
@@ -643,14 +660,13 @@ def _gaussians_to_projection_spread(
                 _variance,
                 shape,
                 pixel_size=pixel_size,
-                n_spread=n_spread,
+                n_spread=_n_spread,
                 use_erf=use_erf,
             )
 
-        contributions = jax.vmap(spread_one_gaussian, in_axes=(1, 1))(
-            _amplitudes, _variances
+        return spread_and_sum_gaussian_components(
+            spread_one_gaussian, _amplitudes, _variances, n_spread
         )
-        return jnp.sum(contributions, axis=0)
 
     return _sum_over_atom_batches(
         kernel_fn, (positions, amplitudes, variances), n_batches, shape, context=context
@@ -663,9 +679,9 @@ def _gaussians_to_projection_spread(
 def _gaussians_to_real_voxels_dense(
     shape: tuple[int, int, int],
     voxel_size: Float[Array, ""],
-    positions: Float[Array, "n_positions 3"],
-    amplitudes: Float[Array, "n_positions n_gaussians"],
-    variances: Float[Array, "n_positions n_gaussians"],
+    positions: Float[Array, "M 3"],
+    amplitudes: Float[Array, "M K"],
+    variances: Float[Array, "M K"],
     n_batches: int,
     context: str,
 ) -> Float[Array, "{shape[0]} {shape[1]} {shape[2]}"]:
@@ -690,9 +706,9 @@ def _gaussians_to_real_voxels_dense_kernel(
     grid_y: Float[Array, " dim_y"],
     grid_z: Float[Array, " dim_z"],
     voxel_size: Float[Array, ""],
-    positions: Float[Array, "n_positions 3"],
-    amplitudes: Float[Array, "n_positions n_gaussians"],
-    variances: Float[Array, "n_positions n_gaussians"],
+    positions: Float[Array, "M 3"],
+    amplitudes: Float[Array, "M K"],
+    variances: Float[Array, "M K"],
 ) -> Float[Array, "dim_z dim_y dim_x"]:
     values_x = amplitudes[None, :, :] * _dense_axis_values(
         grid_x, positions[:, 0], variances, voxel_size, use_erf=True
@@ -717,10 +733,10 @@ def _gaussians_to_real_voxels_dense_kernel(
 def _gaussians_to_real_voxels_spread(
     shape: tuple[int, int, int],
     voxel_size: Float[Array, ""],
-    positions: Float[Array, "n_positions 3"],
-    amplitudes: Float[Array, "n_positions n_gaussians"],
-    variances: Float[Array, "n_positions n_gaussians"],
-    n_spread: int,
+    positions: Float[Array, "M 3"],
+    amplitudes: Float[Array, "M K"],
+    variances: Float[Array, "M K"],
+    n_spread: int | tuple[int, ...],
     n_batches: int,
     context: str,
 ) -> Float[Array, "{shape[0]} {shape[1]} {shape[2]}"]:
@@ -732,7 +748,7 @@ def _gaussians_to_real_voxels_spread(
     def kernel_fn(xs):
         _positions, _amplitudes, _variances = xs
 
-        def spread_one_gaussian(_amplitude, _variance):
+        def spread_one_gaussian(_amplitude, _variance, _n_spread):
             return spread_gaussians_3d(
                 _positions[:, 0],
                 _positions[:, 1],
@@ -741,14 +757,13 @@ def _gaussians_to_real_voxels_spread(
                 _variance,
                 shape,
                 voxel_size=voxel_size,
-                n_spread=n_spread,
+                n_spread=_n_spread,
                 use_erf=True,
             )
 
-        contributions = jax.vmap(spread_one_gaussian, in_axes=(1, 1))(
-            _amplitudes, _variances
+        return spread_and_sum_gaussian_components(
+            spread_one_gaussian, _amplitudes, _variances, n_spread
         )
-        return jnp.sum(contributions, axis=0)
 
     return _sum_over_atom_batches(
         kernel_fn, (positions, amplitudes, variances), n_batches, shape, context=context

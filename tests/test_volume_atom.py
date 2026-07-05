@@ -1102,3 +1102,246 @@ def test_fft_atom_render_custom_upsampfac_jax_finufft(upsampfac):
     )
     result = render_fn(atom_volume, outputs_real_space=True)
     assert result.shape == shape
+
+
+# ── per-gaussian-component `n_spread` (tuple) ─────────────────────────────────
+#
+# `n_spread` may be a single `int` (one spread width shared by every gaussian
+# component) or a `tuple[int, ...]` (one width per component, e.g. from
+# `cxs.suggest_n_spread`). A tuple of `n_spread` values that are all equal
+# must agree exactly with passing that value as a plain `int` -- the tuple
+# path uses a different (Python-loop, not `vmap`) code path internally, so
+# this is a real regression check, not a redundant one.
+
+
+def test_gmm_projection_tuple_n_spread_matches_scalar(toy_gaussian_cloud):
+    atom_positions, ff_a, ff_b, n_voxels_per_side, voxel_size = toy_gaussian_cloud
+    n_pixels_per_side = n_voxels_per_side[:2]
+    n_gaussians = ff_a.shape[-1]
+
+    atomic_volume = cxs.GaussianMixtureVolume(
+        atom_positions, ff_a, ff_b / (8.0 * jnp.pi**2)
+    )
+    image_config = cxs.BasicImageConfig(
+        shape=n_pixels_per_side, pixel_size=voxel_size, voltage_in_kilovolts=300.0
+    )
+    scalar_projection = cxs.GaussianMixtureProjection(n_spread=9).integrate(
+        atomic_volume, image_config, outputs_real_space=True
+    )
+    tuple_projection = cxs.GaussianMixtureProjection(
+        n_spread=(9,) * n_gaussians
+    ).integrate(atomic_volume, image_config, outputs_real_space=True)
+    assert jnp.allclose(scalar_projection, tuple_projection, atol=1e-6)
+
+
+def test_gmm_render_tuple_n_spread_matches_scalar(toy_gaussian_cloud):
+    atom_positions, ff_a, ff_b, n_voxels_per_side, voxel_size = toy_gaussian_cloud
+    n_gaussians = ff_a.shape[-1]
+
+    gmm_volume = cxs.GaussianMixtureVolume(atom_positions, ff_a, ff_b / (8.0 * jnp.pi**2))
+    scalar_grid = cxs.GaussianMixtureRenderFn(n_voxels_per_side, voxel_size, n_spread=9)(
+        gmm_volume
+    )
+    tuple_grid = cxs.GaussianMixtureRenderFn(
+        n_voxels_per_side, voxel_size, n_spread=(9,) * n_gaussians
+    )(gmm_volume)
+    assert jnp.allclose(scalar_grid, tuple_grid, atol=1e-6)
+
+
+def test_gmm_tuple_n_spread_heterogeneous_differs_from_uniform(toy_gaussian_cloud):
+    """A sanity check that genuinely different per-component `n_spread`
+    values actually take effect (not silently ignored/collapsed to one
+    value): using a much smaller `n_spread` for one wide-enough-to-matter
+    component should change the result relative to a uniform `n_spread`.
+    """
+    atom_positions, ff_a, ff_b, n_voxels_per_side, voxel_size = toy_gaussian_cloud
+    gmm_volume = cxs.GaussianMixtureVolume(atom_positions, ff_a, ff_b / (8.0 * jnp.pi**2))
+    uniform = cxs.GaussianMixtureRenderFn(
+        n_voxels_per_side, voxel_size, n_spread=(11, 11)
+    )(gmm_volume)
+    heterogeneous = cxs.GaussianMixtureRenderFn(
+        n_voxels_per_side, voxel_size, n_spread=(3, 11)
+    )(gmm_volume)
+    assert not jnp.allclose(uniform, heterogeneous, atol=1e-6)
+
+
+def test_gmm_tuple_n_spread_wrong_length_raises(toy_gaussian_cloud):
+    atom_positions, ff_a, ff_b, n_voxels_per_side, voxel_size = toy_gaussian_cloud
+    gmm_volume = cxs.GaussianMixtureVolume(atom_positions, ff_a, ff_b / (8.0 * jnp.pi**2))
+    render_fn = cxs.GaussianMixtureRenderFn(n_voxels_per_side, voxel_size, n_spread=(5,))
+    with pytest.raises(ValueError, match="n_spread"):
+        render_fn(gmm_volume)
+
+
+def test_independent_atom_render_tuple_n_spread_matches_scalar():
+    shape, voxel_size = (16, 16, 16), 1.0
+    kernel_fn = im.RealGaussian(
+        amplitude=jnp.array([1.0, 0.5]), variance=jnp.array([0.1, 0.05])
+    )
+    volume = cxs.IndependentAtomVolume(positions=np.zeros((1, 3)), kernel_fns=kernel_fn)
+    scalar_grid = cxs.IndependentAtomRenderFn(shape, voxel_size, n_spread=9)(volume)
+    tuple_grid = cxs.IndependentAtomRenderFn(shape, voxel_size, n_spread=(9, 9))(volume)
+    assert jnp.allclose(scalar_grid, tuple_grid, atol=1e-6)
+
+
+def test_independent_atom_projection_tuple_n_spread_matches_scalar():
+    shape, pixel_size = (16, 16), 1.0
+    kernel_fn = im.RealGaussian(
+        amplitude=jnp.array([1.0, 0.5]), variance=jnp.array([0.1, 0.05])
+    )
+    volume = cxs.IndependentAtomVolume(positions=np.zeros((1, 3)), kernel_fns=kernel_fn)
+    image_config = cxs.BasicImageConfig(shape, pixel_size, voltage_in_kilovolts=300.0)
+    scalar_projection = cxs.IndependentAtomProjection(n_spread=9).integrate(
+        volume, image_config, outputs_real_space=True
+    )
+    tuple_projection = cxs.IndependentAtomProjection(n_spread=(9, 9)).integrate(
+        volume, image_config, outputs_real_space=True
+    )
+    assert jnp.allclose(scalar_projection, tuple_projection, atol=1e-6)
+
+
+def test_independent_atom_tuple_n_spread_with_fourier_kernel_raises():
+    """A tuple `n_spread` is only meaningful for real-space (`RealGaussian`)
+    spreading; NUFFT's `eps` (fourier-space, `FourierGaussian`) has no
+    per-component analog, so this must raise a clear error rather than
+    silently using one of the values or crashing inside `nspread_to_eps`.
+    """
+    shape, voxel_size = (16, 16, 16), 1.0
+    kernel_fn = im.FourierGaussian(
+        amplitude=jnp.array([1.0, 0.5]), b_factor=jnp.array([10.0, 5.0])
+    )
+    volume = cxs.IndependentAtomVolume(positions=np.zeros((1, 3)), kernel_fns=kernel_fn)
+    render_fn = cxs.IndependentAtomRenderFn(shape, voxel_size, n_spread=(9, 9))
+    with pytest.raises(ValueError, match="n_spread"):
+        render_fn(volume)
+
+
+def test_independent_atom_scalar_n_spread_with_fourier_kernel_still_works():
+    """A plain `int` `n_spread` must still work fine with fourier-space
+    kernels (only tuples are restricted to real-space)."""
+    shape, voxel_size = (16, 16, 16), 1.0
+    kernel_fn = im.FourierGaussian(
+        amplitude=jnp.array([1.0, 0.5]), b_factor=jnp.array([10.0, 5.0])
+    )
+    volume = cxs.IndependentAtomVolume(positions=np.zeros((1, 3)), kernel_fns=kernel_fn)
+    render_fn = cxs.IndependentAtomRenderFn(shape, voxel_size, n_spread=9)
+    result = render_fn(volume, outputs_real_space=True)
+    assert jnp.all(jnp.isfinite(result))
+
+
+# ── suggest_n_spread ──────────────────────────────────────────────────────────
+
+
+def test_suggest_n_spread_gmm_global_and_termwise(toy_gaussian_cloud):
+    atom_positions, ff_a, ff_b, _, voxel_size = toy_gaussian_cloud
+    variances = ff_b / (8.0 * jnp.pi**2)
+    n_gaussians = ff_a.shape[-1]
+    volume = cxs.GaussianMixtureVolume(atom_positions, ff_a, variances)
+
+    global_n_spread = cxs.suggest_n_spread(volume, voxel_size, mode="global")
+    termwise_n_spread = cxs.suggest_n_spread(volume, voxel_size, mode="termwise")
+
+    assert isinstance(global_n_spread, int)
+    assert isinstance(termwise_n_spread, tuple)
+    assert len(termwise_n_spread) == n_gaussians
+    assert all(isinstance(n, int) for n in termwise_n_spread)
+    # The global value must be at least as large as every termwise value
+    # (it's sized to the single widest component across all of them).
+    assert global_n_spread >= max(termwise_n_spread)
+    # Each termwise entry must match calling `variance_to_nspread` directly
+    # on that component's own column of variances.
+    for i, n_i in enumerate(termwise_n_spread):
+        expected = im.variance_to_nspread(variances[:, i], voxel_size)
+        assert n_i == expected
+
+
+def test_suggest_n_spread_clamping(toy_gaussian_cloud):
+    atom_positions, ff_a, ff_b, _, voxel_size = toy_gaussian_cloud
+    volume = cxs.GaussianMixtureVolume(atom_positions, ff_a, ff_b / (8.0 * jnp.pi**2))
+
+    unclamped = cxs.suggest_n_spread(volume, voxel_size, mode="termwise")
+    clamped_min = cxs.suggest_n_spread(
+        volume, voxel_size, mode="termwise", min_n_spread=1000
+    )
+    clamped_max = cxs.suggest_n_spread(
+        volume, voxel_size, mode="termwise", max_n_spread=1
+    )
+    assert all(n == 1000 for n in clamped_min)
+    assert all(n == 1 for n in clamped_max)
+    assert unclamped != clamped_min
+
+    global_clamped = cxs.suggest_n_spread(
+        volume, voxel_size, mode="global", min_n_spread=1000
+    )
+    assert global_clamped == 1000
+
+
+def test_suggest_n_spread_independent_atom_real_and_fourier_agree():
+    """`suggest_n_spread` must derive the same widths from a `RealGaussian`'s
+    `variance` as from an equivalent `FourierGaussian`'s `b_factor` (the
+    latter converted via `variance = b_factor / (8 pi^2)`, *not* used
+    directly as if it were already a width -- variance and width differ by a
+    square root, so this is a real correctness check, not a redundant one).
+    """
+    pixel_size = 1.0
+    amplitude = jnp.array([1.0, 0.5, 0.2])
+    variance = jnp.array([0.05, 0.5, 5.0])
+    b_factor = variance * (8.0 * jnp.pi**2)
+
+    volume_real = cxs.IndependentAtomVolume(
+        positions=np.zeros((1, 3)),
+        kernel_fns=im.RealGaussian(amplitude=amplitude, variance=variance),
+    )
+    volume_fourier = cxs.IndependentAtomVolume(
+        positions=np.zeros((1, 3)),
+        kernel_fns=im.FourierGaussian(amplitude=amplitude, b_factor=b_factor),
+    )
+    n_spread_real = cxs.suggest_n_spread(volume_real, pixel_size, mode="termwise")
+    n_spread_fourier = cxs.suggest_n_spread(volume_fourier, pixel_size, mode="termwise")
+    assert n_spread_real == n_spread_fourier
+
+
+def test_suggest_n_spread_independent_atom_mismatched_n_gaussians_raises():
+    volume = cxs.IndependentAtomVolume(
+        positions=(np.zeros((1, 3)), np.zeros((1, 3))),
+        kernel_fns=(
+            im.RealGaussian(
+                amplitude=jnp.array([1.0, 0.5]), variance=jnp.array([0.1, 0.2])
+            ),
+            im.RealGaussian(amplitude=jnp.array([1.0]), variance=jnp.array([0.1])),
+        ),
+    )
+    with pytest.raises(ValueError, match="gaussian components"):
+        cxs.suggest_n_spread(volume, 1.0, mode="termwise")
+
+
+def test_suggest_n_spread_unsupported_volume_type_raises():
+    with pytest.raises(ValueError, match="suggest_n_spread"):
+        cxs.suggest_n_spread(object(), 1.0)  # type: ignore[arg-type]
+
+
+def test_suggest_n_spread_invalid_mode_raises(toy_gaussian_cloud):
+    atom_positions, ff_a, ff_b, _, voxel_size = toy_gaussian_cloud
+    volume = cxs.GaussianMixtureVolume(atom_positions, ff_a, ff_b / (8.0 * jnp.pi**2))
+    with pytest.raises(ValueError, match="mode"):
+        cxs.suggest_n_spread(volume, voxel_size, mode="bogus")  # type: ignore[arg-type]
+
+
+def test_suggest_n_spread_output_is_plain_python_not_jax():
+    """`suggest_n_spread` must be usable to set `n_spread` (a static,
+    shape-determining argument), so its outputs must be plain Python `int`s
+    -- not 0-d JAX/numpy arrays, which would be the wrong type to use as a
+    static argument and would signal that the function accidentally
+    round-tripped through JAX (`b_factor_to_variance` returns a JAX array,
+    for instance) instead of staying eager/numpy-only throughout.
+    """
+    volume = cxs.IndependentAtomVolume(
+        positions=np.zeros((1, 3)),
+        kernel_fns=im.FourierGaussian(
+            amplitude=jnp.array([1.0, 0.5]), b_factor=jnp.array([10.0, 5.0])
+        ),
+    )
+    global_n_spread = cxs.suggest_n_spread(volume, 1.0, mode="global")
+    termwise_n_spread = cxs.suggest_n_spread(volume, 1.0, mode="termwise")
+    assert type(global_n_spread) is int
+    assert all(type(n) is int for n in termwise_n_spread)

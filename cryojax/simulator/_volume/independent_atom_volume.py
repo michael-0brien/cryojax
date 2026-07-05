@@ -40,7 +40,11 @@ from .base_volume import (
     ProjectionArray,
     VoxelArray,
 )
-from .common import make_frequencies_1d, nspread_to_eps
+from .common import (
+    make_frequencies_1d,
+    nspread_to_eps,
+    spread_and_sum_gaussian_components,
+)
 
 
 try:
@@ -251,7 +255,7 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
 
     sampling_mode: Literal["average", "point"]
     upsample_factor: float | None
-    n_spread: int
+    n_spread: int | tuple[int, ...]
     backend: Literal["nufftax", "jax-finufft"]
     options: dict[str, Any]
 
@@ -262,7 +266,7 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
         *,
         sampling_mode: Literal["average", "point"] = "average",
         upsample_factor: int | float | None = None,
-        n_spread: int = 7,
+        n_spread: int | tuple[int, ...] = 7,
         backend: Literal["nufftax", "jax-finufft"] = "nufftax",
         options: dict[str, Any] = {},
     ):
@@ -290,7 +294,18 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
             `IndependentAtomVolume.kernel_fns` are in fourier-space, this is
             translated into an `eps` precision for the underlying non-uniform
             FFT implementation (see
-            [`finufft`](https://finufft.readthedocs.io/en/latest/opts.html#options-parameters-cpu)).
+            [`finufft`](https://finufft.readthedocs.io/en/latest/opts.html#options-parameters-cpu)),
+            and must be a single `int` (a `tuple` is not supported for
+            fourier-space kernels). If `IndependentAtomVolume.kernel_fns` are
+            in real-space, `n_spread` may instead be a `tuple` of `int`s (one
+            value per gaussian component of `kernel_fns`, e.g. of length 5
+            for the Peng et al. 1996 scattering-factor decomposition), to
+            spread each gaussian component with its own width rather than
+            one shared width -- useful when a volume's gaussian components
+            have widths spanning an order of magnitude or more, where a
+            single `n_spread` would either truncate the widest components or
+            waste computation spreading the narrowest ones too widely. See
+            [`cryojax.simulator.suggest_n_spread`][] to choose these values.
         - `backend` (fourier only):
             The backend for non-uniform FFT computation. This is either
             [`nufftax`](https://github.com/GragasLab/nufftax/tree/custom-kernel-spread)
@@ -359,6 +374,7 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
             volume_representation.kernel_fns,
         )
         is_real_space, kernel_fns = _standardize_kernel_fns(kernel_fns, spatial_dim=3)
+        _check_n_spread_real_only(self.n_spread, is_real_space, type(self))
         (shape_u, voxel_size_u), upsampfac = _prepare_upsample(
             shape=self.shape,
             pixel_size=self.voxel_size,
@@ -435,7 +451,7 @@ class IndependentAtomProjection(
 ):
     sampling_mode: Literal["average", "point"]
     upsample_factor: float | None
-    n_spread: int
+    n_spread: int | tuple[int, ...]
     shape: tuple[int, int] | None
     backend: Literal["nufftax", "jax-finufft"]
     options: dict[str, Any]
@@ -447,7 +463,7 @@ class IndependentAtomProjection(
         *,
         sampling_mode: Literal["average", "point"] = "average",
         upsample_factor: int | float | None = None,
-        n_spread: int = 7,
+        n_spread: int | tuple[int, ...] = 7,
         shape: tuple[int, int] | None = None,
         backend: Literal["jax-finufft", "nufftax"] = "nufftax",
         options: dict[str, Any] = {},
@@ -472,7 +488,18 @@ class IndependentAtomProjection(
             `IndependentAtomVolume.kernel_fns` are in fourier-space, this is
             translated into an `eps` precision for the underlying non-uniform
             FFT implementation (see
-            [`finufft`](https://finufft.readthedocs.io/en/latest/opts.html#options-parameters-cpu)).
+            [`finufft`](https://finufft.readthedocs.io/en/latest/opts.html#options-parameters-cpu)),
+            and must be a single `int` (a `tuple` is not supported for
+            fourier-space kernels). If `IndependentAtomVolume.kernel_fns` are
+            in real-space, `n_spread` may instead be a `tuple` of `int`s (one
+            value per gaussian component of `kernel_fns`, e.g. of length 5
+            for the Peng et al. 1996 scattering-factor decomposition), to
+            spread each gaussian component with its own width rather than
+            one shared width -- useful when a volume's gaussian components
+            have widths spanning an order of magnitude or more, where a
+            single `n_spread` would either truncate the widest components or
+            waste computation spreading the narrowest ones too widely. See
+            [`cryojax.simulator.suggest_n_spread`][] to choose these values.
         - `shape`:
             If given, first compute the image at `shape`, then
             pad or crop to `image_config.padded_shape`.
@@ -545,6 +572,7 @@ class IndependentAtomProjection(
             volume_representation.kernel_fns,
         )
         is_real_space, kernel_fns = _standardize_kernel_fns(kernel_fns, spatial_dim=2)
+        _check_n_spread_real_only(self.n_spread, is_real_space, type(self))
         (shape_u, pixel_size_u), upsampfac = _prepare_upsample(
             shape=shape,
             pixel_size=pixel_size,
@@ -608,6 +636,19 @@ class IndependentAtomProjection(
 
 IndependentAtomProjection.__doc__ = f"""Integrate atomic parametrization of a volume "
 "onto the exit plane from an `IndependentAtomVolume`. {_REAL_VS_FOURIER_DOC}"""
+
+
+def _check_n_spread_real_only(
+    n_spread: int | tuple[int, ...], is_real_space: bool, cls: type
+) -> None:
+    if isinstance(n_spread, tuple) and not is_real_space:
+        raise ValueError(
+            f"`{cls.__name__}(..., n_spread=...)` was given as a tuple (one "
+            "value per gaussian component), but `IndependentAtomVolume."
+            "kernel_fns` are in fourier-space (`FourierGaussian`s). A tuple "
+            "`n_spread` is only supported for real-space kernels "
+            "(`RealGaussian`s); pass a single `int` instead."
+        )
 
 
 def _standardize_kernel_fns(
@@ -674,7 +715,7 @@ def _project_impl(
     pixel_size_u: Float[Array, ""],
     shape_out: tuple[int, int],
     backend: Literal["jax-finufft", "nufftax"],
-    n_spread: int,
+    n_spread: int | tuple[int, ...],
     use_erf: bool,
     options: dict[str, Any],
 ) -> Array:
@@ -685,8 +726,10 @@ def _project_impl(
     )
     frequencies_1d = make_frequencies_1d(shape_u, pixel_size_u, modeord=0)
     # The Fourier-space NUFFT backends (`nufftax`/`jax-finufft`) only accept a
-    # precision `eps`, not a kernel width directly.
-    eps = nspread_to_eps(n_spread)
+    # precision `eps`, not a kernel width directly, and only ever accept a
+    # single `int` `n_spread` (a tuple `n_spread` is real-space only -- see
+    # `_check_n_spread_real_only`, checked before this is called).
+    eps = None if is_real_space else nspread_to_eps(cast(int, n_spread))
 
     def real_impl(
         _shape: tuple[int, int],
@@ -766,7 +809,7 @@ def _render_impl(
     shape_u: tuple[int, int, int],
     voxel_size_u: Float[Array, ""],
     shape_out: tuple[int, int, int],
-    n_spread: int,
+    n_spread: int | tuple[int, ...],
     use_erf: bool,
     backend: Literal["jax-finufft", "nufftax"],
     options: dict[str, Any],
@@ -778,8 +821,10 @@ def _render_impl(
     )
     frequencies_1d = make_frequencies_1d(shape_u, voxel_size_u, modeord=0)
     # The Fourier-space NUFFT backends (`nufftax`/`jax-finufft`) only accept a
-    # precision `eps`, not a kernel width directly.
-    eps = nspread_to_eps(n_spread)
+    # precision `eps`, not a kernel width directly, and only ever accept a
+    # single `int` `n_spread` (a tuple `n_spread` is real-space only -- see
+    # `_check_n_spread_real_only`, checked before this is called).
+    eps = None if is_real_space else nspread_to_eps(cast(int, n_spread))
 
     _nufft_offsets_3d = jnp.asarray([2 * jnp.pi * (s // 2) / s for s in shape_out[::-1]])
 
@@ -981,7 +1026,7 @@ def _spread_3d_impl(kernel_fn, voxel_size, x, y, z, c, shape, *, n_spread, use_e
     # (possibly several) gaussian components of this pytree leaf (e.g. the
     # 5-gaussian Peng decomposition). Unlike the fourier-space path, no
     # amplitude root-splitting is needed here (see `_standardize_kernel_fns`).
-    def spread_one(_amplitude, _variance):
+    def spread_one(_amplitude, _variance, _n_spread):
         return spread_gaussians_3d(
             x,
             y,
@@ -990,17 +1035,19 @@ def _spread_3d_impl(kernel_fn, voxel_size, x, y, z, c, shape, *, n_spread, use_e
             _variance,
             shape,
             voxel_size=voxel_size,
-            n_spread=n_spread,
+            n_spread=_n_spread,
             use_erf=use_erf,
         )
 
-    return jnp.sum(jax.vmap(spread_one)(kernel_fn.amplitude, kernel_fn.variance), axis=0)
+    return spread_and_sum_gaussian_components(
+        spread_one, kernel_fn.amplitude, kernel_fn.variance, n_spread
+    )
 
 
 def _spread_2d_impl(kernel_fn, pixel_size, x, y, c, shape, *, n_spread, use_erf):
     # See `_spread_3d_impl` for why `kernel_fn.amplitude`/`.variance` carry a batch
     # dimension.
-    def spread_one(_amplitude, _variance):
+    def spread_one(_amplitude, _variance, _n_spread):
         return spread_gaussians_2d(
             x,
             y,
@@ -1008,11 +1055,13 @@ def _spread_2d_impl(kernel_fn, pixel_size, x, y, c, shape, *, n_spread, use_erf)
             _variance,
             shape,
             pixel_size=pixel_size,
-            n_spread=n_spread,
+            n_spread=_n_spread,
             use_erf=use_erf,
         )
 
-    return jnp.sum(jax.vmap(spread_one)(kernel_fn.amplitude, kernel_fn.variance), axis=0)
+    return spread_and_sum_gaussian_components(
+        spread_one, kernel_fn.amplitude, kernel_fn.variance, n_spread
+    )
 
 
 def _build_extraction_mesh(
