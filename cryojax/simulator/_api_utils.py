@@ -513,6 +513,30 @@ def load_tabulated_volume(
     return atom_volume
 
 
+@overload
+def suggest_n_spread(
+    volume: IndependentAtomVolume | GaussianMixtureVolume,
+    pixel_size: FloatLike,
+    *,
+    cutoff_sigma: float = 4.0,
+    mode: Literal["termwise"] = "termwise",
+    min_n_spread: int = 1,
+    max_n_spread: int | None = None,
+) -> tuple[int, ...]: ...
+
+
+@overload
+def suggest_n_spread(
+    volume: IndependentAtomVolume | GaussianMixtureVolume,
+    pixel_size: FloatLike,
+    *,
+    cutoff_sigma: float = 4.0,
+    mode: Literal["global"],
+    min_n_spread: int = 1,
+    max_n_spread: int | None = None,
+) -> int: ...
+
+
 def suggest_n_spread(
     volume: IndependentAtomVolume | GaussianMixtureVolume,
     pixel_size: FloatLike,
