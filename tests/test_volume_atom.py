@@ -409,6 +409,37 @@ class TestIntegrateGMMToPixelsWithSpreadingBackend:
         for g in grads:
             assert jnp.all(jnp.isfinite(g))
 
+    @pytest.mark.parametrize("sampling_mode", ["average", "point"])
+    def test_gradients_agree_with_dense_backend(self, toy_gaussian_cloud, sampling_mode):
+        """Gradients through the spreading backend (`n_spread` set) should
+        closely agree with gradients through the dense gaussian-integral
+        backend (`n_spread=None`) for a high `n_spread`."""
+        atom_positions, ff_a, ff_b, n_voxels_per_side, voxel_size = toy_gaussian_cloud
+        n_pixels_per_side = n_voxels_per_side[:2]
+        image_config = cxs.BasicImageConfig(
+            shape=n_pixels_per_side,
+            pixel_size=voxel_size,
+            voltage_in_kilovolts=300.0,
+        )
+        dense_integrator = cxs.GaussianMixtureProjection(sampling_mode=sampling_mode)
+        spread_integrator = cxs.GaussianMixtureProjection(
+            sampling_mode=sampling_mode, n_spread=13
+        )
+
+        def make_loss(integrator):
+            def loss(positions, amplitudes, variances):
+                volume = cxs.GaussianMixtureVolume(positions, amplitudes, variances)
+                projection = integrator.integrate(volume, image_config)
+                return jnp.sum(jnp.abs(projection) ** 2)
+
+            return loss
+
+        args = (atom_positions, ff_a, ff_b / (8.0 * jnp.pi**2))
+        dense_grads = jax.grad(make_loss(dense_integrator), argnums=(0, 1, 2))(*args)
+        spread_grads = jax.grad(make_loss(spread_integrator), argnums=(0, 1, 2))(*args)
+        for g_dense, g_spread in zip(dense_grads, spread_grads):
+            assert jnp.allclose(g_dense, g_spread, atol=1e-4, rtol=1e-4)
+
 
 # ── GaussianMixtureRenderFn ───────────────────────────────────────────────────
 
@@ -520,6 +551,30 @@ class TestRenderGMMToVoxelsWithSpreadingBackend:
         )
         for g in grads:
             assert jnp.all(jnp.isfinite(g))
+
+    def test_gradients_agree_with_dense_backend(self, toy_gaussian_cloud):
+        """Gradients through the spreading backend (`n_spread` set) should
+        closely agree with gradients through the dense gaussian-integral
+        backend (`n_spread=None`) for a high `n_spread`."""
+        atom_positions, ff_a, ff_b, n_voxels_per_side, voxel_size = toy_gaussian_cloud
+        dense_render_fn = cxs.GaussianMixtureRenderFn(n_voxels_per_side, voxel_size)
+        spread_render_fn = cxs.GaussianMixtureRenderFn(
+            n_voxels_per_side, voxel_size, n_spread=13
+        )
+
+        def make_loss(render_fn):
+            def loss(positions, amplitudes, variances):
+                volume = cxs.GaussianMixtureVolume(positions, amplitudes, variances)
+                real_voxel_grid = render_fn(volume)
+                return jnp.sum(real_voxel_grid**2)
+
+            return loss
+
+        args = (atom_positions, ff_a, ff_b / (8.0 * jnp.pi**2))
+        dense_grads = jax.grad(make_loss(dense_render_fn), argnums=(0, 1, 2))(*args)
+        spread_grads = jax.grad(make_loss(spread_render_fn), argnums=(0, 1, 2))(*args)
+        for g_dense, g_spread in zip(dense_grads, spread_grads):
+            assert jnp.allclose(g_dense, g_spread, atol=1e-4, rtol=1e-4)
 
 
 # ── GaussianMixture*: n_batches agreement (dense and spread backends) ────────
