@@ -83,7 +83,7 @@ _REMOVED = {
     "RealVoxelProjection": None,
     "AberratedAstigmaticCTF": "AstigmaticCTF",
     "CTF": "AstigmaticCTF",
-    "NufftProjection": "RealVoxelProjection",
+    "NufftProjection": None,
     "PengAtomicVolume": "GaussianMixtureVolume",
     "UncorrelatedGaussianNoiseModel": "GaussianWhiteNoiseModel",
     "CorrelatedGaussianNoiseModel": "GaussianColoredNoiseModel",
