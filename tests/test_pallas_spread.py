@@ -31,15 +31,15 @@ import jax
 import jax.numpy as jnp
 import pytest
 from cryojax.ndimage import spread_gaussians_2d, spread_gaussians_3d
-from cryojax.ndimage._spread.pallas_spread import (
-    _pallas_interp_bwd_2d,
-    _resolve_enable_pallas,
+from cryojax.ndimage._spreading.pallas_spread import (
+    pallas_interp_bwd_2d,
+    resolve_enable_pallas,
 )
 
 
 requires_gpu = pytest.mark.skipif(
     jax.default_backend() != "gpu",
-    reason="Pallas/Triton kernels require a real CUDA GPU",
+    reason="Pallas/Triton kernels require a CUDA GPU",
 )
 
 
@@ -136,76 +136,76 @@ _JIT_SPREAD_3D = {
 }
 
 
-# ── `_resolve_enable_pallas`: pure config-resolution logic, no GPU needed ────
+# ── `resolve_enable_pallas`: pure config-resolution logic, no GPU needed ────
 
 
 @pytest.fixture
 def force_gpu_backend(monkeypatch):
-    # `_resolve_enable_pallas` both resolves the fwd/bwd flags *and* checks
+    # `resolve_enable_pallas` both resolves the fwd/bwd flags *and* checks
     # GPU availability (fail-fast, rather than deferring to whatever error
     # `pallas_call` itself raises). These tests exercise the resolution
     # logic in isolation, so they mock `jax.default_backend()` -> "gpu"
     # (this repo's own `.venv` is CPU-only) rather than actually requiring
     # one; GPU-availability *rejection* is covered separately below.
-    import cryojax.ndimage._spread.pallas_spread as pallas_spread
+    import cryojax.ndimage._spreading.pallas_spread as pallas_spread
 
     monkeypatch.setattr(pallas_spread.jax, "default_backend", lambda: "gpu")
 
 
 def test_resolve_enable_pallas_none_defers_to_env(monkeypatch, force_gpu_backend):
-    import cryojax.ndimage._spread.pallas_spread as pallas_spread
+    import cryojax.ndimage._spreading.pallas_spread as pallas_spread
 
     monkeypatch.setattr(pallas_spread, "CRYOJAX_ENABLE_PALLAS", True)
-    assert _resolve_enable_pallas(None) == (True, True)
+    assert resolve_enable_pallas(None) == (True, True)
     monkeypatch.setattr(pallas_spread, "CRYOJAX_ENABLE_PALLAS", False)
-    assert _resolve_enable_pallas(None) == (False, False)
+    assert resolve_enable_pallas(None) == (False, False)
 
 
 def test_resolve_enable_pallas_bool(force_gpu_backend):
-    assert _resolve_enable_pallas(True) == (True, True)
-    assert _resolve_enable_pallas(False) == (False, False)
+    assert resolve_enable_pallas(True) == (True, True)
+    assert resolve_enable_pallas(False) == (False, False)
 
 
 def test_resolve_enable_pallas_bool_overrides_env(monkeypatch, force_gpu_backend):
     # `enable_pallas=<bool>` must win outright over `CRYOJAX_ENABLE_PALLAS`,
     # in both directions -- not just take effect when the env var agrees.
-    import cryojax.ndimage._spread.pallas_spread as pallas_spread
+    import cryojax.ndimage._spreading.pallas_spread as pallas_spread
 
     monkeypatch.setattr(pallas_spread, "CRYOJAX_ENABLE_PALLAS", True)
-    assert _resolve_enable_pallas(False) == (False, False)
+    assert resolve_enable_pallas(False) == (False, False)
     monkeypatch.setattr(pallas_spread, "CRYOJAX_ENABLE_PALLAS", False)
-    assert _resolve_enable_pallas(True) == (True, True)
+    assert resolve_enable_pallas(True) == (True, True)
 
 
 def test_resolve_enable_pallas_dict_partial(monkeypatch, force_gpu_backend):
-    import cryojax.ndimage._spread.pallas_spread as pallas_spread
+    import cryojax.ndimage._spreading.pallas_spread as pallas_spread
 
     monkeypatch.setattr(pallas_spread, "CRYOJAX_ENABLE_PALLAS", False)
-    assert _resolve_enable_pallas({"fwd": True}) == (True, False)
-    assert _resolve_enable_pallas({"bwd": True}) == (False, True)
-    assert _resolve_enable_pallas({"fwd": True, "bwd": True}) == (True, True)
+    assert resolve_enable_pallas({"fwd": True}) == (True, False)
+    assert resolve_enable_pallas({"bwd": True}) == (False, True)
+    assert resolve_enable_pallas({"fwd": True, "bwd": True}) == (True, True)
     # A dict overrides per-key; a key it doesn't mention still falls back
     # to the env var, not to some other default.
     monkeypatch.setattr(pallas_spread, "CRYOJAX_ENABLE_PALLAS", True)
-    assert _resolve_enable_pallas({"fwd": False}) == (False, True)
+    assert resolve_enable_pallas({"fwd": False}) == (False, True)
 
 
 def test_resolve_enable_pallas_requires_gpu_when_no_gpu_backend(monkeypatch):
-    import cryojax.ndimage._spread.pallas_spread as pallas_spread
+    import cryojax.ndimage._spreading.pallas_spread as pallas_spread
 
     monkeypatch.setattr(pallas_spread.jax, "default_backend", lambda: "cpu")
     with pytest.raises(RuntimeError, match="requires a CUDA GPU"):
-        _resolve_enable_pallas(True)
+        resolve_enable_pallas(True)
 
 
 def test_resolve_enable_pallas_invalid_type():
     with pytest.raises(TypeError):
-        _resolve_enable_pallas("not-a-valid-value")  # type: ignore[arg-type]
+        resolve_enable_pallas("not-a-valid-value")  # type: ignore[arg-type]
 
 
 # ── Backward (gather): safe to check numerically under `interpret=True` ─────
 #
-# `_pallas_interp_bwd_{2,3}d` don't expose an `interpret` argument (the real
+# `pallas_interp_bwd_{2,3}d` don't expose an `interpret` argument (the real
 # module always compiles for real), so these tests call `pl.pallas_call`
 # with `interpret=True` directly via a small local monkeypatch of
 # `pl.pallas_call`'s default, rather than threading an `interpret` kwarg
@@ -251,7 +251,7 @@ def test_pallas_bwd_2d_matches_pure_jax_interpret(
     i = x / pixel_size + nx // 2
     j = y / pixel_size + ny // 2
     res = (i, j, amplitude, variance, pixel_size)
-    di, dj, damplitude, dvariance, dpixel_size = _pallas_interp_bwd_2d(
+    di, dj, damplitude, dvariance, dpixel_size = pallas_interp_bwd_2d(
         ny, nx, n_spread, use_erf, res, g
     )
     # `grads_ref` is w.r.t. physical `x`/`y`; `di`/`dj` are w.r.t. grid-index

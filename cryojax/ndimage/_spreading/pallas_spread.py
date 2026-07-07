@@ -7,8 +7,8 @@ via `segment_sum`), this backend never holds more than `O(block_size *
 n_spread^d)` at once per kernel program, for a total footprint of `O(M)`
 across the whole call.
 
-Forward (`_pallas_spread_fwd_{2,3}d`) scatters, so it needs atomics (only
-available on the Triton backend). Backward (`_pallas_interp_bwd_{2,3}d`) is
+Forward (`pallas_spread_fwd_{2,3}d`) scatters, so it needs atomics (only
+available on the Triton backend). Backward (`pallas_interp_bwd_{2,3}d`) is
 a pure gather (the adjoint of spreading is interpolation, exactly as in
 `spread.py`), so no atomics are needed there at all: each point reads its
 own fixed-size neighborhood of the output cotangent independently. The one
@@ -22,7 +22,10 @@ beats the pure-JAX backend outright (serial `atomic_add` contention), but
 the *backward* kernel is a real, consistent win (no such contention -- it's
 a gather) in both memory and speed. There is no single best
 `enable_pallas` configuration across hardware/scale; see that parameter's
-docstring in `api.py` for the actual recommendation.
+docstring in `api.py` for the actual recommendation. The `enable_pallas`
+custom-VJP dispatch that chooses between this file's kernels and the
+pure-JAX backend in `spread.py` lives in `api.py`, alongside the public
+`spread_gaussians_2d`/`spread_gaussians_3d` functions that call it.
 
 Implementation notes, each hard-won prototyping directly on GPU (see the
 `pallas-triton-gotchas` note):
@@ -42,7 +45,7 @@ Implementation notes, each hard-won prototyping directly on GPU (see the
 
 import math
 from collections.abc import Mapping
-from functools import cache, partial
+from functools import cache
 
 import jax
 import jax.experimental.pallas as pl
@@ -51,7 +54,6 @@ import jax.numpy as jnp
 from jaxtyping import Array
 
 from ..._config import CRYOJAX_ENABLE_PALLAS, CRYOJAX_PALLAS_BLOCK_SIZE
-from .spread import _spread_2d_bwd, _spread_2d_impl, _spread_3d_bwd, _spread_3d_impl
 
 
 # The Triton compiler-params class has been renamed across jax versions
@@ -252,7 +254,7 @@ def _make_fwd_kernel_3d(
     return kernel
 
 
-def _pallas_spread_fwd_2d(
+def pallas_spread_fwd_2d(
     i, j, amplitude, variance, pixel_size, ny, nx, n_spread, use_erf
 ):
     m_total, dtype = i.shape[0], i.dtype
@@ -283,7 +285,7 @@ def _pallas_spread_fwd_2d(
     return out.reshape(ny, nx)
 
 
-def _pallas_spread_fwd_3d(
+def pallas_spread_fwd_3d(
     i, j, k, amplitude, variance, voxel_size, nz, ny, nx, n_spread, use_erf
 ):
     m_total, dtype = i.shape[0], i.dtype
@@ -477,7 +479,7 @@ def _make_bwd_kernel_3d(
     return kernel
 
 
-def _pallas_interp_bwd_2d(ny, nx, n_spread, use_erf, res, g):
+def pallas_interp_bwd_2d(ny, nx, n_spread, use_erf, res, g):
     i, j, amplitude, variance, pixel_size = res
     m_total, dtype = i.shape[0], i.dtype
     j = j.astype(dtype)
@@ -509,7 +511,7 @@ def _pallas_interp_bwd_2d(ny, nx, n_spread, use_erf, res, g):
     return di, dj, damplitude, dvariance, dpixel_size
 
 
-def _pallas_interp_bwd_3d(nz, ny, nx, n_spread, use_erf, res, g):
+def pallas_interp_bwd_3d(nz, ny, nx, n_spread, use_erf, res, g):
     i, j, k, amplitude, variance, voxel_size = res
     m_total, dtype = i.shape[0], i.dtype
     j = j.astype(dtype)
@@ -544,11 +546,12 @@ def _pallas_interp_bwd_3d(nz, ny, nx, n_spread, use_erf, res, g):
 
 
 # ============================================================================
-# `enable_pallas` resolution and dispatch
+# `enable_pallas` resolution (the custom-VJP dispatch that uses this lives in
+# `api.py`)
 # ============================================================================
 
 
-def _resolve_enable_pallas(
+def resolve_enable_pallas(
     enable_pallas: bool | Mapping[str, bool] | None,
 ) -> tuple[bool, bool]:
     """Resolve `enable_pallas` (see `api.py`) to `(use_pallas_fwd,
@@ -575,197 +578,3 @@ def _resolve_enable_pallas(
             "`CRYOJAX_ENABLE_PALLAS`) to use the pure-JAX backend instead."
         )
     return use_fwd, use_bwd
-
-
-@partial(jax.custom_vjp, nondiff_argnums=(5, 6, 7, 8, 9, 10))
-def _spread_2d_dispatch(
-    i,
-    j,
-    amplitude,
-    variance,
-    pixel_size,
-    ny,
-    nx,
-    n_spread,
-    use_erf,
-    use_pallas_fwd,
-    use_pallas_bwd,
-):
-    if use_pallas_fwd:
-        return _pallas_spread_fwd_2d(
-            i,
-            j,
-            amplitude,
-            variance,
-            pixel_size,
-            ny,
-            nx,
-            n_spread,
-            use_erf,
-        )
-    return _spread_2d_impl(
-        i,
-        j,
-        amplitude,
-        variance,
-        ny,
-        nx,
-        pixel_size=pixel_size,
-        n_spread=n_spread,
-        use_erf=use_erf,
-    )
-
-
-def _spread_2d_dispatch_fwd(
-    i,
-    j,
-    amplitude,
-    variance,
-    pixel_size,
-    ny,
-    nx,
-    n_spread,
-    use_erf,
-    use_pallas_fwd,
-    use_pallas_bwd,
-):
-    if use_pallas_fwd:
-        out = _pallas_spread_fwd_2d(
-            i,
-            j,
-            amplitude,
-            variance,
-            pixel_size,
-            ny,
-            nx,
-            n_spread,
-            use_erf,
-        )
-    else:
-        out = _spread_2d_impl(
-            i,
-            j,
-            amplitude,
-            variance,
-            ny,
-            nx,
-            pixel_size=pixel_size,
-            n_spread=n_spread,
-            use_erf=use_erf,
-        )
-    return out, (i, j, amplitude, variance, pixel_size)
-
-
-def _spread_2d_dispatch_bwd(
-    ny, nx, n_spread, use_erf, use_pallas_fwd, use_pallas_bwd, res, g
-):
-    del use_pallas_fwd
-    if use_pallas_bwd:
-        return _pallas_interp_bwd_2d(ny, nx, n_spread, use_erf, res, g)
-    return _spread_2d_bwd(ny, nx, n_spread, use_erf, res, g)
-
-
-_spread_2d_dispatch.defvjp(_spread_2d_dispatch_fwd, _spread_2d_dispatch_bwd)
-
-
-@partial(jax.custom_vjp, nondiff_argnums=(6, 7, 8, 9, 10, 11, 12))
-def _spread_3d_dispatch(
-    i,
-    j,
-    k,
-    amplitude,
-    variance,
-    voxel_size,
-    nz,
-    ny,
-    nx,
-    n_spread,
-    use_erf,
-    use_pallas_fwd,
-    use_pallas_bwd,
-):
-    if use_pallas_fwd:
-        return _pallas_spread_fwd_3d(
-            i,
-            j,
-            k,
-            amplitude,
-            variance,
-            voxel_size,
-            nz,
-            ny,
-            nx,
-            n_spread,
-            use_erf,
-        )
-    return _spread_3d_impl(
-        i,
-        j,
-        k,
-        amplitude,
-        variance,
-        nz,
-        ny,
-        nx,
-        voxel_size=voxel_size,
-        n_spread=n_spread,
-        use_erf=use_erf,
-    )
-
-
-def _spread_3d_dispatch_fwd(
-    i,
-    j,
-    k,
-    amplitude,
-    variance,
-    voxel_size,
-    nz,
-    ny,
-    nx,
-    n_spread,
-    use_erf,
-    use_pallas_fwd,
-    use_pallas_bwd,
-):
-    if use_pallas_fwd:
-        out = _pallas_spread_fwd_3d(
-            i,
-            j,
-            k,
-            amplitude,
-            variance,
-            voxel_size,
-            nz,
-            ny,
-            nx,
-            n_spread,
-            use_erf,
-        )
-    else:
-        out = _spread_3d_impl(
-            i,
-            j,
-            k,
-            amplitude,
-            variance,
-            nz,
-            ny,
-            nx,
-            voxel_size=voxel_size,
-            n_spread=n_spread,
-            use_erf=use_erf,
-        )
-    return out, (i, j, k, amplitude, variance, voxel_size)
-
-
-def _spread_3d_dispatch_bwd(
-    nz, ny, nx, n_spread, use_erf, use_pallas_fwd, use_pallas_bwd, res, g
-):
-    del use_pallas_fwd
-    if use_pallas_bwd:
-        return _pallas_interp_bwd_3d(nz, ny, nx, n_spread, use_erf, res, g)
-    return _spread_3d_bwd(nz, ny, nx, n_spread, use_erf, res, g)
-
-
-_spread_3d_dispatch.defvjp(_spread_3d_dispatch_fwd, _spread_3d_dispatch_bwd)

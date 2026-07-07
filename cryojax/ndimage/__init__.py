@@ -55,8 +55,6 @@ from ._operators import (
     AbstractRealOperator as AbstractRealOperator,
     CustomFourierOperator as CustomFourierOperator,
     FourierConstant as FourierConstant,
-    FourierDC as FourierDC,
-    FourierExp2D as FourierExp2D,
     FourierGaussian as FourierGaussian,
     FourierPhaseShifts as FourierPhaseShifts,
     FourierSinc as FourierSinc,
@@ -71,7 +69,7 @@ from ._radial_average import (
 from ._rescale_pixel_size import (
     rescale_pixel_size as rescale_pixel_size,
 )
-from ._spread import (
+from ._spreading import (
     spread_gaussians_2d as spread_gaussians_2d,
     spread_gaussians_3d as spread_gaussians_3d,
     variance_to_nspread as variance_to_nspread,

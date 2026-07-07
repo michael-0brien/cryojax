@@ -166,7 +166,7 @@ def _axis_weights_and_grad(coord, n, variance, n_spread, pixel_size, *, use_erf)
 # ── 2-D ──────────────────────────────────────────────────────────────────────
 
 
-def _spread_2d_impl(i, j, amplitude, variance, ny, nx, *, pixel_size, n_spread, use_erf):
+def spread_2d_impl(i, j, amplitude, variance, ny, nx, *, pixel_size, n_spread, use_erf):
     indices_i, z_i = _support_indices_and_offsets(i, nx, n_spread)
     indices_j, z_j = _support_indices_and_offsets(j, ny, n_spread)
     variance = _broadcast_per_point(variance)
@@ -187,7 +187,7 @@ def _spread_2d_impl(i, j, amplitude, variance, ny, nx, *, pixel_size, n_spread, 
 
 @partial(jax.custom_vjp, nondiff_argnums=(5, 6, 7, 8))
 def _spread_2d(i, j, amplitude, variance, pixel_size, ny, nx, n_spread, use_erf):
-    return _spread_2d_impl(
+    return spread_2d_impl(
         i,
         j,
         amplitude,
@@ -201,7 +201,7 @@ def _spread_2d(i, j, amplitude, variance, pixel_size, ny, nx, n_spread, use_erf)
 
 
 def _spread_2d_fwd(i, j, amplitude, variance, pixel_size, ny, nx, n_spread, use_erf):
-    out = _spread_2d_impl(
+    out = spread_2d_impl(
         i,
         j,
         amplitude,
@@ -215,7 +215,7 @@ def _spread_2d_fwd(i, j, amplitude, variance, pixel_size, ny, nx, n_spread, use_
     return out, (i, j, amplitude, variance, pixel_size)
 
 
-def _spread_2d_bwd(ny, nx, n_spread, use_erf, res, g):
+def spread_2d_bwd(ny, nx, n_spread, use_erf, res, g):
     """Analytic backward pass. The adjoint of spreading is interpolation at
     the same positions/kernel (`damplitude`); position gradients use the
     analytic kernel derivative w.r.t. the grid offset; `variance`/
@@ -265,13 +265,13 @@ def _spread_2d_bwd(ny, nx, n_spread, use_erf, res, g):
     return di, dj, damplitude, dvariance, dpixel_size
 
 
-_spread_2d.defvjp(_spread_2d_fwd, _spread_2d_bwd)
+_spread_2d.defvjp(_spread_2d_fwd, spread_2d_bwd)
 
 
 # ── 3-D ──────────────────────────────────────────────────────────────────────
 
 
-def _spread_3d_impl(
+def spread_3d_impl(
     i, j, k, amplitude, variance, nz, ny, nx, *, voxel_size, n_spread, use_erf
 ):
     indices_i, z_i = _support_indices_and_offsets(i, nx, n_spread)
@@ -282,7 +282,7 @@ def _spread_3d_impl(
     weights_j = _kernel_weight(z_j, variance, voxel_size, use_erf=use_erf)
     weights_k = _kernel_weight(z_k, variance, voxel_size, use_erf=use_erf)
     # Fold `amplitude` into one 1-D factor before forming the (M, n_spread,
-    # n_spread, n_spread) outer product (see `_spread_2d_impl`).
+    # n_spread, n_spread) outer product (see `spread_2d_impl`).
     weighted_amplitude = (
         (amplitude[:, None] * weights_k)[:, :, None, None]
         * weights_j[:, None, :, None]
@@ -301,7 +301,7 @@ def _spread_3d_impl(
 
 @partial(jax.custom_vjp, nondiff_argnums=(6, 7, 8, 9, 10))
 def _spread_3d(i, j, k, amplitude, variance, voxel_size, nz, ny, nx, n_spread, use_erf):
-    return _spread_3d_impl(
+    return spread_3d_impl(
         i,
         j,
         k,
@@ -319,7 +319,7 @@ def _spread_3d(i, j, k, amplitude, variance, voxel_size, nz, ny, nx, n_spread, u
 def _spread_3d_fwd(
     i, j, k, amplitude, variance, voxel_size, nz, ny, nx, n_spread, use_erf
 ):
-    out = _spread_3d_impl(
+    out = spread_3d_impl(
         i,
         j,
         k,
@@ -335,8 +335,8 @@ def _spread_3d_fwd(
     return out, (i, j, k, amplitude, variance, voxel_size)
 
 
-def _spread_3d_bwd(nz, ny, nx, n_spread, use_erf, res, g):
-    """Analytic backward pass (see `_spread_2d_bwd`). No (M, n_spread,
+def spread_3d_bwd(nz, ny, nx, n_spread, use_erf, res, g):
+    """Analytic backward pass (see `spread_2d_bwd`). No (M, n_spread,
     n_spread, n_spread) *weight* tensor is ever materialized: the (M,
     n_spread, n_spread, n_spread) gathered cotangent is contracted down one
     axis at a time, and each of the two "drop one axis" contraction chains
@@ -392,4 +392,4 @@ def _spread_3d_bwd(nz, ny, nx, n_spread, use_erf, res, g):
     return di, dj, dk, damplitude, dvariance, dvoxel_size
 
 
-_spread_3d.defvjp(_spread_3d_fwd, _spread_3d_bwd)
+_spread_3d.defvjp(_spread_3d_fwd, spread_3d_bwd)

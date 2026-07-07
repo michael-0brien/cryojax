@@ -239,23 +239,6 @@ This documentation is a collection of functions used to work with coordinate sys
 
 ---
 
-::: cryojax.ndimage.FourierExp2D
-        options:
-            members:
-                - __init__
-                - __call__
-
----
-
-::: cryojax.ndimage.FourierDC
-        options:
-            members:
-                - __init__
-                - __call__
-
-
----
-
 ::: cryojax.ndimage.CustomFourierOperator
         options:
             members:

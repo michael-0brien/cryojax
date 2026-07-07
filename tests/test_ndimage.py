@@ -5,7 +5,7 @@ import jax.random as jr
 import numpy as np
 import pytest
 from cryojax.ndimage import make_frequency_grid, make_radial_frequency_grid
-from cryojax.ndimage._spread import spread_gaussians_2d, spread_gaussians_3d
+from cryojax.ndimage._spreading import spread_gaussians_2d, spread_gaussians_3d
 from jax.test_util import check_grads
 
 
@@ -423,7 +423,6 @@ _fourier_operators_common = [
     im.FourierConstant(1.0),
     im.FourierSinc(),
     im.CustomFourierOperator(lambda _, a, b: a + b, 1.0, b=1.0),
-    im.FourierDC(),
     im.FourierConstant(1.0) + im.FourierConstant(1.0),
     im.FourierConstant(1.0) - im.FourierConstant(1.0),
     im.FourierConstant(1.0) * im.FourierConstant(1.0),
@@ -437,7 +436,7 @@ _real_operators_common = [
 ]
 
 _fourier_operators_1d = _fourier_operators_common
-_fourier_operators_2d = [*_fourier_operators_common, im.FourierExp2D()]
+_fourier_operators_2d = [*_fourier_operators_common]
 _fourier_operators_3d = _fourier_operators_common
 _real_operators_1d = [*_real_operators_common, im.RealGaussian(offset=1.0)]
 _real_operators_2d = [*_real_operators_common, im.RealGaussian(offset=(1.0, -1.0))]

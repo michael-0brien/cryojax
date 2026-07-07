@@ -5,16 +5,21 @@ Pallas/Triton GPU backend (`pallas_spread.py`) per-call via `enable_pallas`.
 
 import math
 from collections.abc import Mapping
+from functools import partial
 
+import jax
 import numpy as np
 from jaxtyping import Array, Float
 
 from ...jax_util import FloatLike, NDArrayLike
 from .pallas_spread import (
-    _resolve_enable_pallas,
-    _spread_2d_dispatch,
-    _spread_3d_dispatch,
+    pallas_interp_bwd_2d,
+    pallas_interp_bwd_3d,
+    pallas_spread_fwd_2d,
+    pallas_spread_fwd_3d,
+    resolve_enable_pallas,
 )
+from .spread import spread_2d_bwd, spread_2d_impl, spread_3d_bwd, spread_3d_impl
 
 
 def spread_gaussians_2d(
@@ -116,7 +121,7 @@ def spread_gaussians_2d(
     The grid of shape `(ny, nx)` with gaussians scattered onto it.
     """  # noqa: E501
     _check_n_spread(n_spread, shape)
-    use_pallas_fwd, use_pallas_bwd = _resolve_enable_pallas(enable_pallas)
+    use_pallas_fwd, use_pallas_bwd = resolve_enable_pallas(enable_pallas)
     ny, nx = shape
     i = _normalize_coord_to_grid(x, nx, pixel_size)
     j = _normalize_coord_to_grid(y, ny, pixel_size)
@@ -236,7 +241,7 @@ def spread_gaussians_3d(
     The grid of shape `(nz, ny, nx)` with gaussians scattered onto it.
     """  # noqa: E501
     _check_n_spread(n_spread, shape)
-    use_pallas_fwd, use_pallas_bwd = _resolve_enable_pallas(enable_pallas)
+    use_pallas_fwd, use_pallas_bwd = resolve_enable_pallas(enable_pallas)
     nz, ny, nx = shape
     i = _normalize_coord_to_grid(x, nx, voxel_size)
     j = _normalize_coord_to_grid(y, ny, voxel_size)
@@ -297,6 +302,207 @@ def variance_to_nspread(
     max_variance = float(np.max(np.asarray(variance)))
     n_spread = 2.0 * n_sigma * math.sqrt(max_variance) / float(pixel_size)
     return max(2, math.ceil(n_spread))
+
+
+# ============================================================================
+# `enable_pallas` dispatch: one `jax.custom_vjp` per dimensionality, choosing
+# between the pure-JAX backend (`spread.py`) and the Pallas/Triton backend
+# (`pallas_spread.py`) independently for the forward and backward pass.
+# ============================================================================
+
+
+@partial(jax.custom_vjp, nondiff_argnums=(5, 6, 7, 8, 9, 10))
+def _spread_2d_dispatch(
+    i,
+    j,
+    amplitude,
+    variance,
+    pixel_size,
+    ny,
+    nx,
+    n_spread,
+    use_erf,
+    use_pallas_fwd,
+    use_pallas_bwd,
+):
+    if use_pallas_fwd:
+        return pallas_spread_fwd_2d(
+            i,
+            j,
+            amplitude,
+            variance,
+            pixel_size,
+            ny,
+            nx,
+            n_spread,
+            use_erf,
+        )
+    return spread_2d_impl(
+        i,
+        j,
+        amplitude,
+        variance,
+        ny,
+        nx,
+        pixel_size=pixel_size,
+        n_spread=n_spread,
+        use_erf=use_erf,
+    )
+
+
+def _spread_2d_dispatch_fwd(
+    i,
+    j,
+    amplitude,
+    variance,
+    pixel_size,
+    ny,
+    nx,
+    n_spread,
+    use_erf,
+    use_pallas_fwd,
+    use_pallas_bwd,
+):
+    if use_pallas_fwd:
+        out = pallas_spread_fwd_2d(
+            i,
+            j,
+            amplitude,
+            variance,
+            pixel_size,
+            ny,
+            nx,
+            n_spread,
+            use_erf,
+        )
+    else:
+        out = spread_2d_impl(
+            i,
+            j,
+            amplitude,
+            variance,
+            ny,
+            nx,
+            pixel_size=pixel_size,
+            n_spread=n_spread,
+            use_erf=use_erf,
+        )
+    return out, (i, j, amplitude, variance, pixel_size)
+
+
+def _spread_2d_dispatch_bwd(
+    ny, nx, n_spread, use_erf, use_pallas_fwd, use_pallas_bwd, res, g
+):
+    del use_pallas_fwd
+    if use_pallas_bwd:
+        return pallas_interp_bwd_2d(ny, nx, n_spread, use_erf, res, g)
+    return spread_2d_bwd(ny, nx, n_spread, use_erf, res, g)
+
+
+_spread_2d_dispatch.defvjp(_spread_2d_dispatch_fwd, _spread_2d_dispatch_bwd)
+
+
+@partial(jax.custom_vjp, nondiff_argnums=(6, 7, 8, 9, 10, 11, 12))
+def _spread_3d_dispatch(
+    i,
+    j,
+    k,
+    amplitude,
+    variance,
+    voxel_size,
+    nz,
+    ny,
+    nx,
+    n_spread,
+    use_erf,
+    use_pallas_fwd,
+    use_pallas_bwd,
+):
+    if use_pallas_fwd:
+        return pallas_spread_fwd_3d(
+            i,
+            j,
+            k,
+            amplitude,
+            variance,
+            voxel_size,
+            nz,
+            ny,
+            nx,
+            n_spread,
+            use_erf,
+        )
+    return spread_3d_impl(
+        i,
+        j,
+        k,
+        amplitude,
+        variance,
+        nz,
+        ny,
+        nx,
+        voxel_size=voxel_size,
+        n_spread=n_spread,
+        use_erf=use_erf,
+    )
+
+
+def _spread_3d_dispatch_fwd(
+    i,
+    j,
+    k,
+    amplitude,
+    variance,
+    voxel_size,
+    nz,
+    ny,
+    nx,
+    n_spread,
+    use_erf,
+    use_pallas_fwd,
+    use_pallas_bwd,
+):
+    if use_pallas_fwd:
+        out = pallas_spread_fwd_3d(
+            i,
+            j,
+            k,
+            amplitude,
+            variance,
+            voxel_size,
+            nz,
+            ny,
+            nx,
+            n_spread,
+            use_erf,
+        )
+    else:
+        out = spread_3d_impl(
+            i,
+            j,
+            k,
+            amplitude,
+            variance,
+            nz,
+            ny,
+            nx,
+            voxel_size=voxel_size,
+            n_spread=n_spread,
+            use_erf=use_erf,
+        )
+    return out, (i, j, k, amplitude, variance, voxel_size)
+
+
+def _spread_3d_dispatch_bwd(
+    nz, ny, nx, n_spread, use_erf, use_pallas_fwd, use_pallas_bwd, res, g
+):
+    del use_pallas_fwd
+    if use_pallas_bwd:
+        return pallas_interp_bwd_3d(nz, ny, nx, n_spread, use_erf, res, g)
+    return spread_3d_bwd(nz, ny, nx, n_spread, use_erf, res, g)
+
+
+_spread_3d_dispatch.defvjp(_spread_3d_dispatch_fwd, _spread_3d_dispatch_bwd)
 
 
 # ============================================================================
