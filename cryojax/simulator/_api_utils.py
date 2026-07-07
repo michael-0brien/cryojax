@@ -37,9 +37,9 @@ from ._volume import (
     AbstractVolumeParametrization,
     AbstractVolumeRenderFn,
     AutoVolumeProjection,
-    FourierAtomVolume,
     FourierVoxelGridVolume,
     FourierVoxelSplineVolume,
+    GaussianFourierVolume,
     GaussianMixtureVolume,
     RealVoxelCloudVolume,
     RealVoxelGridVolume,
@@ -355,13 +355,13 @@ def make_image_model(
 def load_tabulated_volume(  # pyright: ignore[reportOverlappingOverload]
     path_or_mmdf: str | pathlib.Path | pd.DataFrame,
     *,
-    output_type: type[FourierAtomVolume] = FourierAtomVolume,
+    output_type: type[GaussianFourierVolume] = GaussianFourierVolume,
     tabulation: Literal["peng"] = "peng",
     include_b_factors: bool = True,
     b_factor_fn: Callable[[NDArrayLike, NDArrayLike], NDArrayLike] = identity_fn,
     selection_string: str = "all",
     pdb_options: dict[str, Any] = {},
-) -> FourierAtomVolume: ...
+) -> GaussianFourierVolume: ...
 
 
 @overload
@@ -380,13 +380,15 @@ def load_tabulated_volume(
 def load_tabulated_volume(
     path_or_mmdf: str | pathlib.Path | pd.DataFrame,
     *,
-    output_type: type[FourierAtomVolume | GaussianMixtureVolume] = GaussianMixtureVolume,
+    output_type: type[
+        GaussianFourierVolume | GaussianMixtureVolume
+    ] = GaussianMixtureVolume,
     tabulation: Literal["peng"] = "peng",
     include_b_factors: bool = False,
     b_factor_fn: Callable[[NDArrayLike, NDArrayLike], NDArrayLike] = identity_fn,
     selection_string: str = "all",
     pdb_options: dict[str, Any] = {},
-) -> FourierAtomVolume | GaussianMixtureVolume:
+) -> GaussianFourierVolume | GaussianMixtureVolume:
     """Load an atomistic representation of a volume from
     tabulated electron scattering factors.
 
@@ -417,7 +419,7 @@ def load_tabulated_volume(
         from [`mmdf.read`](https://github.com/teamtomo/mmdf).
     - `output_type`:
         Either a [`cryojax.simulator.GaussianMixtureVolume`][] or
-        [`cryojax.simulator.FourierAtomVolume`][] class.
+        [`cryojax.simulator.GaussianFourierVolume`][] class.
     - `tabulation`:
         Specifies which electron scattering factor tabulation to use.
         The only supported value current is `tabulation = 'peng'`.
@@ -429,7 +431,7 @@ def load_tabulated_volume(
         A function that modulates PDB B-factors before passing to the
         volume. Has signature
         `new_b_factor = b_factor_fn(b_factor, atomic_number)`.
-        If `output_type = FourierAtomVolume`, `b_factor` is
+        If `output_type = GaussianFourierVolume`, `b_factor` is
         the mean B-factor for a given atom type.
     - `selection_string`:
         A string for [`mdtraj` atom selection](https://mdtraj.org/1.9.4/examples/atom-selection.html#atom-selection).
@@ -481,7 +483,7 @@ def load_tabulated_volume(
         atom_volume = GaussianMixtureVolume.from_tabulated_parameters(
             atom_positions, peng_parameters, extra_b_factors=b_factors
         )
-    elif output_type is FourierAtomVolume:
+    elif output_type is GaussianFourierVolume:
         (positions_by_id, b_factor_by_id), atom_ids = split_atoms_by_element(
             atomic_numbers, (atom_positions, atom_properties["b_factors"])
         )
@@ -495,13 +497,13 @@ def load_tabulated_volume(
                 "Only `tabulation` equal to 'peng' is supported in "
                 f"`load_tabulated_volume`. Instead, got `tabulation = {tabulation}`."
             )
-        atom_volume = FourierAtomVolume.from_tabulated_parameters(
+        atom_volume = GaussianFourierVolume.from_tabulated_parameters(
             positions_by_id, parameters, b_factor_by_element=b_factor_by_id
         )
     else:
         raise ValueError(
             "Only `output_type` equal to `GaussianMixtureVolume` "
-            "or `FourierAtomVolume` are supported."
+            "or `GaussianFourierVolume` are supported."
         )
 
     return atom_volume
@@ -686,7 +688,7 @@ def render_voxel_volume(
     - `atom_volume`:
         An atomistic volume representation, such as a
         [`cryojax.simulator.GaussianMixtureVolume`][] or a
-        [`cryojax.simulator.FourierAtomVolume`][].
+        [`cryojax.simulator.GaussianFourierVolume`][].
     - `render_fn`:
         A [`cryojax.simulator.AbstractVolumeRenderFn`][] that
         accepts `atom_volume` as input. Choose

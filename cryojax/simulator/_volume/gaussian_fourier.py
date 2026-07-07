@@ -50,12 +50,12 @@ except ModuleNotFoundError as err:
 T = TypeVar("T")
 
 
-class FourierAtomVolume(AbstractAtomVolume, strict=True):
+class GaussianFourierVolume(AbstractAtomVolume, strict=True):
     """A representation of a volume that accepts an array of
     atom positions and an electron scattering factor for these
     atoms, projected/rendered via non-uniform FFTs (see
-    [`cryojax.simulator.FourierAtomProjection`][]/
-    [`cryojax.simulator.FourierAtomRenderFn`][]).
+    [`cryojax.simulator.GaussianFourierProjection`][]/
+    [`cryojax.simulator.GaussianFourierRenderFn`][]).
 
     !!! example "A Gaussian at each atom"
         ```python
@@ -64,7 +64,7 @@ class FourierAtomVolume(AbstractAtomVolume, strict=True):
 
         positions = ... # load atom positions
         b_factor = ...  # ... and a B-factor
-        volume = cxs.FourierAtomVolume(
+        volume = cxs.GaussianFourierVolume(
             positions=positions, kernel_fns=im.FourierGaussian(b_factor=b_factor)
         )
         ```
@@ -80,13 +80,13 @@ class FourierAtomVolume(AbstractAtomVolume, strict=True):
 
         positions_1, positions_2 = ...
         b_factor_1, b_factor_2 = ...
-        volume = cxs.FourierAtomVolume(
+        volume = cxs.GaussianFourierVolume(
             positions=(positions_1, positions_2),
             kernel_fns=(im.FourierGaussian(b_factor=b_factor_1), im.FourierGaussian(b_factor=b_factor_2))
         )
         ```
 
-    See [`cryojax.simulator.FourierAtomVolume.from_tabulated_parameters`][] for
+    See [`cryojax.simulator.GaussianFourierVolume.from_tabulated_parameters`][] for
     loading a volume from tabulated electron scattering factors.
     """  # noqa: E501
 
@@ -118,7 +118,7 @@ class FourierAtomVolume(AbstractAtomVolume, strict=True):
             is_leaf=lambda x: isinstance(x, AbstractFourierOperator),
         ):
             raise ValueError(
-                "When instantiating a `FourierAtomVolume`, found "
+                "When instantiating a `GaussianFourierVolume`, found "
                 "that the pytree structures of `positions` and "
                 "`kernel_fns` were not equal."
             )
@@ -169,7 +169,7 @@ class FourierAtomVolume(AbstractAtomVolume, strict=True):
             else:
                 raise ValueError(
                     "Unrecognized argument `parameters` when "
-                    "calling `FourierAtomVolume.from_tabulated_parameters`. "
+                    "calling `GaussianFourierVolume.from_tabulated_parameters`. "
                     "This should be type "
                     "`cryojax.constants.PengScatteringFactorParameters`, "
                     f"but got type {parameters.__class__.__name__}."
@@ -179,7 +179,7 @@ class FourierAtomVolume(AbstractAtomVolume, strict=True):
         a, b = parameters.a, parameters.b
         if a.shape[0] != n_elements or b.shape[0] != n_elements:
             raise ValueError(
-                "When constructing a `FourierAtomVolume` via "
+                "When constructing a `GaussianFourierVolume` via "
                 "`from_tabulated_parameters`, found that "
                 "`parameters.a.shape[0] != len(positions_by_element)` "
                 "or `parameters.b.shape[0] != len(positions_by_element)`. "
@@ -190,7 +190,7 @@ class FourierAtomVolume(AbstractAtomVolume, strict=True):
             if isinstance(b_factor_by_element, Sequence):
                 if len(b_factor_by_element) != n_elements:
                     raise ValueError(
-                        "When constructing a `FourierAtomVolume` via "
+                        "When constructing a `GaussianFourierVolume` via "
                         "`from_tabulated_parameters`, found that "
                         "`len(b_factor_by_element) != len(positions_by_element)`. "
                         "Make sure that `b_factor_by_element` is a tuple with "
@@ -214,8 +214,8 @@ class FourierAtomVolume(AbstractAtomVolume, strict=True):
         return cls(positions_by_element, kernel_fns_by_element)
 
 
-class FourierAtomRenderFn(AbstractVolumeRenderFn[FourierAtomVolume], strict=True):
-    """Render a voxel grid from a `FourierAtomVolume` using non-uniform FFTs
+class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], strict=True):
+    """Render a voxel grid from a `GaussianFourierVolume` using non-uniform FFTs
     and Fourier-domain convolution. Good when kernels span at least a
     couple pixels; see `cryojax.simulator.GaussianMixtureRenderFn` for an
     alternative that directly spreads narrow kernels onto the grid.
@@ -271,14 +271,14 @@ class FourierAtomRenderFn(AbstractVolumeRenderFn[FourierAtomVolume], strict=True
         """  # noqa: E501
         if sampling_mode not in ["average", "point"]:
             raise ValueError(
-                "`sampling_mode` in `FourierAtomRenderFn` "
+                "`sampling_mode` in `GaussianFourierRenderFn` "
                 "must be either 'average' for averaging within a "
                 "pixel or 'point' for point sampling. Got "
                 f"`sampling_mode = {sampling_mode}`."
             )
         if backend not in ["jax-finufft", "nufftax"]:
             raise ValueError(
-                "`backend` in `FourierAtomRenderFn` "
+                "`backend` in `GaussianFourierRenderFn` "
                 "must be either 'jax-finufft' or 'nufftax'. Got "
                 f"`backend = {backend}`."
             )
@@ -293,7 +293,7 @@ class FourierAtomRenderFn(AbstractVolumeRenderFn[FourierAtomVolume], strict=True
     @override
     def __call__(
         self,
-        volume_representation: FourierAtomVolume,
+        volume_representation: GaussianFourierVolume,
         *,
         outputs_real_space: bool = True,
         outputs_rfft: bool = False,
@@ -302,7 +302,7 @@ class FourierAtomRenderFn(AbstractVolumeRenderFn[FourierAtomVolume], strict=True
         """**Arguments:**
 
         - `volume_representation`:
-            The `FourierAtomVolume`.
+            The `GaussianFourierVolume`.
         - `outputs_real_space`:
             If `True`, return a voxel grid in real-space.
         - `outputs_rfft`:
@@ -360,12 +360,12 @@ class FourierAtomRenderFn(AbstractVolumeRenderFn[FourierAtomVolume], strict=True
         )
 
 
-class FourierAtomProjection(
-    AbstractVolumeIntegrator[FourierAtomVolume],
+class GaussianFourierProjection(
+    AbstractVolumeIntegrator[GaussianFourierVolume],
     strict=True,
 ):
     """Integrate atomic parametrization of a volume onto the exit plane from
-    a `FourierAtomVolume` using non-uniform FFTs and Fourier-domain
+    a `GaussianFourierVolume` using non-uniform FFTs and Fourier-domain
     convolution. Good when kernels span at least a couple pixels; see
     `cryojax.simulator.GaussianMixtureProjection` for an alternative that
     directly spreads narrow kernels onto the grid.
@@ -419,14 +419,14 @@ class FourierAtomProjection(
         """  # noqa: E501
         if sampling_mode not in ["average", "point"]:
             raise ValueError(
-                "`sampling_mode` in `FourierAtomProjection` "
+                "`sampling_mode` in `GaussianFourierProjection` "
                 "must be either 'average' for averaging within a "
                 "pixel or 'point' for point sampling. Got "
                 f"`sampling_mode = {sampling_mode}`."
             )
         if backend not in ["jax-finufft", "nufftax"]:
             raise ValueError(
-                "`backend` in `FourierAtomProjection` "
+                "`backend` in `GaussianFourierProjection` "
                 "must be either 'jax-finufft' or 'nufftax'. Got "
                 f"`backend = {backend}`."
             )
@@ -440,12 +440,12 @@ class FourierAtomProjection(
     @override
     def integrate(
         self,
-        volume_representation: FourierAtomVolume,
+        volume_representation: GaussianFourierVolume,
         image_config: AbstractImageConfig,
         outputs_real_space: bool = False,
     ) -> ProjectionArray:
         """Compute a projection from scattering factors per atom type
-        from the `FourierAtomVolume`.
+        from the `GaussianFourierVolume`.
 
         **Arguments:**
 
@@ -520,7 +520,7 @@ def _standardize_kernel_fns(
     )
     if not all(isinstance(kernel, FourierGaussian) for kernel in kernel_list):
         raise ValueError(
-            "Found that `FourierAtomVolume.kernel_fns` was not a "
+            "Found that `GaussianFourierVolume.kernel_fns` was not a "
             "PyTree containing only `FourierGaussian`s."
         )
     # Standardize gaussian kernels for computation
@@ -676,7 +676,7 @@ def _nufft2d1(
         if jax_finufft is None:
             raise RuntimeError(
                 "Tried to use "
-                "`FourierAtomProjection(..., backend='jax-finufft')`, "
+                "`GaussianFourierProjection(..., backend='jax-finufft')`, "
                 "but `jax-finufft` is not installed. "
                 "See https://github.com/flatironinstitute/jax-finufft "
                 "for installation instructions."
@@ -726,7 +726,7 @@ def _nufft3d1(
         if jax_finufft is None:
             raise RuntimeError(
                 "Tried to use "
-                "`FourierAtomRenderFn(..., backend='jax-finufft')`, "
+                "`GaussianFourierRenderFn(..., backend='jax-finufft')`, "
                 "but `jax-finufft` is not installed. "
                 "See https://github.com/flatironinstitute/jax-finufft "
                 "for installation instructions."

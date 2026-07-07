@@ -59,7 +59,7 @@ def setup_volumes_and_configs(n_iterations, n_atoms, box_size, pixel_size=2.0):
     )
 
     # Atom volume for direct projection
-    atom_volume = cxs.FourierAtomVolume(
+    atom_volume = cxs.GaussianFourierVolume(
         positions=atom_positions,
         kernel_fns=im.FourierGaussian(amplitude=1.0, b_factor=10.0),
     )
@@ -175,7 +175,7 @@ def benchmark_projection_methods(
 
                 # Benchmark Atom Projection (FFT)
                 times = []
-                integrator = cxs.FourierAtomProjection(eps=1e-16)
+                integrator = cxs.GaussianFourierProjection(eps=1e-16)
                 for _ in range(n_iterations + 1):
                     start_time = time()
                     images = simulate_image_batch(

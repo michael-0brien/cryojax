@@ -38,7 +38,7 @@ There are many different volume representations of biological structures for cry
 
 ---
 
-::: cryojax.simulator.FourierAtomVolume
+::: cryojax.simulator.GaussianFourierVolume
     options:
         members:
             - __init__
@@ -140,7 +140,7 @@ There are many different volume representations of biological structures for cry
 
 ---
 
-::: cryojax.simulator.FourierAtomRenderFn
+::: cryojax.simulator.GaussianFourierRenderFn
         options:
             members:
                 - __init__

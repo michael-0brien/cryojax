@@ -10,16 +10,16 @@ from .base_volume import (
     AbstractVolumeRepresentation as AbstractVolumeRepresentation,
     AbstractVoxelVolume as AbstractVoxelVolume,
 )
-from .fourier_atom import (
-    FourierAtomProjection as FourierAtomProjection,
-    FourierAtomRenderFn as FourierAtomRenderFn,
-    FourierAtomVolume as FourierAtomVolume,
-)
 from .fourier_voxels import (
     EwaldSphereExtraction as EwaldSphereExtraction,
     FourierSliceExtraction as FourierSliceExtraction,
     FourierVoxelGridVolume as FourierVoxelGridVolume,
     FourierVoxelSplineVolume as FourierVoxelSplineVolume,
+)
+from .gaussian_fourier import (
+    GaussianFourierProjection as GaussianFourierProjection,
+    GaussianFourierRenderFn as GaussianFourierRenderFn,
+    GaussianFourierVolume as GaussianFourierVolume,
 )
 from .gaussian_mixture import (
     GaussianMixtureProjection as GaussianMixtureProjection,
