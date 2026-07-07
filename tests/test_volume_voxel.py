@@ -34,6 +34,9 @@ import numpy as np
 import pytest
 from cryojax.constants import PengScatteringFactorParameters
 from cryojax.io import read_atoms_from_pdb
+from cryojax.simulator._volume.fourier_voxels import (
+    _reconstruct_full_slice_from_half_slice,
+)
 from jaxtyping import Array, Float
 
 
@@ -84,27 +87,6 @@ def fourier_spline_volume(gmm_volume):
     """FourierVoxelSplineVolume rendered from the GMM volume."""
     render_fn = cxs.GaussianMixtureRenderFn((32, 32, 32), voxel_size=1.0)
     return cxs.FourierVoxelSplineVolume.from_real_voxel_grid(render_fn(gmm_volume))
-
-
-@pytest.fixture(scope="module")
-def fourier_grid_volume_full_cube(gmm_volume):
-    """FourierVoxelGridVolume with `use_rfft=False` (full complex FFT cube),
-    for direct comparison against `fourier_grid_volume`'s RFFT storage."""
-    render_fn = cxs.GaussianMixtureRenderFn((32, 32, 32), voxel_size=1.0)
-    return cxs.FourierVoxelGridVolume.from_real_voxel_grid(
-        render_fn(gmm_volume), use_rfft=False
-    )
-
-
-@pytest.fixture(scope="module")
-def fourier_spline_volume_full_cube(gmm_volume):
-    """FourierVoxelSplineVolume with `use_rfft=False` (full complex FFT
-    cube), for direct comparison against `fourier_spline_volume`'s RFFT
-    storage."""
-    render_fn = cxs.GaussianMixtureRenderFn((32, 32, 32), voxel_size=1.0)
-    return cxs.FourierVoxelSplineVolume.from_real_voxel_grid(
-        render_fn(gmm_volume), use_rfft=False
-    )
 
 
 @pytest.fixture(scope="module")
@@ -567,15 +549,21 @@ def _gaussian_mixture_fourier_transform(
 
 
 def _ewald_sphere_analytic_ground_truth(volume, voltage_in_kilovolts: float) -> Array:
+    N = volume.frequency_slice_in_pixels.shape[1]
     config = cxs.BasicImageConfig(
-        volume.frequency_slice_in_pixels.shape[1:3],
+        (N, N),
         pixel_size=1.0,
         voltage_in_kilovolts=voltage_in_kilovolts,
     )
     wavelength = config.wavelength_in_angstroms
     # Curved Ewald sphere frequency coordinates (paraxial approximation, at
-    # identity pose the beam/projection axis is exactly z).
-    q_at_slice = volume.frequency_slice_in_pixels[0]
+    # identity pose the beam/projection axis is exactly z). `volume` only
+    # stores the half (rfft) in-plane slice; reconstruct the full grid this
+    # ground truth needs (an exact, non-interpolating coordinate operation,
+    # independent of the interpolation logic under test).
+    q_at_slice = _reconstruct_full_slice_from_half_slice(
+        volume.frequency_slice_in_pixels
+    )[0]
     q_parallel_squared = jnp.sum(q_at_slice[..., :2] ** 2, axis=-1)
     q_z_curvature = 0.5 * wavelength * q_parallel_squared
     q_at_surface = q_at_slice.at[..., 2].add(q_z_curvature)
@@ -612,34 +600,6 @@ def two_atom_spline_volume():
     return cxs.FourierVoxelSplineVolume.from_real_voxel_grid(render_fn(volume))
 
 
-@pytest.fixture(scope="module")
-def two_atom_grid_volume_full_cube():
-    """Same as `two_atom_grid_volume`, but with `use_rfft=False`."""
-    volume = cxs.GaussianMixtureVolume(
-        _TWO_ATOM_POSITIONS,
-        amplitudes=_TWO_ATOM_AMPLITUDES,
-        variances=_TWO_ATOM_VARIANCES,
-    )
-    render_fn = cxs.GaussianMixtureRenderFn((32, 32, 32), voxel_size=1.0)
-    return cxs.FourierVoxelGridVolume.from_real_voxel_grid(
-        render_fn(volume), use_rfft=False
-    )
-
-
-@pytest.fixture(scope="module")
-def two_atom_spline_volume_full_cube():
-    """Same as `two_atom_spline_volume`, but with `use_rfft=False`."""
-    volume = cxs.GaussianMixtureVolume(
-        _TWO_ATOM_POSITIONS,
-        amplitudes=_TWO_ATOM_AMPLITUDES,
-        variances=_TWO_ATOM_VARIANCES,
-    )
-    render_fn = cxs.GaussianMixtureRenderFn((32, 32, 32), voxel_size=1.0)
-    return cxs.FourierVoxelSplineVolume.from_real_voxel_grid(
-        render_fn(volume), use_rfft=False
-    )
-
-
 def test_ewald_sphere_matches_analytic_ground_truth_grid(two_atom_grid_volume):
     """`EwaldSphereExtraction` must agree with the closed-form gaussian mixture
     fourier transform evaluated directly on the curved Ewald sphere surface.
@@ -672,246 +632,56 @@ def test_ewald_sphere_matches_analytic_ground_truth_spline(two_atom_spline_volum
     assert err < 0.02 * peak
 
 
-# ── use_rfft=True (half-cube) vs use_rfft=False (full cube) equivalence ──────
+# ── RFFT storage shape assertions ─────────────────────────────────────────────
 #
-# `use_rfft=True` stores the 3D voxel grid as a half-space RFFT grid instead
-# of the full complex FFT cube, halving memory. Interpolation reflects each
-# out-of-range query point through the origin and conjugates the result --
-# see `_extract_surface_from_voxel_grid` in `fourier_voxels.py`. This is
-# exact for linear interpolation (`FourierVoxelGridVolume`). For cubic-spline
-# interpolation (`FourierVoxelSplineVolume`), queries very close to the
-# truncation boundary (near the volume's own DC plane) pull a small
-# extrapolated -- rather than exact -- contribution from the spline solver's
-# open boundary condition, so a slightly looser tolerance is used there,
-# with a dedicated test isolating that regime.
-#
-# At an off-axis pose, a handful of query points fall outside the Nyquist
-# box entirely (the rotated slice extends past the edge of the frequency
-# grid). For those, exact equivalence with the full-cube path is *not*
-# expected: JAX's `.at[].get(mode="fill")` only fills indices that are
-# out-of-range on the *positive* side; a negative float index within
-# `[-N, -1]` is treated as ordinary (wrapping) negative indexing, not as
-# out-of-bounds. The full-cube path can therefore pick up a wrapped, non-zero
-# value for some off-grid points with a negative logical index, while the
-# reflected rfft path turns the same query into a *positive* overflow (which
-# does get zero-filled) -- so the two paths can legitimately disagree at
-# those specific pixels. This is a pre-existing quirk of the underlying
-# `out_of_bounds_mode="fill"` indexing, not a bug introduced by RFFT storage;
-# it's already implicitly present in the existing accuracy tolerances used
-# elsewhere in this module for off-axis, boundary-touching poses (see the
-# module docstring), so the same peak-relative scale is used here.
-
-_OFFAXIS_POSE = cxs.EulerAnglePose(phi_angle=30.0, theta_angle=45.0, psi_angle=10.0)
+# Both `FourierVoxelGridVolume`/`FourierVoxelSplineVolume` store the 3D voxel
+# grid as a half-space RFFT grid (halving memory relative to the full complex
+# FFT cube), and `frequency_slice_in_pixels` as the half in-plane grid too.
+# Interpolation reflects each out-of-range query point through the origin and
+# conjugates the result -- see `_extract_surface_from_voxel_grid` in
+# `fourier_voxels.py`. `EwaldSphereExtraction` reconstructs the full in-plane
+# grid on demand (`_reconstruct_full_slice_from_half_slice`), since its
+# curved output isn't Hermitian-symmetric as a whole.
 
 
-def test_rfft_matches_full_cube_slice_extraction_grid_identity(
-    fourier_grid_volume, fourier_grid_volume_full_cube, image_config
-):
-    """At identity (no query points fall outside the Nyquist box), `use_rfft=True`
-    must match `use_rfft=False` for `FourierSliceExtraction` to near machine
-    precision (exact for linear interpolation)."""
-    err = float(
-        _max_abs_error(
-            fourier_grid_volume, fourier_grid_volume_full_cube, _FSE, _FSE, image_config
-        )
-    )
-    assert err < 1e-10
-
-
-def test_rfft_matches_full_cube_slice_extraction_grid_offaxis(
-    fourier_grid_volume, fourier_grid_volume_full_cube, image_config
-):
-    """At an off-axis pose, `use_rfft=True` must match `use_rfft=False` for
-    `FourierSliceExtraction` up to the boundary-pixel effect described above."""
-    proj_rfft = np.array(
-        _project_real(
-            fourier_grid_volume.rotate_to_pose(_OFFAXIS_POSE), _FSE, image_config
-        )
-    )
-    proj_full = np.array(
-        _project_real(
-            fourier_grid_volume_full_cube.rotate_to_pose(_OFFAXIS_POSE),
-            _FSE,
-            image_config,
-        )
-    )
-    err = float(np.max(np.abs(proj_rfft - proj_full)))
-    peak = float(np.max(np.abs(proj_full)))
-    assert err < 0.01 * peak
-
-
-def test_rfft_matches_full_cube_slice_extraction_spline_identity(
-    fourier_spline_volume, fourier_spline_volume_full_cube, image_config
-):
-    """At identity, `use_rfft=True` must match `use_rfft=False` for
-    `FourierSliceExtraction` with spline interpolation, to a tolerance that
-    accounts for the DC-region approximation described above."""
-    err = float(
-        _max_abs_error(
-            fourier_spline_volume,
-            fourier_spline_volume_full_cube,
-            _FSE,
-            _FSE,
-            image_config,
-        )
-    )
-    assert err < 1e-3
-
-
-def test_rfft_matches_full_cube_slice_extraction_spline_offaxis(
-    fourier_spline_volume, fourier_spline_volume_full_cube, image_config
-):
-    """At an off-axis pose, `use_rfft=True` must match `use_rfft=False` for
-    `FourierSliceExtraction` with spline interpolation, up to both the
-    DC-region approximation and the boundary-pixel effect described above."""
-    proj_rfft = np.array(
-        _project_real(
-            fourier_spline_volume.rotate_to_pose(_OFFAXIS_POSE), _FSE, image_config
-        )
-    )
-    proj_full = np.array(
-        _project_real(
-            fourier_spline_volume_full_cube.rotate_to_pose(_OFFAXIS_POSE),
-            _FSE,
-            image_config,
-        )
-    )
-    err = float(np.max(np.abs(proj_rfft - proj_full)))
-    peak = float(np.max(np.abs(proj_full)))
-    assert err < 0.01 * peak
-
-
-def test_rfft_matches_full_cube_near_dc_spline(
-    fourier_spline_volume, fourier_spline_volume_full_cube, image_config
-):
-    """Isolate and quantify the spline DC-region residual: at identity pose,
-    the projection's DC coefficient directly samples the volume's own
-    `q_x = 0` plane, right at the RFFT truncation boundary.
-    """
-    proj_rfft = np.array(_project_real(fourier_spline_volume, _FSE, image_config))
-    proj_full = np.array(
-        _project_real(fourier_spline_volume_full_cube, _FSE, image_config)
-    )
-    err = float(np.max(np.abs(proj_rfft - proj_full)))
-    peak = float(np.max(np.abs(proj_full)))
-    # Reported here (rather than just asserted tightly) so this test also
-    # documents the measured size of the DC-region approximation for the
-    # spline path -- see the "Open question" note in the RFFT storage plan
-    # about whether to keep both `use_rfft` code paths.
-    assert err < 5e-3 * peak
-
-
-@pytest.mark.parametrize("volume_kind", ["grid", "spline"])
-def test_rfft_matches_full_cube_ewald_sphere(
-    volume_kind,
-    two_atom_grid_volume,
-    two_atom_grid_volume_full_cube,
-    two_atom_spline_volume,
-    two_atom_spline_volume_full_cube,
-):
-    """`use_rfft=True` must match `use_rfft=False` for `EwaldSphereExtraction`
-    at low voltage (large curvature), the strongest test that the
-    reflect+conjugate interpolation rule is correct for a curved, globally
-    non-Hermitian-symmetric output surface (not just a flat plane)."""
-    if volume_kind == "grid":
-        rfft_volume, full_cube_volume = (
-            two_atom_grid_volume,
-            two_atom_grid_volume_full_cube,
-        )
-    else:
-        rfft_volume, full_cube_volume = (
-            two_atom_spline_volume,
-            two_atom_spline_volume_full_cube,
-        )
-    config = cxs.BasicImageConfig((32, 32), pixel_size=1.0, voltage_in_kilovolts=60.0)
-    ese_rfft = _ESE.integrate(rfft_volume, config, outputs_real_space=False)
-    ese_full = _ESE.integrate(full_cube_volume, config, outputs_real_space=False)
-    err = float(jnp.max(jnp.abs(ese_rfft - ese_full)))
-    peak = float(jnp.max(jnp.abs(ese_full)))
-    tol = 1e-4 if volume_kind == "grid" else 1e-2
-    assert err < tol * peak
-
-
-# ── use_rfft: storage shape/memory assertions ────────────────────────────────
-
-
-@pytest.mark.parametrize("use_rfft", [True, False])
-def test_use_rfft_storage_shape_grid(use_rfft):
+def test_storage_shape_grid():
     dim = 16
     real_voxel_grid = jnp.zeros((dim, dim, dim), dtype=float)
-    vol = cxs.FourierVoxelGridVolume.from_real_voxel_grid(
-        real_voxel_grid, use_rfft=use_rfft
-    )
-    assert vol.is_rfft == use_rfft
+    vol = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
     assert vol.shape == (dim, dim, dim)
-    expected_last_axis = dim // 2 + 1 if use_rfft else dim
-    assert vol.fourier_voxel_grid.shape == (dim, dim, expected_last_axis)
+    assert vol.fourier_voxel_grid.shape == (dim, dim, dim // 2 + 1)
+    assert vol.frequency_slice_in_pixels.shape == (1, dim, dim // 2 + 1, 3)
 
 
-@pytest.mark.parametrize("use_rfft", [True, False])
-def test_use_rfft_storage_shape_spline(use_rfft):
+def test_storage_shape_spline():
     dim = 16
     real_voxel_grid = jnp.zeros((dim, dim, dim), dtype=float)
-    vol = cxs.FourierVoxelSplineVolume.from_real_voxel_grid(
-        real_voxel_grid, use_rfft=use_rfft
-    )
-    assert vol.is_rfft == use_rfft
+    vol = cxs.FourierVoxelSplineVolume.from_real_voxel_grid(real_voxel_grid)
     assert vol.shape == (dim, dim, dim)
-    expected_last_axis = (dim // 2 + 1 if use_rfft else dim) + 2
-    assert vol.spline_coefficients.shape == (dim + 2, dim + 2, expected_last_axis)
-
-
-def test_use_rfft_default_is_true():
-    """`use_rfft` defaults to `True` on both `from_real_voxel_grid` and
-    `from_fourier_voxel_grid`."""
-    dim = 16
-    real_voxel_grid = jnp.zeros((dim, dim, dim), dtype=float)
-    grid_vol = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
-    spline_vol = cxs.FourierVoxelSplineVolume.from_real_voxel_grid(real_voxel_grid)
-    assert grid_vol.is_rfft
-    assert spline_vol.is_rfft
-    grid_vol2 = cxs.FourierVoxelGridVolume.from_fourier_voxel_grid(
-        im.rfftn(real_voxel_grid)
-    )
-    assert grid_vol2.is_rfft
+    assert vol.spline_coefficients.shape == (dim + 2, dim + 2, dim // 2 + 3)
+    assert vol.frequency_slice_in_pixels.shape == (1, dim, dim // 2 + 1, 3)
 
 
 # ── from_fourier_voxel_grid constructor equivalence ───────────────────────────
 
 
-@pytest.mark.parametrize("use_rfft", [True, False])
-def test_grid_from_fourier_voxel_grid_matches_from_real(
-    gmm_volume, image_config, use_rfft
-):
-    """from_fourier_voxel_grid(fftn(grid)) must equal from_real_voxel_grid(grid),
-    for both `use_rfft=True` (rfftn) and `use_rfft=False` (fftn)."""
+def test_grid_from_fourier_voxel_grid_matches_from_real(gmm_volume, image_config):
+    """from_fourier_voxel_grid(rfftn(grid)) must equal from_real_voxel_grid(grid)."""
     render_fn = cxs.GaussianMixtureRenderFn((32, 32, 32), voxel_size=1.0)
     real_grid = render_fn(gmm_volume)
-    transform = im.rfftn(real_grid) if use_rfft else im.fftn(real_grid)
-    vol_real = cxs.FourierVoxelGridVolume.from_real_voxel_grid(
-        real_grid, use_rfft=use_rfft
-    )
-    vol_fourier = cxs.FourierVoxelGridVolume.from_fourier_voxel_grid(
-        transform, is_rfft=use_rfft
-    )
+    vol_real = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_grid)
+    vol_fourier = cxs.FourierVoxelGridVolume.from_fourier_voxel_grid(im.rfftn(real_grid))
     err = float(_max_abs_error(vol_real, vol_fourier, _FSE, _FSE, image_config))
     assert np.isclose(err, 0.0)
 
 
-@pytest.mark.parametrize("use_rfft", [True, False])
-def test_spline_from_fourier_voxel_grid_matches_from_real(
-    gmm_volume, image_config, use_rfft
-):
-    """from_fourier_voxel_grid(fftn(grid)) must equal from_real_voxel_grid(grid),
-    for both `use_rfft=True` (rfftn) and `use_rfft=False` (fftn)."""
+def test_spline_from_fourier_voxel_grid_matches_from_real(gmm_volume, image_config):
+    """from_fourier_voxel_grid(rfftn(grid)) must equal from_real_voxel_grid(grid)."""
     render_fn = cxs.GaussianMixtureRenderFn((32, 32, 32), voxel_size=1.0)
     real_grid = render_fn(gmm_volume)
-    transform = im.rfftn(real_grid) if use_rfft else im.fftn(real_grid)
-    vol_real = cxs.FourierVoxelSplineVolume.from_real_voxel_grid(
-        real_grid, use_rfft=use_rfft
-    )
+    vol_real = cxs.FourierVoxelSplineVolume.from_real_voxel_grid(real_grid)
     vol_fourier = cxs.FourierVoxelSplineVolume.from_fourier_voxel_grid(
-        transform, is_rfft=use_rfft
+        im.rfftn(real_grid)
     )
     err = float(_max_abs_error(vol_real, vol_fourier, _FSE, _FSE, image_config))
     assert np.isclose(err, 0.0)
@@ -1020,45 +790,35 @@ def test_spline_odd_dimension_raises():
 
 def test_grid_shape_mismatch_raises():
     """A `fourier_voxel_grid` whose shape doesn't correspond to any cubic
-    volume (for either `is_rfft` value) must raise."""
+    volume's half-space RFFT grid must raise."""
     with pytest.raises(AttributeError, match="invalid shape"):
         cxs.FourierVoxelGridVolume(
             jnp.zeros((16, 16, 5), dtype=complex),
-            im.make_frequency_slice((16, 16), fftshifted=True),
-            is_rfft=False,
+            im.make_frequency_slice((16, 16), outputs_rfftfreqs=True, fftshifted=True),
         )
 
 
-def test_grid_is_rfft_mismatch_suggests_correct_flag():
-    """Passing an rfftn-shaped array with `is_rfft=False` (or the reverse)
-    must raise an error naming the `is_rfft` value that would fit."""
+def test_grid_full_cube_shape_suggests_rfftn():
+    """Passing the full (non-rfft) FFT grid shape must raise an error
+    suggesting `cryojax.ndimage.rfftn` instead of `fftn`."""
     dim = 16
-    half_shaped = jnp.zeros((dim, dim, dim // 2 + 1), dtype=complex)
-    with pytest.raises(AttributeError, match="is_rfft=True"):
-        cxs.FourierVoxelGridVolume(
-            half_shaped,
-            im.make_frequency_slice((dim, dim), fftshifted=True),
-            is_rfft=False,
-        )
     full_shaped = jnp.zeros((dim, dim, dim), dtype=complex)
-    with pytest.raises(AttributeError, match="is_rfft=False"):
+    with pytest.raises(AttributeError, match="rfftn"):
         cxs.FourierVoxelGridVolume(
             full_shaped,
-            im.make_frequency_slice((dim, dim), fftshifted=True),
-            is_rfft=True,
+            im.make_frequency_slice((dim, dim), outputs_rfftfreqs=True, fftshifted=True),
         )
 
 
-def test_spline_is_rfft_mismatch_suggests_correct_flag():
-    """Same `is_rfft`-mismatch check for `FourierVoxelSplineVolume`, whose
+def test_spline_full_cube_shape_suggests_rfftn():
+    """Same full-cube-shape check for `FourierVoxelSplineVolume`, whose
     stored array is padded by 2 samples per axis relative to the grid."""
     dim = 16
-    half_shaped = jnp.zeros((dim + 2, dim + 2, dim // 2 + 1 + 2), dtype=complex)
-    with pytest.raises(AttributeError, match="is_rfft=True"):
+    full_shaped = jnp.zeros((dim + 2, dim + 2, dim + 2), dtype=complex)
+    with pytest.raises(AttributeError, match="rfftn"):
         cxs.FourierVoxelSplineVolume(
-            half_shaped,
-            im.make_frequency_slice((dim, dim), fftshifted=True),
-            is_rfft=False,
+            full_shaped,
+            im.make_frequency_slice((dim, dim), outputs_rfftfreqs=True, fftshifted=True),
         )
 
 
@@ -1123,33 +883,27 @@ def _is_smooth(n: int) -> bool:
 
 
 @pytest.mark.parametrize("pad_scale", (1.5, 2.0))
-@pytest.mark.parametrize("use_rfft", [True, False])
-def test_fourier_voxel_grid_pad_scale_produces_smooth_shape(pad_scale, use_rfft):
+def test_fourier_voxel_grid_pad_scale_produces_smooth_shape(pad_scale):
     shape = (10, 10, 10)
     real_voxel_grid = jnp.zeros(shape, dtype=float)
     vol = cxs.FourierVoxelGridVolume.from_real_voxel_grid(
-        real_voxel_grid, pad_scale=pad_scale, use_rfft=use_rfft
+        real_voxel_grid, pad_scale=pad_scale
     )
-    # `.shape` reports the logical (always-full) cubic shape, regardless of
-    # whether storage is truncated -- see it against `_is_smooth` here, and
-    # check the storage shape's own last-axis convention separately below.
+    # `.shape` reports the logical cubic (real-space) shape; check it
+    # against `_is_smooth`, and check the storage shape's own rfft-truncated
+    # last axis separately below.
     for s, p in zip(shape, vol.shape):
         assert p >= math.ceil(pad_scale * s)
         assert _is_smooth(p)
-    expected_last_axis = vol.shape[-1] // 2 + 1 if use_rfft else vol.shape[-1]
-    assert vol.fourier_voxel_grid.shape == vol.shape[:-1] + (expected_last_axis,)
+    assert vol.fourier_voxel_grid.shape == vol.shape[:-1] + (vol.shape[-1] // 2 + 1,)
 
 
-@pytest.mark.parametrize("use_rfft", [True, False])
-def test_fourier_voxel_grid_pad_scale_one_unchanged(use_rfft):
+def test_fourier_voxel_grid_pad_scale_one_unchanged():
     shape = (10, 10, 10)
     real_voxel_grid = jnp.zeros(shape, dtype=float)
-    vol = cxs.FourierVoxelGridVolume.from_real_voxel_grid(
-        real_voxel_grid, pad_scale=1.0, use_rfft=use_rfft
-    )
+    vol = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid, pad_scale=1.0)
     assert vol.shape == shape
-    expected_last_axis = shape[-1] // 2 + 1 if use_rfft else shape[-1]
-    assert vol.fourier_voxel_grid.shape == shape[:-1] + (expected_last_axis,)
+    assert vol.fourier_voxel_grid.shape == shape[:-1] + (shape[-1] // 2 + 1,)
 
 
 def test_fourier_voxel_grid_pad_scale_less_than_one_raises():
@@ -1159,32 +913,29 @@ def test_fourier_voxel_grid_pad_scale_less_than_one_raises():
 
 
 @pytest.mark.parametrize("pad_scale", (1.5, 2.0))
-@pytest.mark.parametrize("use_rfft", [True, False])
-def test_fourier_voxel_spline_pad_scale_produces_smooth_shape(pad_scale, use_rfft):
+def test_fourier_voxel_spline_pad_scale_produces_smooth_shape(pad_scale):
     shape = (10, 10, 10)
     real_voxel_grid = jnp.zeros(shape, dtype=float)
     vol = cxs.FourierVoxelSplineVolume.from_real_voxel_grid(
-        real_voxel_grid, pad_scale=pad_scale, use_rfft=use_rfft
+        real_voxel_grid, pad_scale=pad_scale
     )
     for s, p in zip(shape, vol.shape):
         assert p >= math.ceil(pad_scale * s)
         assert _is_smooth(p)
-    expected_last_axis = (vol.shape[-1] // 2 + 1 if use_rfft else vol.shape[-1]) + 2
+    expected_last_axis = vol.shape[-1] // 2 + 1 + 2
     assert vol.spline_coefficients.shape == tuple(d + 2 for d in vol.shape[:-1]) + (
         expected_last_axis,
     )
 
 
-@pytest.mark.parametrize("use_rfft", [True, False])
-def test_fourier_voxel_spline_pad_scale_one_unchanged(use_rfft):
+def test_fourier_voxel_spline_pad_scale_one_unchanged():
     dim = 10
     real_voxel_grid = jnp.zeros((dim, dim, dim), dtype=float)
     vol = cxs.FourierVoxelSplineVolume.from_real_voxel_grid(
-        real_voxel_grid, pad_scale=1.0, use_rfft=use_rfft
+        real_voxel_grid, pad_scale=1.0
     )
     assert vol.shape == (dim, dim, dim)
-    expected_last_axis = (dim // 2 + 1 if use_rfft else dim) + 2
-    assert vol.spline_coefficients.shape == (dim + 2, dim + 2, expected_last_axis)
+    assert vol.spline_coefficients.shape == (dim + 2, dim + 2, dim // 2 + 3)
 
 
 def test_fourier_voxel_spline_pad_scale_less_than_one_raises():
@@ -1214,20 +965,15 @@ def test_fourier_vs_real_agreement(sample_pdb_path):
     real_volume = cxs.render_voxel_volume(
         atom_volume, render_fn, output_type=cxs.RealVoxelGridVolume
     )
-    if fourier_volume.is_rfft:
-        # Only the two full axes were fftshift'd at construction time (the
-        # truncated axis stays in rfft/corner convention) -- see
-        # `_prepare_fourier_voxel_arguments` in `fourier_voxels.py`.
-        real_voxel_grid = jnp.fft.fftshift(
-            im.irfftn(
-                jnp.fft.ifftshift(fourier_volume.fourier_voxel_grid, axes=(0, 1)),
-                s=shape,
-            )
+    # Only the two full axes were fftshift'd at construction time (the
+    # rfft-truncated axis stays in rfft/corner convention) -- see
+    # `_prepare_fourier_voxel_arguments` in `fourier_voxels.py`.
+    real_voxel_grid = jnp.fft.fftshift(
+        im.irfftn(
+            jnp.fft.ifftshift(fourier_volume.fourier_voxel_grid, axes=(0, 1)),
+            s=shape,
         )
-    else:
-        real_voxel_grid = jnp.fft.fftshift(
-            im.ifftn(jnp.fft.ifftshift(fourier_volume.fourier_voxel_grid)).real
-        )
+    )
 
     np.testing.assert_allclose(real_voxel_grid, real_volume.real_voxel_grid, atol=1e-12)
 
