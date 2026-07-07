@@ -79,6 +79,8 @@ _REMOVED = {
     "IndependentAtomVolume": "FourierAtomVolume",
     "IndependentAtomProjection": "FourierAtomProjection",
     "IndependentAtomRenderFn": "FourierAtomRenderFn",
+    "RealVoxelCloudVolume": None,
+    "RealVoxelProjection": None,
     "AberratedAstigmaticCTF": "AstigmaticCTF",
     "CTF": "AstigmaticCTF",
     "NufftProjection": "RealVoxelProjection",
