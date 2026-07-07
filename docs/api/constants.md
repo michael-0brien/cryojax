@@ -15,20 +15,10 @@ Modeling the electron scattering amplitudes of individual atoms is an important 
 
 ---
 
-::: cryojax.constants.LobatoScatteringFactorParameters
-    options:
-        members:
-            - __init__
-            - a
-            - b
-
----
-
 !!! warning
 
     Only electron scattering factors for elements found in PDB files (e.g. proteins, DNA/RNA,
-    small molecules) are supported when instantiating [`cryojax.constants.PengScatteringFactorParameters`][] or
-    [`cryojax.constants.LobatoScatteringFactorParameters`][]. These are the following `atomic_numbers`:
+    small molecules) are supported when instantiating atom scattering factor parameters. These are the following `atomic_numbers`:
 
         - 1: Hydrogen
         - 6: Carbon
