@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from typing import ClassVar, Literal, Self
 from typing_extensions import override
 
@@ -215,10 +216,20 @@ class GaussianMixtureProjection(
     AbstractVolumeIntegrator[GaussianMixtureVolume],
     strict=True,
 ):
+    """
+    !!! example "Speed up gradients with Pallas"
+        ```python
+        integrator = cxs.GaussianMixtureProjection(
+            n_spread=7, enable_pallas={"bwd": True}
+        )
+        ```
+    """
+
     sampling_mode: Literal["average", "point"]
     shape: tuple[int, int] | None
     n_batches: int
     n_spread: int | tuple[int, ...] | None
+    enable_pallas: bool | Mapping[str, bool] | None
 
     outputs_ewald_sphere: ClassVar[bool] = False
 
@@ -230,6 +241,7 @@ class GaussianMixtureProjection(
         sampling_mode: Literal["average", "point"] = "average",
         n_batches: int = 1,
         n_spread: int | tuple[int, ...] | None = None,
+        enable_pallas: bool | Mapping[str, bool] | None = None,
     ):
         """**Arguments:**
 
@@ -264,6 +276,14 @@ class GaussianMixtureProjection(
             waste computation spreading the narrowest ones too widely. See
             [`cryojax.simulator.suggest_n_spread`][] to choose these values
             from `volume_representation.variances`.
+        - `enable_pallas`:
+            Use the Pallas/Triton GPU backend instead of pure-JAX for the
+            `n_spread` spreading backend (ignored if `n_spread` is `None`).
+            [Pallas](https://docs.jax.dev/en/latest/pallas/index.html) is
+            JAX's framework for writing custom GPU/TPU kernels. This is most
+            advantageous for the *backward* pass -- `{"bwd": True}`. See
+            [`cryojax.ndimage.spread_gaussians_2d`][]'s `enable_pallas` for
+            the full picture. `None` (default) defers to `CRYOJAX_ENABLE_PALLAS`.
         """  # noqa: E501
         if upsampling_factor is not None:
             raise ValueError(
@@ -282,6 +302,7 @@ class GaussianMixtureProjection(
         self.sampling_mode = sampling_mode
         self.n_batches = n_batches
         self.n_spread = n_spread
+        self.enable_pallas = enable_pallas
 
     @override
     def integrate(
@@ -341,6 +362,7 @@ class GaussianMixtureProjection(
                 self.n_spread,
                 self.n_batches,
                 context,
+                self.enable_pallas,
             )
         if self.shape is None:
             return (
@@ -395,12 +417,20 @@ class GaussianMixtureRenderFn(AbstractVolumeRenderFn[GaussianMixtureVolume], str
     where $j$ indexes the components of the spatial coordinate vector $\\mathbf{r}$. The above expression is evaluated using the error function as
 
     $$U_{\\ell} = \\frac{1}{(2 \\Delta r)^3} \\sum\\limits_{i = 1}^5 a_i \\prod\\limits_{j = 1}^3 \\textrm{erf}(\\frac{r_j^{\\ell} - r'_j + \\Delta r / 2}{\\sqrt{2 ((b_i + B) / 8\\pi^2)}}) - \\textrm{erf}(\\frac{r_j^{\\ell} - r'_j - \\Delta r / 2}{\\sqrt{2 ((b_i + B) / 8\\pi^2)}}).$$
+
+    !!! example "Speed up gradients with Pallas"
+        ```python
+        render_fn = cxs.GaussianMixtureRenderFn(
+            shape, voxel_size, n_spread=7, enable_pallas={"bwd": True}
+        )
+        ```
     """  # noqa: E501
 
     shape: tuple[int, int, int]
     voxel_size: Float[Array, ""]
     n_batches: int
     n_spread: int | tuple[int, ...] | None
+    enable_pallas: bool | Mapping[str, bool] | None
 
     def __init__(
         self,
@@ -409,6 +439,7 @@ class GaussianMixtureRenderFn(AbstractVolumeRenderFn[GaussianMixtureVolume], str
         *,
         n_batches: int = 1,
         n_spread: int | tuple[int, ...] | None = None,
+        enable_pallas: bool | Mapping[str, bool] | None = None,
     ):
         """**Arguments:**
 
@@ -438,11 +469,20 @@ class GaussianMixtureRenderFn(AbstractVolumeRenderFn[GaussianMixtureVolume], str
             waste computation spreading the narrowest ones too widely. See
             [`cryojax.simulator.suggest_n_spread`][] to choose these values
             from `volume_representation.variances`.
+        - `enable_pallas`:
+            Use the Pallas/Triton GPU backend instead of pure-JAX for the
+            `n_spread` spreading backend (ignored if `n_spread` is `None`).
+            [Pallas](https://docs.jax.dev/en/latest/pallas/index.html) is
+            JAX's framework for writing custom GPU/TPU kernels. This is most
+            advantageous for the *backward* pass -- `{"bwd": True}`. See
+            [`cryojax.ndimage.spread_gaussians_3d`][]'s `enable_pallas` for
+            the full picture. `None` (default) defers to `CRYOJAX_ENABLE_PALLAS`.
         """  # noqa: E501
         self.shape = shape
         self.voxel_size = jnp.asarray(voxel_size, dtype=float)
         self.n_batches = n_batches
         self.n_spread = n_spread
+        self.enable_pallas = enable_pallas
 
     @override
     def __call__(
@@ -495,6 +535,7 @@ class GaussianMixtureRenderFn(AbstractVolumeRenderFn[GaussianMixtureVolume], str
                 self.n_spread,
                 self.n_batches,
                 context,
+                self.enable_pallas,
             )
         if outputs_real_space:
             return real_voxel_grid
@@ -643,6 +684,7 @@ def _gaussians_to_projection_spread(
     n_spread: int | tuple[int, ...],
     n_batches: int,
     context: str,
+    enable_pallas: bool | Mapping[str, bool] | None,
 ) -> Float[Array, "dim_y dim_x"]:
     """Spread each gaussian component directly onto the `n_spread` nearest
     grid points (see `cryojax.simulator._volume.common`), rather than
@@ -662,6 +704,7 @@ def _gaussians_to_projection_spread(
                 pixel_size=pixel_size,
                 n_spread=_n_spread,
                 use_erf=use_erf,
+                enable_pallas=enable_pallas,
             )
 
         return spread_and_sum_gaussian_components(
@@ -739,6 +782,7 @@ def _gaussians_to_real_voxels_spread(
     n_spread: int | tuple[int, ...],
     n_batches: int,
     context: str,
+    enable_pallas: bool | Mapping[str, bool] | None,
 ) -> Float[Array, "{shape[0]} {shape[1]} {shape[2]}"]:
     """Spread each gaussian component directly onto the `n_spread` nearest
     grid points (see `cryojax.simulator._volume.common`), rather than
@@ -759,6 +803,7 @@ def _gaussians_to_real_voxels_spread(
                 voxel_size=voxel_size,
                 n_spread=_n_spread,
                 use_erf=True,
+                enable_pallas=enable_pallas,
             )
 
         return spread_and_sum_gaussian_components(
