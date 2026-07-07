@@ -54,17 +54,18 @@ def spread_and_sum_gaussian_components(
     spread with the same width.
 
     If `n_spread` is a `tuple` of length `n_gaussians` (one value per
-    component, e.g. from [`cryojax.simulator.suggest_n_spread`][]), this
-    instead loops over components in plain Python and calls `spread_one`
-    once per component with its own `n_spread`. This is necessary --
-    not just an optimization choice -- because `n_spread` fixes array
+    component, e.g. from [`cryojax.simulator.suggest_n_spread`][]), components
+    are grouped by their shared `n_spread` value, and `spread_one` is
+    `vmap`'d once per distinct value across that group -- not once per
+    component. This is necessary to have per-component spread widths at all
+    -- not just an optimization choice -- because `n_spread` fixes array
     shapes inside `spread_one` (see `cryojax.ndimage.spread_gaussians_2d`/
     `spread_gaussians_3d`), so components with different `n_spread` cannot
-    share one `vmap`'d/traced call. This trades the `vmap` path's shared
-    kernel for giving each component an appropriately-sized (and so more
-    accurate and/or more efficient) spread width -- e.g. for X-ray/electron
-    scattering factors written as a sum of 5 Gaussians whose widths span
-    an order of magnitude or more.
+    share one `vmap`'d/traced call. But components that happen to share the
+    same `n_spread` (common -- e.g. X-ray/electron scattering factors written
+    as a sum of 5 Gaussians often have several components of similar width)
+    still get to share a single `vmap`'d call, rather than each getting its
+    own fully unrolled `spread_one` call.
     """
     n_gaussians = amplitudes.shape[-1]
     if isinstance(n_spread, int):
@@ -78,7 +79,19 @@ def spread_and_sum_gaussian_components(
             f"number of gaussian components was {n_gaussians}. These must "
             "be equal (one `n_spread` value per gaussian component)."
         )
-    total = spread_one(amplitudes[..., 0], variances[..., 0], n_spread[0])
-    for i in range(1, n_gaussians):
-        total = total + spread_one(amplitudes[..., i], variances[..., i], n_spread[i])
+    groups: dict[int, list[int]] = {}
+    for i, n in enumerate(n_spread):
+        groups.setdefault(n, []).append(i)
+
+    def _spread_group(n: int, indices: list[int]) -> Array:
+        idx = jnp.asarray(indices)
+        contributions = jax.vmap(lambda a, v: spread_one(a, v, n), in_axes=(-1, -1))(
+            amplitudes[..., idx], variances[..., idx]
+        )
+        return jnp.sum(contributions, axis=0)
+
+    group_totals = [_spread_group(n, indices) for n, indices in groups.items()]
+    total = group_totals[0]
+    for group_total in group_totals[1:]:
+        total = total + group_total
     return total
