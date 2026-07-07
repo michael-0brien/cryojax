@@ -24,7 +24,6 @@ dependencies = [
     "lineax",
     "nufftax>=0.6.0",
     "mrcfile",
-    "starfile",
     "pandas",
     "typing_extensions>=4.5.0",
     "mmdf",

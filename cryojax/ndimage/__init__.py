@@ -1,4 +1,3 @@
-import warnings as _warnings
 from typing import Any as _Any
 
 from ._coordinates import (
@@ -93,56 +92,23 @@ from ._transforms import (
 )
 
 
+_RENAMED = {
+    "downsample_with_fourier_cropping": "fourier_crop_downsample",
+    "downsample_to_shape_with_fourier_cropping": "fourier_crop_to_shape",
+    "normalize_image": "standardize_image",
+}
+_FLATTENED_SUBMODULES = {"operators", "transforms"}
+
+
 def __getattr__(name: str) -> _Any:
-    # Future deprecations
-    if name == "downsample_with_fourier_cropping":
-        _warnings.warn(
-            "'downsample_with_fourier_cropping' is deprecated"
-            "has been renamed to 'fourier_crop_downsample'. "
-            "The old name will be deprecated in cryoJAX 0.6.0.",
-            category=FutureWarning,
-            stacklevel=2,
+    if name in _RENAMED:
+        raise AttributeError(
+            f"'{name}' was removed in cryoJAX 0.6.0. Use '{_RENAMED[name]}' instead."
         )
-        return fourier_crop_downsample
-    if name == "downsample_to_shape_with_fourier_cropping":
-        _warnings.warn(
-            "'downsample_to_shape_with_fourier_cropping' is deprecated"
-            "has been renamed to 'fourier_crop_to_shape'. "
-            "The old name will be deprecated in cryoJAX 0.6.0.",
-            category=FutureWarning,
-            stacklevel=2,
+    if name in _FLATTENED_SUBMODULES:
+        raise AttributeError(
+            f"Submodule `cryojax.ndimage.{name}` was removed in cryoJAX 0.6.0. "
+            f"All symbols from `{name}` are now importable directly from "
+            "`cryojax.ndimage`."
         )
-        return fourier_crop_to_shape
-    if name == "normalize_image":
-        _warnings.warn(
-            "'normalize_image' is deprecated and "
-            "has been renamed to 'standardize_image'. "
-            "The old name will be deprecated in cryoJAX 0.6.0.",
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        return standardize_image
-    if name == "operators":
-        _warnings.warn(
-            "Submodule `cryojax.ndimage.operators` is deprecated and "
-            "has been moved to the `cryojax.ndimage` namespace. "
-            "`cryojax.ndimage.operators` will be removed in cryoJAX 0.6.0.",
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        from . import _operators as operators
-
-        return operators
-    if name == "transforms":
-        _warnings.warn(
-            "Submodule `cryojax.ndimage.transforms` is deprecated and "
-            "has been moved to the `cryojax.ndimage` namespace. "
-            "`cryojax.ndimage.transforms` will be removed in cryoJAX 0.6.0.",
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        from . import _transforms as transforms
-
-        return transforms
-
     raise AttributeError(f"cannot import name '{name}' from 'cryojax.ndimage'.")

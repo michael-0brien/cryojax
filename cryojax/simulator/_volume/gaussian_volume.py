@@ -1,4 +1,3 @@
-import warnings
 from collections.abc import Callable
 from typing import Any, ClassVar, Literal, Self, TypedDict
 from typing_extensions import override
@@ -217,29 +216,6 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
             lambda d: d.positions, self, self.positions + offset_in_angstroms
         )
 
-    def to_real_voxel_grid(
-        self,
-        shape: tuple[int, int, int],
-        voxel_size: Float[NDArrayLike, ""] | float,
-        *,
-        batch_options: dict[str, Any] = {},
-    ) -> Float[Array, "{shape[0]} {shape[1]} {shape[2]}"]:
-        warnings.warn(
-            "'GaussianMixtureVolume.to_real_voxel_grid' is deprecated "
-            "and will be removed in cryoJAX 0.6.0. Instead, use "
-            "`cryojax.simulator.GaussianMixtureRenderFn`.",
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        return _gaussians_to_real_voxels(
-            shape,
-            jnp.asarray(voxel_size, dtype=float),
-            self.positions,
-            self.amplitudes,
-            variance_to_b_factor(self.variances),
-            **batch_options,
-        )
-
 
 class GaussianMixtureProjection(
     AbstractVolumeIntegrator[GaussianMixtureVolume],
@@ -257,7 +233,6 @@ class GaussianMixtureProjection(
         upsampling_factor: int | None = None,
         shape: tuple[int, int] | None = None,
         sampling_mode: Literal["average", "point"] = "average",
-        use_error_functions: bool = False,
         n_batches: int = 1,
     ):
         """**Arguments:**
@@ -277,14 +252,6 @@ class GaussianMixtureProjection(
             which computes a projection for all positions at once.
             This is useful to decrease GPU memory usage.
         """  # noqa: E501
-        if use_error_functions:
-            warnings.warn(
-                "`use_error_functions` in `GaussianMixtureProjection` has "
-                "been deprecated and will be removed in cryoJAX 0.6.0. "
-                "This has been renamed to `sampling_mode = 'average'`.",
-                category=FutureWarning,
-                stacklevel=2,
-            )
         if upsampling_factor is not None:
             raise ValueError(
                 "`upsampling_factor` in `GaussianMixtureProjection` "

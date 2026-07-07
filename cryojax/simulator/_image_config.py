@@ -1,12 +1,10 @@
 """The image configuration and utility manager."""
 
 import math
-import warnings
 from functools import cached_property
 from typing import Literal, cast
 
 import equinox as eqx
-import equinox.internal as eqxi
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
@@ -22,13 +20,6 @@ from ..ndimage import (
     make_coordinate_grid,
     make_frequency_grid,
     query_efficient_grid_size,
-)
-
-
-_get_deprecation_msg = lambda self, prop, func: (
-    f"`{self.__class__.__name__}.{prop}` has been deprecated and will be "
-    "removed in cryoJAX 0.6.0. Instead, make "
-    f"the appropriate call to `{self.__class__.__name__}.{func}`."
 )
 
 
@@ -374,160 +365,6 @@ class AbstractImageConfig(eqx.Module, strict=True):
         else:
             return self.precomputed_grids.get(real_space=False, full=True, padding=True)
 
-    @property
-    def coordinate_grid_in_pixels(
-        self,
-    ) -> Float[Array, "{self.y_dim} {self.x_dim} 2"]:
-        warnings.warn(
-            _get_deprecation_msg(
-                self, "coordinate_grid_in_pixels", "get_coordinate_grid"
-            ),
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        return self._coordinate_grid
-
-    @property
-    def coordinate_grid_in_angstroms(
-        self,
-    ) -> Float[Array, "{self.y_dim} {self.x_dim} 2"]:
-        warnings.warn(
-            _get_deprecation_msg(
-                self, "coordinate_grid_in_angstroms", "get_coordinate_grid"
-            ),
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        return self.get_coordinate_grid()
-
-    @property
-    def frequency_grid_in_pixels(
-        self,
-    ) -> Float[Array, "{self.y_dim} {self.x_dim//2+1} 2"]:
-        warnings.warn(
-            _get_deprecation_msg(self, "frequency_grid_in_pixels", "get_frequency_grid"),
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        return self._frequency_grid
-
-    @property
-    def frequency_grid_in_angstroms(
-        self,
-    ) -> Float[Array, "{self.y_dim} {self.x_dim//2+1} 2"]:
-        warnings.warn(
-            _get_deprecation_msg(
-                self, "frequency_grid_in_angstroms", "get_frequency_grid"
-            ),
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        return self.get_frequency_grid()
-
-    @property
-    def full_frequency_grid_in_pixels(
-        self,
-    ) -> Float[Array, "{self.y_dim} {self.x_dim} 2"]:
-        warnings.warn(
-            _get_deprecation_msg(
-                self, "full_frequency_grid_in_pixels", "get_frequency_grid"
-            ),
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        return self._full_frequency_grid
-
-    @property
-    def full_frequency_grid_in_angstroms(
-        self,
-    ) -> Float[Array, "{self.y_dim} {self.x_dim} 2"]:
-        warnings.warn(
-            _get_deprecation_msg(
-                self, "full_frequency_grid_in_angstroms", "get_frequency_grid"
-            ),
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        return self.get_frequency_grid(full=True)
-
-    @property
-    def padded_coordinate_grid_in_pixels(
-        self,
-    ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim} 2"]:
-        warnings.warn(
-            _get_deprecation_msg(
-                self, "padded_coordinate_grid_in_pixels", "get_coordinate_grid"
-            ),
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        return self._padded_coordinate_grid
-
-    @property
-    def padded_coordinate_grid_in_angstroms(
-        self,
-    ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim} 2"]:
-        warnings.warn(
-            _get_deprecation_msg(
-                self, "coordinate_grid_in_angstroms", "get_coordinate_grid"
-            ),
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        return self.get_coordinate_grid(padding=True)
-
-    @property
-    def padded_frequency_grid_in_pixels(
-        self,
-    ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim//2+1} 2"]:
-        warnings.warn(
-            _get_deprecation_msg(
-                self, "padded_frequency_grid_in_pixels", "get_frequency_grid"
-            ),
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        return self._padded_frequency_grid
-
-    @property
-    def padded_frequency_grid_in_angstroms(
-        self,
-    ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim//2+1} 2"]:
-        warnings.warn(
-            _get_deprecation_msg(
-                self, "padded_frequency_grid_in_angstroms", "get_frequency_grid"
-            ),
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        return self.get_frequency_grid(padding=True)
-
-    @property
-    def padded_full_frequency_grid_in_pixels(
-        self,
-    ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim} 2"]:
-        warnings.warn(
-            _get_deprecation_msg(
-                self, "padded_full_frequency_grid_in_pixels", "get_frequency_grid"
-            ),
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        return self._padded_full_frequency_grid
-
-    @property
-    def padded_full_frequency_grid_in_angstroms(
-        self,
-    ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim} 2"]:
-        warnings.warn(
-            _get_deprecation_msg(
-                self, "padded_full_frequency_grid_in_angstroms", "get_frequency_grid"
-            ),
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        return self.get_frequency_grid(full=True, padding=True)
-
 
 class BasicImageConfig(AbstractImageConfig, strict=True):
     """Configuration and utilities for a basic electron microscopy
@@ -544,7 +381,6 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
     )
     precomputed_grids: PrecomputedGrids | None
 
-    @eqxi.doc_remove_args("pad_options")
     def __init__(
         self,
         shape: tuple[int, int],
@@ -556,7 +392,6 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
         precompute_mode: Literal[
             "none", "rfft", "fft", "all", "compile_time_eval"
         ] = "none",
-        pad_options: dict = {},
     ):
         """**Arguments:**
 
@@ -600,14 +435,6 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
         self.pixel_size = jnp.asarray(pixel_size, dtype=float)
         self.voltage_in_kilovolts = jnp.asarray(voltage_in_kilovolts, dtype=float)
         # Set shape and padded shape
-        if "shape" in pad_options:
-            warnings.warn(
-                "`BasicImageConfig(..., pad_options=...)` is deprecated and will "
-                "be removed in cryoJAX 0.6.0. Use `padded_shape` instead.",
-                category=FutureWarning,
-                stacklevel=2,
-            )
-            padded_shape = pad_options["shape"]
         self.shape = shape
         self.padded_shape = _set_padded_shape(type(self), shape, padded_shape, pad_scale)
         # Finally, grid precompute
@@ -643,7 +470,6 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
     )
     precomputed_grids: PrecomputedGrids | None
 
-    @eqxi.doc_remove_args("pad_options")
     def __init__(
         self,
         shape: tuple[int, int],
@@ -656,7 +482,6 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
         precompute_mode: Literal[
             "none", "rfft", "fft", "all", "compile_time_eval"
         ] = "none",
-        pad_options: dict = {},
     ):
         """**Arguments:**
 
@@ -704,14 +529,6 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
         self.voltage_in_kilovolts = jnp.asarray(voltage_in_kilovolts, dtype=float)
         self.electron_dose = jnp.asarray(electron_dose, dtype=float)
         # Set shape and padded shape
-        if "shape" in pad_options:
-            warnings.warn(
-                "`BasicImageConfig(..., pad_options=...)` is deprecated and will "
-                "be removed in cryoJAX 0.6.0. Use `padded_shape` instead.",
-                category=FutureWarning,
-                stacklevel=2,
-            )
-            padded_shape = pad_options["shape"]
         self.shape = shape
         self.padded_shape = _set_padded_shape(type(self), shape, padded_shape, pad_scale)
         # Finally, grid precompute

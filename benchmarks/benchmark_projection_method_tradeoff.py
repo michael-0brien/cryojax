@@ -41,9 +41,8 @@ def setup_volumes_and_configs(n_iterations, n_atoms, box_size, pixel_size=2.0):
     )
 
     # Fourier slice volume (pre-computed grid)
-    real_voxel_grid = volume_gmm.to_real_voxel_grid(
-        shape=(box_size, box_size, box_size), voxel_size=pixel_size
-    )
+    render_fn = cxs.GaussianMixtureRenderFn((box_size, box_size, box_size), pixel_size)
+    real_voxel_grid = render_fn(volume_gmm)
 
     times = []
     for _ in range(n_iterations + 1):
