@@ -12,24 +12,18 @@ from jaxtyping import Array, Float, PyTree
 
 from ...constants import (
     PengScatteringFactorParameters,
-    b_factor_to_variance,
 )
 from ...jax_util import FloatLike, NDArrayLike
 from ...ndimage import (
     AbstractFourierOperator,
-    AbstractRealOperator,
     FourierGaussian,
     FourierSinc,
-    RealGaussian,
     convert_fftn_to_rfftn,
-    fftn,
     ifftn,
     irfftn,
     query_efficient_grid_size,
     resize_with_crop_or_pad,
     rfftn,
-    spread_gaussians_2d,
-    spread_gaussians_3d,
 )
 from .._image_config import AbstractImageConfig
 from .._pose import AbstractPose
@@ -40,11 +34,7 @@ from .base_volume import (
     ProjectionArray,
     VoxelArray,
 )
-from .common import (
-    make_frequencies_1d,
-    nspread_to_eps,
-    spread_and_sum_gaussian_components,
-)
+from .common import make_frequencies_1d
 
 
 try:
@@ -60,10 +50,12 @@ except ModuleNotFoundError as err:
 T = TypeVar("T")
 
 
-class IndependentAtomVolume(AbstractAtomVolume, strict=True):
+class FourierAtomVolume(AbstractAtomVolume, strict=True):
     """A representation of a volume that accepts an array of
     atom positions and an electron scattering factor for these
-    atoms.
+    atoms, projected/rendered via non-uniform FFTs (see
+    [`cryojax.simulator.FourierAtomProjection`][]/
+    [`cryojax.simulator.FourierAtomRenderFn`][]).
 
     !!! example "A Gaussian at each atom"
         ```python
@@ -72,7 +64,7 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
 
         positions = ... # load atom positions
         b_factor = ...  # ... and a B-factor
-        volume = cxs.IndependentAtomVolume(
+        volume = cxs.FourierAtomVolume(
             positions=positions, kernel_fns=im.FourierGaussian(b_factor=b_factor)
         )
         ```
@@ -88,25 +80,25 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
 
         positions_1, positions_2 = ...
         b_factor_1, b_factor_2 = ...
-        volume = cxs.IndependentAtomVolume(
+        volume = cxs.FourierAtomVolume(
             positions=(positions_1, positions_2),
             kernel_fns=(im.FourierGaussian(b_factor=b_factor_1), im.FourierGaussian(b_factor=b_factor_2))
         )
         ```
 
-    See [`cryojax.simulator.IndependentAtomVolume.from_tabulated_parameters`][] for
+    See [`cryojax.simulator.FourierAtomVolume.from_tabulated_parameters`][] for
     loading a volume from tabulated electron scattering factors.
     """  # noqa: E501
 
     positions: PyTree[Float[Array, "_ 3"]]
-    kernel_fns: PyTree[FourierGaussian] | PyTree[RealGaussian]
+    kernel_fns: PyTree[FourierGaussian]
 
     is_frame_rotation: ClassVar[bool] = False
 
     def __init__(
         self,
         positions: PyTree[Float[NDArrayLike, "_ 3"], "T"],
-        kernel_fns: (PyTree[FourierGaussian, "T"] | PyTree[RealGaussian, "T"]),
+        kernel_fns: PyTree[FourierGaussian, "T"],
     ):
         """**Arguments:**
 
@@ -115,24 +107,18 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
         - `kernel_fns`:
             A pytree of functions with the same tree structure
             as `positions`, where each leaf is a
-            [`cryojax.ndimage.RealGaussian`][] or a
-            [`cryojax.ndimage.FourierGaussian`][].
-            Real-space represents the scattering potential, while
-            fourier-space represents the scattering factor.
-            These classes may have
-            amplitudes and variances/b-factors with a batch dimension
-            to simulate form factors. To use a different amplitude for
-            each atom position, use [`cryojax.simulator.GaussianMixtureVolume`][]
-            instead.
+            [`cryojax.ndimage.FourierGaussian`][] representing the atom
+            type's scattering factor. These may have amplitudes and
+            b-factors with a batch dimension to simulate form factors. To
+            use a different amplitude for each atom position, use
+            [`cryojax.simulator.GaussianMixtureVolume`][] instead.
         """  # noqa: E501
         if jax.tree.structure(positions) != jax.tree.structure(
             kernel_fns,
-            is_leaf=lambda x: isinstance(
-                x, (AbstractFourierOperator, AbstractRealOperator)
-            ),
+            is_leaf=lambda x: isinstance(x, AbstractFourierOperator),
         ):
             raise ValueError(
-                "When instantiating an `IndependentAtomVolume`, found "
+                "When instantiating a `FourierAtomVolume`, found "
                 "that the pytree structures of `positions` and "
                 "`kernel_fns` were not equal."
             )
@@ -172,25 +158,18 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
         positions_by_element: tuple[Float[NDArrayLike, "_ 3"], ...],
         parameters: PengScatteringFactorParameters,
         *,
-        use_real_space: bool = False,
         b_factor_by_element: FloatLike | tuple[FloatLike, ...] | None = None,
     ) -> Self:
         def make_kernel_fn(a, b, b_factor):
             if isinstance(parameters, PengScatteringFactorParameters):
                 b = b + jnp.asarray(b_factor)[None] if b_factor is not None else b
-                if use_real_space:
-                    var = b_factor_to_variance(b)
-                    return eqx.filter_vmap(
-                        lambda _a, _var: RealGaussian(amplitude=_a, variance=_var)
-                    )(a, var)
-                else:
-                    return eqx.filter_vmap(
-                        lambda _a, _b: FourierGaussian(amplitude=_a, b_factor=_b)
-                    )(a, b)
+                return eqx.filter_vmap(
+                    lambda _a, _b: FourierGaussian(amplitude=_a, b_factor=_b)
+                )(a, b)
             else:
                 raise ValueError(
                     "Unrecognized argument `parameters` when "
-                    "calling `IndependentAtomVolume.from_tabulated_parameters`. "
+                    "calling `FourierAtomVolume.from_tabulated_parameters`. "
                     "This should be type "
                     "`cryojax.constants.PengScatteringFactorParameters`, "
                     f"but got type {parameters.__class__.__name__}."
@@ -200,7 +179,7 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
         a, b = parameters.a, parameters.b
         if a.shape[0] != n_elements or b.shape[0] != n_elements:
             raise ValueError(
-                "When constructing an `IndependentAtomVolume` via "
+                "When constructing a `FourierAtomVolume` via "
                 "`from_tabulated_parameters`, found that "
                 "`parameters.a.shape[0] != len(positions_by_element)` "
                 "or `parameters.b.shape[0] != len(positions_by_element)`. "
@@ -211,7 +190,7 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
             if isinstance(b_factor_by_element, Sequence):
                 if len(b_factor_by_element) != n_elements:
                     raise ValueError(
-                        "When constructing an `IndependentAtomVolume` via "
+                        "When constructing a `FourierAtomVolume` via "
                         "`from_tabulated_parameters`, found that "
                         "`len(b_factor_by_element) != len(positions_by_element)`. "
                         "Make sure that `b_factor_by_element` is a tuple with "
@@ -235,27 +214,19 @@ class IndependentAtomVolume(AbstractAtomVolume, strict=True):
         return cls(positions_by_element, kernel_fns_by_element)
 
 
-_REAL_VS_FOURIER_DOC = """The underlying algorithm depends on if
-`IndependentAtomVolume.kernel_fns` are in real-space or
-fourier-space via the [`cryojax.ndimage.FourierGaussian`][]
-or [`cryojax.ndimage.RealGaussian`][] classes.
+class FourierAtomRenderFn(AbstractVolumeRenderFn[FourierAtomVolume], strict=True):
+    """Render a voxel grid from a `FourierAtomVolume` using non-uniform FFTs
+    and Fourier-domain convolution. Good when kernels span at least a
+    couple pixels; see `cryojax.simulator.GaussianMixtureRenderFn` for an
+    alternative that directly spreads narrow kernels onto the grid.
+    """
 
-- If [`cryojax.ndimage.FourierGaussian`][]:
-    Use non-uniform FFTs and convolution. This is good
-    when kernels span at least a couple pixels.
-- If [`cryojax.ndimage.RealGaussian`][]:
-    Directly spread atoms into a volume. This should be
-    preferred in most cases.
-"""
-
-
-class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], strict=True):
     shape: tuple[int, int, int]
     voxel_size: Float[Array, ""]
 
     sampling_mode: Literal["average", "point"]
-    upsample_factor: float | None
-    n_spread: int | tuple[int, ...]
+    upsample_factor: float
+    eps: float
     backend: Literal["nufftax", "jax-finufft"]
     options: dict[str, Any]
 
@@ -265,8 +236,8 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
         voxel_size: FloatLike,
         *,
         sampling_mode: Literal["average", "point"] = "average",
-        upsample_factor: int | float | None = None,
-        n_spread: int | tuple[int, ...] = 7,
+        upsample_factor: int | float = 2.0,
+        eps: float = 1e-6,
         backend: Literal["nufftax", "jax-finufft"] = "nufftax",
         options: dict[str, Any] = {},
     ):
@@ -281,71 +252,48 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
             projected volume at a pixel to be the average value of the
             underlying continuous function. If `'point'`, the volume at
             a pixel will be point sampled.
-            If `IndependentAtomVolume` is instantiated with real-space
-            gaussians, then error functions are used in
-            `sampling_mode = 'average'`.
         - `upsample_factor`:
             How much to upsample the grid on which atoms are spread onto.
-            If equal to `None`, choose a default value at run-time.
-        - `n_spread`:
-            The width (number of grid points, per dimension) of the kernel
-            used to spread/interpolate. Controls speed / accuracy tradeoff:
-            larger `n_spread` is more accurate but slower. If
-            `IndependentAtomVolume.kernel_fns` are in fourier-space, this is
-            translated into an `eps` precision for the underlying non-uniform
-            FFT implementation (see
-            [`finufft`](https://finufft.readthedocs.io/en/latest/opts.html#options-parameters-cpu)),
-            and must be a single `int` (a `tuple` is not supported for
-            fourier-space kernels). If `IndependentAtomVolume.kernel_fns` are
-            in real-space, `n_spread` may instead be a `tuple` of `int`s (one
-            value per gaussian component of `kernel_fns`, e.g. of length 5
-            for the Peng et al. 1996 scattering-factor decomposition), to
-            spread each gaussian component with its own width rather than
-            one shared width -- useful when a volume's gaussian components
-            have widths spanning an order of magnitude or more, where a
-            single `n_spread` would either truncate the widest components or
-            waste computation spreading the narrowest ones too widely. See
-            [`cryojax.simulator.suggest_n_spread`][] to choose these values.
-        - `backend` (fourier only):
+        - `eps`:
+            The precision of the underlying non-uniform FFT implementation.
+            See [`finufft`](https://finufft.readthedocs.io/en/latest/opts.html#options-parameters-cpu)
+            for documentation.
+        - `backend`:
             The backend for non-uniform FFT computation. This is either
             [`nufftax`](https://github.com/GragasLab/nufftax/tree/custom-kernel-spread)
             for a pure-JAX implementation of the
             [`finufft`](https://finufft.readthedocs.io) algorithm,
             or [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft) for
             calling `finufft` directly via `jax.ffi`.
-            Used only when `IndependentAtomVolume.kernel_fns` are
-            [`cryojax.ndimage.FourierGaussian`][]; unused (and has no effect)
-            for real-space kernels.
-        - `options` (fourier only):
-            A dictionary of options for advanced usage. This is passed directly to the underlying
-            non-uniform FFT implementation if kernels are in fourier-space. Unused if kernels are
-            in real-space.
+        - `options`:
+            A dictionary of options for advanced usage, passed directly to
+            the underlying non-uniform FFT implementation.
         """  # noqa: E501
         if sampling_mode not in ["average", "point"]:
             raise ValueError(
-                "`sampling_mode` in `IndependentAtomRenderFn` "
+                "`sampling_mode` in `FourierAtomRenderFn` "
                 "must be either 'average' for averaging within a "
                 "pixel or 'point' for point sampling. Got "
                 f"`sampling_mode = {sampling_mode}`."
             )
         if backend not in ["jax-finufft", "nufftax"]:
             raise ValueError(
-                "`backend` in `IndependentAtomRenderFn` "
+                "`backend` in `FourierAtomRenderFn` "
                 "must be either 'jax-finufft' or 'nufftax'. Got "
                 f"`backend = {backend}`."
             )
         self.shape = shape
         self.voxel_size = jnp.asarray(voxel_size, dtype=float)
         self.sampling_mode = sampling_mode
-        self.upsample_factor = None if upsample_factor is None else float(upsample_factor)
-        self.n_spread = n_spread
+        self.upsample_factor = float(upsample_factor)
+        self.eps = eps
         self.backend = backend
         self.options = options
 
     @override
     def __call__(
         self,
-        volume_representation: IndependentAtomVolume,
+        volume_representation: FourierAtomVolume,
         *,
         outputs_real_space: bool = True,
         outputs_rfft: bool = False,
@@ -354,7 +302,7 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
         """**Arguments:**
 
         - `volume_representation`:
-            The `GaussianMixtureVolume`.
+            The `FourierAtomVolume`.
         - `outputs_real_space`:
             If `True`, return a voxel grid in real-space.
         - `outputs_rfft`:
@@ -373,53 +321,25 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
             volume_representation.positions,
             volume_representation.kernel_fns,
         )
-        is_real_space, kernel_fns = _standardize_kernel_fns(kernel_fns, spatial_dim=3)
-        _check_n_spread_real_only(self.n_spread, is_real_space, type(self))
+        kernel_fns = _standardize_kernel_fns(kernel_fns, spatial_dim=3)
         (shape_u, voxel_size_u), upsampfac = _prepare_upsample(
             shape=self.shape,
             pixel_size=self.voxel_size,
             upsampfac=self.upsample_factor,
-            sampling_mode=self.sampling_mode,
-            is_real_space=is_real_space,
         )
-        # Decide whether to spread the pixel-averaged (erf) kernel directly
-        sampling_mode = self.sampling_mode
-        use_erf = False
-        if is_real_space:
-            use_erf, sampling_mode = _resolve_erf_sampling(sampling_mode, upsampfac)
         # Compute
-        rendering_out = _render_impl(
+        rendering_fft = _render_impl(
             positions,
             kernel_fns,
-            is_real_space=is_real_space,
             shape_u=cast(tuple[int, int, int], shape_u),
             shape_out=cast(tuple[int, int, int], self.shape),
             voxel_size_u=voxel_size_u,
             backend=self.backend,
-            n_spread=self.n_spread,
-            use_erf=use_erf,
+            eps=self.eps,
             options=self.options,
         )
-        if is_real_space:
-            # Check case where we can return immediately
-            rendering = rendering_out
-            if sampling_mode == "point" and self.shape == shape_u:
-                return (
-                    rendering
-                    if outputs_real_space
-                    else _prepare_real_to_fft(
-                        rendering,
-                        outputs_rfft=outputs_rfft,
-                        fftshifted=fftshifted,
-                    )
-                )
-            else:
-                rendering_fft = fftn(rendering)
-        else:
-            # Otherwise, postprocess in fourier-domain
-            rendering_fft = rendering_out
         # Average within a pixel size
-        if sampling_mode == "average":
+        if self.sampling_mode == "average":
             box_fn = FourierSinc(box_width=self.voxel_size)
             frequencies_1d = make_frequencies_1d(shape_u, voxel_size_u, modeord=1)
             rendering_fft *= _eval_separable_impl(box_fn, frequencies_1d)
@@ -440,18 +360,20 @@ class IndependentAtomRenderFn(AbstractVolumeRenderFn[IndependentAtomVolume], str
         )
 
 
-IndependentAtomRenderFn.__doc__ = (
-    f"""Render a voxel grid from an `IndependentAtomVolume`. {_REAL_VS_FOURIER_DOC}"""
-)
-
-
-class IndependentAtomProjection(
-    AbstractVolumeIntegrator[IndependentAtomVolume],
+class FourierAtomProjection(
+    AbstractVolumeIntegrator[FourierAtomVolume],
     strict=True,
 ):
+    """Integrate atomic parametrization of a volume onto the exit plane from
+    a `FourierAtomVolume` using non-uniform FFTs and Fourier-domain
+    convolution. Good when kernels span at least a couple pixels; see
+    `cryojax.simulator.GaussianMixtureProjection` for an alternative that
+    directly spreads narrow kernels onto the grid.
+    """
+
     sampling_mode: Literal["average", "point"]
-    upsample_factor: float | None
-    n_spread: int | tuple[int, ...]
+    upsample_factor: float
+    eps: float
     shape: tuple[int, int] | None
     backend: Literal["nufftax", "jax-finufft"]
     options: dict[str, Any]
@@ -462,8 +384,8 @@ class IndependentAtomProjection(
         self,
         *,
         sampling_mode: Literal["average", "point"] = "average",
-        upsample_factor: int | float | None = None,
-        n_spread: int | tuple[int, ...] = 7,
+        upsample_factor: int | float = 2.0,
+        eps: float = 1e-6,
         shape: tuple[int, int] | None = None,
         backend: Literal["jax-finufft", "nufftax"] = "nufftax",
         options: dict[str, Any] = {},
@@ -475,78 +397,55 @@ class IndependentAtomProjection(
             projected volume at a pixel to be the average value of the
             underlying continuous function. If `'point'`, the volume at
             a pixel will be point sampled.
-            If `IndependentAtomVolume` is instantiated with real-space
-            gaussians, then error functions are used in
-            `sampling_mode = 'average'`.
         - `upsample_factor`:
             How much to upsample the grid on which atoms are spread onto.
-            If equal to `None`, choose a default value at run-time.
-        - `n_spread`:
-            The width (number of grid points, per dimension) of the kernel
-            used to spread/interpolate. Controls speed / accuracy tradeoff:
-            larger `n_spread` is more accurate but slower. If
-            `IndependentAtomVolume.kernel_fns` are in fourier-space, this is
-            translated into an `eps` precision for the underlying non-uniform
-            FFT implementation (see
-            [`finufft`](https://finufft.readthedocs.io/en/latest/opts.html#options-parameters-cpu)),
-            and must be a single `int` (a `tuple` is not supported for
-            fourier-space kernels). If `IndependentAtomVolume.kernel_fns` are
-            in real-space, `n_spread` may instead be a `tuple` of `int`s (one
-            value per gaussian component of `kernel_fns`, e.g. of length 5
-            for the Peng et al. 1996 scattering-factor decomposition), to
-            spread each gaussian component with its own width rather than
-            one shared width -- useful when a volume's gaussian components
-            have widths spanning an order of magnitude or more, where a
-            single `n_spread` would either truncate the widest components or
-            waste computation spreading the narrowest ones too widely. See
-            [`cryojax.simulator.suggest_n_spread`][] to choose these values.
+        - `eps`:
+            The precision of the underlying non-uniform FFT implementation.
+            See [`finufft`](https://finufft.readthedocs.io/en/latest/opts.html#options-parameters-cpu)
+            for documentation.
         - `shape`:
             If given, first compute the image at `shape`, then
             pad or crop to `image_config.padded_shape`.
-        - `backend` (fourier only):
+        - `backend`:
             The backend for non-uniform FFT computation. This is either
             [`nufftax`](https://github.com/GragasLab/nufftax/tree/custom-kernel-spread)
             for a pure-JAX implementation of the
             [`finufft`](https://finufft.readthedocs.io) algorithm,
             or [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft) for
             calling `finufft` directly via `jax.ffi`.
-            Used only when `IndependentAtomVolume.kernel_fns` are
-            [`cryojax.ndimage.FourierGaussian`][]; unused (and has no effect)
-            for real-space kernels.
-        - `options` (fourier only):
-            A dictionary of options for advanced usage. This is passed directly to the underlying
-            non-uniform FFT implementation if kernels are in fourier-space. Unused if kernels are
-            in real-space.
+        - `options`:
+            A dictionary of options for advanced usage, passed directly to
+            the underlying non-uniform FFT implementation.
         """  # noqa: E501
         if sampling_mode not in ["average", "point"]:
             raise ValueError(
-                "`sampling_mode` in `IndependentAtomProjection` "
+                "`sampling_mode` in `FourierAtomProjection` "
                 "must be either 'average' for averaging within a "
                 "pixel or 'point' for point sampling. Got "
                 f"`sampling_mode = {sampling_mode}`."
             )
         if backend not in ["jax-finufft", "nufftax"]:
             raise ValueError(
-                "`backend` in `IndependentAtomProjection` "
+                "`backend` in `FourierAtomProjection` "
                 "must be either 'jax-finufft' or 'nufftax'. Got "
                 f"`backend = {backend}`."
             )
         self.sampling_mode = sampling_mode
         self.shape = shape
-        self.upsample_factor = None if upsample_factor is None else float(upsample_factor)
-        self.n_spread = n_spread
+        self.upsample_factor = float(upsample_factor)
+        self.eps = eps
         self.backend = backend
         self.options = options
 
     @override
     def integrate(
         self,
-        volume_representation: IndependentAtomVolume,
+        volume_representation: FourierAtomVolume,
         image_config: AbstractImageConfig,
         outputs_real_space: bool = False,
     ) -> ProjectionArray:
         """Compute a projection from scattering factors per atom type
-        from the `IndependentAtomVolume`.
+        from the `FourierAtomVolume`.
 
         **Arguments:**
 
@@ -571,47 +470,25 @@ class IndependentAtomProjection(
             volume_representation.positions,
             volume_representation.kernel_fns,
         )
-        is_real_space, kernel_fns = _standardize_kernel_fns(kernel_fns, spatial_dim=2)
-        _check_n_spread_real_only(self.n_spread, is_real_space, type(self))
+        kernel_fns = _standardize_kernel_fns(kernel_fns, spatial_dim=2)
         (shape_u, pixel_size_u), upsampfac = _prepare_upsample(
             shape=shape,
             pixel_size=pixel_size,
             upsampfac=self.upsample_factor,
-            sampling_mode=self.sampling_mode,
-            is_real_space=is_real_space,
         )
-        # Decide whether to spread the pixel-averaged (erf) kernel directly
-        sampling_mode = self.sampling_mode
-        use_erf = False
-        if is_real_space:
-            use_erf, sampling_mode = _resolve_erf_sampling(sampling_mode, upsampfac)
         # Compute projection
-        projection_out = _project_impl(
+        projection_fft = _project_impl(
             positions,
             kernel_fns,
-            is_real_space=is_real_space,
             shape_u=cast(tuple[int, int], shape_u),
             pixel_size_u=pixel_size_u,
             shape_out=cast(tuple[int, int], shape),
             backend=self.backend,
-            n_spread=self.n_spread,
-            use_erf=use_erf,
+            eps=self.eps,
             options=self.options,
         )
-        if is_real_space:
-            # Check case where we can return immediately
-            projection = projection_out
-            if sampling_mode == "point" and shape == shape_u:
-                if output_shape != shape:
-                    projection = resize_with_crop_or_pad(projection, output_shape)
-                return projection if outputs_real_space else rfftn(projection)
-            else:
-                projection_fft = fftn(projection)
-        else:
-            # Otherwise, postprocess in fourier-domain
-            projection_fft = projection_out
         # Average within a pixel size
-        if sampling_mode == "average":
+        if self.sampling_mode == "average":
             box_fn = FourierSinc(box_width=pixel_size)
             frequencies_1d = make_frequencies_1d(shape_u, pixel_size_u, modeord=1)
             projection_fft *= _eval_separable_impl(box_fn, frequencies_1d)
@@ -634,120 +511,48 @@ class IndependentAtomProjection(
             return projection if outputs_real_space else rfftn(projection)
 
 
-IndependentAtomProjection.__doc__ = f"""Integrate atomic parametrization of a volume "
-"onto the exit plane from an `IndependentAtomVolume`. {_REAL_VS_FOURIER_DOC}"""
-
-
-def _check_n_spread_real_only(
-    n_spread: int | tuple[int, ...], is_real_space: bool, cls: type
-) -> None:
-    if isinstance(n_spread, tuple) and not is_real_space:
-        raise ValueError(
-            f"`{cls.__name__}(..., n_spread=...)` was given as a tuple (one "
-            "value per gaussian component), but `IndependentAtomVolume."
-            "kernel_fns` are in fourier-space (`FourierGaussian`s). A tuple "
-            "`n_spread` is only supported for real-space kernels "
-            "(`RealGaussian`s); pass a single `int` instead."
-        )
-
-
 def _standardize_kernel_fns(
-    kernel_pytree: PyTree[FourierGaussian] | PyTree[RealGaussian], *, spatial_dim: int
-) -> tuple[bool, PyTree[FourierGaussian] | PyTree[RealGaussian]]:
+    kernel_pytree: PyTree[FourierGaussian], *, spatial_dim: int
+) -> PyTree[FourierGaussian]:
     kernel_list = jax.tree.leaves(
         kernel_pytree,
-        is_leaf=lambda x: isinstance(x, (AbstractFourierOperator, AbstractRealOperator)),
+        is_leaf=lambda x: isinstance(x, AbstractFourierOperator),
     )
-    if all(isinstance(kernel, (FourierGaussian, RealGaussian)) for kernel in kernel_list):
-        # Standardize gaussian kernels for computation
-        # ... pytree leaves have a batch dim
-        kernel_pytree = jax.tree.map(lambda x: jnp.atleast_1d(x), kernel_pytree)
-        # ... in fourier-space, `eval_separable_impl` embeds the kernel's
-        # amplitude once per axis (outer product), so it must be pre-split by
-        # the `spatial_dim`-th root to recover the correct total amplitude.
-        # In real-space, `common.spread_2d`/`spread_3d` fold the full
-        # amplitude into `c` exactly once, so no split is needed there.
-        replace_fn = lambda fn: (
-            eqx.tree_at(
-                lambda _fn: _fn.amplitude, fn, (fn.amplitude ** (1 / spatial_dim))
-            )
-            if isinstance(fn, FourierGaussian)
-            else fn
-        )
-        kernel_pytree = jax.tree.map(
-            replace_fn,
-            kernel_pytree,
-            is_leaf=lambda x: isinstance(x, (RealGaussian, FourierGaussian)),
-        )
-    else:
+    if not all(isinstance(kernel, FourierGaussian) for kernel in kernel_list):
         raise ValueError(
-            "Found that `IndependentAtomVolume.kernel_fns` was not a "
-            "PyTree containing only `FourierGaussian`s or "
-            "`RealGaussian`s."
+            "Found that `FourierAtomVolume.kernel_fns` was not a "
+            "PyTree containing only `FourierGaussian`s."
         )
-    is_real_space = True if isinstance(kernel_list[0], RealGaussian) else False
-
-    return is_real_space, kernel_pytree
-
-
-def _resolve_erf_sampling(
-    sampling_mode: Literal["average", "point"],
-    upsampfac: float,
-) -> tuple[bool, Literal["average", "point"]]:
-    """Decide whether to spread with the pixel-averaged (erf) Gaussian kernel.
-
-    When averaging without any upsampling, the exact average of the Gaussian
-    within a pixel can be spread directly (`use_erf=True`), which is
-    equivalent to (and cheaper than) spreading a point-sampled kernel and
-    then convolving with a box function in Fourier space.
-    """
-    if sampling_mode == "average" and upsampfac == 1.0:
-        return True, "point"
-    return False, sampling_mode
+    # Standardize gaussian kernels for computation
+    # ... pytree leaves have a batch dim
+    kernel_pytree = jax.tree.map(lambda x: jnp.atleast_1d(x), kernel_pytree)
+    # ... `eval_separable_impl` embeds the kernel's amplitude once per axis
+    # (outer product), so it must be pre-split by the `spatial_dim`-th root
+    # to recover the correct total amplitude.
+    replace_fn = lambda fn: eqx.tree_at(
+        lambda _fn: _fn.amplitude, fn, (fn.amplitude ** (1 / spatial_dim))
+    )
+    kernel_pytree = jax.tree.map(
+        replace_fn,
+        kernel_pytree,
+        is_leaf=lambda x: isinstance(x, FourierGaussian),
+    )
+    return kernel_pytree
 
 
 def _project_impl(
     positions: PyTree[Float[Array, "_ 3"]],
-    kernel_fns: PyTree[RealGaussian] | PyTree[AbstractFourierOperator],
+    kernel_fns: PyTree[FourierGaussian],
     *,
-    is_real_space: bool,
     shape_u: tuple[int, int],
     pixel_size_u: Float[Array, ""],
     shape_out: tuple[int, int],
     backend: Literal["jax-finufft", "nufftax"],
-    n_spread: int | tuple[int, ...],
-    use_erf: bool,
+    eps: float,
     options: dict[str, Any],
 ) -> Array:
-    is_leaf = (
-        (lambda x: isinstance(x, AbstractRealOperator))
-        if is_real_space
-        else (lambda x: isinstance(x, AbstractFourierOperator))
-    )
+    is_leaf = lambda x: isinstance(x, AbstractFourierOperator)  # noqa: E731
     frequencies_1d = make_frequencies_1d(shape_u, pixel_size_u, modeord=0)
-    # The Fourier-space NUFFT backends (`nufftax`/`jax-finufft`) only accept a
-    # precision `eps`, not a kernel width directly, and only ever accept a
-    # single `int` `n_spread` (a tuple `n_spread` is real-space only -- see
-    # `_check_n_spread_real_only`, checked before this is called).
-    eps = None if is_real_space else nspread_to_eps(cast(int, n_spread))
-
-    def real_impl(
-        _shape: tuple[int, int],
-        _ps: Float[Array, ""],
-        _positions: Float[Array, "_ 3"],
-        _kernel_fn: AbstractRealOperator,
-    ) -> Array:
-        projection = _spread_2d_impl(
-            kernel_fn=_kernel_fn,
-            pixel_size=_ps,
-            x=_positions[:, 0],
-            y=_positions[:, 1],
-            c=jnp.ones(_positions.shape[0]),
-            shape=(_shape[0], _shape[1]),
-            n_spread=n_spread,
-            use_erf=use_erf,
-        )
-        return projection
 
     # Per-dimension NUFFT offset: 2*pi*(N//2)/N maps physical center (x=0) to
     # integer pixel index N//2.  For even N this equals pi; for odd N it is
@@ -757,133 +562,71 @@ def _project_impl(
     )
 
     def fourier_impl(
-        _shape: tuple[int, int],
-        _ps: Float[Array, ""],
         _positions: Float[Array, "_ 3"],
         _kernel_fn: FourierGaussian,
-        _f_1d: tuple[Array, ...],
     ) -> Array:
-        # Scale positions onto the upsampled grid, then apply the shape_out-based
-        # center offset.  Do NOT apply the shape_u parity correction here: that
-        # correction is for the spread path; the NUFFT offset is entirely
-        # determined by shape_out regardless of the parity of shape_u.
-        _ns = jnp.asarray(_shape[::-1][:2], dtype=float)
-        xy = 2 * jnp.pi * _positions[:, :2] / (_ps * _ns) + _nufft_offsets_2d
+        _ns = jnp.asarray(shape_u[::-1][:2], dtype=float)
+        xy = 2 * jnp.pi * _positions[:, :2] / (pixel_size_u * _ns) + _nufft_offsets_2d
         return (
-            _eval_kernel_impl(_kernel_fn, _f_1d)
+            _eval_kernel_impl(_kernel_fn, frequencies_1d)
             * _nufft2d1(
-                _shape,  # type: ignore
+                shape_u,
                 source=jnp.ones(_positions.shape[0], dtype=complex),
                 xy=xy,
                 backend=backend,
                 eps=eps,
                 options=options,
             )
-            / _ps**2
+            / pixel_size_u**2
         )
 
-    if is_real_space:
-        project_impl, args = real_impl, ()
-    else:
-        project_impl, args = (fourier_impl, cast(Any, (frequencies_1d,)))
-
     # Project and sum over kernels
-    project_dispatch = lambda _positions, _kernel_fn: project_impl(
-        shape_u, pixel_size_u, _positions, _kernel_fn, *args
-    )
     projection_out = jax.tree.reduce(
         lambda x, y: x + y,
-        jax.tree.map(project_dispatch, positions, kernel_fns, is_leaf=is_leaf),
+        jax.tree.map(fourier_impl, positions, kernel_fns, is_leaf=is_leaf),
     )
-    if not is_real_space:
-        projection_out = jnp.fft.ifftshift(projection_out)
-
-    return projection_out
+    return jnp.fft.ifftshift(projection_out)
 
 
 def _render_impl(
     positions: PyTree[Float[Array, "_ 3"]],
-    kernel_fns: PyTree[RealGaussian] | PyTree[AbstractFourierOperator],
+    kernel_fns: PyTree[FourierGaussian],
     *,
-    is_real_space: bool,
     shape_u: tuple[int, int, int],
     voxel_size_u: Float[Array, ""],
     shape_out: tuple[int, int, int],
-    n_spread: int | tuple[int, ...],
-    use_erf: bool,
+    eps: float,
     backend: Literal["jax-finufft", "nufftax"],
     options: dict[str, Any],
 ) -> Array:
-    is_leaf = (
-        (lambda x: isinstance(x, AbstractRealOperator))
-        if is_real_space
-        else (lambda x: isinstance(x, AbstractFourierOperator))
-    )
+    is_leaf = lambda x: isinstance(x, AbstractFourierOperator)  # noqa: E731
     frequencies_1d = make_frequencies_1d(shape_u, voxel_size_u, modeord=0)
-    # The Fourier-space NUFFT backends (`nufftax`/`jax-finufft`) only accept a
-    # precision `eps`, not a kernel width directly, and only ever accept a
-    # single `int` `n_spread` (a tuple `n_spread` is real-space only -- see
-    # `_check_n_spread_real_only`, checked before this is called).
-    eps = None if is_real_space else nspread_to_eps(cast(int, n_spread))
 
     _nufft_offsets_3d = jnp.asarray([2 * jnp.pi * (s // 2) / s for s in shape_out[::-1]])
 
-    def real_impl(
-        _shape: tuple[int, int, int],
-        _vs: Float[Array, ""],
-        _positions: Float[Array, "_ 3"],
-        _kernel_fn: AbstractRealOperator,
-    ) -> Array:
-        rendering = _spread_3d_impl(
-            kernel_fn=_kernel_fn,
-            voxel_size=_vs,
-            x=_positions[:, 0],
-            y=_positions[:, 1],
-            z=_positions[:, 2],
-            c=jnp.ones(_positions.shape[0]),
-            shape=_shape,
-            n_spread=n_spread,
-            use_erf=use_erf,
-        )
-        return rendering
-
     def fourier_impl(
-        _shape: tuple[int, int, int],
-        _vs: Float[Array, ""],
         _positions: Float[Array, "_ 3"],
         _kernel_fn: FourierGaussian,
-        _f_1d: tuple[Array, ...],
     ) -> Array:
-        _ns = jnp.asarray(_shape[::-1], dtype=float)
-        xyz = 2 * jnp.pi * _positions / (_vs * _ns) + _nufft_offsets_3d
-        return _eval_kernel_impl(_kernel_fn, _f_1d) * (
+        _ns = jnp.asarray(shape_u[::-1], dtype=float)
+        xyz = 2 * jnp.pi * _positions / (voxel_size_u * _ns) + _nufft_offsets_3d
+        return _eval_kernel_impl(_kernel_fn, frequencies_1d) * (
             _nufft3d1(
-                _shape,  # type: ignore
+                shape_u,
                 source=jnp.ones(_positions.shape[0], dtype=complex),
                 xyz=xyz,
                 backend=backend,
                 eps=eps,
                 options=options,
             )
-            / _vs**3
+            / voxel_size_u**3
         )
 
-    if is_real_space:
-        compute_fn, args = real_impl, ()
-    else:
-        compute_fn, args = cast(Any, (fourier_impl, (frequencies_1d,)))
-
-    render_dispatch = lambda _positions, _kernel_fn: compute_fn(
-        shape_u, voxel_size_u, _positions, _kernel_fn, *args
-    )
     rendering_out = jax.tree.reduce(
         lambda x, y: x + y,
-        jax.tree.map(render_dispatch, positions, kernel_fns, is_leaf=is_leaf),
+        jax.tree.map(fourier_impl, positions, kernel_fns, is_leaf=is_leaf),
     )
-    if not is_real_space:
-        rendering_out = jnp.fft.ifftshift(rendering_out)
-
-    return rendering_out
+    return jnp.fft.ifftshift(rendering_out)
 
 
 def _eval_kernel_impl(kernel_fn: FourierGaussian, frequencies_1d: tuple[Array, ...]):
@@ -933,7 +676,7 @@ def _nufft2d1(
         if jax_finufft is None:
             raise RuntimeError(
                 "Tried to use "
-                "`IndependentAtomProjection(..., backend='jax-finufft')`, "
+                "`FourierAtomProjection(..., backend='jax-finufft')`, "
                 "but `jax-finufft` is not installed. "
                 "See https://github.com/flatironinstitute/jax-finufft "
                 "for installation instructions."
@@ -983,7 +726,7 @@ def _nufft3d1(
         if jax_finufft is None:
             raise RuntimeError(
                 "Tried to use "
-                "`IndependentAtomRenderFn(..., backend='jax-finufft')`, "
+                "`FourierAtomRenderFn(..., backend='jax-finufft')`, "
                 "but `jax-finufft` is not installed. "
                 "See https://github.com/flatironinstitute/jax-finufft "
                 "for installation instructions."
@@ -1021,49 +764,6 @@ def _nufft3d1(
         )
 
 
-def _spread_3d_impl(kernel_fn, voxel_size, x, y, z, c, shape, *, n_spread, use_erf):
-    # `kernel_fn.amplitude`/`.variance` carry a batch dimension over the
-    # (possibly several) gaussian components of this pytree leaf (e.g. the
-    # 5-gaussian Peng decomposition). Unlike the fourier-space path, no
-    # amplitude root-splitting is needed here (see `_standardize_kernel_fns`).
-    def spread_one(_amplitude, _variance, _n_spread):
-        return spread_gaussians_3d(
-            x,
-            y,
-            z,
-            c * _amplitude,
-            _variance,
-            shape,
-            voxel_size=voxel_size,
-            n_spread=_n_spread,
-            use_erf=use_erf,
-        )
-
-    return spread_and_sum_gaussian_components(
-        spread_one, kernel_fn.amplitude, kernel_fn.variance, n_spread
-    )
-
-
-def _spread_2d_impl(kernel_fn, pixel_size, x, y, c, shape, *, n_spread, use_erf):
-    # See `_spread_3d_impl` for why `kernel_fn.amplitude`/`.variance` carry a batch
-    # dimension.
-    def spread_one(_amplitude, _variance, _n_spread):
-        return spread_gaussians_2d(
-            x,
-            y,
-            c * _amplitude,
-            _variance,
-            shape,
-            pixel_size=pixel_size,
-            n_spread=_n_spread,
-            use_erf=use_erf,
-        )
-
-    return spread_and_sum_gaussian_components(
-        spread_one, kernel_fn.amplitude, kernel_fn.variance, n_spread
-    )
-
-
 def _build_extraction_mesh(
     shape: tuple[int, ...], shape_ds: tuple[int, ...], *, modeord: int
 ):
@@ -1097,16 +797,11 @@ def _build_extraction_indices_1d(dim: int, dim_ds: int, *, modeord: int):
 def _prepare_upsample(
     shape: tuple[int, ...],
     pixel_size: Float[Array, ""],
-    upsampfac: float | None,
-    *,
-    is_real_space: bool,
-    sampling_mode: Literal["point", "average"],
+    upsampfac: float,
 ) -> tuple[tuple[tuple[int, ...], Array], float]:
     """Find the upsampfac that perfectly divides the upsampled
     image shape.
     """
-    if upsampfac is None:
-        upsampfac = 1.0 if (is_real_space and sampling_mode == "average") else 2.0
     if upsampfac == 1.0:
         return (shape, pixel_size), upsampfac
     else:
@@ -1128,15 +823,6 @@ def _prepare_upsample(
             (tuple(int(upsampfac * s) for s in shape), pixel_size / upsampfac),
             upsampfac,
         )
-
-
-def _prepare_real_to_fft(a: Array, *, outputs_rfft: bool, fftshifted: bool) -> Array:
-    if outputs_rfft:
-        f = rfftn(a)
-        return jnp.fft.fftshift(f, axes=(0, 1)) if fftshifted else f
-    else:
-        f = fftn(a)
-        return jnp.fft.fftshift(f) if fftshifted else f
 
 
 def _prepare_fft_to_fft(f: Array, *, outputs_rfft: bool, fftshifted: bool) -> Array:

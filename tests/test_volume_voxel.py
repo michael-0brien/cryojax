@@ -994,7 +994,7 @@ def _make_gmm_voxel_scene(pdb_info):
         ),
         (
             cxs.RealVoxelCloudVolume,
-            cxs.RealVoxelProjection(n_spread=17, backend="nufftax"),
+            cxs.RealVoxelProjection(eps=1e-16, backend="nufftax"),
             1e-10,
         ),
     ],
@@ -1063,7 +1063,7 @@ def test_gaussian_vs_voxels_nopose_jax_finufft(pdb_info):
     gmm_volume, real_voxel_grid, image_config = _make_gmm_voxel_scene(pdb_info)
     gmm_integrator = cxs.GaussianMixtureProjection(sampling_mode="average")
     cloud_volume = cxs.RealVoxelCloudVolume.from_real_voxel_grid(real_voxel_grid)
-    integrator = cxs.RealVoxelProjection(n_spread=17, backend="jax-finufft")  # type: ignore
+    integrator = cxs.RealVoxelProjection(eps=1e-16, backend="jax-finufft")  # type: ignore
     proj_ref = _compute_projection(gmm_volume, gmm_integrator, image_config)
     proj = _compute_projection(cloud_volume, integrator, image_config)
     np.testing.assert_allclose(proj_ref, proj, atol=1e-8)

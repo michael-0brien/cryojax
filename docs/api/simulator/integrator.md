@@ -49,7 +49,7 @@
 
 ---
 
-::: cryojax.simulator.IndependentAtomProjection
+::: cryojax.simulator.FourierAtomProjection
         options:
             members:
                 - __init__
