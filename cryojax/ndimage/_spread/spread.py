@@ -1,20 +1,20 @@
-"""A pure-JAX Gaussian spreading backend (scatter point strengths onto a
+"""The pure-JAX Gaussian spreading backend (scatter point strengths onto a
 uniform grid), adapted from `nufftax`'s NUFFT type-1 spreading, specialized
 to the isotropic Gaussian (and pixel-averaged Gaussian) kernels used by
 `cryojax.simulator.IndependentAtomVolume` and
 `cryojax.simulator.GaussianMixtureVolume`.
+
+This is the pallas-agnostic reference implementation: it works standalone
+(e.g. on a machine with no GPU) and is the trusted reference the Pallas
+kernels in `pallas_spread.py` are validated against.
 """
 
-import math
 from functools import partial
 
 import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
-import numpy as np
 from jaxtyping import Array, Float
-
-from ..jax_util import FloatLike, NDArrayLike
 
 
 # ============================================================================
@@ -39,220 +39,11 @@ from ..jax_util import FloatLike, NDArrayLike
 # (normalized) kernel exactly once, regardless of dimensionality. `variance`
 # only shapes the kernel and is not otherwise special-cased.
 #
-# The public `spread_gaussians_2d`/`spread_gaussians_3d` take physical-unit positions
-# `x`, `y`, `z`: `x = 0` corresponds to grid index `n // 2` (the RELION real-space
-# center convention used throughout cryojax), for both even and odd `n`.
-# Internally, positions are converted to grid-index units
-# (`_normalize_coord_to_grid`) and named `i`, `j`, `k` from that point on —
-# this differs from `nufftax`, which instead works on the NUFFT domain
-# `[-pi, pi)`; there is no NUFFT involved here, so that intermediate
-# representation is unnecessary. The conversion is plain, cheap, and
-# differentiable, so composing it with the custom-VJP'd core (which works
-# entirely in grid-index units) is automatically correct — no changes to the
-# custom VJP rule itself are needed.
-
-
-def spread_gaussians_2d(
-    x: Float[Array, " M"],
-    y: Float[Array, " M"],
-    amplitude: Float[Array, " M"],
-    variance: Float[Array, ""] | Float[Array, " M"],
-    shape: tuple[int, int],
-    *,
-    pixel_size: Float[Array, ""],
-    n_spread: int = 7,
-    use_erf: bool = True,
-) -> Float[Array, "{shape[0]} {shape[1]}"]:
-    """Scatter point strengths onto a 2D grid with an isotropic Gaussian
-    (or pixel-averaged Gaussian) kernel.
-
-    This scatters each point's strength onto the `n_spread` nearest grid
-    points along each axis, weighted by a compactly-supported Gaussian
-    kernel. Differentiable with a custom VJP rule w.r.t. all array
-    arguments.
-
-    **Arguments:**
-
-    - `x`, `y`:
-        Physical-unit positions of shape `(M,)`, where `0` corresponds to
-        the real-space center at grid index `n // 2` (for both even and
-        odd `n`).
-    - `amplitude`:
-        The per-point scattering weight, of shape `(M,)` (e.g. an
-        amplitude times an atom occupancy). Multiplies the (normalized)
-        kernel exactly once, regardless of dimensionality.
-    - `variance`:
-        The variance of the isotropic Gaussian kernel. May be a scalar or
-        a per-point array of shape `(M,)`.
-    - `shape`:
-        The shape `(ny, nx)` of the output grid.
-    - `pixel_size`:
-        The pixel size of the output grid, in the same units as `x`, `y`.
-    - `n_spread`:
-        The width (number of grid points, per axis) of the kernel used to
-        spread each point. Controls speed / accuracy tradeoff: larger
-        `n_spread` is more accurate but slower. Must be chosen relative to
-        `variance` and the pixel/voxel size — too small truncates the
-        Gaussian and silently biases the result. See
-        [`cryojax.ndimage.variance_to_nspread`][] to pick a value for a given
-        `variance`. Must not exceed the smallest dimension of `shape`
-        (otherwise a single point's kernel support would wrap around the
-        grid more than once, aliasing the result).
-    - `use_erf`:
-        If `True` (default), spread the exact average of the Gaussian over
-        a pixel (used to sample the average value within a pixel, rather
-        than its value at a point). If `False`, spread a point-sampled
-        Gaussian instead.
-
-    **Returns:**
-
-    The grid of shape `(ny, nx)` with gaussians scattered onto it.
-    """
-    _check_n_spread(n_spread, shape)
-    ny, nx = shape
-    i = _normalize_coord_to_grid(x, nx, pixel_size)
-    j = _normalize_coord_to_grid(y, ny, pixel_size)
-    return _spread_2d(i, j, amplitude, variance, pixel_size, ny, nx, n_spread, use_erf)
-
-
-def spread_gaussians_3d(
-    x: Float[Array, " M"],
-    y: Float[Array, " M"],
-    z: Float[Array, " M"],
-    amplitude: Float[Array, " M"],
-    variance: Float[Array, ""] | Float[Array, " M"],
-    shape: tuple[int, int, int],
-    *,
-    voxel_size: Float[Array, ""],
-    n_spread: int = 7,
-    use_erf: bool = True,
-) -> Float[Array, "{shape[0]} {shape[1]} {shape[2]}"]:
-    """Scatter point strengths onto a 3D grid with an isotropic Gaussian
-    (or voxel-averaged Gaussian) kernel.
-
-    This scatters each point's strength onto the `n_spread` nearest grid
-    points along each axis, weighted by a compactly-supported Gaussian
-    kernel. Differentiable with a custom VJP rule w.r.t. all array
-    arguments.
-
-    **Arguments:**
-
-    - `x`, `y`, `z`:
-        Physical-unit positions of shape `(M,)`, where `0` corresponds to
-        the real-space center at grid index `n // 2` (for both even and
-        odd `n`).
-    - `amplitude`:
-        The per-point scattering weight, of shape `(M,)` (e.g. an
-        amplitude times an atom occupancy). Multiplies the (normalized)
-        kernel exactly once, regardless of dimensionality.
-    - `variance`:
-        The variance of the isotropic Gaussian kernel. May be a scalar or
-        a per-point array of shape `(M,)`.
-    - `shape`:
-        The shape `(nz, ny, nx)` of the output grid.
-    - `voxel_size`:
-        The voxel size of the output grid, in the same units as `x`, `y`,
-        `z`.
-    - `n_spread`:
-        The width (number of grid points, per axis) of the kernel used to
-        spread each point. Controls speed / accuracy tradeoff: larger
-        `n_spread` is more accurate but slower. Must be chosen relative to
-        `variance` and the pixel/voxel size — too small truncates the
-        Gaussian and silently biases the result. See
-        [`cryojax.ndimage.variance_to_nspread`][] to pick a value for a given
-        `variance`. Must not exceed the smallest dimension of `shape`
-        (otherwise a single point's kernel support would wrap around the
-        grid more than once, aliasing the result).
-    - `use_erf`:
-        If `True` (default), spread the exact average of the Gaussian over
-        a voxel (used to sample the average value within a voxel, rather
-        than its value at a point). If `False`, spread a point-sampled
-        Gaussian instead.
-
-    **Returns:**
-
-    The grid of shape `(nz, ny, nx)` with gaussians scattered onto it.
-    """
-    _check_n_spread(n_spread, shape)
-    nz, ny, nx = shape
-    i = _normalize_coord_to_grid(x, nx, voxel_size)
-    j = _normalize_coord_to_grid(y, ny, voxel_size)
-    k = _normalize_coord_to_grid(z, nz, voxel_size)
-    return _spread_3d(
-        i, j, k, amplitude, variance, voxel_size, nz, ny, nx, n_spread, use_erf
-    )
-
-
-def variance_to_nspread(
-    variance: FloatLike | Float[NDArrayLike, " M"],
-    pixel_size: FloatLike,
-    n_sigma: float = 4.0,
-) -> int:
-    """Choose an `n_spread` sufficient to truncate the Gaussian kernel used by
-    [`cryojax.ndimage.spread_gaussians_2d`][]/[`cryojax.ndimage.spread_gaussians_3d`][]
-    at `n_sigma` standard deviations.
-
-    `n_spread` sets array shapes, so it must be a static value rather than
-    depending on `variance` through tracing; call this ahead of time with
-    concrete values instead of guessing. Too small an `n_spread` silently
-    truncates the Gaussian and biases the result.
-
-    !!! warning
-        Not JIT-compatible, and never invokes JAX — `variance` and
-        `pixel_size` are handled with plain `numpy`/`math`, so passing
-        numpy arrays or python floats never triggers a JAX dispatch or
-        device transfer. Call this once outside of any `jax.jit`-compiled
-        function (e.g. when choosing `n_spread` up front from known/expected
-        variances), not from within a jitted call graph.
-
-    **Arguments:**
-
-    - `variance`:
-        The variance (or per-point array of variances — the largest is
-        used) that will be passed to `spread_gaussians_2d`/`spread_gaussians_3d`.
-    - `pixel_size`:
-        The pixel/voxel size of the grid `variance` will be spread onto.
-    - `n_sigma`:
-        The number of standard deviations of the Gaussian to truncate at.
-
-    **Returns:**
-
-    An integer `n_spread`, at least `2`.
-    """
-    max_variance = float(np.max(np.asarray(variance)))
-    n_spread = 2.0 * n_sigma * math.sqrt(max_variance) / float(pixel_size)
-    return max(2, math.ceil(n_spread))
-
-
-# ============================================================================
-# Private implementation
-# ============================================================================
-
-
-def _check_n_spread(n_spread: int, shape: tuple[int, ...]) -> None:
-    """Guard against `n_spread` exceeding a grid dimension.
-
-    Grid indices wrap modulo the grid size (`_support_indices_and_offsets`),
-    so if `n_spread` exceeds a dimension, a single point's kernel support
-    wraps around that axis more than once. This does not raise on its own —
-    `segment_sum` silently adds the aliased contributions — so without this
-    check the grid would be silently corrupted by periodic wraparound
-    instead of erroring.
-    """
-    if n_spread > min(shape):
-        raise ValueError(
-            f"`n_spread` ({n_spread}) must not exceed the smallest grid "
-            f"dimension in `shape` ({shape})."
-        )
-
-
-def _normalize_coord_to_grid(
-    coord: Float[Array, " M"], n: int, pixel_size: Float[Array, ""]
-) -> Float[Array, " M"]:
-    """Convert a physical-unit coordinate to grid-index units, where the
-    real-space center is always at integer index `n // 2` (RELION
-    convention), for both even and odd `n`."""
-    return coord / pixel_size + n // 2
+# Positions `i`, `j`, `k` here are already in grid-index units (the physical
+# -> grid-index conversion, which depends on `pixel_size`, happens in
+# `api.py`, outside this custom-VJP boundary, so it is differentiated
+# automatically/correctly by ordinary JAX autodiff composing with the
+# analytic rules below).
 
 
 def _gaussian_weight(r: Array, variance: Array) -> Array:
