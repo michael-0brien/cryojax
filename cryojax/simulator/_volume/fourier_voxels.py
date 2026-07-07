@@ -3,7 +3,7 @@ Fourier voxel-based representations of a volume.
 """
 
 import abc
-from typing import Any, ClassVar, Self, cast
+from typing import Any, ClassVar, Self
 from typing_extensions import override
 
 import equinox as eqx
@@ -41,20 +41,7 @@ class AbstractFourierVoxelVolume(AbstractVoxelVolume, strict=True):
     """Abstract interface for a voxel-based volume."""
 
     frequency_slice_in_pixels: eqx.AbstractVar[Float[Array, "1 dim dim 3"]]
-
-    def __check_init__(self):
-        if any(s % 2 == 1 for s in self.shape):
-            raise ValueError(
-                f"`{type(self).__name__}` does not support odd voxel map dimensions, "
-                f"but got a voxel map with shape `{self.shape}`. Please pass "
-                "a voxel map with even dimensions."
-            )
-        dim = self.shape[0]
-        if self.shape != (dim, dim, dim):
-            raise AttributeError(
-                f"Only cubic boxes are supported for `{type(self).__name__}.shape`, "
-                f"but got `shape = {self.shape}`."
-            )
+    is_rfft: eqx.AbstractVar[bool]
 
     @classmethod
     @abc.abstractmethod
@@ -73,6 +60,47 @@ class AbstractFourierVoxelVolume(AbstractVoxelVolume, strict=True):
             pose.rotate_coordinates(
                 self.frequency_slice_in_pixels, inverse=self.is_frame_rotation
             ),
+        )
+
+
+def _check_voxel_array_shape(
+    shape: tuple[int, ...],
+    is_rfft: bool,
+    padding: int,
+    cls_name: str,
+    array_name: str,
+) -> None:
+    """Validate that `shape` (the raw stored array shape, e.g.
+    `fourier_voxel_grid.shape` or `spline_coefficients.shape`) is consistent
+    with a cubic, even-dimension volume, given `is_rfft` (whether the last
+    axis is RFFT-truncated) and `padding` (extra samples added per axis,
+    e.g. `2` for cubic-spline coefficients).
+    """
+    d0, d1, d2 = (s - padding for s in shape)
+    if d0 % 2 == 1:
+        raise ValueError(
+            f"`{cls_name}` does not support odd voxel map dimensions, but got "
+            f"a voxel map with `{array_name}.shape = {shape}`. Please pass a "
+            "voxel map with even dimensions."
+        )
+    expected_d2 = d0 // 2 + 1 if is_rfft else d0
+    if d1 != d0 or d2 != expected_d2:
+        expected_shape = tuple(s + padding for s in (d0, d0, expected_d2))
+        # Common misuse: the array is a valid voxel grid, just for the
+        # opposite `is_rfft` convention (e.g. passed the output of `rfftn`
+        # but left `is_rfft` at its default of `False`, or vice versa).
+        other_d2 = d0 if is_rfft else d0 // 2 + 1
+        if d1 == d0 and d2 == other_d2:
+            raise AttributeError(
+                f"`{array_name}` passed to `{cls_name}` has shape `{shape}`, "
+                f"which does not match `is_rfft={is_rfft}` (expected shape "
+                f"`{expected_shape}`). This shape matches `is_rfft={not is_rfft}` "
+                f"instead -- did you mean to set `is_rfft={not is_rfft}`?"
+            )
+        raise AttributeError(
+            f"`{array_name}` passed to `{cls_name}` has an invalid shape "
+            f"`{shape}`. Expected shape `{expected_shape}` for "
+            f"`is_rfft={is_rfft}`."
         )
 
 
@@ -108,36 +136,58 @@ class FourierVoxelGridVolume(AbstractFourierVoxelVolume, strict=True):
         ```
     """  # noqa: E501
 
-    fourier_voxel_grid: Complex[Array, "dim dim dim"]
+    fourier_voxel_grid: Complex[Array, "dim dim dim"] | Complex[Array, "dim dim dim//2+1"]
     frequency_slice_in_pixels: Float[Array, "1 dim dim 3"]
+    is_rfft: bool = eqx.field(static=True)
 
     is_frame_rotation: ClassVar[bool] = True
 
     def __init__(
         self,
-        fourier_voxel_grid: Complex[NDArrayLike, "dim dim dim"],
+        fourier_voxel_grid: (
+            Complex[NDArrayLike, "dim dim dim"] | Complex[NDArrayLike, "dim dim dim//2+1"]
+        ),
         frequency_slice_in_pixels: Float[NDArrayLike, "1 dim dim 3"],
+        is_rfft: bool = False,
     ):
         """**Arguments:**
 
         - `fourier_voxel_grid`:
-            The cubic voxel grid in fourier space.
+            The cubic voxel grid in fourier space. If `is_rfft = True`,
+            this is truncated to the half-space `(dim, dim, dim // 2 + 1)`,
+            as returned by `cryojax.ndimage.rfftn`.
         - `frequency_slice_in_pixels`:
             The frequency slice coordinate system.
+        - `is_rfft`:
+            Whether `fourier_voxel_grid` is a half-space RFFT grid (see
+            above) rather than the full FFT grid.
         """
         # Multiply by phase correction for interpolation logic
         self.fourier_voxel_grid = jnp.asarray(fourier_voxel_grid, dtype=complex)
+        _check_voxel_array_shape(
+            self.fourier_voxel_grid.shape,
+            is_rfft,
+            padding=0,
+            cls_name=type(self).__name__,
+            array_name="fourier_voxel_grid",
+        )
         self.frequency_slice_in_pixels = jnp.asarray(
             frequency_slice_in_pixels, dtype=float
         )
+        self.is_rfft = is_rfft
 
     @property
     def shape(self) -> tuple[int, int, int]:
-        """The shape of the `fourier_voxel_grid`."""
-        return cast(tuple[int, int, int], self.fourier_voxel_grid.shape)
+        """The logical cubic shape of the volume, regardless of whether
+        `fourier_voxel_grid` is stored as a full or half-space (RFFT) grid.
+        """
+        dim = self.fourier_voxel_grid.shape[0]
+        return (dim, dim, dim)
 
     @classmethod
-    def from_fourier_voxel_grid(cls, fourier_voxel_grid: NDArrayLike) -> Self:
+    def from_fourier_voxel_grid(
+        cls, fourier_voxel_grid: NDArrayLike, *, is_rfft: bool = True
+    ) -> Self:
         """Load from a fourier-domain 3D voxel grid.
 
         This should be the output of
@@ -146,20 +196,28 @@ class FourierVoxelGridVolume(AbstractFourierVoxelVolume, strict=True):
         import cryojax.simulator as cxs
         import cryojax.ndimage import im
 
-        fourier_voxel_grid = im.fftn(real_voxel_grid)
+        fourier_voxel_grid = im.rfftn(real_voxel_grid) if is_rfft else im.fftn(real_voxel_grid)
         volume = cxs.FourierVoxelSplineVolume(fourier_voxel_grid)
         ```
 
         **Arguments:**
 
         - `fourier_voxel_grid`:
-            A voxel grid in fourier space.
-        """
+            A voxel grid in fourier space. If `is_rfft = True`, this
+            should be the output of `cryojax.ndimage.rfftn`; otherwise,
+            the output of `cryojax.ndimage.fftn`.
+        - `is_rfft`:
+            Whether `fourier_voxel_grid` is the output of `cryojax.ndimage.rfftn`
+            (`True`, default) rather than `cryojax.ndimage.fftn` (`False`). If
+            `True`, the volume is stored as a half-space RFFT grid, halving
+            memory usage. This relies on the fact that `fourier_voxel_grid`
+            is the transform of a real-valued signal.
+        """  # noqa: E501
         fourier_voxel_grid, frequency_slice = _prepare_fourier_voxel_arguments(
-            jnp.asarray(fourier_voxel_grid)
+            jnp.asarray(fourier_voxel_grid), use_rfft=is_rfft
         )
 
-        return cls(jnp.asarray(fourier_voxel_grid), frequency_slice)
+        return cls(jnp.asarray(fourier_voxel_grid), frequency_slice, is_rfft=is_rfft)
 
     @classmethod
     def from_real_voxel_grid(
@@ -168,6 +226,7 @@ class FourierVoxelGridVolume(AbstractFourierVoxelVolume, strict=True):
         *,
         apply_deconvolve: bool = False,
         pad_scale: float = 1.0,
+        use_rfft: bool = True,
     ) -> Self:
         """Load from a real-valued 3D voxel grid.
 
@@ -181,16 +240,20 @@ class FourierVoxelGridVolume(AbstractFourierVoxelVolume, strict=True):
         - `pad_scale`:
             Scale factor at which to pad `real_voxel_grid` before fourier
             transform. Must be a value greater than `1.0`.
+        - `use_rfft`:
+            If `True` (default), store the volume as a half-space RFFT
+            grid, halving memory usage and speeding up construction (via
+            `cryojax.ndimage.rfftn` instead of `cryojax.ndimage.fftn`).
         """
         # Cast to JAX array
         real_voxel_grid = jnp.asarray(real_voxel_grid, dtype=float)
         # Preprocess to fourier grid, deconvolving after any padding so that
         # the sinc² correction uses the actual Fourier grid size.
         fourier_voxel_grid, frequency_slice = _real_to_fourier_voxels(
-            cls, real_voxel_grid, pad_scale, apply_deconvolve
+            cls, real_voxel_grid, pad_scale, apply_deconvolve, use_rfft=use_rfft
         )
 
-        return cls(fourier_voxel_grid, frequency_slice)
+        return cls(fourier_voxel_grid, frequency_slice, is_rfft=use_rfft)
 
 
 class FourierVoxelSplineVolume(AbstractFourierVoxelVolume, strict=True):
@@ -198,41 +261,65 @@ class FourierVoxelSplineVolume(AbstractFourierVoxelVolume, strict=True):
     by spline coefficients.
     """
 
-    spline_coefficients: Complex[Array, "coeff_dim coeff_dim coeff_dim"]
+    spline_coefficients: (
+        Complex[Array, "coeff_dim coeff_dim coeff_dim"]
+        | Complex[Array, "coeff_dim coeff_dim coeff_dim//2+1"]
+    )
     frequency_slice_in_pixels: Float[Array, "1 dim dim 3"]
+    is_rfft: bool = eqx.field(static=True)
 
     is_frame_rotation: ClassVar[bool] = True
 
     def __init__(
         self,
-        spline_coefficients: Complex[NDArrayLike, "coeff_dim coeff_dim coeff_dim"],
+        spline_coefficients: (
+            Complex[NDArrayLike, "coeff_dim coeff_dim coeff_dim"]
+            | Complex[NDArrayLike, "coeff_dim coeff_dim coeff_dim//2+1"]
+        ),
         frequency_slice_in_pixels: Float[NDArrayLike, "1 dim dim 3"],
+        is_rfft: bool = False,
     ):
         """**Arguments:**
 
         - `spline_coefficients`:
             The spline coefficents computed from the cubic voxel grid
             in fourier space. See `cryojax.ndimage.compute_spline_coefficients`.
+            If `is_rfft = True`, these are computed from the half-space
+            RFFT grid (i.e. last axis of size `dim // 2 + 1`, before the
+            `+ 2` spline padding), as returned by `cryojax.ndimage.rfftn`.
         - `frequency_slice_in_pixels`:
             Frequency slice coordinate system.
             See `cryojax.coordinates.make_frequency_slice`.
+        - `is_rfft`:
+            Whether `spline_coefficients` were computed from a half-space
+            RFFT grid (see above) rather than the full FFT grid.
         """
         self.spline_coefficients = jnp.asarray(spline_coefficients, dtype=complex)
+        _check_voxel_array_shape(
+            self.spline_coefficients.shape,
+            is_rfft,
+            padding=2,
+            cls_name=type(self).__name__,
+            array_name="spline_coefficients",
+        )
         self.frequency_slice_in_pixels = jnp.asarray(
             frequency_slice_in_pixels, dtype=float
         )
+        self.is_rfft = is_rfft
 
     @property
     def shape(self) -> tuple[int, int, int]:
-        """The shape of the original `fourier_voxel_grid` from which
-        `coefficients` were computed.
+        """The logical cubic shape of the original `fourier_voxel_grid`
+        from which `coefficients` were computed, regardless of whether it
+        was a full or half-space (RFFT) grid.
         """
-        return cast(
-            tuple[int, int, int], tuple([s - 2 for s in self.spline_coefficients.shape])
-        )
+        dim = self.spline_coefficients.shape[0] - 2
+        return (dim, dim, dim)
 
     @classmethod
-    def from_fourier_voxel_grid(cls, fourier_voxel_grid: NDArrayLike) -> Self:
+    def from_fourier_voxel_grid(
+        cls, fourier_voxel_grid: NDArrayLike, *, is_rfft: bool = True
+    ) -> Self:
         """Load from a fourier-domain 3D voxel grid.
 
         This should be the output of
@@ -241,26 +328,37 @@ class FourierVoxelSplineVolume(AbstractFourierVoxelVolume, strict=True):
         import cryojax.simulator as cxs
         import cryojax.ndimage import im
 
-        fourier_voxel_grid = im.fftn(real_voxel_grid)
+        fourier_voxel_grid = im.rfftn(real_voxel_grid) if is_rfft else im.fftn(real_voxel_grid)
         volume = cxs.FourierVoxelSplineVolume(fourier_voxel_grid)
         ```
 
         **Arguments:**
 
         - `fourier_voxel_grid`:
-            A voxel grid in fourier space.
-        """
+            A voxel grid in fourier space. If `is_rfft = True`, this
+            should be the output of `cryojax.ndimage.rfftn`; otherwise,
+            the output of `cryojax.ndimage.fftn`.
+        - `is_rfft`:
+            Whether `fourier_voxel_grid` is the output of `cryojax.ndimage.rfftn`
+            (`True`, default) rather than `cryojax.ndimage.fftn` (`False`). If
+            `True`, spline coefficients are computed from a half-space RFFT
+            grid, halving memory usage.
+        """  # noqa: E501
         fourier_voxel_grid, frequency_slice = _prepare_fourier_voxel_arguments(
-            jnp.asarray(fourier_voxel_grid)
+            jnp.asarray(fourier_voxel_grid), use_rfft=is_rfft
         )
         # Compute spline coefficients
         spline_coefficients = compute_spline_coefficients(fourier_voxel_grid)
 
-        return cls(spline_coefficients, frequency_slice)
+        return cls(spline_coefficients, frequency_slice, is_rfft=is_rfft)
 
     @classmethod
     def from_real_voxel_grid(
-        cls, real_voxel_grid: Float[NDArrayLike, "dim dim dim"], *, pad_scale: float = 1.0
+        cls,
+        real_voxel_grid: Float[NDArrayLike, "dim dim dim"],
+        *,
+        pad_scale: float = 1.0,
+        use_rfft: bool = True,
     ) -> Self:
         """Load from a real-valued 3D voxel grid.
 
@@ -271,17 +369,21 @@ class FourierVoxelSplineVolume(AbstractFourierVoxelVolume, strict=True):
         - `pad_scale`:
             Scale factor at which to pad `real_voxel_grid` before fourier
             transform. Must be a value greater than `1.0`.
+        - `use_rfft`:
+            If `True` (default), store the volume as a half-space RFFT
+            grid, halving memory usage and speeding up construction (via
+            `cryojax.ndimage.rfftn` instead of `cryojax.ndimage.fftn`).
         """
         # Cast to JAX array
         real_voxel_grid = jnp.asarray(real_voxel_grid, dtype=float)
         # Preprocess to fourier grid
         fourier_voxel_grid, frequency_slice = _real_to_fourier_voxels(
-            cls, real_voxel_grid, pad_scale
+            cls, real_voxel_grid, pad_scale, use_rfft=use_rfft
         )
         # Compute spline coefficients
         spline_coefficients = compute_spline_coefficients(fourier_voxel_grid)
 
-        return cls(spline_coefficients, frequency_slice)
+        return cls(spline_coefficients, frequency_slice, is_rfft=use_rfft)
 
 
 class FourierSliceExtraction(
@@ -364,6 +466,7 @@ class FourierSliceExtraction(
             fourier_projection = _extract_slice_spline(
                 volume_representation.spline_coefficients,
                 frequency_slice,
+                is_rfft=volume_representation.is_rfft,
                 out_of_bounds_mode=self.out_of_bounds_mode,
                 unroll_gather=self.unroll_gather,
             )
@@ -371,6 +474,7 @@ class FourierSliceExtraction(
             fourier_projection = _extract_slice(
                 volume_representation.fourier_voxel_grid,
                 frequency_slice,
+                is_rfft=volume_representation.is_rfft,
                 out_of_bounds_mode=self.out_of_bounds_mode,
                 unroll_gather=self.unroll_gather,
             )
@@ -484,6 +588,7 @@ class EwaldSphereExtraction(
                 frequency_slice,
                 image_config.pixel_size,
                 image_config.wavelength_in_angstroms,
+                is_rfft=volume_representation.is_rfft,
                 out_of_bounds_mode=self.out_of_bounds_mode,
                 unroll_gather=self.unroll_gather,
             )
@@ -493,6 +598,7 @@ class EwaldSphereExtraction(
                 frequency_slice,
                 image_config.pixel_size,
                 image_config.wavelength_in_angstroms,
+                is_rfft=volume_representation.is_rfft,
                 out_of_bounds_mode=self.out_of_bounds_mode,
                 unroll_gather=self.unroll_gather,
             )
@@ -614,13 +720,38 @@ def _extract_surface_from_voxel_grid(
     voxel_grid: Array,
     frequency_coordinates: Array,
     is_spline_coefficients: bool = False,
+    is_rfft: bool = False,
     **kwargs: Any,
 ):
     # Convert to logical coordinates
     N = frequency_coordinates.shape[1]
-    logical_coordinates = (frequency_coordinates * N) + N // 2
-    # Convert arguments to map_coordinates convention and compute
-    k_x, k_y, k_z = jnp.transpose(logical_coordinates, axes=[3, 0, 1, 2])
+    if is_rfft:
+        # `voxel_grid`'s last axis only stores non-negative frequencies
+        # along x (i.e. `F(-q) = conj(F(q))` is not stored, only `F(q)`
+        # for `q_x >= 0`). Reflect the whole 3-vector through the origin
+        # whenever `q_x < 0`, so we always look up a point with `q_x >= 0`,
+        # then conjugate the interpolated result to correct for it. This is
+        # exact, not an approximation: it's evaluated once per query point,
+        # on the continuous coordinate, before any interpolation taps are
+        # generated, so taps never straddle the truncation boundary.
+        sign = jnp.where(frequency_coordinates[..., 0] < 0, -1.0, 1.0)
+        reflected = sign[..., None] * frequency_coordinates
+        k_x = reflected[..., 0] * N  # rfft/corner convention: no N // 2 offset
+        k_y = reflected[..., 1] * N + N // 2
+        k_z = reflected[..., 2] * N + N // 2
+        # The centered axes' Nyquist bin (frequency -0.5) is stored only at
+        # index 0, not also at index N -- +0.5 and -0.5 are the same
+        # (aliased) physical frequency. Reflecting a coordinate that was
+        # exactly at -0.5 lands exactly on index N, one past the valid
+        # range; wrap that exact case back to index 0, without touching any
+        # other (genuinely out-of-bounds) coordinate.
+        k_y = jnp.where(k_y == N, 0.0, k_y)
+        k_z = jnp.where(k_z == N, 0.0, k_z)
+    else:
+        logical_coordinates = (frequency_coordinates * N) + N // 2
+        # Convert arguments to map_coordinates convention and compute
+        k_x, k_y, k_z = jnp.transpose(logical_coordinates, axes=[3, 0, 1, 2])
+        sign = None
     if is_spline_coefficients:
         spline_coefficients = voxel_grid
         surface = map_coordinates_spline(spline_coefficients, (k_z, k_y, k_x), **kwargs)[
@@ -629,6 +760,9 @@ def _extract_surface_from_voxel_grid(
     else:
         fourier_voxel_grid = voxel_grid
         surface = map_coordinates(fourier_voxel_grid, (k_z, k_y, k_x), **kwargs)[0, :, :]
+    if is_rfft:
+        assert sign is not None
+        surface = jnp.where(sign[0, :, :] < 0, jnp.conj(surface), surface)
     # FFT shift and multiply by (-1)^k phase factors
     surface = jnp.fft.ifftshift(make_fftshift_phase(surface.shape) * surface)
 
@@ -648,7 +782,11 @@ def _deconvolve_linear(real_voxel_grid: Array) -> Array:
 
 
 def _real_to_fourier_voxels(
-    cls, real_voxel_grid: Array, pad_scale: float, apply_deconvolve: bool = False
+    cls,
+    real_voxel_grid: Array,
+    pad_scale: float,
+    apply_deconvolve: bool = False,
+    use_rfft: bool = True,
 ) -> tuple[Array, Array]:
     if pad_scale == 1.0:
         shape_p = real_voxel_grid.shape
@@ -669,11 +807,20 @@ def _real_to_fourier_voxels(
     if apply_deconvolve:
         real_voxel_grid_p = _deconvolve_linear(real_voxel_grid_p)
 
-    return _prepare_fourier_voxel_arguments(fftn(real_voxel_grid_p))
+    transform = rfftn(real_voxel_grid_p) if use_rfft else fftn(real_voxel_grid_p)
+    return _prepare_fourier_voxel_arguments(transform, use_rfft=use_rfft)
 
 
-def _prepare_fourier_voxel_arguments(fourier_voxel_grid: Array) -> tuple[Array, Array]:
+def _prepare_fourier_voxel_arguments(
+    fourier_voxel_grid: Array, use_rfft: bool = True
+) -> tuple[Array, Array]:
     dim = fourier_voxel_grid.shape[0]
+    if use_rfft:
+        # Truncated (last) axis stays in rfft/corner convention -- only the
+        # two full axes get fftshift'd to center convention.
+        phase = make_fftshift_phase((dim, dim, dim), outputs_rfft=True)
+        shifted = jnp.fft.fftshift(phase * fourier_voxel_grid, axes=(0, 1))
+        return shifted, make_frequency_slice((dim, dim), fftshifted=True)
     return (
         jnp.fft.fftshift(make_fftshift_phase((dim, dim, dim)) * fourier_voxel_grid),
         make_frequency_slice((dim, dim), fftshifted=True),
