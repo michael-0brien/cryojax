@@ -221,14 +221,14 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
     couple pixels; see `cryojax.simulator.GaussianMixtureRenderFn` for an
     alternative that directly spreads narrow kernels onto the grid.
 
-    By default, the non-uniform FFT runs on a pure-JAX backend using
-    [`nufftax`](https://github.com/GragasLab/nufftax/tree/custom-kernel-spread).
-    For larger, more compute-heavy problems, setting the environment variable
-    `CRYOJAX_FINUFFT_BACKEND=jax-finufft` switches to
-    [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft), which
-    can be more computationally efficient and less memory-demanding, at the
-    cost of being trickier to install and having more limited integration
-    with multi-GPU JAX.
+    !!! info
+        By default, the non-uniform FFT runs on a pure-JAX backend using
+        [`nufftax`](https://github.com/GragasLab/nufftax/tree/custom-kernel-spread).
+        Setting the environment variable `CRYOJAX_FINUFFT_BACKEND=jax-finufft` switches to
+        [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft), which
+        can be more computationally efficient and less memory-demanding, at the
+        cost of being trickier to install and having more limited integration
+        with multi-GPU JAX.
     """  # noqa: E501
 
     shape: tuple[int, int, int]
@@ -363,14 +363,14 @@ class GaussianFourierProjection(
     `cryojax.simulator.GaussianMixtureProjection` for an alternative that
     directly spreads narrow kernels onto the grid.
 
-    By default, the non-uniform FFT runs on a pure-JAX backend using
-    [`nufftax`](https://github.com/GragasLab/nufftax/tree/custom-kernel-spread).
-    For larger, more compute-heavy problems, setting the environment variable
-    `CRYOJAX_FINUFFT_BACKEND=jax-finufft` switches to
-    [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft), which
-    can be more computationally efficient and less memory-demanding, at the
-    cost of being trickier to install and having more limited integration
-    with multi-GPU JAX.
+    !!! info
+        By default, the non-uniform FFT runs on a pure-JAX backend using
+        [`nufftax`](https://github.com/GragasLab/nufftax/tree/custom-kernel-spread).
+        Setting the environment variable `CRYOJAX_FINUFFT_BACKEND=jax-finufft` switches to
+        [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft), which
+        can be more computationally efficient and less memory-demanding, at the
+        cost of being trickier to install and having more limited integration
+        with multi-GPU JAX.
     """  # noqa: E501
 
     sampling_mode: Literal["average", "point"]
