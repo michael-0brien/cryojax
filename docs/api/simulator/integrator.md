@@ -25,6 +25,14 @@
 
 ---
 
+::: cryojax.simulator.EwaldSphereExtraction
+        options:
+            members:
+                - __init__
+                - integrate
+
+---
+
 ::: cryojax.simulator.RealVoxelProjection
         options:
             members:

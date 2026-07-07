@@ -41,7 +41,7 @@ from ._pose import (
 from ._scattering_theory import (
     AbstractScatteringTheory as AbstractScatteringTheory,
     AbstractWaveScatteringTheory as AbstractWaveScatteringTheory,
-    StrongPhaseScatteringTheory as StrongPhaseScatteringTheory,
+    RytovScatteringTheory as RytovScatteringTheory,
     WeakPhaseScatteringTheory as WeakPhaseScatteringTheory,
 )
 from ._transfer_theory import (
@@ -60,6 +60,7 @@ from ._volume import (
     AbstractVoxelVolume as AbstractVoxelVolume,
     AutoVolumeProjection as AutoVolumeProjection,
     AutoVolumeRenderFn as AutoVolumeRenderFn,
+    EwaldSphereExtraction as EwaldSphereExtraction,
     FourierSliceExtraction as FourierSliceExtraction,
     FourierVoxelGridVolume as FourierVoxelGridVolume,
     FourierVoxelSplineVolume as FourierVoxelSplineVolume,

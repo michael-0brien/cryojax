@@ -312,7 +312,7 @@ class FourierSliceExtraction(
         - `outputs_integral`:
             If `True`, return the fourier slice
             *multiplied by the voxel size*. Including the voxel size
-            numerical approximates the projection integral and is
+            numerically approximates the projection integral and is
             necessary for simulating images in physical units.
         - `out_of_bounds_mode`:
             Specify how to handle out of bounds indexing. See
@@ -395,8 +395,8 @@ class EwaldSphereExtraction(
     the ewald sphere in fourier space.
 
     This extracts surfaces using interpolation methods housed in
-    `cryojax.image.map_coordinates`
-    and `cryojax.image.map_coordinates_spline`.
+    `cryojax.ndimage.map_coordinates`
+    and `cryojax.ndimage.map_coordinates_spline`.
     """
 
     outputs_integral: bool
@@ -415,11 +415,11 @@ class EwaldSphereExtraction(
         - `outputs_integral`:
             If `True`, return the ewald sphere surface
             *multiplied by the voxel size*. Including the voxel size
-            numerical approximates the projection integral and is
+            numerically approximates the projection integral and is
             necessary for simulating images in physical units.
         - `out_of_bounds_mode`:
             Specify how to handle out of bounds indexing. See
-            `cryojax.image.map_coordinates` for documentation.
+            `cryojax.ndimage.map_coordinates` for documentation.
         """
         self.outputs_integral = outputs_integral
         self.out_of_bounds_mode = out_of_bounds_mode
@@ -431,9 +431,7 @@ class EwaldSphereExtraction(
         image_config: AbstractImageConfig,
         outputs_real_space: bool = False,
     ) -> EwaldSphereArray:
-        """Integrate the volume at the `AbstractImageConfig` settings
-        of a voxel-based representation in fourier-space, using fourier
-        slice extraction.
+        """Extract the ewald sphere surface.
 
         **Arguments:**
 
@@ -447,8 +445,9 @@ class EwaldSphereExtraction(
 
         **Returns:**
 
-        The Ewald sphere surface in real or Fourier space at the
-        `AbstractImageConfig.padded_shape` and the `image_config.pixel_size`.
+        The Ewald sphere surface in the real-space or fourier-space at the
+        `image_config.padded_shape`, `image_config.pixel_size`,
+        and `image_config.voltage_in_kilovolts`.
         """
         frequency_slice = volume_representation.frequency_slice_in_pixels
         N = frequency_slice.shape[1]

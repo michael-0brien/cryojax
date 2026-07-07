@@ -363,7 +363,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
         fourier_image = self.transfer_theory.propagate_object(  # noqa: E501
             fourier_image,
             self.image_config,
-            input_is_ewald_sphere=self.volume_integrator.outputs_ewald_sphere,
+            is_ewald_sphere=self.volume_integrator.outputs_ewald_sphere,
             defocus_offset=self.pose.offset_z_in_angstroms,
         )
         # Now for the in-plane translation if using phase shifts
