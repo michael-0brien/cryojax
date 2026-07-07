@@ -9,7 +9,7 @@ import pandas as pd
 from jaxtyping import Bool
 
 from ..atom_util import split_atoms_by_element
-from ..constants import LobatoScatteringFactorParameters, PengScatteringFactorParameters
+from ..constants import PengScatteringFactorParameters
 from ..io import mmdf_to_atoms
 from ..jax_util import NDArrayLike
 from ..ndimage import AbstractImageTransform, make_coordinate_grid
@@ -351,7 +351,7 @@ def load_tabulated_volume(  # pyright: ignore[reportOverlappingOverload]
     path_or_mmdf: str | pathlib.Path | pd.DataFrame,
     *,
     output_type: type[IndependentAtomVolume] = IndependentAtomVolume,
-    tabulation: Literal["peng", "lobato"] = "peng",
+    tabulation: Literal["peng"] = "peng",
     include_b_factors: bool = True,
     b_factor_fn: Callable[[NDArrayLike, NDArrayLike], NDArrayLike] = identity_fn,
     selection_string: str = "all",
@@ -378,7 +378,7 @@ def load_tabulated_volume(
     output_type: type[
         IndependentAtomVolume | GaussianMixtureVolume
     ] = IndependentAtomVolume,
-    tabulation: Literal["peng", "lobato"] = "peng",
+    tabulation: Literal["peng"] = "peng",
     include_b_factors: bool = False,
     b_factor_fn: Callable[[NDArrayLike, NDArrayLike], NDArrayLike] = identity_fn,
     selection_string: str = "all",
@@ -417,9 +417,8 @@ def load_tabulated_volume(
         [`cryojax.simulator.IndependentAtomVolume`][] class.
     - `tabulation`:
         Specifies which electron scattering factor tabulation to use.
-        Supported values are `tabulation = 'peng'` or `tabulation = 'lobato'`.
-        See [`cryojax.constants.PengScatteringFactorParameters`][] and
-        [`cryojax.constants.LobatoScatteringFactorParameters`][]
+        The only supported value current is `tabulation = 'peng'`.
+        See [`cryojax.constants.PengScatteringFactorParameters`][]
         for more information.
     - `include_b_factors`:
         If `True`, include PDB B-factors in the volume.
@@ -488,11 +487,9 @@ def load_tabulated_volume(
         )
         if tabulation == "peng":
             parameters = PengScatteringFactorParameters(atom_ids)
-        elif tabulation == "lobato":
-            parameters = LobatoScatteringFactorParameters(atom_ids)
         else:
             raise ValueError(
-                "Only `tabulation` equal to 'peng' or 'lobato' are supported in "
+                "Only `tabulation` equal to 'peng' is supported in "
                 f"`load_tabulated_volume`. Instead, got `tabulation = {tabulation}`."
             )
         atom_volume = IndependentAtomVolume.from_tabulated_parameters(
