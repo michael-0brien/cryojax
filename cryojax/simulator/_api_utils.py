@@ -41,7 +41,6 @@ from ._volume import (
     FourierVoxelSplineVolume,
     GaussianFourierVolume,
     GaussianMixtureVolume,
-    RealVoxelCloudVolume,
     RealVoxelGridVolume,
 )
 
@@ -641,31 +640,14 @@ def render_voxel_volume(
 ) -> RealVoxelGridVolume: ...
 
 
-@overload
-def render_voxel_volume(
-    atom_volume: AbstractAtomVolume,
-    render_fn: AbstractVolumeRenderFn,
-    *,
-    output_type: type[RealVoxelCloudVolume] = RealVoxelCloudVolume,
-) -> RealVoxelCloudVolume: ...
-
-
 def render_voxel_volume(
     atom_volume: AbstractAtomVolume,
     render_fn: AbstractVolumeRenderFn,
     *,
     output_type: type[
-        FourierVoxelGridVolume
-        | FourierVoxelSplineVolume
-        | RealVoxelGridVolume
-        | RealVoxelCloudVolume
+        FourierVoxelGridVolume | FourierVoxelSplineVolume | RealVoxelGridVolume
     ] = FourierVoxelGridVolume,
-) -> (
-    FourierVoxelGridVolume
-    | FourierVoxelSplineVolume
-    | RealVoxelGridVolume
-    | RealVoxelCloudVolume
-):
+) -> FourierVoxelGridVolume | FourierVoxelSplineVolume | RealVoxelGridVolume:
     """Render a voxel volume representation from an atomistic one.
 
     !!! example "Simulate an image with Fourier slice extraction"
@@ -701,8 +683,7 @@ def render_voxel_volume(
         Either [`cryojax.simulator.FourierVoxelGridVolume`][] /
         [`cryojax.simulator.FourierVoxelSplineVolume`][] for
         fourier-space representations, or
-        [`cryojax.simulator.RealVoxelGridVolume`][] /
-        [`cryojax.simulator.RealVoxelCloudVolume`][] for real-space.
+        [`cryojax.simulator.RealVoxelGridVolume`][] for real-space.
 
 
     **Returns:**
@@ -725,20 +706,14 @@ def render_voxel_volume(
             return FourierVoxelGridVolume.from_fourier_voxel_grid(fourier_voxel_grid)
         else:
             return FourierVoxelSplineVolume.from_fourier_voxel_grid(fourier_voxel_grid)
-    elif output_type == RealVoxelGridVolume or output_type == RealVoxelCloudVolume:
+    elif output_type == RealVoxelGridVolume:
         coordinate_grid = make_coordinate_grid(render_fn.shape)
         real_voxel_grid = render_fn(atom_volume, outputs_real_space=True)
-        if output_type == RealVoxelGridVolume:
-            return RealVoxelGridVolume(real_voxel_grid, coordinate_grid)
-        else:
-            return RealVoxelCloudVolume.from_real_voxel_grid(
-                real_voxel_grid, coordinate_grid_in_pixels=coordinate_grid
-            )
+        return RealVoxelGridVolume(real_voxel_grid, coordinate_grid)
     else:
         raise ValueError(
             f"Got `output_type = {output_type}`, but this is "
             "not supported by `render_voxel_volume(..., output_type=...)`."
             "Valid values for `output_type` are `FourierVoxelGridVolume`, "
-            "`FourierVoxelSplineVolume`, `RealVoxelGridVolume`, or "
-            "`RealVoxelCloudVolume`."
+            "`FourierVoxelSplineVolume`, or `RealVoxelGridVolume`."
         )

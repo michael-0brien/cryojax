@@ -27,7 +27,5 @@ from .gaussian_mixture import (
     GaussianMixtureVolume as GaussianMixtureVolume,
 )
 from .real_voxels import (
-    RealVoxelCloudVolume as RealVoxelCloudVolume,
     RealVoxelGridVolume as RealVoxelGridVolume,
-    RealVoxelProjection as RealVoxelProjection,
 )
