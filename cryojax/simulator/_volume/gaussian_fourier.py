@@ -10,6 +10,7 @@ import jax.numpy as jnp
 import nufftax
 from jaxtyping import Array, Float, PyTree
 
+from ..._config import CRYOJAX_FINUFFT_BACKEND
 from ...constants import (
     PengScatteringFactorParameters,
 )
@@ -219,7 +220,16 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
     and Fourier-domain convolution. Good when kernels span at least a
     couple pixels; see `cryojax.simulator.GaussianMixtureRenderFn` for an
     alternative that directly spreads narrow kernels onto the grid.
-    """
+
+    By default, the non-uniform FFT runs on a pure-JAX backend using
+    [`nufftax`](https://github.com/GragasLab/nufftax/tree/custom-kernel-spread).
+    For larger, more compute-heavy problems, setting the environment variable
+    `CRYOJAX_FINUFFT_BACKEND=jax-finufft` switches to
+    [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft), which
+    can be more computationally efficient and less memory-demanding, at the
+    cost of being trickier to install and having more limited integration
+    with multi-GPU JAX.
+    """  # noqa: E501
 
     shape: tuple[int, int, int]
     voxel_size: Float[Array, ""]
@@ -227,7 +237,6 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
     sampling_mode: Literal["average", "point"]
     upsample_factor: float
     eps: float
-    backend: Literal["nufftax", "jax-finufft"]
     options: dict[str, Any]
 
     def __init__(
@@ -238,7 +247,6 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
         sampling_mode: Literal["average", "point"] = "average",
         upsample_factor: int | float = 1.0,
         eps: float = 1e-6,
-        backend: Literal["nufftax", "jax-finufft"] = "nufftax",
         options: dict[str, Any] = {},
     ):
         """**Arguments:**
@@ -258,13 +266,6 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
             The precision of the underlying non-uniform FFT implementation.
             See [`finufft`](https://finufft.readthedocs.io/en/latest/opts.html#options-parameters-cpu)
             for documentation.
-        - `backend`:
-            The backend for non-uniform FFT computation. This is either
-            [`nufftax`](https://github.com/GragasLab/nufftax/tree/custom-kernel-spread)
-            for a pure-JAX implementation of the
-            [`finufft`](https://finufft.readthedocs.io) algorithm,
-            or [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft) for
-            calling `finufft` directly via `jax.ffi`.
         - `options`:
             A dictionary of options for advanced usage, passed directly to
             the underlying non-uniform FFT implementation.
@@ -276,18 +277,11 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
                 "pixel or 'point' for point sampling. Got "
                 f"`sampling_mode = {sampling_mode}`."
             )
-        if backend not in ["jax-finufft", "nufftax"]:
-            raise ValueError(
-                "`backend` in `GaussianFourierRenderFn` "
-                "must be either 'jax-finufft' or 'nufftax'. Got "
-                f"`backend = {backend}`."
-            )
         self.shape = shape
         self.voxel_size = jnp.asarray(voxel_size, dtype=float)
         self.sampling_mode = sampling_mode
         self.upsample_factor = float(upsample_factor)
         self.eps = eps
-        self.backend = backend
         self.options = options
 
     @override
@@ -334,7 +328,6 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
             shape_u=cast(tuple[int, int, int], shape_u),
             shape_out=cast(tuple[int, int, int], self.shape),
             voxel_size_u=voxel_size_u,
-            backend=self.backend,
             eps=self.eps,
             options=self.options,
         )
@@ -369,13 +362,21 @@ class GaussianFourierProjection(
     convolution. Good when kernels span at least a couple pixels; see
     `cryojax.simulator.GaussianMixtureProjection` for an alternative that
     directly spreads narrow kernels onto the grid.
-    """
+
+    By default, the non-uniform FFT runs on a pure-JAX backend using
+    [`nufftax`](https://github.com/GragasLab/nufftax/tree/custom-kernel-spread).
+    For larger, more compute-heavy problems, setting the environment variable
+    `CRYOJAX_FINUFFT_BACKEND=jax-finufft` switches to
+    [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft), which
+    can be more computationally efficient and less memory-demanding, at the
+    cost of being trickier to install and having more limited integration
+    with multi-GPU JAX.
+    """  # noqa: E501
 
     sampling_mode: Literal["average", "point"]
     upsample_factor: float
     eps: float
     shape: tuple[int, int] | None
-    backend: Literal["nufftax", "jax-finufft"]
     options: dict[str, Any]
 
     outputs_ewald_sphere: ClassVar[bool] = False
@@ -387,7 +388,6 @@ class GaussianFourierProjection(
         upsample_factor: int | float = 1.0,
         eps: float = 1e-6,
         shape: tuple[int, int] | None = None,
-        backend: Literal["jax-finufft", "nufftax"] = "nufftax",
         options: dict[str, Any] = {},
     ):
         """**Arguments:**
@@ -406,13 +406,6 @@ class GaussianFourierProjection(
         - `shape`:
             If given, first compute the image at `shape`, then
             pad or crop to `image_config.padded_shape`.
-        - `backend`:
-            The backend for non-uniform FFT computation. This is either
-            [`nufftax`](https://github.com/GragasLab/nufftax/tree/custom-kernel-spread)
-            for a pure-JAX implementation of the
-            [`finufft`](https://finufft.readthedocs.io) algorithm,
-            or [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft) for
-            calling `finufft` directly via `jax.ffi`.
         - `options`:
             A dictionary of options for advanced usage, passed directly to
             the underlying non-uniform FFT implementation.
@@ -424,17 +417,10 @@ class GaussianFourierProjection(
                 "pixel or 'point' for point sampling. Got "
                 f"`sampling_mode = {sampling_mode}`."
             )
-        if backend not in ["jax-finufft", "nufftax"]:
-            raise ValueError(
-                "`backend` in `GaussianFourierProjection` "
-                "must be either 'jax-finufft' or 'nufftax'. Got "
-                f"`backend = {backend}`."
-            )
         self.sampling_mode = sampling_mode
         self.shape = shape
         self.upsample_factor = float(upsample_factor)
         self.eps = eps
-        self.backend = backend
         self.options = options
 
     @override
@@ -483,7 +469,6 @@ class GaussianFourierProjection(
             shape_u=cast(tuple[int, int], shape_u),
             pixel_size_u=pixel_size_u,
             shape_out=cast(tuple[int, int], shape),
-            backend=self.backend,
             eps=self.eps,
             options=self.options,
         )
@@ -547,7 +532,6 @@ def _project_impl(
     shape_u: tuple[int, int],
     pixel_size_u: Float[Array, ""],
     shape_out: tuple[int, int],
-    backend: Literal["jax-finufft", "nufftax"],
     eps: float,
     options: dict[str, Any],
 ) -> Array:
@@ -573,7 +557,6 @@ def _project_impl(
                 shape_u,
                 source=jnp.ones(_positions.shape[0], dtype=complex),
                 xy=xy,
-                backend=backend,
                 eps=eps,
                 options=options,
             )
@@ -596,7 +579,6 @@ def _render_impl(
     voxel_size_u: Float[Array, ""],
     shape_out: tuple[int, int, int],
     eps: float,
-    backend: Literal["jax-finufft", "nufftax"],
     options: dict[str, Any],
 ) -> Array:
     is_leaf = lambda x: isinstance(x, AbstractFourierOperator)  # noqa: E731
@@ -615,7 +597,6 @@ def _render_impl(
                 shape_u,
                 source=jnp.ones(_positions.shape[0], dtype=complex),
                 xyz=xyz,
-                backend=backend,
                 eps=eps,
                 options=options,
             )
@@ -667,17 +648,16 @@ def _nufft2d1(
     source: Array,
     xy: Array,
     *,
-    backend: Literal["jax-finufft", "nufftax"],
     eps: float,
     options: dict[str, Any],
 ):
     default_upsampfac = 1.25
-    if backend == "jax-finufft":
+    if CRYOJAX_FINUFFT_BACKEND == "jax-finufft":
         if jax_finufft is None:
             raise RuntimeError(
-                "Tried to use "
-                "`GaussianFourierProjection(..., backend='jax-finufft')`, "
-                "but `jax-finufft` is not installed. "
+                "Tried to use the `jax-finufft` non-uniform FFT backend "
+                "(set via the `CRYOJAX_FINUFFT_BACKEND` environment "
+                "variable), but `jax-finufft` is not installed. "
                 "See https://github.com/flatironinstitute/jax-finufft "
                 "for installation instructions."
             ) from JAX_FINUFFT_IMPORT_ERROR
@@ -717,17 +697,16 @@ def _nufft3d1(
     source: Array,
     xyz: Array,
     *,
-    backend: Literal["jax-finufft", "nufftax"],
     eps: float,
     options: dict[str, Any],
 ):
     default_upsampfac = 1.25
-    if backend == "jax-finufft":
+    if CRYOJAX_FINUFFT_BACKEND == "jax-finufft":
         if jax_finufft is None:
             raise RuntimeError(
-                "Tried to use "
-                "`GaussianFourierRenderFn(..., backend='jax-finufft')`, "
-                "but `jax-finufft` is not installed. "
+                "Tried to use the `jax-finufft` non-uniform FFT backend "
+                "(set via the `CRYOJAX_FINUFFT_BACKEND` environment "
+                "variable), but `jax-finufft` is not installed. "
                 "See https://github.com/flatironinstitute/jax-finufft "
                 "for installation instructions."
             ) from JAX_FINUFFT_IMPORT_ERROR

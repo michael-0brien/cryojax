@@ -3,7 +3,7 @@ Real voxel-based representations of a volume.
 """
 
 import math
-from typing import ClassVar, Literal, Self, cast
+from typing import ClassVar, Self, cast
 from typing_extensions import override
 
 import equinox as eqx
@@ -11,6 +11,7 @@ import jax.numpy as jnp
 import nufftax
 from jaxtyping import Array, Float
 
+from ..._config import CRYOJAX_FINUFFT_BACKEND
 from ...jax_util import NDArrayLike
 from ...ndimage import convert_fftn_to_rfftn, crop_to_shape, irfftn, make_coordinate_grid
 from .._image_config import AbstractImageConfig
@@ -211,36 +212,29 @@ class RealVoxelProjection(
     AbstractVolumeIntegrator[RealVoxelCloudVolume],
     strict=True,
 ):
-    """Integrate points onto the exit plane using non-uniform FFTs."""
+    """Integrate points onto the exit plane using non-uniform FFTs.
+
+    By default, the non-uniform FFT runs on a pure-JAX backend using
+    [`nufftax`](https://github.com/GragasLab/nufftax/tree/custom-kernel-spread).
+    For larger, more compute-heavy problems, setting the environment variable
+    `CRYOJAX_FINUFFT_BACKEND=jax-finufft` switches to
+    [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft), which
+    can be more computationally efficient and less memory-demanding, at the
+    cost of being trickier to install and having more limited integration
+    with multi-GPU JAX.
+    """  # noqa: E501
 
     eps: float
-    backend: Literal["jax-finufft", "nufftax"]
 
     outputs_ewald_sphere: ClassVar[bool] = False
 
-    def __init__(
-        self, *, backend: Literal["jax-finufft", "nufftax"] = "nufftax", eps: float = 1e-6
-    ):
+    def __init__(self, *, eps: float = 1e-6):
         """**Arguments:**
 
-        - `backend`:
-            The backend for non-uniform FFT computation. This is either
-            [`nufftax`](https://github.com/GragasLab/nufftax/tree/custom-kernel-spread)
-            for a pure-JAX implementation of the
-            [`finufft`](https://finufft.readthedocs.io) algorithm,
-            or [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft) for
-            calling `finufft` directly via `jax.ffi`.
         - `eps`:
             See [`finufft`](https://finufft.readthedocs.io/en/latest/opts.html#options-parameters-cpu)
             for documentation.
         """  # noqa: E501
-        if backend not in ["jax-finufft", "nufftax"]:
-            raise ValueError(
-                "`backend` in `RealVoxelProjection` "
-                "must be either 'jax-finufft' or 'nufftax'. Got "
-                f"`backend = {backend}`."
-            )
-        self.backend = backend
         self.eps = eps
 
     @override
@@ -278,7 +272,6 @@ class RealVoxelProjection(
             volume_representation.weights,
             volume_representation.coordinate_list_in_pixels,
             image_config.padded_shape,
-            backend=self.backend,
             eps=self.eps,
         )
         # Scale by voxel size for units
@@ -294,7 +287,6 @@ def _project_with_nufft(
     weights,
     coordinate_list,
     shape,
-    backend: Literal["jax-finufft", "nufftax"],
     eps: float,
 ):
     weights, coordinate_list = (
@@ -312,12 +304,12 @@ def _project_with_nufft(
     coordinates_periodic = 2 * jnp.pi * (coordinates_xy + center_xy) / box_xy
     # Unpack and compute
     x, y = coordinates_periodic[:, 0], coordinates_periodic[:, 1]
-    if backend == "jax-finufft":
+    if CRYOJAX_FINUFFT_BACKEND == "jax-finufft":
         if jax_finufft is None:
             raise RuntimeError(
-                "Tried to use "
-                "`RealVoxelProjection(..., backend='jax-finufft')`, "
-                "but `jax-finufft` is not installed. "
+                "Tried to use the `jax-finufft` non-uniform FFT backend "
+                "(set via the `CRYOJAX_FINUFFT_BACKEND` environment "
+                "variable), but `jax-finufft` is not installed. "
                 "See https://github.com/flatironinstitute/jax-finufft "
                 "for installation instructions."
             ) from JAX_FINUFFT_IMPORT_ERROR

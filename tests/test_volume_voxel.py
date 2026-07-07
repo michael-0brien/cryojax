@@ -34,6 +34,7 @@ import numpy as np
 import pytest
 from cryojax.constants import PengScatteringFactorParameters
 from cryojax.io import read_atoms_from_pdb
+from cryojax.simulator._volume import real_voxels
 from jaxtyping import Array, Float
 
 
@@ -994,7 +995,7 @@ def _make_gmm_voxel_scene(pdb_info):
         ),
         (
             cxs.RealVoxelCloudVolume,
-            cxs.RealVoxelProjection(eps=1e-16, backend="nufftax"),
+            cxs.RealVoxelProjection(eps=1e-16),
             1e-10,
         ),
     ],
@@ -1058,12 +1059,13 @@ def test_spline_agrees_with_grid_at_exact_angles(
 
 
 @pytest.mark.skipif(jnufft is None, reason="jax-finufft not installed")
-def test_gaussian_vs_voxels_nopose_jax_finufft(pdb_info):
+def test_gaussian_vs_voxels_nopose_jax_finufft(monkeypatch, pdb_info):
     """RealVoxelProjection with jax-finufft must agree with GMM at identity pose."""
+    monkeypatch.setattr(real_voxels, "CRYOJAX_FINUFFT_BACKEND", "jax-finufft")
     gmm_volume, real_voxel_grid, image_config = _make_gmm_voxel_scene(pdb_info)
     gmm_integrator = cxs.GaussianMixtureProjection(sampling_mode="average")
     cloud_volume = cxs.RealVoxelCloudVolume.from_real_voxel_grid(real_voxel_grid)
-    integrator = cxs.RealVoxelProjection(eps=1e-16, backend="jax-finufft")  # type: ignore
+    integrator = cxs.RealVoxelProjection(eps=1e-16)
     proj_ref = _compute_projection(gmm_volume, gmm_integrator, image_config)
     proj = _compute_projection(cloud_volume, integrator, image_config)
     np.testing.assert_allclose(proj_ref, proj, atol=1e-8)
