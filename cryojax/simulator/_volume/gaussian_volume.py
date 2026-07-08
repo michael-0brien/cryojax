@@ -236,7 +236,6 @@ class GaussianMixtureProjection(
     def __init__(
         self,
         *,
-        upsampling_factor: int | None = None,
         shape: tuple[int, int] | None = None,
         sampling_mode: Literal["average", "point"] = "average",
         n_batches: int = 1,
@@ -285,12 +284,6 @@ class GaussianMixtureProjection(
             [`cryojax.ndimage.spread_gaussians_2d`][]'s `enable_pallas` for
             the full picture. `None` (default) defers to `CRYOJAX_ENABLE_PALLAS`.
         """  # noqa: E501
-        if upsampling_factor is not None:
-            raise ValueError(
-                "`upsampling_factor` in `GaussianMixtureProjection` "
-                "has been deprecated as of cryoJAX 0.5.1. The "
-                "functionality this implemented was not as intended."
-            )
         if sampling_mode not in ["average", "point"]:
             raise ValueError(
                 "`sampling_mode` in `GaussianMixtureProjection` "
