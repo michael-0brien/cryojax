@@ -34,6 +34,9 @@ import numpy as np
 import pytest
 from cryojax.constants import PengScatteringFactorParameters
 from cryojax.io import read_atoms_from_pdb
+from cryojax.simulator._volume.fourier_voxels import (
+    _reconstruct_full_slice_from_half_slice,
+)
 from jaxtyping import Array, Float
 
 
@@ -546,15 +549,21 @@ def _gaussian_mixture_fourier_transform(
 
 
 def _ewald_sphere_analytic_ground_truth(volume, voltage_in_kilovolts: float) -> Array:
+    N = volume.frequency_slice_in_pixels.shape[1]
     config = cxs.BasicImageConfig(
-        volume.frequency_slice_in_pixels.shape[1:3],
+        (N, N),
         pixel_size=1.0,
         voltage_in_kilovolts=voltage_in_kilovolts,
     )
     wavelength = config.wavelength_in_angstroms
     # Curved Ewald sphere frequency coordinates (paraxial approximation, at
-    # identity pose the beam/projection axis is exactly z).
-    q_at_slice = volume.frequency_slice_in_pixels[0]
+    # identity pose the beam/projection axis is exactly z). `volume` only
+    # stores the half (rfft) in-plane slice; reconstruct the full grid this
+    # ground truth needs (an exact, non-interpolating coordinate operation,
+    # independent of the interpolation logic under test).
+    q_at_slice = _reconstruct_full_slice_from_half_slice(
+        volume.frequency_slice_in_pixels
+    )[0]
     q_parallel_squared = jnp.sum(q_at_slice[..., :2] ** 2, axis=-1)
     q_z_curvature = 0.5 * wavelength * q_parallel_squared
     q_at_surface = q_at_slice.at[..., 2].add(q_z_curvature)
@@ -623,25 +632,57 @@ def test_ewald_sphere_matches_analytic_ground_truth_spline(two_atom_spline_volum
     assert err < 0.02 * peak
 
 
+# ── RFFT storage shape assertions ─────────────────────────────────────────────
+#
+# Both `FourierVoxelGridVolume`/`FourierVoxelSplineVolume` store the 3D voxel
+# grid as a half-space RFFT grid (halving memory relative to the full complex
+# FFT cube), and `frequency_slice_in_pixels` as the half in-plane grid too.
+# Interpolation reflects each out-of-range query point through the origin and
+# conjugates the result -- see `_extract_surface_from_voxel_grid` in
+# `fourier_voxels.py`. `EwaldSphereExtraction` reconstructs the full in-plane
+# grid on demand (`_reconstruct_full_slice_from_half_slice`), since its
+# curved output isn't Hermitian-symmetric as a whole.
+
+
+def test_storage_shape_grid():
+    dim = 16
+    real_voxel_grid = jnp.zeros((dim, dim, dim), dtype=float)
+    vol = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
+    assert vol.shape == (dim, dim, dim)
+    assert vol.fourier_voxel_grid.shape == (dim, dim, dim // 2 + 1)
+    assert vol.frequency_slice_in_pixels.shape == (1, dim, dim // 2 + 1, 3)
+
+
+def test_storage_shape_spline():
+    dim = 16
+    real_voxel_grid = jnp.zeros((dim, dim, dim), dtype=float)
+    vol = cxs.FourierVoxelSplineVolume.from_real_voxel_grid(real_voxel_grid)
+    assert vol.shape == (dim, dim, dim)
+    assert vol.spline_coefficients.shape == (dim + 2, dim + 2, dim // 2 + 3)
+    assert vol.frequency_slice_in_pixels.shape == (1, dim, dim // 2 + 1, 3)
+
+
 # ── from_fourier_voxel_grid constructor equivalence ───────────────────────────
 
 
 def test_grid_from_fourier_voxel_grid_matches_from_real(gmm_volume, image_config):
-    """from_fourier_voxel_grid(fftn(grid)) must equal from_real_voxel_grid(grid)."""
+    """from_fourier_voxel_grid(rfftn(grid)) must equal from_real_voxel_grid(grid)."""
     render_fn = cxs.GaussianMixtureRenderFn((32, 32, 32), voxel_size=1.0)
     real_grid = render_fn(gmm_volume)
     vol_real = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_grid)
-    vol_fourier = cxs.FourierVoxelGridVolume.from_fourier_voxel_grid(im.fftn(real_grid))
+    vol_fourier = cxs.FourierVoxelGridVolume.from_fourier_voxel_grid(im.rfftn(real_grid))
     err = float(_max_abs_error(vol_real, vol_fourier, _FSE, _FSE, image_config))
     assert np.isclose(err, 0.0)
 
 
 def test_spline_from_fourier_voxel_grid_matches_from_real(gmm_volume, image_config):
-    """from_fourier_voxel_grid(fftn(grid)) must equal from_real_voxel_grid(grid)."""
+    """from_fourier_voxel_grid(rfftn(grid)) must equal from_real_voxel_grid(grid)."""
     render_fn = cxs.GaussianMixtureRenderFn((32, 32, 32), voxel_size=1.0)
     real_grid = render_fn(gmm_volume)
     vol_real = cxs.FourierVoxelSplineVolume.from_real_voxel_grid(real_grid)
-    vol_fourier = cxs.FourierVoxelSplineVolume.from_fourier_voxel_grid(im.fftn(real_grid))
+    vol_fourier = cxs.FourierVoxelSplineVolume.from_fourier_voxel_grid(
+        im.rfftn(real_grid)
+    )
     err = float(_max_abs_error(vol_real, vol_fourier, _FSE, _FSE, image_config))
     assert np.isclose(err, 0.0)
 
@@ -747,6 +788,40 @@ def test_spline_odd_dimension_raises():
         cxs.FourierVoxelSplineVolume.from_real_voxel_grid(np.ones((31, 31, 31)))
 
 
+def test_grid_shape_mismatch_raises():
+    """A `fourier_voxel_grid` whose shape doesn't correspond to any cubic
+    volume's half-space RFFT grid must raise."""
+    with pytest.raises(AttributeError, match="invalid shape"):
+        cxs.FourierVoxelGridVolume(
+            jnp.zeros((16, 16, 5), dtype=complex),
+            im.make_frequency_slice((16, 16), outputs_rfftfreqs=True, fftshifted=True),
+        )
+
+
+def test_grid_full_cube_shape_suggests_rfftn():
+    """Passing the full (non-rfft) FFT grid shape must raise an error
+    suggesting `cryojax.ndimage.rfftn` instead of `fftn`."""
+    dim = 16
+    full_shaped = jnp.zeros((dim, dim, dim), dtype=complex)
+    with pytest.raises(AttributeError, match="rfftn"):
+        cxs.FourierVoxelGridVolume(
+            full_shaped,
+            im.make_frequency_slice((dim, dim), outputs_rfftfreqs=True, fftshifted=True),
+        )
+
+
+def test_spline_full_cube_shape_suggests_rfftn():
+    """Same full-cube-shape check for `FourierVoxelSplineVolume`, whose
+    stored array is padded by 2 samples per axis relative to the grid."""
+    dim = 16
+    full_shaped = jnp.zeros((dim + 2, dim + 2, dim + 2), dtype=complex)
+    with pytest.raises(AttributeError, match="rfftn"):
+        cxs.FourierVoxelSplineVolume(
+            full_shaped,
+            im.make_frequency_slice((dim, dim), outputs_rfftfreqs=True, fftshifted=True),
+        )
+
+
 def test_wrong_volume_type_raises(image_config):
     """FourierSliceExtraction must raise for unsupported volume types."""
     wrong_volume = cxs.GaussianMixtureVolume(
@@ -814,17 +889,21 @@ def test_fourier_voxel_grid_pad_scale_produces_smooth_shape(pad_scale):
     vol = cxs.FourierVoxelGridVolume.from_real_voxel_grid(
         real_voxel_grid, pad_scale=pad_scale
     )
-    padded_shape = vol.fourier_voxel_grid.shape
-    for s, p in zip(shape, padded_shape):
+    # `.shape` reports the logical cubic (real-space) shape; check it
+    # against `_is_smooth`, and check the storage shape's own rfft-truncated
+    # last axis separately below.
+    for s, p in zip(shape, vol.shape):
         assert p >= math.ceil(pad_scale * s)
         assert _is_smooth(p)
+    assert vol.fourier_voxel_grid.shape == vol.shape[:-1] + (vol.shape[-1] // 2 + 1,)
 
 
 def test_fourier_voxel_grid_pad_scale_one_unchanged():
     shape = (10, 10, 10)
     real_voxel_grid = jnp.zeros(shape, dtype=float)
     vol = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid, pad_scale=1.0)
-    assert vol.fourier_voxel_grid.shape == shape
+    assert vol.shape == shape
+    assert vol.fourier_voxel_grid.shape == shape[:-1] + (shape[-1] // 2 + 1,)
 
 
 def test_fourier_voxel_grid_pad_scale_less_than_one_raises():
@@ -840,10 +919,13 @@ def test_fourier_voxel_spline_pad_scale_produces_smooth_shape(pad_scale):
     vol = cxs.FourierVoxelSplineVolume.from_real_voxel_grid(
         real_voxel_grid, pad_scale=pad_scale
     )
-    padded_shape = vol.spline_coefficients.shape
-    for s, p in zip(shape, padded_shape):
+    for s, p in zip(shape, vol.shape):
         assert p >= math.ceil(pad_scale * s)
-        assert _is_smooth(p - 2)
+        assert _is_smooth(p)
+    expected_last_axis = vol.shape[-1] // 2 + 1 + 2
+    assert vol.spline_coefficients.shape == tuple(d + 2 for d in vol.shape[:-1]) + (
+        expected_last_axis,
+    )
 
 
 def test_fourier_voxel_spline_pad_scale_one_unchanged():
@@ -852,7 +934,8 @@ def test_fourier_voxel_spline_pad_scale_one_unchanged():
     vol = cxs.FourierVoxelSplineVolume.from_real_voxel_grid(
         real_voxel_grid, pad_scale=1.0
     )
-    assert all(d - 2 == dim for d in vol.spline_coefficients.shape)
+    assert vol.shape == (dim, dim, dim)
+    assert vol.spline_coefficients.shape == (dim + 2, dim + 2, dim // 2 + 3)
 
 
 def test_fourier_voxel_spline_pad_scale_less_than_one_raises():
@@ -882,8 +965,14 @@ def test_fourier_vs_real_agreement(sample_pdb_path):
     real_volume = cxs.render_voxel_volume(
         atom_volume, render_fn, output_type=cxs.RealVoxelGridVolume
     )
+    # Only the two full axes were fftshift'd at construction time (the
+    # rfft-truncated axis stays in rfft/corner convention) -- see
+    # `_prepare_fourier_voxel_arguments` in `fourier_voxels.py`.
     real_voxel_grid = jnp.fft.fftshift(
-        im.ifftn(jnp.fft.ifftshift(fourier_volume.fourier_voxel_grid)).real
+        im.irfftn(
+            jnp.fft.ifftshift(fourier_volume.fourier_voxel_grid, axes=(0, 1)),
+            s=shape,
+        )
     )
 
     np.testing.assert_allclose(real_voxel_grid, real_volume.real_voxel_grid, atol=1e-12)
