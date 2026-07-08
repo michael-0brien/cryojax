@@ -142,4 +142,4 @@ def _sample_voxel_grid(volume: RealVoxelGridVolume):
     )
     # Convert arguments to map_coordinates convention and compute
     x, y, z = jnp.transpose(logical_coordinate_grid, axes=[3, 0, 1, 2])
-    return map_coordinates(volume.real_voxel_grid, (z, y, x), order=1, mode="fill")
+    return map_coordinates(volume.real_voxel_grid, (z, y, x), out_of_bounds_mode="fill")
