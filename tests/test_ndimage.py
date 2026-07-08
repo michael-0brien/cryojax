@@ -554,73 +554,73 @@ _real_operators_3d = [*_real_operators_common, im.RealGaussian(offset=(1.0, -1.0
         (True, 2.0, (18, 18, 11)),
     ),
 )
-def test_prepare_sampling_rfft_shapes(use_spline, pad_scale, expected_shape):
+def test_prepare_sampling_fft_shapes(use_spline, pad_scale, expected_shape):
     real_voxel_grid = jr.normal(jr.key(0), (8, 8, 8))
-    prepared = im.prepare_sampling_rfft(
+    prepared = im.prepare_sampling_fft(
         real_voxel_grid, pad_scale=pad_scale, use_spline=use_spline
     )
     assert prepared.shape == expected_shape
 
 
-def test_prepare_sampling_rfft_deconvolve_ignored_for_spline():
+def test_prepare_sampling_fft_deconvolve_ignored_for_spline():
     # `apply_deconvolve` compensates for trilinear interpolation, so it must
     # be a no-op for spline coefficients but change the raw fourier grid.
     real_voxel_grid = jr.normal(jr.key(0), (8, 8, 8))
-    spline_on = im.prepare_sampling_rfft(
+    spline_on = im.prepare_sampling_fft(
         real_voxel_grid, use_spline=True, apply_deconvolve=True
     )
-    spline_off = im.prepare_sampling_rfft(
+    spline_off = im.prepare_sampling_fft(
         real_voxel_grid, use_spline=True, apply_deconvolve=False
     )
     np.testing.assert_array_equal(spline_on, spline_off)
 
-    grid_on = im.prepare_sampling_rfft(real_voxel_grid, apply_deconvolve=True)
-    grid_off = im.prepare_sampling_rfft(real_voxel_grid, apply_deconvolve=False)
+    grid_on = im.prepare_sampling_fft(real_voxel_grid, apply_deconvolve=True)
+    grid_off = im.prepare_sampling_fft(real_voxel_grid, apply_deconvolve=False)
     assert not jnp.allclose(grid_on, grid_off)
 
 
-def test_prepare_sampling_rfft_invalid_pad_scale():
+def test_prepare_sampling_fft_invalid_pad_scale():
     real_voxel_grid = jr.normal(jr.key(0), (8, 8, 8))
     with pytest.raises(ValueError, match="pad_scale"):
-        im.prepare_sampling_rfft(real_voxel_grid, pad_scale=0.5)
+        im.prepare_sampling_fft(real_voxel_grid, pad_scale=0.5)
 
 
-def test_prepare_sampling_rfft_rejects_odd_and_noncubic():
+def test_prepare_sampling_fft_rejects_odd_and_noncubic():
     # The rfft half-grid logic assumes cubic, even dimensions.
     with pytest.raises(ValueError, match="even"):
-        im.prepare_sampling_rfft(jr.normal(jr.key(0), (7, 7, 7)))
+        im.prepare_sampling_fft(jr.normal(jr.key(0), (7, 7, 7)))
     with pytest.raises(ValueError, match="cubic"):
-        im.prepare_sampling_rfft(jr.normal(jr.key(0), (8, 8, 6)))
+        im.prepare_sampling_fft(jr.normal(jr.key(0), (8, 8, 6)))
 
 
-def test_sample_rfft_surface_rejects_odd_dim():
-    grid = im.prepare_sampling_rfft(jr.normal(jr.key(0), (8, 8, 8)))
+def test_sample_fft_slice_rejects_odd_dim():
+    grid = im.prepare_sampling_fft(jr.normal(jr.key(0), (8, 8, 8)))
     odd_frequency_slice = im.make_frequency_slice((7, 7), fftshifted=True)
     with pytest.raises(ValueError, match="even"):
-        im.sample_rfft_surface(grid, odd_frequency_slice)
+        im.sample_fft_slice(grid, odd_frequency_slice)
 
 
 @pytest.mark.parametrize("use_spline", (False, True))
-def test_sample_rfft_surface_shape_check(use_spline):
+def test_sample_fft_slice_shape_check(use_spline):
     # Passing a grid with `use_spline=True` (or spline coefficients with
     # `use_spline=False`) must be rejected, since the expected shapes differ.
     real_voxel_grid = jr.normal(jr.key(0), (8, 8, 8))
     # Deliberately mismatched: prepare the *wrong* representation.
-    mismatched = im.prepare_sampling_rfft(real_voxel_grid, use_spline=not use_spline)
+    mismatched = im.prepare_sampling_fft(real_voxel_grid, use_spline=not use_spline)
     frequency_slice = im.make_frequency_slice((8, 8), fftshifted=True)
     with pytest.raises(ValueError, match="use_spline"):
-        im.sample_rfft_surface(mismatched, frequency_slice, use_spline=use_spline)
+        im.sample_fft_slice(mismatched, frequency_slice, use_spline=use_spline)
 
 
-def test_central_slice_to_ewald_sphere_curvature():
+def test_ewald_sphere_from_slice_curvature():
     # For an unrotated slice, the Ewald surface keeps the in-plane
     # coordinates and displaces out of plane by `(wavelength / voxel_size) *
     # |q|**2 / 2` along the slice normal. The `wavelength=0` call gives the
     # flat, fully-reconstructed slice used as the in-plane reference.
     N, voxel_size, wavelength = 16, 1.3, 0.02
     frequency_slice = im.make_frequency_slice((N, N), fftshifted=True)
-    flat = im.central_slice_to_ewald_sphere(frequency_slice, voxel_size, 0.0)
-    surface = im.central_slice_to_ewald_sphere(frequency_slice, voxel_size, wavelength)
+    flat = im.ewald_sphere_from_slice(frequency_slice, voxel_size, 0.0)
+    surface = im.ewald_sphere_from_slice(frequency_slice, voxel_size, wavelength)
 
     assert surface.shape == (1, N, N, 3)
     # The `wavelength=0` surface is flat (no out-of-plane displacement).

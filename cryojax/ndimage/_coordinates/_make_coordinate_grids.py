@@ -150,7 +150,7 @@ def make_frequency_slice(
 ) -> Float[Array, "1 {shape[0]} {shape[1]} 3"]:
     """Create central slice frequency coordinates. By default,
     returns in the convention required for usage with
-    [`cryojax.ndimage.sample_rfft_surface`][].
+    [`cryojax.ndimage.sample_fft_slice`][].
 
     **Arguments:**
 

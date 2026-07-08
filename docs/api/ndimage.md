@@ -304,8 +304,8 @@ This documentation is a collection of functions used to work with coordinate sys
 
 ### Fourier projection-slice extraction
 
-::: cryojax.ndimage.prepare_sampling_rfft
+::: cryojax.ndimage.prepare_sampling_fft
 
-::: cryojax.ndimage.sample_rfft_surface
+::: cryojax.ndimage.sample_fft_slice
 
-::: cryojax.ndimage.central_slice_to_ewald_sphere
+::: cryojax.ndimage.ewald_sphere_from_slice

@@ -12,18 +12,18 @@ from jaxtyping import Array, Complex, Float
 
 from ...jax_util import NDArrayLike
 from ...ndimage import (
-    central_slice_to_ewald_sphere,
     compute_spline_coefficients,
     enforce_rfftn_self_conjugates,
+    ewald_sphere_from_slice,
     fftn,
     ifftn,
     irfftn,
     make_fftshift_phase,
     make_frequency_slice,
-    prepare_sampling_rfft,
+    prepare_sampling_fft,
     resize_with_crop_or_pad,
     rfftn,
-    sample_rfft_surface,
+    sample_fft_slice,
 )
 from .._image_config import AbstractImageConfig
 from .._pose import AbstractPose
@@ -218,7 +218,7 @@ class FourierVoxelGridVolume(AbstractFourierVoxelVolume, strict=True):
         """
         # Preprocess to fourier grid, deconvolving after any padding so that
         # the sinc² correction uses the actual Fourier grid size.
-        fourier_voxel_grid = prepare_sampling_rfft(
+        fourier_voxel_grid = prepare_sampling_fft(
             jnp.asarray(real_voxel_grid, dtype=float),
             apply_deconvolve=apply_deconvolve,
             pad_scale=pad_scale,
@@ -319,7 +319,7 @@ class FourierVoxelSplineVolume(AbstractFourierVoxelVolume, strict=True):
             transform. Must be a value greater than `1.0`.
         """
         # Preprocess to fourier grid and compute spline coefficients
-        spline_coefficients = prepare_sampling_rfft(
+        spline_coefficients = prepare_sampling_fft(
             jnp.asarray(real_voxel_grid, dtype=float),
             pad_scale=pad_scale,
             use_spline=True,
@@ -407,7 +407,7 @@ class FourierSliceExtraction(
         N = frequency_slice.shape[1]
         # Compute the fourier projection
         if isinstance(volume_representation, FourierVoxelSplineVolume):
-            fourier_projection = sample_rfft_surface(
+            fourier_projection = sample_fft_slice(
                 volume_representation.spline_coefficients,
                 frequency_slice,
                 use_spline=True,
@@ -415,7 +415,7 @@ class FourierSliceExtraction(
                 unroll_gather=self.unroll_gather,
             )
         elif isinstance(volume_representation, FourierVoxelGridVolume):
-            fourier_projection = sample_rfft_surface(
+            fourier_projection = sample_fft_slice(
                 volume_representation.fourier_voxel_grid,
                 frequency_slice,
                 use_spline=False,
@@ -534,16 +534,16 @@ class EwaldSphereExtraction(
         # The Ewald sphere surface curves the in-plane slice out of its own
         # plane, so unlike `FourierSliceExtraction`, its output isn't
         # Hermitian-symmetric as a whole and every output pixel is queried
-        # independently. `central_slice_to_ewald_sphere` reconstructs the full
+        # independently. `ewald_sphere_from_slice` reconstructs the full
         # in-plane grid from the stored half one before curving.
-        ewald_sphere_frequencies = central_slice_to_ewald_sphere(
+        ewald_sphere_frequencies = ewald_sphere_from_slice(
             frequency_slice,
             image_config.pixel_size,
             image_config.wavelength_in_angstroms,
         )
         # Compute the fourier projection
         if isinstance(volume_representation, FourierVoxelSplineVolume):
-            ewald_sphere_surface = sample_rfft_surface(
+            ewald_sphere_surface = sample_fft_slice(
                 volume_representation.spline_coefficients,
                 ewald_sphere_frequencies,
                 use_spline=True,
@@ -551,7 +551,7 @@ class EwaldSphereExtraction(
                 unroll_gather=self.unroll_gather,
             )
         elif isinstance(volume_representation, FourierVoxelGridVolume):
-            ewald_sphere_surface = sample_rfft_surface(
+            ewald_sphere_surface = sample_fft_slice(
                 volume_representation.fourier_voxel_grid,
                 ewald_sphere_frequencies,
                 use_spline=False,

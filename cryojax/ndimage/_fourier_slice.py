@@ -25,12 +25,12 @@ from ._map_coordinates import (
 )
 
 
-def sample_rfft_surface(
+def sample_fft_slice(
     voxels_or_spline: (
         Complex[Array, "dim dim dim//2+1"] | Complex[Array, "dim+2 dim+2 dim//2+3"]
     ),
     /,
-    frequency_surface: Float[Array, "1 dim dim//2+1 3"] | Float[Array, "1 dim dim 3"],
+    frequency_slice: Float[Array, "1 dim dim//2+1 3"] | Float[Array, "1 dim dim 3"],
     *,
     use_spline: bool = False,
     out_of_bounds_mode: str = "fill",
@@ -55,7 +55,7 @@ def sample_rfft_surface(
         The voxel grid must be prepared with the convention used internally by
         `cryojax.simulator.FourierVoxelGridVolume`: `fftshift` the object in
         real space, then `fftshift` the two full axes in fourier space.
-        `cryojax.ndimage.prepare_sampling_rfft` does this for you.
+        `cryojax.ndimage.prepare_sampling_fft` does this for you.
 
         ```python
         import cryojax.ndimage as im
@@ -64,13 +64,13 @@ def sample_rfft_surface(
         real_voxel_grid = ...  # shape (dim, dim, dim)
         dim = real_voxel_grid.shape[0]
 
-        fourier_voxel_grid = im.prepare_sampling_rfft(real_voxel_grid)
+        fourier_voxel_grid = im.prepare_sampling_fft(real_voxel_grid)
 
         # The (unrotated) central-slice coordinate system, zero-centered
         frequency_slice = im.make_frequency_slice((dim, dim), fftshifted=True)
 
         # Extract the slice and transform back to a real-space projection
-        projection = im.sample_rfft_surface(
+        projection = im.sample_fft_slice(
             fourier_voxel_grid, frequency_slice
         )
         image = im.irfftn(projection, s=(dim, dim))
@@ -93,7 +93,7 @@ def sample_rfft_surface(
             frequency_slice
         )
 
-        projection = im.sample_rfft_surface(
+        projection = im.sample_fft_slice(
             fourier_voxel_grid, rotated_slice
         )
         ```
@@ -106,13 +106,13 @@ def sample_rfft_surface(
         `use_spline` is `True`, this should instead be the spline
         coefficients, of shape `(dim + 2, dim + 2, dim // 2 + 3)`, computed
         by `cryojax.ndimage.compute_spline_coefficients`.
-    - `frequency_surface`:
+    - `frequency_slice`:
         The 3D frequency coordinates to interpolate onto, in pixel units.
         This can either be a half (rfft) central slice of shape
         `(1, dim, dim // 2 + 1, 3)`, as returned by
         `cryojax.ndimage.make_frequency_slice`, or a full Ewald sphere
         surface of shape `(1, dim, dim, 3)`, as returned by
-        `cryojax.ndimage.central_slice_to_ewald_sphere`.
+        `cryojax.ndimage.ewald_sphere_from_slice`.
     - `use_spline`:
         If `True`, `voxels_or_spline` is interpreted as spline coefficients
         and interpolated with `cryojax.ndimage.map_coordinates_spline`.
@@ -132,12 +132,12 @@ def sample_rfft_surface(
     full Ewald sphere surface.
     """
     # Convert to logical coordinates
-    N = frequency_surface.shape[1]
+    N = frequency_slice.shape[1]
     if N % 2 != 0:
         raise ValueError(
-            "`sample_rfft_surface` does not support odd dimensions, but "
-            f"got a `frequency_surface` of dimension `{N}`. Please use a voxel "
-            "grid and `frequency_surface` with even dimensions."
+            "`sample_fft_slice` does not support odd dimensions, but "
+            f"got a `frequency_slice` of dimension `{N}`. Please use a voxel "
+            "grid and `frequency_slice` with even dimensions."
         )
     # Validate that `voxels_or_spline` matches `use_spline`: a raw fourier
     # voxel grid is stored at `(N, N, N // 2 + 1)`, while spline coefficients
@@ -145,9 +145,9 @@ def sample_rfft_surface(
     expected_shape = (N + 2, N + 2, N // 2 + 3) if use_spline else (N, N, N // 2 + 1)
     if voxels_or_spline.shape != expected_shape:
         raise ValueError(
-            f"`sample_rfft_surface` got input with shape "
+            f"`sample_fft_slice` got input with shape "
             f"`{voxels_or_spline.shape}` and `use_spline={use_spline}`, but for "
-            f"a `frequency_surface` of dimension `{N}` this array is expected to "
+            f"a `frequency_slice` of dimension `{N}` this array is expected to "
             f"have shape `{expected_shape}`. "
             + (
                 "Did you mean to pass `use_spline=False` (a raw fourier voxel grid)?"
@@ -164,8 +164,8 @@ def sample_rfft_surface(
     # approximation: it's evaluated once per query point, on the continuous
     # coordinate, before any interpolation taps are generated, so taps never
     # straddle the truncation boundary.
-    sign = jnp.where(frequency_surface[..., 0] < 0, -1.0, 1.0)
-    reflected = sign[..., None] * frequency_surface
+    sign = jnp.where(frequency_slice[..., 0] < 0, -1.0, 1.0)
+    reflected = sign[..., None] * frequency_slice
     k_x = reflected[..., 0] * N  # rfft/corner convention: no N // 2 offset
     k_y = reflected[..., 1] * N + N // 2
     k_z = reflected[..., 2] * N + N // 2
@@ -189,7 +189,7 @@ def sample_rfft_surface(
         surface = map_coordinates(voxels_or_spline, (k_z, k_y, k_x), **kwargs)[0, :, :]
     surface = jnp.where(sign[0, :, :] < 0, jnp.conj(surface), surface)
     # FFT shift and multiply by (-1)^k phase factors. `surface` is itself
-    # rfft-shaped only when `frequency_surface` was (i.e. only for the
+    # rfft-shaped only when `frequency_slice` was (i.e. only for the
     # half in-plane slice -- an Ewald sphere surface is always a full grid),
     # in which case only the first axis is shifted, mirroring the same
     # convention used for the 3D volume storage.
@@ -203,7 +203,7 @@ def sample_rfft_surface(
     return surface
 
 
-def prepare_sampling_rfft(
+def prepare_sampling_fft(
     real_voxel_grid: Float[Array, "dim dim dim"],
     *,
     apply_deconvolve: bool = True,
@@ -211,13 +211,13 @@ def prepare_sampling_rfft(
     use_spline: bool = False,
 ) -> Complex[Array, "dim dim dim//2+1"] | Complex[Array, "dim+2 dim+2 dim//2+3"]:
     """Transform a real-space voxel grid into the fourier-space array
-    consumed by `cryojax.ndimage.sample_rfft_surface`.
+    consumed by `cryojax.ndimage.sample_fft_slice`.
 
     This performs the same preprocessing used internally by
     `cryojax.simulator.FourierVoxelGridVolume` and
     `cryojax.simulator.FourierVoxelSplineVolume`: optional Fourier-padding and
     sinc² deconvolution, followed by the `rfftn` and the `fftshift`s that put
-    the grid in the center convention (see `sample_rfft_surface`).
+    the grid in the center convention (see `sample_fft_slice`).
 
     !!! example
 
@@ -226,11 +226,11 @@ def prepare_sampling_rfft(
 
         real_voxel_grid = ...  # shape (dim, dim, dim)
 
-        fourier_voxel_grid = im.prepare_sampling_rfft(real_voxel_grid)
+        fourier_voxel_grid = im.prepare_sampling_fft(real_voxel_grid)
         frequency_slice = im.make_frequency_slice(
             fourier_voxel_grid.shape[:2], fftshifted=True
         )
-        projection = im.sample_rfft_surface(
+        projection = im.sample_fft_slice(
             fourier_voxel_grid, frequency_slice
         )
         ```
@@ -252,7 +252,7 @@ def prepare_sampling_rfft(
         If `True`, return the cubic-spline coefficients (of shape
         `(dim + 2, dim + 2, dim // 2 + 3)`) computed by
         `cryojax.ndimage.compute_spline_coefficients`, ready for
-        `sample_rfft_surface(..., use_spline=True)`. Otherwise return
+        `sample_fft_slice(..., use_spline=True)`. Otherwise return
         the raw fourier voxel grid, of shape `(dim, dim, dim // 2 + 1)`.
 
     **Returns:**
@@ -263,12 +263,12 @@ def prepare_sampling_rfft(
     real_voxel_grid = jnp.asarray(real_voxel_grid, dtype=float)
     if real_voxel_grid.ndim != 3 or len(set(real_voxel_grid.shape)) != 1:
         raise ValueError(
-            "`prepare_sampling_rfft` only supports cubic voxel grids, but "
+            "`prepare_sampling_fft` only supports cubic voxel grids, but "
             f"got `real_voxel_grid.shape = {real_voxel_grid.shape}`."
         )
     if real_voxel_grid.shape[0] % 2 != 0:
         raise ValueError(
-            "`prepare_sampling_rfft` does not support odd voxel grid "
+            "`prepare_sampling_fft` does not support odd voxel grid "
             f"dimensions, but got `real_voxel_grid.shape = {real_voxel_grid.shape}`. "
             "Please pass a voxel grid with even dimensions."
         )
@@ -282,7 +282,7 @@ def prepare_sampling_rfft(
         real_voxel_grid_padded = pad_to_shape(real_voxel_grid, padded_shape)
     else:
         raise ValueError(
-            "Invalid value for `prepare_sampling_rfft(..., pad_scale=...)`. "
+            "Invalid value for `prepare_sampling_fft(..., pad_scale=...)`. "
             f"This must be a value `>= 1.0`, but got value `{pad_scale}`."
         )
     # Deconvolve after padding so the sinc² correction uses the actual
@@ -297,7 +297,7 @@ def prepare_sampling_rfft(
     return fourier_voxel_grid
 
 
-def central_slice_to_ewald_sphere(
+def ewald_sphere_from_slice(
     frequency_slice: Float[Array, "1 dim dim//2+1 3"],
     voxel_size: FloatLike,
     wavelength: FloatLike,
@@ -308,7 +308,7 @@ def central_slice_to_ewald_sphere(
     in-plane grid, and displace each in-plane frequency out of the plane onto
     the curved Ewald sphere surface. The result can be passed as the
     `frequency_slice` argument of
-    `cryojax.ndimage.sample_rfft_surface`.
+    `cryojax.ndimage.sample_fft_slice`.
 
     !!! example
 
@@ -318,10 +318,10 @@ def central_slice_to_ewald_sphere(
         # A half (rfft) central slice from `make_frequency_slice`
         frequency_slice = im.make_frequency_slice((dim, dim), fftshifted=True)
 
-        frequency_surface = im.central_slice_to_ewald_sphere(
+        frequency_surface = im.ewald_sphere_from_slice(
             frequency_slice, voxel_size, wavelength
         )
-        surface = im.sample_rfft_surface(fourier_voxel_grid, frequency_surface)
+        surface = im.sample_fft_slice(fourier_voxel_grid, frequency_surface)
         ```
 
     **Arguments:**
@@ -407,7 +407,7 @@ def _fftshift_fourier_voxel_grid(
     fourier_voxel_grid: Complex[Array, "dim dim dim//2+1"],
 ) -> Complex[Array, "dim dim dim//2+1"]:
     """Put an `rfftn` voxel grid in the center convention expected by
-    `sample_rfft_surface`.
+    `sample_fft_slice`.
     """
     dim = fourier_voxel_grid.shape[0]
     # Truncated (last) axis stays in rfft/corner convention -- only the two
