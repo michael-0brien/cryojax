@@ -76,11 +76,11 @@ from ._volume import (
 
 
 _REMOVED = {
-    "IndependentAtomVolume": "FourierAtomVolume",
-    "IndependentAtomProjection": "FourierAtomProjection",
-    "IndependentAtomRenderFn": "FourierAtomRenderFn",
     "RealVoxelCloudVolume": None,
     "RealVoxelProjection": None,
+    "IndependentAtomVolume": "GaussianFourierVolume",
+    "IndependentAtomProjection": "GaussianFourierProjection",
+    "IndependentAtomRenderFn": "GaussianFourierRenderFn",
     "AberratedAstigmaticCTF": "AstigmaticCTF",
     "CTF": "AstigmaticCTF",
     "NufftProjection": None,
