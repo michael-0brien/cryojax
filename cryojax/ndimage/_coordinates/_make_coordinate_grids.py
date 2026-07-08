@@ -145,30 +145,12 @@ def make_radial_frequency_grid(
 def make_frequency_slice(
     shape: tuple[int, int],
     grid_spacing: float | Float[np.ndarray, ""] | Float[Array, ""] = 1.0,
-    outputs_rfftfreqs: bool = False,
+    outputs_rfftfreqs: bool = True,
     fftshifted: bool = True,
 ) -> Float[Array, "1 {shape[0]} {shape[1]} 3"]:
-    """Create a fourier-space cartesian coordinate system on a grid, where
-    zero-frequency component is in the *center* of the grid.
-
-    !!! warning
-        In the function `make_frequency_grid`, the convention is that
-        the grid is returned with the zero frequency component is in the
-        corner. In this function, as mentioned above, frequency slices are
-        returned with the zero frequency component in the center. To convert
-        between the two conventions, run
-
-        ```python
-        import jax.numpy as jnp
-        from cryojax.coordinates import make_frequency_slice
-
-        frequency_slice_with_zero_in_center = make_frequency_slice((100, 100)) # Shape (1, 100, 100, 3)
-        frequency_slice_with_zero_in_corner = jnp.fft.ifftshift(frequency_slice_with_zero_in_center, axes=(1, 2))
-        ```
-
-        The reason for the difference is so that this function can be used to
-        directly pass a `frequency_slice` to the `cryojax.simulator.FourierVoxelGridPotential`,
-        which requires that the zero is in the center of the grid.
+    """Create central slice frequency coordinates. By default,
+    returns in the convention required for usage with
+    [`cryojax.ndimage.sample_rfft_surface`][].
 
     **Arguments:**
 

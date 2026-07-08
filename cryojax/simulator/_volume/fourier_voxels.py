@@ -3,7 +3,7 @@ Fourier voxel-based representations of a volume.
 """
 
 import abc
-from typing import Any, ClassVar, Self
+from typing import ClassVar, Self
 from typing_extensions import override
 
 import equinox as eqx
@@ -12,21 +12,18 @@ from jaxtyping import Array, Complex, Float
 
 from ...jax_util import NDArrayLike
 from ...ndimage import (
+    central_slice_to_ewald_sphere,
     compute_spline_coefficients,
     enforce_rfftn_self_conjugates,
     fftn,
     ifftn,
     irfftn,
-    make_1d_coordinate_grid,
-    make_1d_frequency_grid,
     make_fftshift_phase,
     make_frequency_slice,
-    map_coordinates,
-    map_coordinates_spline,
-    pad_to_shape,
-    query_efficient_grid_size,
+    prepare_rfft_sampling,
     resize_with_crop_or_pad,
     rfftn,
+    sample_rfft_surface,
 )
 from .._image_config import AbstractImageConfig
 from .._pose import AbstractPose
@@ -219,13 +216,15 @@ class FourierVoxelGridVolume(AbstractFourierVoxelVolume, strict=True):
             Scale factor at which to pad `real_voxel_grid` before fourier
             transform. Must be a value greater than `1.0`.
         """
-        # Cast to JAX array
-        real_voxel_grid = jnp.asarray(real_voxel_grid, dtype=float)
         # Preprocess to fourier grid, deconvolving after any padding so that
         # the sinc² correction uses the actual Fourier grid size.
-        fourier_voxel_grid, frequency_slice = _real_to_fourier_voxels(
-            cls, real_voxel_grid, pad_scale, apply_deconvolve
+        fourier_voxel_grid = prepare_rfft_sampling(
+            jnp.asarray(real_voxel_grid, dtype=float),
+            apply_deconvolve=apply_deconvolve,
+            pad_scale=pad_scale,
         )
+        dim = fourier_voxel_grid.shape[0]
+        frequency_slice = make_frequency_slice((dim, dim), fftshifted=True)
 
         return cls(fourier_voxel_grid, frequency_slice)
 
@@ -319,14 +318,14 @@ class FourierVoxelSplineVolume(AbstractFourierVoxelVolume, strict=True):
             Scale factor at which to pad `real_voxel_grid` before fourier
             transform. Must be a value greater than `1.0`.
         """
-        # Cast to JAX array
-        real_voxel_grid = jnp.asarray(real_voxel_grid, dtype=float)
-        # Preprocess to fourier grid
-        fourier_voxel_grid, frequency_slice = _real_to_fourier_voxels(
-            cls, real_voxel_grid, pad_scale
+        # Preprocess to fourier grid and compute spline coefficients
+        spline_coefficients = prepare_rfft_sampling(
+            jnp.asarray(real_voxel_grid, dtype=float),
+            pad_scale=pad_scale,
+            use_spline=True,
         )
-        # Compute spline coefficients
-        spline_coefficients = compute_spline_coefficients(fourier_voxel_grid)
+        dim = spline_coefficients.shape[0] - 2
+        frequency_slice = make_frequency_slice((dim, dim), fftshifted=True)
 
         return cls(spline_coefficients, frequency_slice)
 
@@ -408,16 +407,18 @@ class FourierSliceExtraction(
         N = frequency_slice.shape[1]
         # Compute the fourier projection
         if isinstance(volume_representation, FourierVoxelSplineVolume):
-            fourier_projection = _extract_slice_spline(
+            fourier_projection = sample_rfft_surface(
                 volume_representation.spline_coefficients,
                 frequency_slice,
+                use_spline=True,
                 out_of_bounds_mode=self.out_of_bounds_mode,
                 unroll_gather=self.unroll_gather,
             )
         elif isinstance(volume_representation, FourierVoxelGridVolume):
-            fourier_projection = _extract_slice(
+            fourier_projection = sample_rfft_surface(
                 volume_representation.fourier_voxel_grid,
                 frequency_slice,
+                use_spline=False,
                 out_of_bounds_mode=self.out_of_bounds_mode,
                 unroll_gather=self.unroll_gather,
             )
@@ -428,6 +429,12 @@ class FourierSliceExtraction(
                 "or `FourierVoxelSplineVolume`, "
                 f"but got `{volume_representation.__class__.__name__}`."
             )
+        # The extracted half-slice is already rfft-shaped (the query grid
+        # itself was), so only self-conjugate (DC/Nyquist) realness needs
+        # enforcing here -- no crop.
+        fourier_projection = enforce_rfftn_self_conjugates(
+            fourier_projection, (N, N), includes_dc=False, mode="zero"
+        )
 
         # Resize the image to match the AbstractImageConfig.padded_shape
         if image_config.padded_shape != (N, N):
@@ -527,25 +534,27 @@ class EwaldSphereExtraction(
         # The Ewald sphere surface curves the in-plane slice out of its own
         # plane, so unlike `FourierSliceExtraction`, its output isn't
         # Hermitian-symmetric as a whole and every output pixel is queried
-        # independently -- reconstruct the full in-plane grid from the
-        # stored half one before curving.
-        full_frequency_slice = _reconstruct_full_slice_from_half_slice(frequency_slice)
+        # independently. `central_slice_to_ewald_sphere` reconstructs the full
+        # in-plane grid from the stored half one before curving.
+        ewald_sphere_frequencies = central_slice_to_ewald_sphere(
+            frequency_slice,
+            image_config.pixel_size,
+            image_config.wavelength_in_angstroms,
+        )
         # Compute the fourier projection
         if isinstance(volume_representation, FourierVoxelSplineVolume):
-            ewald_sphere_surface = _extract_ewald_sphere_spline(
+            ewald_sphere_surface = sample_rfft_surface(
                 volume_representation.spline_coefficients,
-                full_frequency_slice,
-                image_config.pixel_size,
-                image_config.wavelength_in_angstroms,
+                ewald_sphere_frequencies,
+                use_spline=True,
                 out_of_bounds_mode=self.out_of_bounds_mode,
                 unroll_gather=self.unroll_gather,
             )
         elif isinstance(volume_representation, FourierVoxelGridVolume):
-            ewald_sphere_surface = _extract_ewald_sphere(
+            ewald_sphere_surface = sample_rfft_surface(
                 volume_representation.fourier_voxel_grid,
-                full_frequency_slice,
-                image_config.pixel_size,
-                image_config.wavelength_in_angstroms,
+                ewald_sphere_frequencies,
+                use_spline=False,
                 out_of_bounds_mode=self.out_of_bounds_mode,
                 unroll_gather=self.unroll_gather,
             )
@@ -574,214 +583,6 @@ class EwaldSphereExtraction(
         )
 
 
-def _extract_slice(
-    fourier_voxel_grid: Array,
-    frequency_slice: Array,
-    **kwargs: Any,
-) -> Complex[Array, "dim dim//2+1"]:
-    N = frequency_slice.shape[1]
-    surface = _extract_surface_from_voxel_grid(
-        fourier_voxel_grid,
-        frequency_slice,
-        is_spline_coefficients=False,
-        **kwargs,
-    )
-    # `surface` is already rfft-shaped (the query grid itself was), so only
-    # self-conjugate (DC/Nyquist) realness needs enforcing here -- no crop.
-    return enforce_rfftn_self_conjugates(surface, (N, N), includes_dc=False, mode="zero")
-
-
-def _extract_slice_spline(
-    spline_coefficients: Array, frequency_slice: Array, **kwargs: Any
-) -> Complex[Array, "dim dim//2+1"]:
-    N = frequency_slice.shape[1]
-    surface = _extract_surface_from_voxel_grid(
-        spline_coefficients, frequency_slice, is_spline_coefficients=True, **kwargs
-    )
-    return enforce_rfftn_self_conjugates(surface, (N, N), includes_dc=False, mode="zero")
-
-
-def _extract_ewald_sphere(
-    fourier_voxel_grid: Array,
-    frequency_slice: Array,
-    voxel_size: Array,
-    wavelength: Array,
-    **kwargs: Any,
-) -> Complex[Array, "dim dim"]:
-    ewald_sphere_frequencies = _get_ewald_sphere_surface_from_slice(
-        frequency_slice, voxel_size, wavelength
-    )
-    return _extract_surface_from_voxel_grid(
-        fourier_voxel_grid,
-        ewald_sphere_frequencies,
-        is_spline_coefficients=False,
-        **kwargs,
-    )
-
-
-def _extract_ewald_sphere_spline(
-    spline_coefficients: Array,
-    frequency_slice: Array,
-    voxel_size: Array,
-    wavelength: Array,
-    **kwargs: Any,
-) -> Complex[Array, "dim dim"]:
-    ewald_sphere_frequencies = _get_ewald_sphere_surface_from_slice(
-        frequency_slice, voxel_size, wavelength
-    )
-    return _extract_surface_from_voxel_grid(
-        spline_coefficients,
-        ewald_sphere_frequencies,
-        is_spline_coefficients=True,
-        **kwargs,
-    )
-
-
-def _reconstruct_full_slice_from_half_slice(
-    half_slice: Float[Array, "1 dim dim//2+1 3"],
-) -> Float[Array, "1 dim dim 3"]:
-    """Reconstruct the full in-plane frequency grid from the half (rfft) one
-    stored on the volume, for `EwaldSphereExtraction`, which needs the full
-    grid to compute its local `xhat`/`yhat`/`zhat` basis and to produce its
-    curved, non-Hermitian-symmetric-as-a-whole output surface.
-
-    A rotated in-plane grid is an exactly linear function of the (unrotated)
-    local x-coordinate, for any fixed y: `slice(x, y) = x * xhat_rot +
-    slice(0, y)`, where `xhat_rot` is a single constant vector (the rotated
-    local x unit vector). `xhat_rot` is recovered from any two adjacent
-    columns of the half grid, then used to extrapolate every column of the
-    full grid. This is exact (no interpolation, and no reflection of array
-    indices, so no boundary case at the row-Nyquist frequency -- unlike a
-    literal point-reflection, this only ever reads columns that are already
-    stored in `half_slice`).
-    """
-    N = half_slice.shape[1]
-    xhat_rot = N * (half_slice[:, :, 1, :] - half_slice[:, :, 0, :])
-    x_full = make_1d_frequency_grid(N, outputs_rfftfreqs=False, fftshifted=True)
-    x_term = x_full[None, None, :, None] * xhat_rot[:, :, None, :]
-    return half_slice[:, :, 0:1, :] + x_term
-
-
-def _get_ewald_sphere_surface_from_slice(
-    frequency_slice_in_pixels: Array, voxel_size: Array, wavelength: Array
-) -> Float[Array, "1 dim dim 3"]:
-    frequency_slice_with_zero_in_corner = jnp.fft.ifftshift(
-        frequency_slice_in_pixels, axes=(0, 1, 2)
-    )
-    # Get zhat unit vector of the frequency slice
-    xhat, yhat = (
-        frequency_slice_with_zero_in_corner[0, 0, 1, :],
-        frequency_slice_with_zero_in_corner[0, 1, 0, :],
-    )
-    xhat, yhat = xhat / jnp.linalg.norm(xhat), yhat / jnp.linalg.norm(yhat)
-    zhat = jnp.cross(xhat, yhat)
-    # Compute the ewald sphere surface, assuming the frequency slice is
-    # in a rotated frame
-    q_at_slice = frequency_slice_in_pixels
-    q_squared = jnp.sum(q_at_slice**2, axis=-1)
-    q_at_surface = (
-        q_at_slice
-        + (wavelength / voxel_size)
-        * (q_squared[..., None] * zhat[None, None, None, :])
-        / 2
-    )
-    return q_at_surface
-
-
-def _extract_surface_from_voxel_grid(
-    voxel_grid: Array,
-    frequency_coordinates: Array,
-    is_spline_coefficients: bool = False,
-    **kwargs: Any,
-):
-    # Convert to logical coordinates
-    N = frequency_coordinates.shape[1]
-    # `voxel_grid`'s last axis only stores non-negative frequencies along x
-    # (i.e. `F(-q) = conj(F(q))` is not stored, only `F(q)` for `q_x >= 0`).
-    # Reflect the whole 3-vector through the origin whenever `q_x < 0`, so we
-    # always look up a point with `q_x >= 0`, then conjugate the interpolated
-    # result to correct for it. This is exact, not an approximation: it's
-    # evaluated once per query point, on the continuous coordinate, before
-    # any interpolation taps are generated, so taps never straddle the
-    # truncation boundary.
-    sign = jnp.where(frequency_coordinates[..., 0] < 0, -1.0, 1.0)
-    reflected = sign[..., None] * frequency_coordinates
-    k_x = reflected[..., 0] * N  # rfft/corner convention: no N // 2 offset
-    k_y = reflected[..., 1] * N + N // 2
-    k_z = reflected[..., 2] * N + N // 2
-    # The centered axes' Nyquist bin (frequency -0.5) is stored only at
-    # index 0, not also at index N -- +0.5 and -0.5 are the same (aliased)
-    # physical frequency. Reflecting a coordinate that was exactly at -0.5
-    # lands exactly on index N, one past the valid range; wrap that exact
-    # case back to index 0, without touching any other (genuinely
-    # out-of-bounds) coordinate.
-    k_y = jnp.where(k_y == N, 0.0, k_y)
-    k_z = jnp.where(k_z == N, 0.0, k_z)
-    if is_spline_coefficients:
-        spline_coefficients = voxel_grid
-        surface = map_coordinates_spline(spline_coefficients, (k_z, k_y, k_x), **kwargs)[
-            0, :, :
-        ]
-    else:
-        fourier_voxel_grid = voxel_grid
-        surface = map_coordinates(fourier_voxel_grid, (k_z, k_y, k_x), **kwargs)[0, :, :]
-    surface = jnp.where(sign[0, :, :] < 0, jnp.conj(surface), surface)
-    # FFT shift and multiply by (-1)^k phase factors. `surface` is itself
-    # rfft-shaped only when `frequency_coordinates` was (i.e. only for
-    # `FourierSliceExtraction`'s half in-plane slice -- `EwaldSphereExtraction`
-    # always reconstructs a full grid before calling this function), in which
-    # case only the first axis is shifted, mirroring the same convention used
-    # for the 3D volume storage.
-    if surface.shape[0] == surface.shape[1]:
-        surface = jnp.fft.ifftshift(make_fftshift_phase(surface.shape) * surface)
-    else:
-        surface = jnp.fft.ifftshift(
-            make_fftshift_phase((N, N), outputs_rfft=True) * surface, axes=(0,)
-        )
-
-    return surface
-
-
-def _deconvolve_linear(real_voxel_grid: Array) -> Array:
-    """Deconvolves the effect of the triangular interpolation kernel"""
-    dim = real_voxel_grid.shape[0]
-    assert all(dim == d for d in real_voxel_grid.shape)
-    x = make_1d_coordinate_grid(dim)
-    sinc_array = jnp.sinc(x / dim)
-    deconvolve_factor = (
-        sinc_array[:, None, None] * sinc_array[None, :, None] * sinc_array[None, None, :]
-    ) ** 2
-    return real_voxel_grid / deconvolve_factor
-
-
-def _real_to_fourier_voxels(
-    cls,
-    real_voxel_grid: Array,
-    pad_scale: float,
-    apply_deconvolve: bool = False,
-) -> tuple[Array, Array]:
-    if pad_scale == 1.0:
-        shape_p = real_voxel_grid.shape
-        real_voxel_grid_p = real_voxel_grid
-    elif pad_scale > 1.0:
-        shape_p = query_efficient_grid_size(
-            real_voxel_grid.shape, pad_scale=pad_scale, only_even=True
-        )
-        real_voxel_grid_p = pad_to_shape(real_voxel_grid, shape_p)
-    else:
-        raise ValueError(
-            "Invalid value for "
-            f"`{cls.__name__}.from_real_voxel_grid(..., pad_scale=...)`. "
-            f"This must be greater than `1.0`, but got value `{pad_scale}`."
-        )
-    # Deconvolve after padding so the sinc² correction uses the actual
-    # Fourier grid size (N_pad), not the original unpadded size.
-    if apply_deconvolve:
-        real_voxel_grid_p = _deconvolve_linear(real_voxel_grid_p)
-
-    return _prepare_fourier_voxel_arguments(rfftn(real_voxel_grid_p))
-
-
 def _prepare_fourier_voxel_arguments(fourier_voxel_grid: Array) -> tuple[Array, Array]:
     dim = fourier_voxel_grid.shape[0]
     # Only the kept (non-negative local-x) half of the in-plane slice is
@@ -789,9 +590,7 @@ def _prepare_fourier_voxel_arguments(fourier_voxel_grid: Array) -> tuple[Array, 
     # and `EwaldSphereExtraction` reconstructs the full grid on demand from
     # this half (see `_reconstruct_full_slice_from_half_slice`). This halves
     # the cost of rotating the slice to a pose.
-    frequency_slice = make_frequency_slice(
-        (dim, dim), outputs_rfftfreqs=True, fftshifted=True
-    )
+    frequency_slice = make_frequency_slice((dim, dim), fftshifted=True)
     # Truncated (last) axis stays in rfft/corner convention -- only the
     # two full axes get fftshift'd to center convention.
     phase = make_fftshift_phase((dim, dim, dim), outputs_rfft=True)

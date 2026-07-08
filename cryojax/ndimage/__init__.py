@@ -26,6 +26,11 @@ from ._fft import (
     irfftn as irfftn,
     rfftn as rfftn,
 )
+from ._fourier_slice import (
+    central_slice_to_ewald_sphere as central_slice_to_ewald_sphere,
+    prepare_rfft_sampling as prepare_rfft_sampling,
+    sample_rfft_surface as sample_rfft_surface,
+)
 from ._fourier_statistics import (
     compute_binned_powerspectrum as compute_binned_powerspectrum,
     compute_fourier_ring_correlation as compute_fourier_ring_correlation,

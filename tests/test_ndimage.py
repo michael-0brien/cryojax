@@ -537,3 +537,97 @@ _fourier_operators_3d = _fourier_operators_common
 _real_operators_1d = [*_real_operators_common, im.RealGaussian(offset=1.0)]
 _real_operators_2d = [*_real_operators_common, im.RealGaussian(offset=(1.0, -1.0))]
 _real_operators_3d = [*_real_operators_common, im.RealGaussian(offset=(1.0, -1.0, 0.0))]
+
+
+#
+# Fourier projection-slice extraction
+#
+# These exercise the `cryojax.ndimage` API contracts directly. The actual
+# slice/Ewald extraction accuracy is covered end-to-end in
+# `test_volume_voxel.py`, so we deliberately avoid re-testing that here.
+@pytest.mark.parametrize(
+    "use_spline, pad_scale, expected_shape",
+    (
+        (False, 1.0, (8, 8, 5)),
+        (True, 1.0, (10, 10, 7)),
+        (False, 2.0, (16, 16, 9)),
+        (True, 2.0, (18, 18, 11)),
+    ),
+)
+def test_prepare_rfft_sampling_shapes(use_spline, pad_scale, expected_shape):
+    real_voxel_grid = jr.normal(jr.key(0), (8, 8, 8))
+    prepared = im.prepare_rfft_sampling(
+        real_voxel_grid, pad_scale=pad_scale, use_spline=use_spline
+    )
+    assert prepared.shape == expected_shape
+
+
+def test_prepare_rfft_sampling_deconvolve_ignored_for_spline():
+    # `apply_deconvolve` compensates for trilinear interpolation, so it must
+    # be a no-op for spline coefficients but change the raw fourier grid.
+    real_voxel_grid = jr.normal(jr.key(0), (8, 8, 8))
+    spline_on = im.prepare_rfft_sampling(
+        real_voxel_grid, use_spline=True, apply_deconvolve=True
+    )
+    spline_off = im.prepare_rfft_sampling(
+        real_voxel_grid, use_spline=True, apply_deconvolve=False
+    )
+    np.testing.assert_array_equal(spline_on, spline_off)
+
+    grid_on = im.prepare_rfft_sampling(real_voxel_grid, apply_deconvolve=True)
+    grid_off = im.prepare_rfft_sampling(real_voxel_grid, apply_deconvolve=False)
+    assert not jnp.allclose(grid_on, grid_off)
+
+
+def test_prepare_rfft_sampling_invalid_pad_scale():
+    real_voxel_grid = jr.normal(jr.key(0), (8, 8, 8))
+    with pytest.raises(ValueError, match="pad_scale"):
+        im.prepare_rfft_sampling(real_voxel_grid, pad_scale=0.5)
+
+
+def test_prepare_rfft_sampling_rejects_odd_and_noncubic():
+    # The rfft half-grid logic assumes cubic, even dimensions.
+    with pytest.raises(ValueError, match="even"):
+        im.prepare_rfft_sampling(jr.normal(jr.key(0), (7, 7, 7)))
+    with pytest.raises(ValueError, match="cubic"):
+        im.prepare_rfft_sampling(jr.normal(jr.key(0), (8, 8, 6)))
+
+
+def test_sample_rfft_surface_rejects_odd_dim():
+    grid = im.prepare_rfft_sampling(jr.normal(jr.key(0), (8, 8, 8)))
+    odd_frequency_slice = im.make_frequency_slice((7, 7), fftshifted=True)
+    with pytest.raises(ValueError, match="even"):
+        im.sample_rfft_surface(grid, odd_frequency_slice)
+
+
+@pytest.mark.parametrize("use_spline", (False, True))
+def test_sample_rfft_surface_shape_check(use_spline):
+    # Passing a grid with `use_spline=True` (or spline coefficients with
+    # `use_spline=False`) must be rejected, since the expected shapes differ.
+    real_voxel_grid = jr.normal(jr.key(0), (8, 8, 8))
+    # Deliberately mismatched: prepare the *wrong* representation.
+    mismatched = im.prepare_rfft_sampling(real_voxel_grid, use_spline=not use_spline)
+    frequency_slice = im.make_frequency_slice((8, 8), fftshifted=True)
+    with pytest.raises(ValueError, match="use_spline"):
+        im.sample_rfft_surface(mismatched, frequency_slice, use_spline=use_spline)
+
+
+def test_central_slice_to_ewald_sphere_curvature():
+    # For an unrotated slice, the Ewald surface keeps the in-plane
+    # coordinates and displaces out of plane by `(wavelength / voxel_size) *
+    # |q|**2 / 2` along the slice normal. The `wavelength=0` call gives the
+    # flat, fully-reconstructed slice used as the in-plane reference.
+    N, voxel_size, wavelength = 16, 1.3, 0.02
+    frequency_slice = im.make_frequency_slice((N, N), fftshifted=True)
+    flat = im.central_slice_to_ewald_sphere(frequency_slice, voxel_size, 0.0)
+    surface = im.central_slice_to_ewald_sphere(frequency_slice, voxel_size, wavelength)
+
+    assert surface.shape == (1, N, N, 3)
+    # The `wavelength=0` surface is flat (no out-of-plane displacement).
+    np.testing.assert_allclose(flat[..., 2], 0.0, atol=1e-6)
+    # In-plane coordinates are unchanged by the curving.
+    np.testing.assert_allclose(surface[..., 0:2], flat[..., 0:2], atol=1e-6)
+    # Out-of-plane displacement matches the analytic Ewald curvature.
+    q_squared = flat[..., 0] ** 2 + flat[..., 1] ** 2
+    predicted_z = (wavelength / voxel_size) * q_squared / 2
+    np.testing.assert_allclose(surface[..., 2], predicted_z, atol=1e-6)

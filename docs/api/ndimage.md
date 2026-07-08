@@ -301,3 +301,11 @@ This documentation is a collection of functions used to work with coordinate sys
 ::: cryojax.ndimage.map_coordinates_spline
 
 ::: cryojax.ndimage.compute_spline_coefficients
+
+### Fourier projection-slice extraction
+
+::: cryojax.ndimage.prepare_rfft_sampling
+
+::: cryojax.ndimage.sample_rfft_surface
+
+::: cryojax.ndimage.central_slice_to_ewald_sphere
