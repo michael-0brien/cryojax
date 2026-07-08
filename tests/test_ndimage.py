@@ -24,6 +24,103 @@ def test_downsample_preserves_sum(shape, downsample_factor):
     np.testing.assert_allclose(image.sum(), upsampled_image.sum())
 
 
+def _flip_about_center(array):
+    """Flip an array about the RELION-convention real-space center (index
+    `shape // 2` on every axis), rather than about index `0` like `jnp.flip`.
+    Equal to `jnp.flip` on odd-length axes; requires an extra one-pixel roll
+    on even-length axes.
+    """
+    out = array
+    for axis, size in enumerate(array.shape):
+        out = jnp.flip(out, axis=axis)
+        if size % 2 == 0:
+            out = jnp.roll(out, shift=1, axis=axis)
+    return out
+
+
+@pytest.mark.parametrize(
+    "shape, downsample_factor",
+    (
+        ((20, 20), 2),
+        ((21, 21), 2),
+        ((20, 20), 3),
+        ((30, 30), 2.5),
+        ((16, 20), 2),
+        ((16, 16, 16), 2),
+    ),
+)
+def test_fourier_crop_downsample_center_unchanged(shape, downsample_factor):
+    # A real-space bump centered exactly at the RELION-convention center
+    # index (`shape // 2`) should still peak at the (downsampled) center
+    # index after downsampling.
+    coordinate_grid = im.make_coordinate_grid(shape)
+    image_or_volume = jnp.exp(-jnp.sum(coordinate_grid**2, axis=-1) / 8.0)
+    downsampled = im.fourier_crop_downsample(image_or_volume, downsample_factor)
+    peak_index = jnp.unravel_index(jnp.argmax(downsampled), downsampled.shape)
+    center_index = tuple(s // 2 for s in downsampled.shape)
+    assert peak_index == center_index
+
+
+@pytest.mark.parametrize(
+    "shape, downsample_factor",
+    (
+        ((20, 20), 2),
+        ((21, 21), 2),
+        ((20, 20), 3),
+        ((16, 20), 2),
+        ((15, 21), 3),
+        ((16, 16, 16), 2),
+    ),
+)
+def test_fourier_crop_downsample_preserves_center_symmetry(shape, downsample_factor):
+    # A real-space signal that is symmetric about the RELION-convention
+    # center should remain symmetric about that same (downsampled) center
+    # index after downsampling.
+    coordinate_grid = im.make_coordinate_grid(shape)
+    image_or_volume = jnp.exp(-jnp.sum(coordinate_grid**2, axis=-1) / 8.0)
+    downsampled = im.fourier_crop_downsample(image_or_volume, downsample_factor)
+    np.testing.assert_allclose(downsampled, _flip_about_center(downsampled), atol=1e-4)
+
+
+def test_fourier_crop_downsample_factor_one_is_identity():
+    rng_key = jr.key(seed=0)
+    image = jr.normal(rng_key, (10, 10))
+    downsampled = im.fourier_crop_downsample(image, 1)
+    np.testing.assert_allclose(downsampled, image, atol=1e-5)
+
+
+@pytest.mark.parametrize(
+    "shape, pixel_size, downsample_factor, sigma",
+    (
+        ((60, 60), 0.5, 3, 8.0),
+        ((80, 80), 1.0, 2, 10.0),
+        ((63, 63), 0.75, 3, 9.0),
+        ((40, 40, 40), 0.5, 2, 6.0),
+    ),
+)
+def test_fourier_crop_downsample_matches_directly_rendered_gaussian(
+    shape, pixel_size, downsample_factor, sigma
+):
+    # Downsampling a well-resolved (i.e. not aliased -- `sigma` much greater
+    # than either pixel size) Gaussian rendered at a fine pixel size should
+    # quantitatively agree with directly rendering the same Gaussian at the
+    # coarse pixel size. `preserve_mean=True` is needed so that amplitude
+    # (rather than sum) is preserved, matching the amplitude-normalized,
+    # directly-rendered Gaussian.
+    fine_grid = im.make_coordinate_grid(shape) * pixel_size
+    fine_gaussian = jnp.exp(-jnp.sum(fine_grid**2, axis=-1) / (2 * sigma**2))
+
+    downsampled = im.fourier_crop_downsample(
+        fine_gaussian, downsample_factor, preserve_mean=True
+    )
+
+    coarse_shape = tuple(s // downsample_factor for s in shape)
+    coarse_grid = im.make_coordinate_grid(coarse_shape) * (pixel_size * downsample_factor)
+    coarse_gaussian = jnp.exp(-jnp.sum(coarse_grid**2, axis=-1) / (2 * sigma**2))
+
+    np.testing.assert_allclose(downsampled, coarse_gaussian, atol=2e-2)
+
+
 #
 # FFT
 #
@@ -545,3 +642,95 @@ def test_spread_3d_custom_vjp(points_3d, use_erf, scalar_variance):
         atol=1e-4,
         rtol=1e-4,
     )
+#
+# Fourier projection-slice extraction
+#
+# These exercise the `cryojax.ndimage` API contracts directly. The actual
+# slice/Ewald extraction accuracy is covered end-to-end in
+# `test_volume_voxel.py`, so we deliberately avoid re-testing that here.
+@pytest.mark.parametrize(
+    "use_spline, pad_scale, expected_shape",
+    (
+        (False, 1.0, (8, 8, 5)),
+        (True, 1.0, (10, 10, 7)),
+        (False, 2.0, (16, 16, 9)),
+        (True, 2.0, (18, 18, 11)),
+    ),
+)
+def test_prepare_sampling_fft_shapes(use_spline, pad_scale, expected_shape):
+    real_voxel_grid = jr.normal(jr.key(0), (8, 8, 8))
+    prepared = im.prepare_sampling_fft(
+        real_voxel_grid, pad_scale=pad_scale, use_spline=use_spline
+    )
+    assert prepared.shape == expected_shape
+
+
+def test_prepare_sampling_fft_deconvolve_ignored_for_spline():
+    # `apply_deconvolve` compensates for trilinear interpolation, so it must
+    # be a no-op for spline coefficients but change the raw fourier grid.
+    real_voxel_grid = jr.normal(jr.key(0), (8, 8, 8))
+    spline_on = im.prepare_sampling_fft(
+        real_voxel_grid, use_spline=True, apply_deconvolve=True
+    )
+    spline_off = im.prepare_sampling_fft(
+        real_voxel_grid, use_spline=True, apply_deconvolve=False
+    )
+    np.testing.assert_array_equal(spline_on, spline_off)
+
+    grid_on = im.prepare_sampling_fft(real_voxel_grid, apply_deconvolve=True)
+    grid_off = im.prepare_sampling_fft(real_voxel_grid, apply_deconvolve=False)
+    assert not jnp.allclose(grid_on, grid_off)
+
+
+def test_prepare_sampling_fft_invalid_pad_scale():
+    real_voxel_grid = jr.normal(jr.key(0), (8, 8, 8))
+    with pytest.raises(ValueError, match="pad_scale"):
+        im.prepare_sampling_fft(real_voxel_grid, pad_scale=0.5)
+
+
+def test_prepare_sampling_fft_rejects_odd_and_noncubic():
+    # The rfft half-grid logic assumes cubic, even dimensions.
+    with pytest.raises(ValueError, match="even"):
+        im.prepare_sampling_fft(jr.normal(jr.key(0), (7, 7, 7)))
+    with pytest.raises(ValueError, match="cubic"):
+        im.prepare_sampling_fft(jr.normal(jr.key(0), (8, 8, 6)))
+
+
+def test_sample_fft_slice_rejects_odd_dim():
+    grid = im.prepare_sampling_fft(jr.normal(jr.key(0), (8, 8, 8)))
+    odd_frequency_slice = im.make_frequency_slice((7, 7), fftshifted=True)
+    with pytest.raises(ValueError, match="even"):
+        im.sample_fft_slice(grid, odd_frequency_slice)
+
+
+@pytest.mark.parametrize("use_spline", (False, True))
+def test_sample_fft_slice_shape_check(use_spline):
+    # Passing a grid with `use_spline=True` (or spline coefficients with
+    # `use_spline=False`) must be rejected, since the expected shapes differ.
+    real_voxel_grid = jr.normal(jr.key(0), (8, 8, 8))
+    # Deliberately mismatched: prepare the *wrong* representation.
+    mismatched = im.prepare_sampling_fft(real_voxel_grid, use_spline=not use_spline)
+    frequency_slice = im.make_frequency_slice((8, 8), fftshifted=True)
+    with pytest.raises(ValueError, match="use_spline"):
+        im.sample_fft_slice(mismatched, frequency_slice, use_spline=use_spline)
+
+
+def test_ewald_sphere_from_slice_curvature():
+    # For an unrotated slice, the Ewald surface keeps the in-plane
+    # coordinates and displaces out of plane by `(wavelength / voxel_size) *
+    # |q|**2 / 2` along the slice normal. The `wavelength=0` call gives the
+    # flat, fully-reconstructed slice used as the in-plane reference.
+    N, voxel_size, wavelength = 16, 1.3, 0.02
+    frequency_slice = im.make_frequency_slice((N, N), fftshifted=True)
+    flat = im.ewald_sphere_from_slice(frequency_slice, voxel_size, 0.0)
+    surface = im.ewald_sphere_from_slice(frequency_slice, voxel_size, wavelength)
+
+    assert surface.shape == (1, N, N, 3)
+    # The `wavelength=0` surface is flat (no out-of-plane displacement).
+    np.testing.assert_allclose(flat[..., 2], 0.0, atol=1e-6)
+    # In-plane coordinates are unchanged by the curving.
+    np.testing.assert_allclose(surface[..., 0:2], flat[..., 0:2], atol=1e-6)
+    # Out-of-plane displacement matches the analytic Ewald curvature.
+    q_squared = flat[..., 0] ** 2 + flat[..., 1] ** 2
+    predicted_z = (wavelength / voxel_size) * q_squared / 2
+    np.testing.assert_allclose(surface[..., 2], predicted_z, atol=1e-6)
