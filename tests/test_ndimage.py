@@ -22,6 +22,103 @@ def test_downsample_preserves_sum(shape, downsample_factor):
     np.testing.assert_allclose(image.sum(), upsampled_image.sum())
 
 
+def _flip_about_center(array):
+    """Flip an array about the RELION-convention real-space center (index
+    `shape // 2` on every axis), rather than about index `0` like `jnp.flip`.
+    Equal to `jnp.flip` on odd-length axes; requires an extra one-pixel roll
+    on even-length axes.
+    """
+    out = array
+    for axis, size in enumerate(array.shape):
+        out = jnp.flip(out, axis=axis)
+        if size % 2 == 0:
+            out = jnp.roll(out, shift=1, axis=axis)
+    return out
+
+
+@pytest.mark.parametrize(
+    "shape, downsample_factor",
+    (
+        ((20, 20), 2),
+        ((21, 21), 2),
+        ((20, 20), 3),
+        ((30, 30), 2.5),
+        ((16, 20), 2),
+        ((16, 16, 16), 2),
+    ),
+)
+def test_fourier_crop_downsample_center_unchanged(shape, downsample_factor):
+    # A real-space bump centered exactly at the RELION-convention center
+    # index (`shape // 2`) should still peak at the (downsampled) center
+    # index after downsampling.
+    coordinate_grid = im.make_coordinate_grid(shape)
+    image_or_volume = jnp.exp(-jnp.sum(coordinate_grid**2, axis=-1) / 8.0)
+    downsampled = im.fourier_crop_downsample(image_or_volume, downsample_factor)
+    peak_index = jnp.unravel_index(jnp.argmax(downsampled), downsampled.shape)
+    center_index = tuple(s // 2 for s in downsampled.shape)
+    assert peak_index == center_index
+
+
+@pytest.mark.parametrize(
+    "shape, downsample_factor",
+    (
+        ((20, 20), 2),
+        ((21, 21), 2),
+        ((20, 20), 3),
+        ((16, 20), 2),
+        ((15, 21), 3),
+        ((16, 16, 16), 2),
+    ),
+)
+def test_fourier_crop_downsample_preserves_center_symmetry(shape, downsample_factor):
+    # A real-space signal that is symmetric about the RELION-convention
+    # center should remain symmetric about that same (downsampled) center
+    # index after downsampling.
+    coordinate_grid = im.make_coordinate_grid(shape)
+    image_or_volume = jnp.exp(-jnp.sum(coordinate_grid**2, axis=-1) / 8.0)
+    downsampled = im.fourier_crop_downsample(image_or_volume, downsample_factor)
+    np.testing.assert_allclose(downsampled, _flip_about_center(downsampled), atol=1e-4)
+
+
+def test_fourier_crop_downsample_factor_one_is_identity():
+    rng_key = jr.key(seed=0)
+    image = jr.normal(rng_key, (10, 10))
+    downsampled = im.fourier_crop_downsample(image, 1)
+    np.testing.assert_allclose(downsampled, image, atol=1e-5)
+
+
+@pytest.mark.parametrize(
+    "shape, pixel_size, downsample_factor, sigma",
+    (
+        ((60, 60), 0.5, 3, 8.0),
+        ((80, 80), 1.0, 2, 10.0),
+        ((63, 63), 0.75, 3, 9.0),
+        ((40, 40, 40), 0.5, 2, 6.0),
+    ),
+)
+def test_fourier_crop_downsample_matches_directly_rendered_gaussian(
+    shape, pixel_size, downsample_factor, sigma
+):
+    # Downsampling a well-resolved (i.e. not aliased -- `sigma` much greater
+    # than either pixel size) Gaussian rendered at a fine pixel size should
+    # quantitatively agree with directly rendering the same Gaussian at the
+    # coarse pixel size. `preserve_mean=True` is needed so that amplitude
+    # (rather than sum) is preserved, matching the amplitude-normalized,
+    # directly-rendered Gaussian.
+    fine_grid = im.make_coordinate_grid(shape) * pixel_size
+    fine_gaussian = jnp.exp(-jnp.sum(fine_grid**2, axis=-1) / (2 * sigma**2))
+
+    downsampled = im.fourier_crop_downsample(
+        fine_gaussian, downsample_factor, preserve_mean=True
+    )
+
+    coarse_shape = tuple(s // downsample_factor for s in shape)
+    coarse_grid = im.make_coordinate_grid(coarse_shape) * (pixel_size * downsample_factor)
+    coarse_gaussian = jnp.exp(-jnp.sum(coarse_grid**2, axis=-1) / (2 * sigma**2))
+
+    np.testing.assert_allclose(downsampled, coarse_gaussian, atol=2e-2)
+
+
 #
 # FFT
 #

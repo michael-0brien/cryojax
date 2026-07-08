@@ -141,7 +141,7 @@ def fourier_crop_downsample(
     outputs_real_space: bool = True,
     preserve_mean: bool = False,
     *,
-    outputs_resolved_factor: Literal[False] = False,
+    outputs_factor: Literal[False] = False,
 ) -> Inexact[Array, "_ _"] | Inexact[Array, "_ _ _"]: ...
 
 
@@ -152,7 +152,7 @@ def fourier_crop_downsample(
     outputs_real_space: bool = True,
     preserve_mean: bool = False,
     *,
-    outputs_resolved_factor: Literal[True],
+    outputs_factor: Literal[True],
 ) -> tuple[Inexact[Array, "_ _"] | Inexact[Array, "_ _ _"], tuple[float, ...]]: ...
 
 
@@ -162,7 +162,7 @@ def fourier_crop_downsample(
     outputs_real_space: bool = True,
     preserve_mean: bool = False,
     *,
-    outputs_resolved_factor: bool = False,
+    outputs_factor: bool = False,
 ) -> (
     Inexact[Array, "_ _"]
     | Inexact[Array, "_ _ _"]
@@ -183,7 +183,7 @@ def fourier_crop_downsample(
     achievable with integer-pixel padding; the new shape and padding are
     instead chosen to make the achieved ratio as close to `downsample_factor`
     as possible (error shrinking as the output size grows), and this resolved
-    ratio can be recovered with `outputs_resolved_factor = True`.
+    ratio can be recovered with `outputs_factor = True`.
 
     **Arguments:**
 
@@ -198,7 +198,7 @@ def fourier_crop_downsample(
     - `preserve_mean`:
         Preserve the mean of the volume after downsampling, rather
         than the sum.
-    - `outputs_resolved_factor`:
+    - `outputs_factor`:
         If `True`, also return the downsample factor actually resolved on
         each axis, as a tuple the same length as `image_or_volume.ndim`.
         Equal to `downsample_factor` on every axis when `downsample_factor`
@@ -207,7 +207,7 @@ def fourier_crop_downsample(
     **Returns:**
 
     The downsampled `image_or_volume` at shape reduced by
-    `downsample_factor`. If `outputs_resolved_factor = True`, a
+    `downsample_factor`. If `outputs_factor = True`, a
     `(downsampled_array, resolved_downsample_factor)` tuple instead.
     """
     downsample_factor = float(downsample_factor)
@@ -248,7 +248,7 @@ def fourier_crop_downsample(
         shift=shift,
     )
 
-    if outputs_resolved_factor:
+    if outputs_factor:
         return downsampled_array, resolved_factor
     else:
         return downsampled_array
@@ -329,10 +329,7 @@ def _fourier_crop_to_shape(
             shift=shift,
         )
     n_pixels, n_pixels_ds = math.prod(image_or_volume.shape), math.prod(shape)
-    if outputs_real_space:
-        return signal
-    else:
-        return (n_pixels_ds / n_pixels) * signal if preserve_mean else signal
+    return (n_pixels_ds / n_pixels) * signal if preserve_mean else signal
 
 
 def _phase_shift_factor(
