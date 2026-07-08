@@ -554,47 +554,47 @@ _real_operators_3d = [*_real_operators_common, im.RealGaussian(offset=(1.0, -1.0
         (True, 2.0, (18, 18, 11)),
     ),
 )
-def test_prepare_rfft_sampling_shapes(use_spline, pad_scale, expected_shape):
+def test_prepare_sampling_rfft_shapes(use_spline, pad_scale, expected_shape):
     real_voxel_grid = jr.normal(jr.key(0), (8, 8, 8))
-    prepared = im.prepare_rfft_sampling(
+    prepared = im.prepare_sampling_rfft(
         real_voxel_grid, pad_scale=pad_scale, use_spline=use_spline
     )
     assert prepared.shape == expected_shape
 
 
-def test_prepare_rfft_sampling_deconvolve_ignored_for_spline():
+def test_prepare_sampling_rfft_deconvolve_ignored_for_spline():
     # `apply_deconvolve` compensates for trilinear interpolation, so it must
     # be a no-op for spline coefficients but change the raw fourier grid.
     real_voxel_grid = jr.normal(jr.key(0), (8, 8, 8))
-    spline_on = im.prepare_rfft_sampling(
+    spline_on = im.prepare_sampling_rfft(
         real_voxel_grid, use_spline=True, apply_deconvolve=True
     )
-    spline_off = im.prepare_rfft_sampling(
+    spline_off = im.prepare_sampling_rfft(
         real_voxel_grid, use_spline=True, apply_deconvolve=False
     )
     np.testing.assert_array_equal(spline_on, spline_off)
 
-    grid_on = im.prepare_rfft_sampling(real_voxel_grid, apply_deconvolve=True)
-    grid_off = im.prepare_rfft_sampling(real_voxel_grid, apply_deconvolve=False)
+    grid_on = im.prepare_sampling_rfft(real_voxel_grid, apply_deconvolve=True)
+    grid_off = im.prepare_sampling_rfft(real_voxel_grid, apply_deconvolve=False)
     assert not jnp.allclose(grid_on, grid_off)
 
 
-def test_prepare_rfft_sampling_invalid_pad_scale():
+def test_prepare_sampling_rfft_invalid_pad_scale():
     real_voxel_grid = jr.normal(jr.key(0), (8, 8, 8))
     with pytest.raises(ValueError, match="pad_scale"):
-        im.prepare_rfft_sampling(real_voxel_grid, pad_scale=0.5)
+        im.prepare_sampling_rfft(real_voxel_grid, pad_scale=0.5)
 
 
-def test_prepare_rfft_sampling_rejects_odd_and_noncubic():
+def test_prepare_sampling_rfft_rejects_odd_and_noncubic():
     # The rfft half-grid logic assumes cubic, even dimensions.
     with pytest.raises(ValueError, match="even"):
-        im.prepare_rfft_sampling(jr.normal(jr.key(0), (7, 7, 7)))
+        im.prepare_sampling_rfft(jr.normal(jr.key(0), (7, 7, 7)))
     with pytest.raises(ValueError, match="cubic"):
-        im.prepare_rfft_sampling(jr.normal(jr.key(0), (8, 8, 6)))
+        im.prepare_sampling_rfft(jr.normal(jr.key(0), (8, 8, 6)))
 
 
 def test_sample_rfft_surface_rejects_odd_dim():
-    grid = im.prepare_rfft_sampling(jr.normal(jr.key(0), (8, 8, 8)))
+    grid = im.prepare_sampling_rfft(jr.normal(jr.key(0), (8, 8, 8)))
     odd_frequency_slice = im.make_frequency_slice((7, 7), fftshifted=True)
     with pytest.raises(ValueError, match="even"):
         im.sample_rfft_surface(grid, odd_frequency_slice)
@@ -606,7 +606,7 @@ def test_sample_rfft_surface_shape_check(use_spline):
     # `use_spline=False`) must be rejected, since the expected shapes differ.
     real_voxel_grid = jr.normal(jr.key(0), (8, 8, 8))
     # Deliberately mismatched: prepare the *wrong* representation.
-    mismatched = im.prepare_rfft_sampling(real_voxel_grid, use_spline=not use_spline)
+    mismatched = im.prepare_sampling_rfft(real_voxel_grid, use_spline=not use_spline)
     frequency_slice = im.make_frequency_slice((8, 8), fftshifted=True)
     with pytest.raises(ValueError, match="use_spline"):
         im.sample_rfft_surface(mismatched, frequency_slice, use_spline=use_spline)

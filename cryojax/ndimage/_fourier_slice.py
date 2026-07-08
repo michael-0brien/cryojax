@@ -55,7 +55,7 @@ def sample_rfft_surface(
         The voxel grid must be prepared with the convention used internally by
         `cryojax.simulator.FourierVoxelGridVolume`: `fftshift` the object in
         real space, then `fftshift` the two full axes in fourier space.
-        `cryojax.ndimage.prepare_rfft_sampling` does this for you.
+        `cryojax.ndimage.prepare_sampling_rfft` does this for you.
 
         ```python
         import cryojax.ndimage as im
@@ -64,7 +64,7 @@ def sample_rfft_surface(
         real_voxel_grid = ...  # shape (dim, dim, dim)
         dim = real_voxel_grid.shape[0]
 
-        fourier_voxel_grid = im.prepare_rfft_sampling(real_voxel_grid)
+        fourier_voxel_grid = im.prepare_sampling_rfft(real_voxel_grid)
 
         # The (unrotated) central-slice coordinate system, zero-centered
         frequency_slice = im.make_frequency_slice((dim, dim), fftshifted=True)
@@ -203,7 +203,7 @@ def sample_rfft_surface(
     return surface
 
 
-def prepare_rfft_sampling(
+def prepare_sampling_rfft(
     real_voxel_grid: Float[Array, "dim dim dim"],
     *,
     apply_deconvolve: bool = True,
@@ -226,7 +226,7 @@ def prepare_rfft_sampling(
 
         real_voxel_grid = ...  # shape (dim, dim, dim)
 
-        fourier_voxel_grid = im.prepare_rfft_sampling(real_voxel_grid)
+        fourier_voxel_grid = im.prepare_sampling_rfft(real_voxel_grid)
         frequency_slice = im.make_frequency_slice(
             fourier_voxel_grid.shape[:2], fftshifted=True
         )
@@ -263,12 +263,12 @@ def prepare_rfft_sampling(
     real_voxel_grid = jnp.asarray(real_voxel_grid, dtype=float)
     if real_voxel_grid.ndim != 3 or len(set(real_voxel_grid.shape)) != 1:
         raise ValueError(
-            "`prepare_rfft_sampling` only supports cubic voxel grids, but "
+            "`prepare_sampling_rfft` only supports cubic voxel grids, but "
             f"got `real_voxel_grid.shape = {real_voxel_grid.shape}`."
         )
     if real_voxel_grid.shape[0] % 2 != 0:
         raise ValueError(
-            "`prepare_rfft_sampling` does not support odd voxel grid "
+            "`prepare_sampling_rfft` does not support odd voxel grid "
             f"dimensions, but got `real_voxel_grid.shape = {real_voxel_grid.shape}`. "
             "Please pass a voxel grid with even dimensions."
         )
@@ -282,7 +282,7 @@ def prepare_rfft_sampling(
         real_voxel_grid_padded = pad_to_shape(real_voxel_grid, padded_shape)
     else:
         raise ValueError(
-            "Invalid value for `prepare_rfft_sampling(..., pad_scale=...)`. "
+            "Invalid value for `prepare_sampling_rfft(..., pad_scale=...)`. "
             f"This must be a value `>= 1.0`, but got value `{pad_scale}`."
         )
     # Deconvolve after padding so the sinc² correction uses the actual

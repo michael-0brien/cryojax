@@ -20,7 +20,7 @@ from ...ndimage import (
     irfftn,
     make_fftshift_phase,
     make_frequency_slice,
-    prepare_rfft_sampling,
+    prepare_sampling_rfft,
     resize_with_crop_or_pad,
     rfftn,
     sample_rfft_surface,
@@ -218,7 +218,7 @@ class FourierVoxelGridVolume(AbstractFourierVoxelVolume, strict=True):
         """
         # Preprocess to fourier grid, deconvolving after any padding so that
         # the sinc² correction uses the actual Fourier grid size.
-        fourier_voxel_grid = prepare_rfft_sampling(
+        fourier_voxel_grid = prepare_sampling_rfft(
             jnp.asarray(real_voxel_grid, dtype=float),
             apply_deconvolve=apply_deconvolve,
             pad_scale=pad_scale,
@@ -319,7 +319,7 @@ class FourierVoxelSplineVolume(AbstractFourierVoxelVolume, strict=True):
             transform. Must be a value greater than `1.0`.
         """
         # Preprocess to fourier grid and compute spline coefficients
-        spline_coefficients = prepare_rfft_sampling(
+        spline_coefficients = prepare_sampling_rfft(
             jnp.asarray(real_voxel_grid, dtype=float),
             pad_scale=pad_scale,
             use_spline=True,

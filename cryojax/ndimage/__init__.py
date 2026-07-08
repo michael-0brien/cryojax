@@ -28,7 +28,7 @@ from ._fft import (
 )
 from ._fourier_slice import (
     central_slice_to_ewald_sphere as central_slice_to_ewald_sphere,
-    prepare_rfft_sampling as prepare_rfft_sampling,
+    prepare_sampling_rfft as prepare_sampling_rfft,
     sample_rfft_surface as sample_rfft_surface,
 )
 from ._fourier_statistics import (

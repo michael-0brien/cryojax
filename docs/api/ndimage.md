@@ -304,7 +304,7 @@ This documentation is a collection of functions used to work with coordinate sys
 
 ### Fourier projection-slice extraction
 
-::: cryojax.ndimage.prepare_rfft_sampling
+::: cryojax.ndimage.prepare_sampling_rfft
 
 ::: cryojax.ndimage.sample_rfft_surface
 
