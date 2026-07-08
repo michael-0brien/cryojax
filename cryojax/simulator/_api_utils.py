@@ -719,7 +719,7 @@ def render_voxel_volume(
         )
     if output_type == FourierVoxelGridVolume or output_type == FourierVoxelSplineVolume:
         fourier_voxel_grid = render_fn(
-            atom_volume, outputs_real_space=False, outputs_rfft=False
+            atom_volume, outputs_real_space=False, outputs_rfft=True
         )
         if output_type == FourierVoxelGridVolume:
             return FourierVoxelGridVolume.from_fourier_voxel_grid(fourier_voxel_grid)
