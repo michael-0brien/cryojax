@@ -5,8 +5,8 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float, Inexact, PRNGKeyArray
 
-from .._internal import error_if_not_fractional
-from ..jax_util import FloatLike
+from .._internal import error_if_not_fractional, leaf_asarray
+from ..jax_util import FloatLike, NDArrayLike
 from ..ndimage import fftn, ifftn, irfftn, rfftn
 from ._image_config import AbstractImageConfig
 from ._transfer_theory import ContrastTransferTheory, WaveTransferTheory
@@ -211,7 +211,7 @@ class RytovScatteringTheory(AbstractWaveScatteringTheory, strict=True):
 
     volume_integrator: AbstractVolumeIntegrator
     transfer_theory: WaveTransferTheory
-    amplitude_contrast_ratio: Float[Array, ""]
+    amplitude_contrast_ratio: Float[NDArrayLike, "..."]
 
     def __init__(
         self,
@@ -227,7 +227,9 @@ class RytovScatteringTheory(AbstractWaveScatteringTheory, strict=True):
         """
         self.volume_integrator = volume_integrator
         self.transfer_theory = transfer_theory
-        self.amplitude_contrast_ratio = jnp.asarray(amplitude_contrast_ratio, dtype=float)
+        self.amplitude_contrast_ratio = leaf_asarray(
+            amplitude_contrast_ratio, dtype=float
+        )
 
     @override
     def compute_exit_wave(
@@ -251,7 +253,7 @@ class RytovScatteringTheory(AbstractWaveScatteringTheory, strict=True):
         )
         integrated_potential = _compute_complex_potential(
             do_ifft(fourier_in_plane_potential),
-            error_if_not_fractional(self.amplitude_contrast_ratio),
+            error_if_not_fractional(jnp.asarray(self.amplitude_contrast_ratio)),
         )
         object = image_config.interaction_constant * integrated_potential
         # Compute wavefunction, with amplitude and phase contrast

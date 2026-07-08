@@ -6,9 +6,10 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
+import numpy as np
 from jaxtyping import Array, Float, PyTree
 
-from ..._internal import error_if_not_positive
+from ..._internal import error_if_not_positive, leaf_asarray
 from ...constants import PengScatteringFactorParameters, b_factor_to_variance
 from ...jax_util import FloatLike, NDArrayLike, filter_bscan
 from ...ndimage import (
@@ -29,6 +30,14 @@ from .base_volume import (
     VoxelArray,
 )
 from .common import spread_and_sum_gaussian_components
+
+
+def _leaf_broadcast_to(x, shape):
+    """Broadcast an array leaf to `shape`, preserving its backend (NumPy stays
+    on the host, JAX stays on-device)."""
+    if isinstance(x, np.ndarray):
+        return np.broadcast_to(x, shape)
+    return jnp.broadcast_to(x, shape)
 
 
 class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
@@ -59,9 +68,9 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
         ```
     """
 
-    positions: Float[Array, "M 3"]
-    amplitudes: Float[Array, "M K"]
-    variances: Float[Array, " M K"]
+    positions: Float[NDArrayLike, "M 3"]
+    amplitudes: Float[NDArrayLike, "M K"]
+    variances: Float[NDArrayLike, " M K"]
 
     is_frame_rotation: ClassVar[bool] = False
 
@@ -93,43 +102,43 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
             The variance for each gaussian. This has units of angstroms
             squared.
         """
+        # Convert inputs to array leaves, preserving their backend (JAX arrays
+        # stay on-device, NumPy arrays and Python scalars stay on the host).
+        positions = leaf_asarray(positions, dtype=float)
+        amplitudes = leaf_asarray(amplitudes, dtype=float)
+        variances = leaf_asarray(variances, dtype=float)
         M = positions.shape[0]
-        if isinstance(amplitudes, NDArrayLike):
-            if amplitudes.ndim == 2:
-                K = amplitudes.shape[-1]
-            elif amplitudes.ndim == 1:
-                K = 1
-                amplitudes = amplitudes[:, None]
-            elif amplitudes.ndim == 0:
-                K = 1
-                amplitudes = amplitudes[None, None]
-            else:
-                raise ValueError(
-                    "Passed `amplitudes` to `GaussianMixtureVolume` "
-                    f"with shape {amplitudes.shape}, but must be of "
-                    "shape `()`, `(M,)`, or "
-                    "`(M, K)`."
-                )
+        K = 1
+        if amplitudes.ndim == 2:
+            K = amplitudes.shape[-1]
+        elif amplitudes.ndim == 1:
+            amplitudes = amplitudes[:, None]
+        elif amplitudes.ndim == 0:
+            amplitudes = amplitudes[None, None]
         else:
-            K = 1
-        if isinstance(variances, NDArrayLike):
-            if variances.ndim == 2:
-                K = variances.shape[-1]
-            elif variances.ndim == 1:
-                variances = variances[:, None]
-            elif variances.ndim == 0:
-                variances = variances[None, None]
-            else:
-                raise ValueError(
-                    "Passed `variances` to `GaussianMixtureVolume` "
-                    f"with shape {variances.shape}, but must be of "
-                    "shape `()`, `(M,)`, or "
-                    "`(M, K)`."
-                )
+            raise ValueError(
+                "Passed `amplitudes` to `GaussianMixtureVolume` "
+                f"with shape {amplitudes.shape}, but must be of "
+                "shape `()`, `(M,)`, or "
+                "`(M, K)`."
+            )
+        if variances.ndim == 2:
+            K = variances.shape[-1]
+        elif variances.ndim == 1:
+            variances = variances[:, None]
+        elif variances.ndim == 0:
+            variances = variances[None, None]
+        else:
+            raise ValueError(
+                "Passed `variances` to `GaussianMixtureVolume` "
+                f"with shape {variances.shape}, but must be of "
+                "shape `()`, `(M,)`, or "
+                "`(M, K)`."
+            )
 
-        self.positions = jnp.asarray(positions, dtype=float)
-        self.amplitudes = jnp.broadcast_to(jnp.asarray(amplitudes, dtype=float), (M, K))
-        self.variances = jnp.broadcast_to(jnp.asarray(variances, dtype=float), (M, K))
+        self.positions = positions
+        self.amplitudes = _leaf_broadcast_to(amplitudes, (M, K))
+        self.variances = _leaf_broadcast_to(variances, (M, K))
 
     def __check_init__(self):
         if not (
@@ -193,22 +202,23 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
     @override
     def rotate_to_pose(self, pose: AbstractPose) -> Self:
         """Return a new potential with rotated `positions`."""
+        positions = jnp.asarray(self.positions)
         return eqx.tree_at(
             lambda d: d.positions,
             self,
-            pose.rotate_coordinates(self.positions, inverse=self.is_frame_rotation),
+            pose.rotate_coordinates(positions, inverse=self.is_frame_rotation),
         )
 
     @override
     def translate_to_pose(self, pose: AbstractPose) -> Self:
         """Return a new potential with rotated `positions`."""
-        offset_in_angstroms = pose.offset_in_angstroms
+        offset_in_angstroms = jnp.asarray(pose.offset_in_angstroms)
         if pose.offset_z_in_angstroms is None:
             offset_in_angstroms = jnp.concatenate(
                 (offset_in_angstroms, jnp.atleast_1d(0.0))
             )
         return eqx.tree_at(
-            lambda d: d.positions, self, self.positions + offset_in_angstroms
+            lambda d: d.positions, self, jnp.asarray(self.positions) + offset_in_angstroms
         )
 
 
@@ -322,11 +332,11 @@ class GaussianMixtureProjection(
         """  # noqa: E501
         # Grab the image configuration
         shape = image_config.padded_shape if self.shape is None else self.shape
-        pixel_size = image_config.pixel_size
-        # Grab the gaussian amplitudes and widths
-        positions = volume_representation.positions
-        amplitudes = volume_representation.amplitudes
-        variances = error_if_not_positive(volume_representation.variances)
+        pixel_size = jnp.asarray(image_config.pixel_size)
+        # Grab the gaussian amplitudes and widths, casting to JAX arrays
+        positions = jnp.asarray(volume_representation.positions)
+        amplitudes = jnp.asarray(volume_representation.amplitudes)
+        variances = error_if_not_positive(jnp.asarray(volume_representation.variances))
         use_erf = self.sampling_mode == "average"
         context = (
             f"Error during projection using `{type(self).__name__}(..., n_batches=...)`"
@@ -419,7 +429,7 @@ class GaussianMixtureRenderFn(AbstractVolumeRenderFn[GaussianMixtureVolume], str
     """  # noqa: E501
 
     shape: tuple[int, int, int]
-    voxel_size: Float[Array, ""]
+    voxel_size: Float[NDArrayLike, "..."]
     n_batches: int
     n_spread: int | tuple[int, ...] | None
     enable_pallas: bool | Mapping[str, bool] | None
@@ -470,7 +480,7 @@ class GaussianMixtureRenderFn(AbstractVolumeRenderFn[GaussianMixtureVolume], str
             the full picture. `None` (default) defers to `CRYOJAX_ENABLE_PALLAS`.
         """  # noqa: E501
         self.shape = shape
-        self.voxel_size = jnp.asarray(voxel_size, dtype=float)
+        self.voxel_size = leaf_asarray(voxel_size, dtype=float)
         self.n_batches = n_batches
         self.n_spread = n_spread
         self.enable_pallas = enable_pallas
@@ -501,8 +511,10 @@ class GaussianMixtureRenderFn(AbstractVolumeRenderFn[GaussianMixtureVolume], str
             component is in the corner. Does nothing if
             `outputs_real_space = True`.
         """
-        voxel_size = error_if_not_positive(self.voxel_size)
-        variances = error_if_not_positive(volume_representation.variances)
+        voxel_size = error_if_not_positive(jnp.asarray(self.voxel_size))
+        positions = jnp.asarray(volume_representation.positions)
+        amplitudes = jnp.asarray(volume_representation.amplitudes)
+        variances = error_if_not_positive(jnp.asarray(volume_representation.variances))
         context = (
             f"Error during rendering using `{type(self).__name__}(..., n_batches=...)`"
         )
@@ -510,8 +522,8 @@ class GaussianMixtureRenderFn(AbstractVolumeRenderFn[GaussianMixtureVolume], str
             real_voxel_grid = _gaussians_to_real_voxels_dense(
                 self.shape,
                 voxel_size,
-                volume_representation.positions,
-                volume_representation.amplitudes,
+                positions,
+                amplitudes,
                 variances,
                 self.n_batches,
                 context,
@@ -520,8 +532,8 @@ class GaussianMixtureRenderFn(AbstractVolumeRenderFn[GaussianMixtureVolume], str
             real_voxel_grid = _gaussians_to_real_voxels_spread(
                 self.shape,
                 voxel_size,
-                volume_representation.positions,
-                volume_representation.amplitudes,
+                positions,
+                amplitudes,
                 variances,
                 self.n_spread,
                 self.n_batches,

@@ -11,7 +11,7 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float, Inexact
 
-from ..._internal import error_if_not_positive
+from ..._internal import error_if_not_positive, leaf_asarray
 from ...jax_util import FloatLike, NDArrayLike
 
 
@@ -125,9 +125,9 @@ class RealGaussian(AbstractRealOperator, strict=True):
     where $r^2 = x^2 + y^2$.
     """
 
-    amplitude: Float[Array, ""]
-    variance: Float[Array, ""]
-    offset: Float[Array, " _"] | None
+    amplitude: Float[NDArrayLike, "..."]
+    variance: Float[NDArrayLike, "..."]
+    offset: Float[NDArrayLike, " _"] | None
 
     spatial_dims: ClassVar[list[int]] = [1, 2, 3]
 
@@ -135,7 +135,7 @@ class RealGaussian(AbstractRealOperator, strict=True):
         self,
         amplitude: FloatLike = 1.0,
         variance: FloatLike = 1.0,
-        offset: FloatLike | Float[NDArrayLike, " _"] | Sequence[float] | None = None,
+        offset: FloatLike | Float[NDArrayLike, "... _"] | Sequence[float] | None = None,
     ):
         """**Arguments:**
 
@@ -149,32 +149,35 @@ class RealGaussian(AbstractRealOperator, strict=True):
             An offset to the origin, equal to $r_0$
             in the above equation.
         """
-        self.amplitude = jnp.asarray(amplitude, dtype=float)
-        self.variance = jnp.asarray(variance, dtype=float)
+        self.amplitude = leaf_asarray(amplitude, dtype=float)
+        self.variance = leaf_asarray(variance, dtype=float)
         if offset is not None:
-            self.offset = jnp.atleast_1d(jnp.asarray(offset, dtype=float))
+            offset = leaf_asarray(offset, dtype=float)
+            self.offset = offset[None] if offset.ndim == 0 else offset
         else:
             self.offset = None
 
     @override
     def __call__(self, coordinates: Float[Array, "..."]) -> Float[Array, "..."]:
         coordinates, ndim, flag = _standardize_coordinates(coordinates)
-        offset = jnp.zeros((ndim,), dtype=float) if self.offset is None else self.offset
-        if offset is None:
-            r_squared = jnp.sum(coordinates**2, axis=-1)
-        else:
-            r_squared = jnp.sum((coordinates - offset) ** 2, axis=-1)
+        variance = jnp.asarray(self.variance)
+        offset = (
+            jnp.zeros((ndim,), dtype=float)
+            if self.offset is None
+            else jnp.asarray(self.offset)
+        )
+        r_squared = jnp.sum((coordinates - offset) ** 2, axis=-1)
         scaling = (
-            self.amplitude
-            / jnp.sqrt(2 * jnp.pi * error_if_not_positive(self.variance)) ** ndim
-        ) * jnp.exp(-0.5 * r_squared / self.variance)
+            jnp.asarray(self.amplitude)
+            / jnp.sqrt(2 * jnp.pi * error_if_not_positive(variance)) ** ndim
+        ) * jnp.exp(-0.5 * r_squared / variance)
         return _standardize_output(scaling, flag=flag)
 
 
 class RealConstant(AbstractRealOperator, strict=True):
     """An operator that is a constant."""
 
-    value: Float[Array, "..."]
+    value: Float[NDArrayLike, "..."]
 
     spatial_dims: ClassVar[list[int]] = [1, 2, 3]
 
@@ -183,12 +186,12 @@ class RealConstant(AbstractRealOperator, strict=True):
 
         - `value`: The value of the constant
         """
-        self.value = jnp.asarray(value)
+        self.value = leaf_asarray(value, dtype=float)
 
     @override
     def __call__(self, coordinates: Float[Array, "..."]) -> Float[Array, ""]:
         del coordinates
-        return self.value
+        return jnp.asarray(self.value)
 
 
 def _standardize_coordinates(x: Array):

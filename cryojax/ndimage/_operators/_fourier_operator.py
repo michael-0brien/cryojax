@@ -20,7 +20,7 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float, Inexact
 
-from ..._internal import error_if_negative, error_if_not_positive
+from ..._internal import error_if_negative, error_if_not_positive, leaf_asarray
 from ...jax_util import FloatLike, NDArrayLike
 
 
@@ -165,7 +165,7 @@ CustomFourierOperator.__init__.__doc__ = """**Arguments:**
 class FourierConstant(AbstractFourierOperator, strict=True):
     """An operator that is a constant."""
 
-    value: Float[Array, "..."]
+    value: Float[NDArrayLike, "..."]
 
     spatial_dims: ClassVar[list[int]] = [1, 2, 3]
 
@@ -174,12 +174,12 @@ class FourierConstant(AbstractFourierOperator, strict=True):
 
         - `value`: The value of the constant
         """
-        self.value = jnp.asarray(value)
+        self.value = leaf_asarray(value, dtype=float)
 
     @override
     def __call__(self, frequencies: Float[Array, "..."]) -> Float[Array, "..."]:
         del frequencies
-        return self.value
+        return jnp.asarray(self.value)
 
 
 class FourierGaussian(AbstractFourierOperator, strict=True):
@@ -194,8 +194,8 @@ class FourierGaussian(AbstractFourierOperator, strict=True):
     squared.
     """
 
-    amplitude: Float[Array, ""]
-    b_factor: Float[Array, ""]
+    amplitude: Float[NDArrayLike, "..."]
+    b_factor: Float[NDArrayLike, "..."]
 
     spatial_dims: ClassVar[list[int]] = [1, 2, 3]
 
@@ -209,15 +209,15 @@ class FourierGaussian(AbstractFourierOperator, strict=True):
             The B-factor of the gaussian, equal to $\\beta$
             in the above equation.
         """
-        self.amplitude = jnp.asarray(amplitude, dtype=float)
-        self.b_factor = jnp.asarray(b_factor, dtype=float)
+        self.amplitude = leaf_asarray(amplitude, dtype=float)
+        self.b_factor = leaf_asarray(b_factor, dtype=float)
 
     @override
     def __call__(self, frequencies: Float[Array, "..."]) -> Float[Array, "..."]:
         frequencies, _, flag = _standardize_frequencies(frequencies)
         q_squared = jnp.sum(frequencies**2, axis=-1)
-        gaussian = self.amplitude * jnp.exp(
-            -0.25 * error_if_not_positive(self.b_factor) * q_squared
+        gaussian = jnp.asarray(self.amplitude) * jnp.exp(
+            -0.25 * error_if_not_positive(jnp.asarray(self.b_factor)) * q_squared
         )
         return _standardize_output(gaussian, flag=flag)
 
@@ -227,9 +227,9 @@ class PeakedFourierGaussian(AbstractFourierOperator, strict=True):
     at a given frequency shell.
     """
 
-    amplitude: Float[Array, ""]
-    b_factor: Float[Array, ""]
-    radial_peak: Float[Array, ""]
+    amplitude: Float[NDArrayLike, "..."]
+    b_factor: Float[NDArrayLike, "..."]
+    radial_peak: Float[NDArrayLike, "..."]
 
     spatial_dims: ClassVar[list[int]] = [1, 2, 3]
 
@@ -250,18 +250,18 @@ class PeakedFourierGaussian(AbstractFourierOperator, strict=True):
         - `radial_peak`:
             The frequency shell of the gaussian peak.
         """
-        self.amplitude = jnp.asarray(amplitude, dtype=float)
-        self.b_factor = jnp.asarray(b_factor, dtype=float)
-        self.radial_peak = jnp.asarray(radial_peak, dtype=float)
+        self.amplitude = leaf_asarray(amplitude, dtype=float)
+        self.b_factor = leaf_asarray(b_factor, dtype=float)
+        self.radial_peak = leaf_asarray(radial_peak, dtype=float)
 
     @override
     def __call__(self, frequencies: Float[Array, "..."]) -> Float[Array, "..."]:
         frequencies, _, flag = _standardize_frequencies(frequencies)
         k = jnp.linalg.norm(frequencies, axis=-1)
-        gaussian = self.amplitude * jnp.exp(
+        gaussian = jnp.asarray(self.amplitude) * jnp.exp(
             -0.25
-            * error_if_not_positive(self.b_factor)
-            * (k - error_if_negative(self.radial_peak)) ** 2
+            * error_if_not_positive(jnp.asarray(self.b_factor))
+            * (k - error_if_negative(jnp.asarray(self.radial_peak))) ** 2
         )
         return _standardize_output(gaussian, flag=flag)
 
@@ -283,7 +283,7 @@ class FourierSinc(AbstractFourierOperator, strict=True):
     and $w$ is width of the real-space box function.
     """
 
-    box_width: Float[Array, ""]
+    box_width: Float[NDArrayLike, "..."]
 
     spatial_dims: ClassVar[list[int]] = [1, 2, 3]
 
@@ -295,15 +295,16 @@ class FourierSinc(AbstractFourierOperator, strict=True):
             is the rectangular function, its interval is
             `- box_width / 2` to `+ box_width / 2`.
         """
-        self.box_width = jnp.asarray(box_width, dtype=float)
+        self.box_width = leaf_asarray(box_width, dtype=float)
 
     @override
     def __call__(self, frequencies: Float[Array, "..."]) -> Float[Array, "..."]:
         frequencies, ndim, flag = _standardize_frequencies(frequencies)
+        box_width = jnp.asarray(self.box_width)
         return _standardize_output(
             functools.reduce(
                 operator.mul,
-                [jnp.sinc(frequencies[..., i] * self.box_width) for i in range(ndim)],
+                [jnp.sinc(frequencies[..., i] * box_width) for i in range(ndim)],
             ),
             flag=flag,
         )
@@ -312,7 +313,7 @@ class FourierSinc(AbstractFourierOperator, strict=True):
 class FourierPhaseShifts(AbstractFourierOperator):
     """Apply a phase shift the Fourier domain."""
 
-    shift: Float[Array, " _"]
+    shift: Float[NDArrayLike, " _"]
 
     spatial_dims: ClassVar[list[int]] = [1, 2, 3]
 
@@ -326,20 +327,24 @@ class FourierPhaseShifts(AbstractFourierOperator):
             The shift to apply in the Fourier domain. The units of this should
             be the inverse of the units of the `frequencies` passed at runtime.
         """
-        self.shift = jnp.asarray(jnp.atleast_1d(shift), dtype=float)
+        # Convert to an array leaf, preserving backend, and ensure at least 1D
+        # without forcing a device transfer.
+        shift = leaf_asarray(shift, dtype=float)
+        self.shift = shift[None] if shift.ndim == 0 else shift
 
     @override
     def __call__(self, frequencies: Float[Array, "..."]) -> Complex[Array, "..."]:
         frequencies, ndim, flag = _standardize_frequencies(frequencies)
-        if ndim != self.shift.size:
+        shift = jnp.asarray(self.shift)
+        if ndim != shift.size:
             raise ValueError(
                 "The `frequencies` passed to `FourierPhaseShift` had "
                 "dimensionality that does not seem to match `FourierPhaseShift.shift`. "
                 f"Got that the dimensionality of the grid was `{ndim}`, but the "
-                f"shift was an array of size {self.shift.size}"
+                f"shift was an array of size {shift.size}"
             )
         return _standardize_output(
-            jnp.exp(-1.0j * (2 * jnp.pi * jnp.matmul(frequencies, self.shift))), flag=flag
+            jnp.exp(-1.0j * (2 * jnp.pi * jnp.matmul(frequencies, shift))), flag=flag
         )
 
 

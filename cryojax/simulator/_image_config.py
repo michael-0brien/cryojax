@@ -9,13 +9,13 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
-from .._internal import error_if_not_positive
+from .._internal import error_if_not_positive, leaf_asarray
 from ..constants import (
     interaction_constant_from_kilovolts,
     lorentz_factor_from_kilovolts,
     wavelength_from_kilovolts,
 )
-from ..jax_util import FloatLike
+from ..jax_util import FloatLike, NDArrayLike
 from ..ndimage import (
     make_coordinate_grid,
     make_frequency_grid,
@@ -127,8 +127,8 @@ class AbstractImageConfig(eqx.Module, strict=True):
     """Configuration and utilities for an electron microscopy image."""
 
     shape: eqx.AbstractVar[tuple[int, int]]
-    pixel_size: eqx.AbstractVar[Float[Array, ""]]
-    voltage_in_kilovolts: eqx.AbstractVar[Float[Array, ""]]
+    pixel_size: eqx.AbstractVar[Float[NDArrayLike, "..."]]
+    voltage_in_kilovolts: eqx.AbstractVar[Float[NDArrayLike, "..."]]
 
     padded_shape: eqx.AbstractVar[tuple[int, int]]
     precompute_mode: eqx.AbstractVar[
@@ -157,20 +157,22 @@ class AbstractImageConfig(eqx.Module, strict=True):
         """The incident electron wavelength corresponding to the beam
         energy `voltage_in_kilovolts`.
         """
-        return wavelength_from_kilovolts(error_if_not_positive(self.voltage_in_kilovolts))
+        return wavelength_from_kilovolts(
+            error_if_not_positive(jnp.asarray(self.voltage_in_kilovolts))
+        )
 
     @property
     def lorentz_factor(self) -> Float[Array, ""]:
         """The lorenz factor at the given `voltage_in_kilovolts`."""
         return lorentz_factor_from_kilovolts(
-            error_if_not_positive(self.voltage_in_kilovolts)
+            error_if_not_positive(jnp.asarray(self.voltage_in_kilovolts))
         )
 
     @property
     def interaction_constant(self) -> Float[Array, ""]:
         """The electron interaction constant at the given `voltage_in_kilovolts`."""
         return interaction_constant_from_kilovolts(
-            error_if_not_positive(self.voltage_in_kilovolts)
+            error_if_not_positive(jnp.asarray(self.voltage_in_kilovolts))
         )
 
     def get_coordinate_grid(self, *, padding: bool = False, physical: bool = True):
@@ -206,7 +208,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
             coordinate_grid = _get_grid_impl(self)
 
         if physical:
-            pixel_size = error_if_not_positive(self.pixel_size)
+            pixel_size = error_if_not_positive(jnp.asarray(self.pixel_size))
             coordinate_grid = _safe_multiply_by_constant(
                 coordinate_grid, pixel_size, is_fft_grid=False
             )
@@ -260,7 +262,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
             frequency_grid = _get_grid_impl(self)
 
         if physical:
-            pixel_size = error_if_not_positive(self.pixel_size)
+            pixel_size = error_if_not_positive(jnp.asarray(self.pixel_size))
             frequency_grid = _safe_multiply_by_constant(
                 frequency_grid, 1 / pixel_size, is_fft_grid=True
             )
@@ -372,8 +374,8 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
     """
 
     shape: tuple[int, int]
-    pixel_size: Float[Array, ""]
-    voltage_in_kilovolts: Float[Array, ""]
+    pixel_size: Float[NDArrayLike, "..."]
+    voltage_in_kilovolts: Float[NDArrayLike, "..."]
 
     padded_shape: tuple[int, int]
     precompute_mode: Literal["none", "rfft", "fft", "all", "compile_time_eval"] = (
@@ -432,8 +434,8 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
                 `jax.ensure_compile_time_eval`.
         """
         # Set parameters
-        self.pixel_size = jnp.asarray(pixel_size, dtype=float)
-        self.voltage_in_kilovolts = jnp.asarray(voltage_in_kilovolts, dtype=float)
+        self.pixel_size = leaf_asarray(pixel_size, dtype=float)
+        self.voltage_in_kilovolts = leaf_asarray(voltage_in_kilovolts, dtype=float)
         # Set shape and padded shape
         self.shape = shape
         self.padded_shape = _set_padded_shape(type(self), shape, padded_shape, pad_scale)
@@ -460,9 +462,9 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
     including the electron dose."""
 
     shape: tuple[int, int]
-    pixel_size: Float[Array, ""]
-    voltage_in_kilovolts: Float[Array, ""]
-    electron_dose: Float[Array, ""]
+    pixel_size: Float[NDArrayLike, "..."]
+    voltage_in_kilovolts: Float[NDArrayLike, "..."]
+    electron_dose: Float[NDArrayLike, "..."]
 
     padded_shape: tuple[int, int]
     precompute_mode: Literal["none", "rfft", "fft", "all", "compile_time_eval"] = (
@@ -525,9 +527,9 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
                 `jax.ensure_compile_time_eval`.
         """
         # Set parameters
-        self.pixel_size = jnp.asarray(pixel_size, dtype=float)
-        self.voltage_in_kilovolts = jnp.asarray(voltage_in_kilovolts, dtype=float)
-        self.electron_dose = jnp.asarray(electron_dose, dtype=float)
+        self.pixel_size = leaf_asarray(pixel_size, dtype=float)
+        self.voltage_in_kilovolts = leaf_asarray(voltage_in_kilovolts, dtype=float)
+        self.electron_dose = leaf_asarray(electron_dose, dtype=float)
         # Set shape and padded shape
         self.shape = shape
         self.padded_shape = _set_padded_shape(type(self), shape, padded_shape, pad_scale)
@@ -551,7 +553,10 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
     @property
     def electrons_per_pixel(self) -> Float[Array, ""]:
         """The `electron_dose` in a given pixel area."""
-        return error_if_not_positive(self.electron_dose) * self.pixel_size**2
+        return (
+            error_if_not_positive(jnp.asarray(self.electron_dose))
+            * jnp.asarray(self.pixel_size) ** 2
+        )
 
 
 def _safe_multiply_by_constant(
