@@ -28,7 +28,6 @@ from .gaussian_mixture import (
     GaussianMixtureRenderFn,
     GaussianMixtureVolume,
 )
-from .real_voxels import RealVoxelCloudVolume, RealVoxelProjection
 
 
 class AutoVolumeProjection(
@@ -47,18 +46,11 @@ class AutoVolumeProjection(
         | [`cryojax.simulator.GaussianMixtureVolume`][] | [`cryojax.simulator.GaussianMixtureProjection`][] | atom |
         | [`cryojax.simulator.GaussianFourierVolume`][] | [`cryojax.simulator.GaussianFourierProjection`][] | atom |
         | [`cryojax.simulator.FourierVoxelGridVolume`][] or [`cryojax.simulator.FourierVoxelSplineVolume`][] | [`cryojax.simulator.FourierSliceExtraction`][] | voxel |
-        | [`cryojax.simulator.RealVoxelCloudVolume`][] | [`cryojax.simulator.RealVoxelProjection`][] | voxel |
 
-        Note that [`cryojax.simulator.RealVoxelGridVolume`][] does not have an associated projection method. To
-        compute projections from real-space voxels, use [`cryojax.simulator.RealVoxelCloudVolume`][].
+        Note that [`cryojax.simulator.RealVoxelGridVolume`][] does not have an associated projection method.
 
         To use advanced options for a given projection method,
         instantiate each respective class directly.
-
-    !!! warning
-        If using [`cryojax.simulator.GaussianFourierRenderFn`][] or [`cryojax.simulator.RealVoxelProjection`][], [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft)
-        must be installed. See the cryoJAX [installation instructions](https://github.com/michael-0brien/cryojax?tab=readme-ov-file#installation)
-        for installing `jax-finufft`.
     """  # noqa: E501
 
     outputs_ewald_sphere: ClassVar[bool] = False
@@ -70,8 +62,6 @@ class AutoVolumeProjection(
             integrator = FourierSliceExtraction()
         elif isinstance(volume, GaussianMixtureVolume):
             integrator = GaussianMixtureProjection()
-        elif isinstance(volume, RealVoxelCloudVolume):
-            integrator = RealVoxelProjection()
         elif isinstance(volume, GaussianFourierVolume):
             integrator = GaussianFourierProjection()
         else:
@@ -140,11 +130,6 @@ class AutoVolumeRenderFn(
 
         To use advanced options for a given rendering function,
         see each respective class.
-
-    !!! warning
-        If using [`cryojax.simulator.GaussianFourierRenderFn`][], [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft)
-        must be installed. See the cryoJAX [installation instructions](https://github.com/michael-0brien/cryojax?tab=readme-ov-file#installation)
-        for installing `jax-finufft`.
     """  # noqa: E501
 
     shape: tuple[int, int, int]

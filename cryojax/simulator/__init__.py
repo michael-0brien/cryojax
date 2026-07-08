@@ -71,19 +71,19 @@ from ._volume import (
     GaussianMixtureProjection as GaussianMixtureProjection,
     GaussianMixtureRenderFn as GaussianMixtureRenderFn,
     GaussianMixtureVolume as GaussianMixtureVolume,
-    RealVoxelCloudVolume as RealVoxelCloudVolume,
     RealVoxelGridVolume as RealVoxelGridVolume,
-    RealVoxelProjection as RealVoxelProjection,
 )
 
 
 _REMOVED = {
+    "RealVoxelCloudVolume": None,
+    "RealVoxelProjection": None,
     "IndependentAtomVolume": "GaussianFourierVolume",
     "IndependentAtomProjection": "GaussianFourierProjection",
     "IndependentAtomRenderFn": "GaussianFourierRenderFn",
     "AberratedAstigmaticCTF": "AstigmaticCTF",
     "CTF": "AstigmaticCTF",
-    "NufftProjection": "RealVoxelProjection",
+    "NufftProjection": None,
     "PengAtomicVolume": "GaussianMixtureVolume",
     "UncorrelatedGaussianNoiseModel": "GaussianWhiteNoiseModel",
     "CorrelatedGaussianNoiseModel": "GaussianColoredNoiseModel",
