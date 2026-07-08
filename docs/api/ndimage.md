@@ -292,3 +292,11 @@ This documentation is a collection of functions used to work with coordinate sys
 ::: cryojax.ndimage.spread_gaussians_3d
 
 ::: cryojax.ndimage.variance_to_nspread
+
+### Fourier projection-slice extraction
+
+::: cryojax.ndimage.prepare_sampling_fft
+
+::: cryojax.ndimage.sample_fft_slice
+
+::: cryojax.ndimage.ewald_sphere_from_slice
