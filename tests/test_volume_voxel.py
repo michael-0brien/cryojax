@@ -34,10 +34,10 @@ import numpy as np
 import pytest
 from cryojax.constants import PengScatteringFactorParameters
 from cryojax.io import read_atoms_from_pdb
-from cryojax.simulator._volume import real_voxels
 from cryojax.ndimage._fourier_slice import (
     _reconstruct_full_slice_from_half_slice,
 )
+from cryojax.simulator._volume import real_voxels
 from jaxtyping import Array, Float
 
 
