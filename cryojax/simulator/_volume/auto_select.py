@@ -18,17 +18,16 @@ from .fourier_voxels import (
     FourierVoxelGridVolume,
     FourierVoxelSplineVolume,
 )
-from .gaussian_volume import (
+from .gaussian_fourier import (
+    GaussianFourierProjection,
+    GaussianFourierRenderFn,
+    GaussianFourierVolume,
+)
+from .gaussian_mixture import (
     GaussianMixtureProjection,
     GaussianMixtureRenderFn,
     GaussianMixtureVolume,
 )
-from .independent_atom_volume import (
-    IndependentAtomProjection,
-    IndependentAtomRenderFn,
-    IndependentAtomVolume,
-)
-from .real_voxels import RealVoxelCloudVolume, RealVoxelProjection
 
 
 class AutoVolumeProjection(
@@ -45,20 +44,13 @@ class AutoVolumeProjection(
         | Volume representation | Projection method | Atom or voxel? |
         | :-------------------- | :------------------ | :------------------ |
         | [`cryojax.simulator.GaussianMixtureVolume`][] | [`cryojax.simulator.GaussianMixtureProjection`][] | atom |
-        | [`cryojax.simulator.IndependentAtomVolume`][] | [`cryojax.simulator.IndependentAtomProjection`][] | atom |
+        | [`cryojax.simulator.GaussianFourierVolume`][] | [`cryojax.simulator.GaussianFourierProjection`][] | atom |
         | [`cryojax.simulator.FourierVoxelGridVolume`][] or [`cryojax.simulator.FourierVoxelSplineVolume`][] | [`cryojax.simulator.FourierSliceExtraction`][] | voxel |
-        | [`cryojax.simulator.RealVoxelCloudVolume`][] | [`cryojax.simulator.RealVoxelProjection`][] | voxel |
 
-        Note that [`cryojax.simulator.RealVoxelGridVolume`][] does not have an associated projection method. To
-        compute projections from real-space voxels, use [`cryojax.simulator.RealVoxelCloudVolume`][].
+        Note that [`cryojax.simulator.RealVoxelGridVolume`][] does not have an associated projection method.
 
         To use advanced options for a given projection method,
         instantiate each respective class directly.
-
-    !!! warning
-        If using [`cryojax.simulator.IndependentAtomRenderFn`][] or [`cryojax.simulator.RealVoxelProjection`][], [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft)
-        must be installed. See the cryoJAX [installation instructions](https://github.com/michael-0brien/cryojax?tab=readme-ov-file#installation)
-        for installing `jax-finufft`.
     """  # noqa: E501
 
     outputs_ewald_sphere: ClassVar[bool] = False
@@ -70,10 +62,8 @@ class AutoVolumeProjection(
             integrator = FourierSliceExtraction()
         elif isinstance(volume, GaussianMixtureVolume):
             integrator = GaussianMixtureProjection()
-        elif isinstance(volume, RealVoxelCloudVolume):
-            integrator = RealVoxelProjection()
-        elif isinstance(volume, IndependentAtomVolume):
-            integrator = IndependentAtomProjection()
+        elif isinstance(volume, GaussianFourierVolume):
+            integrator = GaussianFourierProjection()
         else:
             raise ValueError(
                 "Could not use `AutoVolumeProjection` for volume of "
@@ -136,15 +126,10 @@ class AutoVolumeRenderFn(
         | Volume representation | Rendering function  |
         | :-------------------- | :-----------------  |
         | [`cryojax.simulator.GaussianMixtureVolume`][] | [`cryojax.simulator.GaussianMixtureRenderFn`][] |
-        | [`cryojax.simulator.IndependentAtomVolume`][] | [`cryojax.simulator.IndependentAtomRenderFn`][] |
+        | [`cryojax.simulator.GaussianFourierVolume`][] | [`cryojax.simulator.GaussianFourierRenderFn`][] |
 
         To use advanced options for a given rendering function,
         see each respective class.
-
-    !!! warning
-        If using [`cryojax.simulator.IndependentAtomRenderFn`][], [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft)
-        must be installed. See the cryoJAX [installation instructions](https://github.com/michael-0brien/cryojax?tab=readme-ov-file#installation)
-        for installing `jax-finufft`.
     """  # noqa: E501
 
     shape: tuple[int, int, int]
@@ -175,8 +160,8 @@ class AutoVolumeRenderFn(
     def _select_render_method(
         self, volume: AbstractVolumeRepresentation
     ) -> AbstractVolumeRenderFn:
-        if isinstance(volume, IndependentAtomVolume):
-            return IndependentAtomRenderFn(self.shape, self.voxel_size, **self.options)
+        if isinstance(volume, GaussianFourierVolume):
+            return GaussianFourierRenderFn(self.shape, self.voxel_size, **self.options)
         elif isinstance(volume, GaussianMixtureVolume):
             return GaussianMixtureRenderFn(self.shape, self.voxel_size, **self.options)
         else:

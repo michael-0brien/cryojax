@@ -31,14 +31,6 @@
                 - __init__
                 - integrate
 
----
-
-::: cryojax.simulator.RealVoxelProjection
-        options:
-            members:
-                - __init__
-                - integrate
-
 ## Integration methods for atom-based based structures
 
 ::: cryojax.simulator.GaussianMixtureProjection
@@ -49,7 +41,7 @@
 
 ---
 
-::: cryojax.simulator.IndependentAtomProjection
+::: cryojax.simulator.GaussianFourierProjection
         options:
             members:
                 - __init__

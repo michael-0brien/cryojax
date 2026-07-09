@@ -544,7 +544,7 @@ _real_operators_3d = [*_real_operators_common, im.RealGaussian(offset=(1.0, -1.0
 #
 # Minimal, focused tests of `spread_2d`/`spread_3d` in isolation
 # (finite-difference checks of the custom VJP rule), independent of the full
-# `GaussianMixtureVolume`/`IndependentAtomVolume` machinery that calls them.
+# `GaussianMixtureVolume` machinery that calls them.
 
 
 @pytest.fixture

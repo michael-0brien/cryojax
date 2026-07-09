@@ -25,17 +25,6 @@ def make_frequencies_1d(
     )
 
 
-def nspread_to_eps(n_spread: int) -> float:
-    """Inverse of the FINUFFT-style `eps -> nspread` heuristic used by
-    `nufftax`/`finufft` (`nspread = ceil(-log10(eps) + 1)`): the precision
-    `eps` that a FINUFFT-compatible NUFFT would resolve using a kernel width
-    of `n_spread`. Used to translate our own `n_spread` parameter into an
-    `eps` for NUFFT backends that only accept a precision, not a kernel
-    width, directly.
-    """
-    return 10.0 ** (1 - n_spread)
-
-
 def spread_and_sum_gaussian_components(
     spread_one: Callable[[Array, Array, int], Array],
     amplitudes: Float[Array, "... n_gaussians"],
@@ -44,9 +33,8 @@ def spread_and_sum_gaussian_components(
 ) -> Array:
     """Spread each gaussian component -- indexed by the trailing axis of
     `amplitudes`/`variances` -- via `spread_one(amplitude, variance,
-    n_spread)`, and sum the results. Used by both `GaussianMixtureVolume`
-    (where the leading axes are `(n_positions,)`) and `IndependentAtomVolume`
-    (where there are no leading axes: one shared kernel per atom type).
+    n_spread)`, and sum the results. Used by `GaussianMixtureVolume` (where
+    the leading axes are `(n_positions,)`).
 
     If `n_spread` is a single `int`, `spread_one` is `vmap`'d over the
     `n_gaussians` axis, sharing one compiled/traced call across every

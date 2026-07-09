@@ -1,7 +1,6 @@
 """The pure-JAX Gaussian spreading backend (scatter point strengths onto a
 uniform grid), adapted from `nufftax`'s NUFFT type-1 spreading, specialized
 to the isotropic Gaussian (and pixel-averaged Gaussian) kernels used by
-`cryojax.simulator.IndependentAtomVolume` and
 `cryojax.simulator.GaussianMixtureVolume`.
 
 This is the pallas-agnostic reference implementation: it works standalone

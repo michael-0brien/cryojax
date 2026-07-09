@@ -16,18 +16,16 @@ from .fourier_voxels import (
     FourierVoxelGridVolume as FourierVoxelGridVolume,
     FourierVoxelSplineVolume as FourierVoxelSplineVolume,
 )
-from .gaussian_volume import (
+from .gaussian_fourier import (
+    GaussianFourierProjection as GaussianFourierProjection,
+    GaussianFourierRenderFn as GaussianFourierRenderFn,
+    GaussianFourierVolume as GaussianFourierVolume,
+)
+from .gaussian_mixture import (
     GaussianMixtureProjection as GaussianMixtureProjection,
     GaussianMixtureRenderFn as GaussianMixtureRenderFn,
     GaussianMixtureVolume as GaussianMixtureVolume,
 )
-from .independent_atom_volume import (
-    IndependentAtomProjection as IndependentAtomProjection,
-    IndependentAtomRenderFn as IndependentAtomRenderFn,
-    IndependentAtomVolume as IndependentAtomVolume,
-)
 from .real_voxels import (
-    RealVoxelCloudVolume as RealVoxelCloudVolume,
     RealVoxelGridVolume as RealVoxelGridVolume,
-    RealVoxelProjection as RealVoxelProjection,
 )

@@ -1,8 +1,8 @@
 """Tests for atom-based volume representations and their integrators/render fns.
 
-Covers GaussianMixtureVolume and IndependentAtomVolume, with their associated
-AbstractVolumeIntegrators (GaussianMixtureProjection, IndependentAtomProjection)
-and AbstractVolumeRenderFns (GaussianMixtureRenderFn, IndependentAtomRenderFn).
+Covers GaussianMixtureVolume and GaussianFourierVolume, with their associated
+AbstractVolumeIntegrators (GaussianMixtureProjection, GaussianFourierProjection)
+and AbstractVolumeRenderFns (GaussianMixtureRenderFn, GaussianFourierRenderFn).
 
 Tests demand precise numerical agreement between implementations and between
 the two NUFFT backends (nufftax and jax-finufft).
@@ -21,6 +21,7 @@ from cryojax.constants import (
     check_atomic_numbers_supported,
 )
 from cryojax.ndimage import make_coordinate_grid
+from cryojax.simulator._volume import gaussian_fourier
 from jaxtyping import Array
 
 
@@ -119,10 +120,10 @@ def test_load_atom_volume(tabulation, sample_pdb_path: str):
 
     atom_volume = cxs.load_tabulated_volume(
         sample_pdb_path,
-        output_type=cxs.IndependentAtomVolume,
+        output_type=cxs.GaussianFourierVolume,
         tabulation=tabulation,
     )
-    assert isinstance(atom_volume, cxs.IndependentAtomVolume)
+    assert isinstance(atom_volume, cxs.GaussianFourierVolume)
     if tabulation == "peng":
         atom_volume = cxs.load_tabulated_volume(
             sample_pdb_path,
@@ -140,10 +141,10 @@ def test_load_atom_volume(tabulation, sample_pdb_path: str):
     atom_data = mmdf.read(pathlib.Path(sample_pdb_path))
     atom_volume = cxs.load_tabulated_volume(
         atom_data,
-        output_type=cxs.IndependentAtomVolume,
+        output_type=cxs.GaussianFourierVolume,
         tabulation=tabulation,
     )
-    assert isinstance(atom_volume, cxs.IndependentAtomVolume)
+    assert isinstance(atom_volume, cxs.GaussianFourierVolume)
 
 
 # ── scattering factor parameters ──────────────────────────────────────────────
@@ -653,49 +654,18 @@ def test_gmm_render_peak_at_box_center(n, n_spread):
     assert peak_index == (n // 2, n // 2, n // 2)
 
 
-@pytest.mark.parametrize("n", (10, 11))
-def test_independent_atom_real_space_projection_peak_at_box_center(n):
-    shape = (n, n)
-    pixel_size = 1.0
-    volume = cxs.IndependentAtomVolume(
-        positions=np.zeros((1, 3)),
-        kernel_fns=im.RealGaussian(amplitude=1.0, variance=0.1),
-    )
-    image_config = cxs.BasicImageConfig(shape, pixel_size, voltage_in_kilovolts=300.0)
-    integrator = cxs.IndependentAtomProjection(sampling_mode="point")
-    projection = integrator.integrate(volume, image_config, outputs_real_space=True)
-    peak_index = tuple(int(i) for i in jnp.unravel_index(jnp.argmax(projection), shape))
-    assert peak_index == (n // 2, n // 2)
-
-
-@pytest.mark.parametrize("n", (10, 11))
-def test_independent_atom_real_space_render_peak_at_box_center(n):
-    shape = (n, n, n)
-    voxel_size = 1.0
-    volume = cxs.IndependentAtomVolume(
-        positions=np.zeros((1, 3)),
-        kernel_fns=im.RealGaussian(amplitude=1.0, variance=0.1),
-    )
-    render_fn = cxs.IndependentAtomRenderFn(shape, voxel_size, sampling_mode="point")
-    real_voxel_grid = render_fn(volume, outputs_real_space=True)
-    peak_index = tuple(
-        int(i) for i in jnp.unravel_index(jnp.argmax(real_voxel_grid), shape)
-    )
-    assert peak_index == (n // 2, n // 2, n // 2)
-
-
-# ── IndependentAtomVolume: bad instantiation ──────────────────────────────────
+# ── GaussianFourierVolume: bad instantiation ──────────────────────────────────
 
 
 def test_fft_atom_bad_instantiation():
     with pytest.raises(ValueError):
-        _ = cxs.IndependentAtomVolume(
+        _ = cxs.GaussianFourierVolume(
             positions=np.zeros((10, 3)),
             kernel_fns=(im.FourierGaussian(),),
         )
 
 
-# ── IndependentAtomProjection: each backend vs GaussianMixtureProjection ─────
+# ── GaussianFourierProjection: each backend vs GaussianMixtureProjection ─────
 
 
 def _make_fft_projection_exact_volumes(pdb_info):
@@ -711,7 +681,7 @@ def _make_fft_projection_exact_volumes(pdb_info):
         variances=b_factor / (8 * np.pi**2),
     )
     gaussian_integrator = cxs.GaussianMixtureProjection(sampling_mode="point")
-    atom_volume = cxs.IndependentAtomVolume(
+    atom_volume = cxs.GaussianFourierVolume(
         positions=atom_positions,
         kernel_fns=im.FourierGaussian(amplitude=amplitude, b_factor=b_factor),
     )
@@ -723,14 +693,14 @@ def _make_fft_projection_exact_volumes(pdb_info):
     ((1.0, (32, 32)), (1.0, (32, 31)), (1.0, (31, 32)), (1.0, (31, 31))),
 )
 @_backends
-def test_fft_atom_projection_exact(pdb_info, pixel_size, shape, backend):
+def test_fft_atom_projection_exact(monkeypatch, pdb_info, pixel_size, shape, backend):
+    monkeypatch.setattr(gaussian_fourier, "CRYOJAX_FINUFFT_BACKEND", backend)
     gaussian_volume, gaussian_integrator, atom_volume, image_config = (
         _make_fft_projection_exact_volumes(pdb_info)
     )
-    atom_integrator = cxs.IndependentAtomProjection(
-        backend=backend,  # type: ignore
+    atom_integrator = cxs.GaussianFourierProjection(
         sampling_mode="point",
-        n_spread=11,
+        eps=1e-10,
     )
     proj_by_gaussians = compute_projection(
         gaussian_volume, gaussian_integrator, image_config
@@ -744,51 +714,24 @@ def test_fft_atom_projection_exact(pdb_info, pixel_size, shape, backend):
     "pixel_size, shape",
     ((1.0, (32, 32)), (1.0, (32, 31)), (1.0, (31, 32)), (1.0, (31, 31))),
 )
-def test_fft_atom_projection_exact_backends_agree(pdb_info, pixel_size, shape):
+def test_fft_atom_projection_exact_backends_agree(
+    monkeypatch, pdb_info, pixel_size, shape
+):
     """nufftax and jax-finufft must produce identical projections."""
     _, _, atom_volume, image_config = _make_fft_projection_exact_volumes(pdb_info)
+    monkeypatch.setattr(gaussian_fourier, "CRYOJAX_FINUFFT_BACKEND", "nufftax")
     proj_nufftax = compute_projection(
         atom_volume,
-        cxs.IndependentAtomProjection(
-            backend="nufftax", sampling_mode="point", n_spread=11
-        ),
+        cxs.GaussianFourierProjection(sampling_mode="point", eps=1e-10),
         image_config,
     )
+    monkeypatch.setattr(gaussian_fourier, "CRYOJAX_FINUFFT_BACKEND", "jax-finufft")
     proj_jax_finufft = compute_projection(
         atom_volume,
-        cxs.IndependentAtomProjection(
-            backend="jax-finufft", sampling_mode="point", n_spread=11
-        ),
+        cxs.GaussianFourierProjection(sampling_mode="point", eps=1e-10),
         image_config,
     )
     np.testing.assert_allclose(proj_nufftax, proj_jax_finufft, atol=1e-6)
-
-
-@pytest.mark.parametrize(
-    "pixel_size, shape",
-    (
-        (0.5, (63, 63)),
-        (0.5, (64, 64)),
-    ),
-)
-def test_real_atom_projection_exact(pdb_info, pixel_size, shape):
-    atom_positions, _, _ = pdb_info
-    image_config = cxs.BasicImageConfig(shape, pixel_size, voltage_in_kilovolts=300.0)
-    amplitude, variance = 0.75, 20.0 / (8 * np.pi**2)
-    gaussian_volume = cxs.GaussianMixtureVolume(
-        atom_positions, amplitudes=amplitude, variances=variance
-    )
-    gaussian_integrator = cxs.GaussianMixtureProjection(sampling_mode="average")
-    atom_volume = cxs.IndependentAtomVolume(
-        positions=atom_positions,
-        kernel_fns=im.RealGaussian(amplitude=amplitude, variance=variance),
-    )
-    atom_integrator = cxs.IndependentAtomProjection(sampling_mode="average", n_spread=13)
-    proj_by_gaussians = compute_projection(
-        gaussian_volume, gaussian_integrator, image_config
-    )
-    proj_by_atom = compute_projection(atom_volume, atom_integrator, image_config)
-    np.testing.assert_allclose(proj_by_gaussians, proj_by_atom, atol=1e-5)
 
 
 def _make_antialias_volumes(pdb_info, width, pixel_size, shape):
@@ -796,7 +739,7 @@ def _make_antialias_volumes(pdb_info, width, pixel_size, shape):
     gaussian_volume = cxs.GaussianMixtureVolume(
         atom_positions, amplitudes=1.0, variances=width**2
     )
-    atom_volume = cxs.IndependentAtomVolume(
+    atom_volume = cxs.GaussianFourierVolume(
         positions=atom_positions,
         kernel_fns=im.FourierGaussian(amplitude=1.0, b_factor=width**2 * (8 * np.pi**2)),
     )
@@ -813,13 +756,15 @@ def _make_antialias_volumes(pdb_info, width, pixel_size, shape):
     ((5.0, 0.5, (64, 64)), (1.0, 0.5, (64, 64)), (2.0, 1.0, (32, 32))),
 )
 @_backends
-def test_fft_atom_projection_antialias(pdb_info, width, pixel_size, shape, backend):
+def test_fft_atom_projection_antialias(
+    monkeypatch, pdb_info, width, pixel_size, shape, backend
+):
+    monkeypatch.setattr(gaussian_fourier, "CRYOJAX_FINUFFT_BACKEND", backend)
     gaussian_volume, gaussian_integrator, atom_volume, image_config = (
         _make_antialias_volumes(pdb_info, width, pixel_size, shape)
     )
-    atom_integrator = cxs.IndependentAtomProjection(
-        n_spread=11,
-        backend=backend,  # type: ignore
+    atom_integrator = cxs.GaussianFourierProjection(
+        eps=1e-10,
         upsample_factor=2.0,
     )
     proj_by_gaussians = compute_projection(
@@ -834,23 +779,23 @@ def test_fft_atom_projection_antialias(pdb_info, width, pixel_size, shape, backe
     "width, pixel_size, shape",
     ((5.0, 0.5, (64, 64)), (1.0, 0.5, (64, 64)), (2.0, 1.0, (32, 32))),
 )
-def test_fft_atom_projection_antialias_backends_agree(pdb_info, width, pixel_size, shape):
+def test_fft_atom_projection_antialias_backends_agree(
+    monkeypatch, pdb_info, width, pixel_size, shape
+):
     """nufftax and jax-finufft must produce identical antialiased projections."""
     _, _, atom_volume, image_config = _make_antialias_volumes(
         pdb_info, width, pixel_size, shape
     )
+    monkeypatch.setattr(gaussian_fourier, "CRYOJAX_FINUFFT_BACKEND", "nufftax")
     proj_nufftax = compute_projection(
         atom_volume,
-        cxs.IndependentAtomProjection(
-            backend="nufftax", n_spread=11, upsample_factor=2.0
-        ),
+        cxs.GaussianFourierProjection(eps=1e-10, upsample_factor=2.0),
         image_config,
     )
+    monkeypatch.setattr(gaussian_fourier, "CRYOJAX_FINUFFT_BACKEND", "jax-finufft")
     proj_jax_finufft = compute_projection(
         atom_volume,
-        cxs.IndependentAtomProjection(
-            backend="jax-finufft", n_spread=11, upsample_factor=2.0
-        ),
+        cxs.GaussianFourierProjection(eps=1e-10, upsample_factor=2.0),
         image_config,
     )
     np.testing.assert_allclose(proj_nufftax, proj_jax_finufft, atol=1e-6)
@@ -864,11 +809,10 @@ def _make_peng_volumes(pdb_info, upsampfac):
     gaussian_volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(
         atom_positions, peng_parameters, extra_b_factors=4.0
     )
-    atom_volume = cxs.IndependentAtomVolume.from_tabulated_parameters(
+    atom_volume = cxs.GaussianFourierVolume.from_tabulated_parameters(
         positions_by_id,
         peng_parameters_by_id,
         b_factor_by_element=4.0,
-        use_real_space=False,
     )
     gaussian_integrator = cxs.GaussianMixtureProjection(sampling_mode="average")
     return gaussian_volume, gaussian_integrator, atom_volume
@@ -896,16 +840,18 @@ def _make_peng_volumes(pdb_info, upsampfac):
     ),
 )
 @_backends
-def test_fft_projection_peng(pdb_info, pixel_size, shape, upsampfac, eps, backend):
+def test_fft_projection_peng(
+    monkeypatch, pdb_info, pixel_size, shape, upsampfac, eps, backend
+):
+    monkeypatch.setattr(gaussian_fourier, "CRYOJAX_FINUFFT_BACKEND", backend)
     gaussian_volume, gaussian_integrator, atom_volume = _make_peng_volumes(
         pdb_info, upsampfac
     )
     image_config = cxs.BasicImageConfig(shape, pixel_size, voltage_in_kilovolts=300.0)
-    atom_integrator = cxs.IndependentAtomProjection(
-        backend=backend,  # type: ignore
+    atom_integrator = cxs.GaussianFourierProjection(
         sampling_mode="average",
         upsample_factor=upsampfac,
-        n_spread=11,
+        eps=eps,
     )
     proj_by_gaussians = compute_projection(
         gaussian_volume, gaussian_integrator, image_config
@@ -922,61 +868,33 @@ def test_fft_projection_peng(pdb_info, pixel_size, shape, upsampfac, eps, backen
         (0.25, (133, 133), 2),
     ),
 )
-def test_fft_projection_peng_backends_agree(pdb_info, pixel_size, shape, upsampfac):
+def test_fft_projection_peng_backends_agree(
+    monkeypatch, pdb_info, pixel_size, shape, upsampfac
+):
     """nufftax and jax-finufft must produce identical Peng-tabulated projections."""
     _, _, atom_volume = _make_peng_volumes(pdb_info, upsampfac)
     image_config = cxs.BasicImageConfig(shape, pixel_size, voltage_in_kilovolts=300.0)
+    monkeypatch.setattr(gaussian_fourier, "CRYOJAX_FINUFFT_BACKEND", "nufftax")
     proj_nufftax = compute_projection(
         atom_volume,
-        cxs.IndependentAtomProjection(
-            backend="nufftax",
+        cxs.GaussianFourierProjection(
             sampling_mode="average",
             upsample_factor=upsampfac,
-            n_spread=11,
+            eps=1e-10,
         ),
         image_config,
     )
+    monkeypatch.setattr(gaussian_fourier, "CRYOJAX_FINUFFT_BACKEND", "jax-finufft")
     proj_jax_finufft = compute_projection(
         atom_volume,
-        cxs.IndependentAtomProjection(
-            backend="jax-finufft",
+        cxs.GaussianFourierProjection(
             sampling_mode="average",
             upsample_factor=upsampfac,
-            n_spread=11,
+            eps=1e-10,
         ),
         image_config,
     )
     np.testing.assert_allclose(proj_nufftax, proj_jax_finufft, atol=1e-6)
-
-
-@pytest.mark.parametrize(
-    "pixel_size, shape",
-    (
-        (0.5, (64, 64)),
-        (0.5, (63, 63)),
-        (0.5, (64, 63)),
-        (0.5, (63, 64)),
-    ),
-)
-def test_real_projection_peng_erf(pdb_info, pixel_size, shape):
-    atom_positions, atom_ids, _ = pdb_info
-    positions_by_id, unique_atom_ids = split_atoms_by_element(atom_ids, atom_positions)
-    peng_parameters = PengScatteringFactorParameters(atom_ids)
-    peng_parameters_by_id = PengScatteringFactorParameters(unique_atom_ids)
-    gaussian_volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(
-        atom_positions, peng_parameters
-    )
-    atom_volume = cxs.IndependentAtomVolume.from_tabulated_parameters(
-        positions_by_id, peng_parameters_by_id, use_real_space=True
-    )
-    image_config = cxs.BasicImageConfig(shape, pixel_size, voltage_in_kilovolts=300.0)
-    gaussian_integrator = cxs.GaussianMixtureProjection(sampling_mode="average")
-    atom_integrator = cxs.IndependentAtomProjection(sampling_mode="average", n_spread=17)
-    proj_by_gaussians = compute_projection(
-        gaussian_volume, gaussian_integrator, image_config
-    )
-    proj_by_atoms = compute_projection(atom_volume, atom_integrator, image_config)
-    np.testing.assert_allclose(proj_by_gaussians, proj_by_atoms, atol=1e-6)
 
 
 @pytest.mark.parametrize("upsampfac", (1.25, 2.0))
@@ -985,14 +903,13 @@ def test_fft_atom_projection_custom_upsampfac(upsampfac):
     positions = np.array([[0.0, 0.0, 0.0], [1.0, 0.5, -0.5]])
     shape, pixel_size = (8, 8), 1.0
     image_config = cxs.BasicImageConfig(shape, pixel_size, voltage_in_kilovolts=300.0)
-    atom_volume = cxs.IndependentAtomVolume(
+    atom_volume = cxs.GaussianFourierVolume(
         positions=positions,
         kernel_fns=im.FourierGaussian(amplitude=1.0, b_factor=100.0),
     )
-    atom_integrator = cxs.IndependentAtomProjection(
-        backend="nufftax",
+    atom_integrator = cxs.GaussianFourierProjection(
         sampling_mode="point",
-        n_spread=7,
+        eps=1e-6,
         options={"upsampfac": upsampfac},
     )
     result = atom_integrator.integrate(
@@ -1003,14 +920,15 @@ def test_fft_atom_projection_custom_upsampfac(upsampfac):
 
 @_jax_finufft
 @pytest.mark.parametrize("upsampfac", (1.25, 2.0))
-def test_fft_atom_projection_custom_upsampfac_jax_finufft(upsampfac):
+def test_fft_atom_projection_custom_upsampfac_jax_finufft(monkeypatch, upsampfac):
     """Smoke test: custom opts via options (jax-finufft) runs without error."""
     from jax_finufft.options import NestedOpts, Opts
 
+    monkeypatch.setattr(gaussian_fourier, "CRYOJAX_FINUFFT_BACKEND", "jax-finufft")
     positions = np.array([[0.0, 0.0, 0.0], [1.0, 0.5, -0.5]])
     shape, pixel_size = (8, 8), 1.0
     image_config = cxs.BasicImageConfig(shape, pixel_size, voltage_in_kilovolts=300.0)
-    atom_volume = cxs.IndependentAtomVolume(
+    atom_volume = cxs.GaussianFourierVolume(
         positions=positions,
         kernel_fns=im.FourierGaussian(amplitude=1.0, b_factor=100.0),
     )
@@ -1018,10 +936,9 @@ def test_fft_atom_projection_custom_upsampfac_jax_finufft(upsampfac):
         forward=Opts(upsampfac=upsampfac, gpu_upsampfac=upsampfac),
         backward=Opts(upsampfac=upsampfac, gpu_upsampfac=upsampfac),
     )
-    atom_integrator = cxs.IndependentAtomProjection(
-        backend="jax-finufft",
+    atom_integrator = cxs.GaussianFourierProjection(
         sampling_mode="point",
-        n_spread=7,
+        eps=1e-6,
         options={"opts": opts},
     )
     result = atom_integrator.integrate(
@@ -1030,7 +947,7 @@ def test_fft_atom_projection_custom_upsampfac_jax_finufft(upsampfac):
     assert result.shape == (shape[0], shape[1] // 2 + 1)
 
 
-# ── IndependentAtomRenderFn: each backend vs GaussianMixtureRenderFn ──────────
+# ── GaussianFourierRenderFn: each backend vs GaussianMixtureRenderFn ──────────
 
 
 def _make_render_volumes(pdb_info, width):
@@ -1038,7 +955,7 @@ def _make_render_volumes(pdb_info, width):
     gaussian_volume = cxs.GaussianMixtureVolume(
         atom_positions, amplitudes=1.0, variances=width**2
     )
-    atom_volume = cxs.IndependentAtomVolume(
+    atom_volume = cxs.GaussianFourierVolume(
         positions=atom_positions,
         kernel_fns=im.FourierGaussian(amplitude=1.0, b_factor=width**2 * (8 * np.pi**2)),
     )
@@ -1053,14 +970,14 @@ def _make_render_volumes(pdb_info, width):
     ),
 )
 @_backends
-def test_fft_atom_render(pdb_info, width, voxel_size, shape, backend):
+def test_fft_atom_render(monkeypatch, pdb_info, width, voxel_size, shape, backend):
+    monkeypatch.setattr(gaussian_fourier, "CRYOJAX_FINUFFT_BACKEND", backend)
     gaussian_volume, atom_volume = _make_render_volumes(pdb_info, width)
     gaussian_render_fn = cxs.GaussianMixtureRenderFn(shape, voxel_size)
-    atom_render_fn = cxs.IndependentAtomRenderFn(
+    atom_render_fn = cxs.GaussianFourierRenderFn(
         shape,
         voxel_size,
-        n_spread=11,
-        backend=backend,  # type: ignore
+        eps=1e-10,
     )
     voxels_by_gaussians = gaussian_render_fn(gaussian_volume)
     voxels_by_atoms = atom_render_fn(atom_volume)
@@ -1075,15 +992,17 @@ def test_fft_atom_render(pdb_info, width, voxel_size, shape, backend):
         (1.0, 0.5, (63, 63, 63)),
     ),
 )
-def test_fft_atom_render_backends_agree(pdb_info, width, voxel_size, shape):
+def test_fft_atom_render_backends_agree(monkeypatch, pdb_info, width, voxel_size, shape):
     """nufftax and jax-finufft must produce identical rendered voxel grids."""
     _, atom_volume = _make_render_volumes(pdb_info, width)
-    voxels_nufftax = cxs.IndependentAtomRenderFn(
-        shape, voxel_size, n_spread=11, backend="nufftax"
-    )(atom_volume)
-    voxels_jax_finufft = cxs.IndependentAtomRenderFn(
-        shape, voxel_size, n_spread=11, backend="jax-finufft"
-    )(atom_volume)
+    monkeypatch.setattr(gaussian_fourier, "CRYOJAX_FINUFFT_BACKEND", "nufftax")
+    voxels_nufftax = cxs.GaussianFourierRenderFn(shape, voxel_size, eps=1e-10)(
+        atom_volume
+    )
+    monkeypatch.setattr(gaussian_fourier, "CRYOJAX_FINUFFT_BACKEND", "jax-finufft")
+    voxels_jax_finufft = cxs.GaussianFourierRenderFn(shape, voxel_size, eps=1e-10)(
+        atom_volume
+    )
     np.testing.assert_allclose(voxels_nufftax, voxels_jax_finufft, atol=1e-6)
 
 
@@ -1096,14 +1015,14 @@ def test_render_options(pdb_info):
     gaussian_render_fn = cxs.GaussianMixtureRenderFn(shape, voxel_size)
     volumes, render_fns = [gaussian_volume], [gaussian_render_fn]
     if jnufft is not None:
-        atom_volume = cxs.IndependentAtomVolume(
+        atom_volume = cxs.GaussianFourierVolume(
             positions=atom_positions,
             kernel_fns=im.FourierGaussian(
                 amplitude=1.0, b_factor=width**2 * (8 * np.pi**2)
             ),
         )
         volumes.append(atom_volume)  # type: ignore
-        render_fns.append(cxs.IndependentAtomRenderFn(shape, voxel_size, n_spread=11))  # type: ignore
+        render_fns.append(cxs.GaussianFourierRenderFn(shape, voxel_size, eps=1e-10))  # type: ignore
     for volume, render_fn in zip(volumes, render_fns):
         real_voxel_grid = render_fn(volume, outputs_real_space=True)
         assert real_voxel_grid.shape == shape
@@ -1121,15 +1040,14 @@ def test_fft_atom_render_custom_upsampfac(upsampfac):
     """Smoke test: custom upsampfac via options (nufftax) runs without error."""
     positions = np.array([[0.0, 0.0, 0.0], [1.0, 0.5, -0.5]])
     shape, voxel_size = (8, 8, 8), 1.0
-    atom_volume = cxs.IndependentAtomVolume(
+    atom_volume = cxs.GaussianFourierVolume(
         positions=positions,
         kernel_fns=im.FourierGaussian(amplitude=1.0, b_factor=100.0),
     )
-    render_fn = cxs.IndependentAtomRenderFn(
+    render_fn = cxs.GaussianFourierRenderFn(
         shape,
         voxel_size,
-        backend="nufftax",
-        n_spread=7,
+        eps=1e-6,
         options={"upsampfac": upsampfac},
     )
     result = render_fn(atom_volume, outputs_real_space=True)
@@ -1138,13 +1056,14 @@ def test_fft_atom_render_custom_upsampfac(upsampfac):
 
 @_jax_finufft
 @pytest.mark.parametrize("upsampfac", (1.25, 2.0))
-def test_fft_atom_render_custom_upsampfac_jax_finufft(upsampfac):
+def test_fft_atom_render_custom_upsampfac_jax_finufft(monkeypatch, upsampfac):
     """Smoke test: custom opts via options (jax-finufft) runs without error."""
     from jax_finufft.options import NestedOpts, Opts
 
+    monkeypatch.setattr(gaussian_fourier, "CRYOJAX_FINUFFT_BACKEND", "jax-finufft")
     positions = np.array([[0.0, 0.0, 0.0], [1.0, 0.5, -0.5]])
     shape, voxel_size = (8, 8, 8), 1.0
-    atom_volume = cxs.IndependentAtomVolume(
+    atom_volume = cxs.GaussianFourierVolume(
         positions=positions,
         kernel_fns=im.FourierGaussian(amplitude=1.0, b_factor=100.0),
     )
@@ -1152,8 +1071,8 @@ def test_fft_atom_render_custom_upsampfac_jax_finufft(upsampfac):
         forward=Opts(upsampfac=upsampfac, gpu_upsampfac=upsampfac),
         backward=Opts(upsampfac=upsampfac, gpu_upsampfac=upsampfac),
     )
-    render_fn = cxs.IndependentAtomRenderFn(
-        shape, voxel_size, backend="jax-finufft", n_spread=7, options={"opts": opts}
+    render_fn = cxs.GaussianFourierRenderFn(
+        shape, voxel_size, eps=1e-6, options={"opts": opts}
     )
     result = render_fn(atom_volume, outputs_real_space=True)
     assert result.shape == shape
@@ -1228,62 +1147,6 @@ def test_gmm_tuple_n_spread_wrong_length_raises(toy_gaussian_cloud):
         render_fn(gmm_volume)
 
 
-def test_independent_atom_render_tuple_n_spread_matches_scalar():
-    shape, voxel_size = (16, 16, 16), 1.0
-    kernel_fn = im.RealGaussian(
-        amplitude=jnp.array([1.0, 0.5]), variance=jnp.array([0.1, 0.05])
-    )
-    volume = cxs.IndependentAtomVolume(positions=np.zeros((1, 3)), kernel_fns=kernel_fn)
-    scalar_grid = cxs.IndependentAtomRenderFn(shape, voxel_size, n_spread=9)(volume)
-    tuple_grid = cxs.IndependentAtomRenderFn(shape, voxel_size, n_spread=(9, 9))(volume)
-    assert jnp.allclose(scalar_grid, tuple_grid, atol=1e-6)
-
-
-def test_independent_atom_projection_tuple_n_spread_matches_scalar():
-    shape, pixel_size = (16, 16), 1.0
-    kernel_fn = im.RealGaussian(
-        amplitude=jnp.array([1.0, 0.5]), variance=jnp.array([0.1, 0.05])
-    )
-    volume = cxs.IndependentAtomVolume(positions=np.zeros((1, 3)), kernel_fns=kernel_fn)
-    image_config = cxs.BasicImageConfig(shape, pixel_size, voltage_in_kilovolts=300.0)
-    scalar_projection = cxs.IndependentAtomProjection(n_spread=9).integrate(
-        volume, image_config, outputs_real_space=True
-    )
-    tuple_projection = cxs.IndependentAtomProjection(n_spread=(9, 9)).integrate(
-        volume, image_config, outputs_real_space=True
-    )
-    assert jnp.allclose(scalar_projection, tuple_projection, atol=1e-6)
-
-
-def test_independent_atom_tuple_n_spread_with_fourier_kernel_raises():
-    """A tuple `n_spread` is only meaningful for real-space (`RealGaussian`)
-    spreading; NUFFT's `eps` (fourier-space, `FourierGaussian`) has no
-    per-component analog, so this must raise a clear error rather than
-    silently using one of the values or crashing inside `nspread_to_eps`.
-    """
-    shape, voxel_size = (16, 16, 16), 1.0
-    kernel_fn = im.FourierGaussian(
-        amplitude=jnp.array([1.0, 0.5]), b_factor=jnp.array([10.0, 5.0])
-    )
-    volume = cxs.IndependentAtomVolume(positions=np.zeros((1, 3)), kernel_fns=kernel_fn)
-    render_fn = cxs.IndependentAtomRenderFn(shape, voxel_size, n_spread=(9, 9))
-    with pytest.raises(ValueError, match="n_spread"):
-        render_fn(volume)
-
-
-def test_independent_atom_scalar_n_spread_with_fourier_kernel_still_works():
-    """A plain `int` `n_spread` must still work fine with fourier-space
-    kernels (only tuples are restricted to real-space)."""
-    shape, voxel_size = (16, 16, 16), 1.0
-    kernel_fn = im.FourierGaussian(
-        amplitude=jnp.array([1.0, 0.5]), b_factor=jnp.array([10.0, 5.0])
-    )
-    volume = cxs.IndependentAtomVolume(positions=np.zeros((1, 3)), kernel_fns=kernel_fn)
-    render_fn = cxs.IndependentAtomRenderFn(shape, voxel_size, n_spread=9)
-    result = render_fn(volume, outputs_real_space=True)
-    assert jnp.all(jnp.isfinite(result))
-
-
 # ── suggest_n_spread ──────────────────────────────────────────────────────────
 
 
@@ -1331,45 +1194,6 @@ def test_suggest_n_spread_clamping(toy_gaussian_cloud):
     assert global_clamped == 1000
 
 
-def test_suggest_n_spread_independent_atom_real_and_fourier_agree():
-    """`suggest_n_spread` must derive the same widths from a `RealGaussian`'s
-    `variance` as from an equivalent `FourierGaussian`'s `b_factor` (the
-    latter converted via `variance = b_factor / (8 pi^2)`, *not* used
-    directly as if it were already a width -- variance and width differ by a
-    square root, so this is a real correctness check, not a redundant one).
-    """
-    pixel_size = 1.0
-    amplitude = jnp.array([1.0, 0.5, 0.2])
-    variance = jnp.array([0.05, 0.5, 5.0])
-    b_factor = variance * (8.0 * jnp.pi**2)
-
-    volume_real = cxs.IndependentAtomVolume(
-        positions=np.zeros((1, 3)),
-        kernel_fns=im.RealGaussian(amplitude=amplitude, variance=variance),
-    )
-    volume_fourier = cxs.IndependentAtomVolume(
-        positions=np.zeros((1, 3)),
-        kernel_fns=im.FourierGaussian(amplitude=amplitude, b_factor=b_factor),
-    )
-    n_spread_real = cxs.suggest_n_spread(volume_real, pixel_size, mode="termwise")
-    n_spread_fourier = cxs.suggest_n_spread(volume_fourier, pixel_size, mode="termwise")
-    assert n_spread_real == n_spread_fourier
-
-
-def test_suggest_n_spread_independent_atom_mismatched_n_gaussians_raises():
-    volume = cxs.IndependentAtomVolume(
-        positions=(np.zeros((1, 3)), np.zeros((1, 3))),
-        kernel_fns=(
-            im.RealGaussian(
-                amplitude=jnp.array([1.0, 0.5]), variance=jnp.array([0.1, 0.2])
-            ),
-            im.RealGaussian(amplitude=jnp.array([1.0]), variance=jnp.array([0.1])),
-        ),
-    )
-    with pytest.raises(ValueError, match="gaussian components"):
-        cxs.suggest_n_spread(volume, 1.0, mode="termwise")
-
-
 def test_suggest_n_spread_unsupported_volume_type_raises():
     with pytest.raises(ValueError, match="suggest_n_spread"):
         cxs.suggest_n_spread(object(), 1.0)  # type: ignore[arg-type]
@@ -1387,14 +1211,13 @@ def test_suggest_n_spread_output_is_plain_python_not_jax():
     shape-determining argument), so its outputs must be plain Python `int`s
     -- not 0-d JAX/numpy arrays, which would be the wrong type to use as a
     static argument and would signal that the function accidentally
-    round-tripped through JAX (`b_factor_to_variance` returns a JAX array,
-    for instance) instead of staying eager/numpy-only throughout.
+    round-tripped through JAX instead of staying eager/numpy-only
+    throughout.
     """
-    volume = cxs.IndependentAtomVolume(
-        positions=np.zeros((1, 3)),
-        kernel_fns=im.FourierGaussian(
-            amplitude=jnp.array([1.0, 0.5]), b_factor=jnp.array([10.0, 5.0])
-        ),
+    volume = cxs.GaussianMixtureVolume(
+        np.zeros((1, 3)),
+        amplitudes=jnp.array([[1.0, 0.5]]),
+        variances=jnp.array([[0.1, 0.05]]),
     )
     global_n_spread = cxs.suggest_n_spread(volume, 1.0, mode="global")
     termwise_n_spread = cxs.suggest_n_spread(volume, 1.0, mode="termwise")

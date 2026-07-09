@@ -3,7 +3,6 @@ from collections.abc import Callable
 from typing import Any, Literal, overload
 
 import equinox.internal as eqxi
-import jax
 import jax.numpy as jnp
 import mmdf
 import numpy as np
@@ -15,10 +14,7 @@ from ..constants import PengScatteringFactorParameters
 from ..io import mmdf_to_atoms
 from ..jax_util import FloatLike, NDArrayLike
 from ..ndimage import (
-    AbstractFourierOperator,
     AbstractImageTransform,
-    AbstractRealOperator,
-    RealGaussian,
     make_coordinate_grid,
     variance_to_nspread,
 )
@@ -43,9 +39,8 @@ from ._volume import (
     AutoVolumeProjection,
     FourierVoxelGridVolume,
     FourierVoxelSplineVolume,
+    GaussianFourierVolume,
     GaussianMixtureVolume,
-    IndependentAtomVolume,
-    RealVoxelCloudVolume,
     RealVoxelGridVolume,
 )
 
@@ -359,13 +354,13 @@ def make_image_model(
 def load_tabulated_volume(  # pyright: ignore[reportOverlappingOverload]
     path_or_mmdf: str | pathlib.Path | pd.DataFrame,
     *,
-    output_type: type[IndependentAtomVolume] = IndependentAtomVolume,
+    output_type: type[GaussianFourierVolume] = GaussianFourierVolume,
     tabulation: Literal["peng"] = "peng",
     include_b_factors: bool = True,
     b_factor_fn: Callable[[NDArrayLike, NDArrayLike], NDArrayLike] = identity_fn,
     selection_string: str = "all",
     pdb_options: dict[str, Any] = {},
-) -> IndependentAtomVolume: ...
+) -> GaussianFourierVolume: ...
 
 
 @overload
@@ -385,14 +380,14 @@ def load_tabulated_volume(
     path_or_mmdf: str | pathlib.Path | pd.DataFrame,
     *,
     output_type: type[
-        IndependentAtomVolume | GaussianMixtureVolume
+        GaussianFourierVolume | GaussianMixtureVolume
     ] = GaussianMixtureVolume,
     tabulation: Literal["peng"] = "peng",
     include_b_factors: bool = False,
     b_factor_fn: Callable[[NDArrayLike, NDArrayLike], NDArrayLike] = identity_fn,
     selection_string: str = "all",
     pdb_options: dict[str, Any] = {},
-) -> IndependentAtomVolume | GaussianMixtureVolume:
+) -> GaussianFourierVolume | GaussianMixtureVolume:
     """Load an atomistic representation of a volume from
     tabulated electron scattering factors.
 
@@ -423,7 +418,7 @@ def load_tabulated_volume(
         from [`mmdf.read`](https://github.com/teamtomo/mmdf).
     - `output_type`:
         Either a [`cryojax.simulator.GaussianMixtureVolume`][] or
-        [`cryojax.simulator.IndependentAtomVolume`][] class.
+        [`cryojax.simulator.GaussianFourierVolume`][] class.
     - `tabulation`:
         Specifies which electron scattering factor tabulation to use.
         The only supported value current is `tabulation = 'peng'`.
@@ -435,7 +430,7 @@ def load_tabulated_volume(
         A function that modulates PDB B-factors before passing to the
         volume. Has signature
         `new_b_factor = b_factor_fn(b_factor, atomic_number)`.
-        If `output_type = IndependentAtomVolume`, `b_factor` is
+        If `output_type = GaussianFourierVolume`, `b_factor` is
         the mean B-factor for a given atom type.
     - `selection_string`:
         A string for [`mdtraj` atom selection](https://mdtraj.org/1.9.4/examples/atom-selection.html#atom-selection).
@@ -487,7 +482,7 @@ def load_tabulated_volume(
         atom_volume = GaussianMixtureVolume.from_tabulated_parameters(
             atom_positions, peng_parameters, extra_b_factors=b_factors
         )
-    elif output_type is IndependentAtomVolume:
+    elif output_type is GaussianFourierVolume:
         (positions_by_id, b_factor_by_id), atom_ids = split_atoms_by_element(
             atomic_numbers, (atom_positions, atom_properties["b_factors"])
         )
@@ -501,13 +496,13 @@ def load_tabulated_volume(
                 "Only `tabulation` equal to 'peng' is supported in "
                 f"`load_tabulated_volume`. Instead, got `tabulation = {tabulation}`."
             )
-        atom_volume = IndependentAtomVolume.from_tabulated_parameters(
+        atom_volume = GaussianFourierVolume.from_tabulated_parameters(
             positions_by_id, parameters, b_factor_by_element=b_factor_by_id
         )
     else:
         raise ValueError(
             "Only `output_type` equal to `GaussianMixtureVolume` "
-            "or `IndependentAtomVolume` are supported."
+            "or `GaussianFourierVolume` are supported."
         )
 
     return atom_volume
@@ -515,7 +510,7 @@ def load_tabulated_volume(
 
 @overload
 def suggest_n_spread(
-    volume: IndependentAtomVolume | GaussianMixtureVolume,
+    volume: GaussianMixtureVolume,
     pixel_size: FloatLike,
     *,
     cutoff_sigma: float = 4.0,
@@ -527,7 +522,7 @@ def suggest_n_spread(
 
 @overload
 def suggest_n_spread(
-    volume: IndependentAtomVolume | GaussianMixtureVolume,
+    volume: GaussianMixtureVolume,
     pixel_size: FloatLike,
     *,
     cutoff_sigma: float = 4.0,
@@ -538,7 +533,7 @@ def suggest_n_spread(
 
 
 def suggest_n_spread(
-    volume: IndependentAtomVolume | GaussianMixtureVolume,
+    volume: GaussianMixtureVolume,
     pixel_size: FloatLike,
     *,
     cutoff_sigma: float = 4.0,
@@ -573,15 +568,14 @@ def suggest_n_spread(
 
     **Arguments:**
 
-    - `volume`: The volume to suggest `n_spread` for.
+    - `volume`: The `GaussianMixtureVolume` to suggest `n_spread` for.
     - `pixel_size`: The pixel/voxel size of the grid `volume` is spread onto.
     - `cutoff_sigma`: Truncation width in standard deviations (`n_sigma` in
       `variance_to_nspread`).
     - `mode`: `"termwise"` (default) returns one `n_spread` per gaussian
-      component, each sized to that component's largest variance (across
-      positions, for `GaussianMixtureVolume`; across atom types, for
-      `IndependentAtomVolume`). `"global"` returns a single `int` sized to
-      the single widest gaussian in `volume`.
+      component, each sized to that component's largest variance across
+      positions. `"global"` returns a single `int` sized to the single
+      widest gaussian in `volume`.
     - `min_n_spread`/`max_n_spread`: Clamp every returned value to this range.
 
     **Returns:**
@@ -612,48 +606,10 @@ def suggest_n_spread(
             _clamp(variance_to_nspread(variances[:, i], pixel_size, n_sigma=cutoff_sigma))
             for i in range(n_gaussians)
         )
-    elif isinstance(volume, IndependentAtomVolume):
-        is_leaf = lambda x: isinstance(  # noqa: E731
-            x, (AbstractRealOperator, AbstractFourierOperator)
-        )
-        kernel_leaves = jax.tree.leaves(volume.kernel_fns, is_leaf=is_leaf)
-        # `(n_gaussians,)` variance per leaf, as plain numpy -- avoiding
-        # `cryojax.constants.b_factor_to_variance`, which always returns a
-        # JAX array, so that `suggest_n_spread` stays numpy/python-only.
-        variance_leaves = [
-            np.asarray(fn.variance)
-            if isinstance(fn, RealGaussian)
-            else np.asarray(fn.b_factor) / (8.0 * np.pi**2)
-            for fn in kernel_leaves
-        ]
-        n_gaussians_set = {v.shape[-1] for v in variance_leaves}
-        if len(n_gaussians_set) != 1:
-            raise ValueError(
-                "`suggest_n_spread` requires every `IndependentAtomVolume."
-                "kernel_fns` leaf to have the same number of gaussian "
-                f"components; got leaves with {sorted(n_gaussians_set)} "
-                "gaussian components."
-            )
-        n_gaussians = n_gaussians_set.pop()
-        if mode == "global":
-            n_spread_per_leaf = [
-                variance_to_nspread(v, pixel_size, n_sigma=cutoff_sigma)
-                for v in variance_leaves
-            ]
-            return _clamp(max(n_spread_per_leaf))
-        per_component = []
-        for i in range(n_gaussians):
-            n_spread_per_leaf_i = [
-                variance_to_nspread(v[i], pixel_size, n_sigma=cutoff_sigma)
-                for v in variance_leaves
-            ]
-            per_component.append(_clamp(max(n_spread_per_leaf_i)))
-        return tuple(per_component)
     else:
         raise ValueError(
             "`cryojax.simulator.suggest_n_spread` only supports `volume` of type "
-            "`GaussianMixtureVolume` or `IndependentAtomVolume`, but got "
-            f"type `{type(volume).__name__}`."
+            f"`GaussianMixtureVolume`, but got type `{type(volume).__name__}`."
         )
 
 
@@ -684,31 +640,14 @@ def render_voxel_volume(
 ) -> RealVoxelGridVolume: ...
 
 
-@overload
-def render_voxel_volume(
-    atom_volume: AbstractAtomVolume,
-    render_fn: AbstractVolumeRenderFn,
-    *,
-    output_type: type[RealVoxelCloudVolume] = RealVoxelCloudVolume,
-) -> RealVoxelCloudVolume: ...
-
-
 def render_voxel_volume(
     atom_volume: AbstractAtomVolume,
     render_fn: AbstractVolumeRenderFn,
     *,
     output_type: type[
-        FourierVoxelGridVolume
-        | FourierVoxelSplineVolume
-        | RealVoxelGridVolume
-        | RealVoxelCloudVolume
+        FourierVoxelGridVolume | FourierVoxelSplineVolume | RealVoxelGridVolume
     ] = FourierVoxelGridVolume,
-) -> (
-    FourierVoxelGridVolume
-    | FourierVoxelSplineVolume
-    | RealVoxelGridVolume
-    | RealVoxelCloudVolume
-):
+) -> FourierVoxelGridVolume | FourierVoxelSplineVolume | RealVoxelGridVolume:
     """Render a voxel volume representation from an atomistic one.
 
     !!! example "Simulate an image with Fourier slice extraction"
@@ -731,7 +670,7 @@ def render_voxel_volume(
     - `atom_volume`:
         An atomistic volume representation, such as a
         [`cryojax.simulator.GaussianMixtureVolume`][] or a
-        [`cryojax.simulator.IndependentAtomVolume`][].
+        [`cryojax.simulator.GaussianFourierVolume`][].
     - `render_fn`:
         A [`cryojax.simulator.AbstractVolumeRenderFn`][] that
         accepts `atom_volume` as input. Choose
@@ -744,8 +683,7 @@ def render_voxel_volume(
         Either [`cryojax.simulator.FourierVoxelGridVolume`][] /
         [`cryojax.simulator.FourierVoxelSplineVolume`][] for
         fourier-space representations, or
-        [`cryojax.simulator.RealVoxelGridVolume`][] /
-        [`cryojax.simulator.RealVoxelCloudVolume`][] for real-space.
+        [`cryojax.simulator.RealVoxelGridVolume`][] for real-space.
 
 
     **Returns:**
@@ -768,20 +706,14 @@ def render_voxel_volume(
             return FourierVoxelGridVolume.from_fourier_voxel_grid(fourier_voxel_grid)
         else:
             return FourierVoxelSplineVolume.from_fourier_voxel_grid(fourier_voxel_grid)
-    elif output_type == RealVoxelGridVolume or output_type == RealVoxelCloudVolume:
+    elif output_type == RealVoxelGridVolume:
         coordinate_grid = make_coordinate_grid(render_fn.shape)
         real_voxel_grid = render_fn(atom_volume, outputs_real_space=True)
-        if output_type == RealVoxelGridVolume:
-            return RealVoxelGridVolume(real_voxel_grid, coordinate_grid)
-        else:
-            return RealVoxelCloudVolume.from_real_voxel_grid(
-                real_voxel_grid, coordinate_grid_in_pixels=coordinate_grid
-            )
+        return RealVoxelGridVolume(real_voxel_grid, coordinate_grid)
     else:
         raise ValueError(
             f"Got `output_type = {output_type}`, but this is "
             "not supported by `render_voxel_volume(..., output_type=...)`."
             "Valid values for `output_type` are `FourierVoxelGridVolume`, "
-            "`FourierVoxelSplineVolume`, `RealVoxelGridVolume`, or "
-            "`RealVoxelCloudVolume`."
+            "`FourierVoxelSplineVolume`, or `RealVoxelGridVolume`."
         )

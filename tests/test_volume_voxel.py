@@ -1,8 +1,8 @@
 """Tests for voxel-based volume representations and their integrators.
 
-Covers FourierVoxelGridVolume, FourierVoxelSplineVolume, RealVoxelGridVolume,
-and RealVoxelCloudVolume.  GaussianMixtureVolume / GaussianMixtureProjection
-serve as analytic ground truth throughout.
+Covers FourierVoxelGridVolume, FourierVoxelSplineVolume, and RealVoxelGridVolume.
+GaussianMixtureVolume / GaussianMixtureProjection serve as analytic ground truth
+throughout.
 
 FourierSliceExtraction accuracy
 --------------------------------
@@ -139,7 +139,6 @@ def _compute_projection(volume, integrator, image_config) -> Array:
         cxs.FourierVoxelGridVolume,
         cxs.FourierVoxelSplineVolume,
         cxs.RealVoxelGridVolume,
-        cxs.RealVoxelCloudVolume,
     ],
 )
 def test_render_voxel_volume_output_type(output_type, gmm_volume):
@@ -155,7 +154,6 @@ def test_render_voxel_volume_output_type(output_type, gmm_volume):
         cxs.FourierVoxelGridVolume,
         cxs.FourierVoxelSplineVolume,
         cxs.RealVoxelGridVolume,
-        cxs.RealVoxelCloudVolume,
     ],
 )
 def test_render_voxel_volume_auto_render_fn(output_type, gmm_volume):
@@ -182,7 +180,6 @@ def test_render_voxel_volume_auto_render_fn(output_type, gmm_volume):
             np.array(explicit.real_voxel_grid),
             np.array(auto.real_voxel_grid),
         )
-    # RealVoxelCloudVolume: type check above is sufficient
 
 
 def test_render_voxel_volume_matches_direct_construction(gmm_volume):
@@ -204,10 +201,6 @@ def test_render_voxel_volume_matches_direct_construction(gmm_volume):
             cxs.RealVoxelGridVolume,
             cxs.RealVoxelGridVolume.from_real_voxel_grid(real_grid),
         ),
-        (
-            cxs.RealVoxelCloudVolume,
-            cxs.RealVoxelCloudVolume.from_real_voxel_grid(real_grid),
-        ),
     ]:
         via_api = cxs.render_voxel_volume(gmm_volume, render_fn, output_type=output_type)
         if output_type is cxs.FourierVoxelGridVolume:
@@ -225,7 +218,6 @@ def test_render_voxel_volume_matches_direct_construction(gmm_volume):
                 np.array(via_api.real_voxel_grid),
                 np.array(direct.real_voxel_grid),
             )
-        # RealVoxelCloudVolume: type identity is sufficient
 
 
 def test_render_voxel_volume_projection_accuracy(gmm_volume, image_config):
@@ -569,7 +561,10 @@ def _ewald_sphere_analytic_ground_truth(volume, voltage_in_kilovolts: float) -> 
     q_at_surface = q_at_slice.at[..., 2].add(q_z_curvature)
 
     transform = _gaussian_mixture_fourier_transform(
-        _TWO_ATOM_POSITIONS, _TWO_ATOM_AMPLITUDES, _TWO_ATOM_VARIANCES, q_at_surface
+        jnp.asarray(_TWO_ATOM_POSITIONS),
+        jnp.asarray(_TWO_ATOM_AMPLITUDES),
+        jnp.asarray(_TWO_ATOM_VARIANCES),
+        q_at_surface,
     )
     # cryojax's real-space convention puts the origin at array index N // 2,
     # so any analytic transform evaluated at raw (corner-indexed) frequency
@@ -839,7 +834,6 @@ def test_voxel_volume_loaders():
     fourier_grid = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
     fourier_spline = cxs.FourierVoxelSplineVolume.from_real_voxel_grid(real_voxel_grid)
     real_grid = cxs.RealVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
-    real_cloud = cxs.RealVoxelCloudVolume.from_real_voxel_grid(real_voxel_grid)
 
     assert isinstance(
         fourier_grid.frequency_slice_in_pixels,
@@ -852,7 +846,6 @@ def test_voxel_volume_loaders():
         Float[Array, "_ _ _ 3"],  # type: ignore
     )
     assert isinstance(real_grid.real_voxel_grid, Array)
-    assert isinstance(real_cloud, cxs.RealVoxelCloudVolume)
 
 
 def test_render_voxels(sample_pdb_path):
@@ -865,7 +858,6 @@ def test_render_voxels(sample_pdb_path):
         cxs.FourierVoxelGridVolume,
         cxs.FourierVoxelSplineVolume,
         cxs.RealVoxelGridVolume,
-        cxs.RealVoxelCloudVolume,
     ]:
         assert (
             type(cxs.render_voxel_volume(atom_volume, render_fn, output_type=cls)) == cls
@@ -1081,13 +1073,8 @@ def _make_gmm_voxel_scene(pdb_info):
             cxs.FourierSliceExtraction(),
             1e-2,
         ),
-        (
-            cxs.RealVoxelCloudVolume,
-            cxs.RealVoxelProjection(n_spread=17, backend="nufftax"),
-            1e-10,
-        ),
     ],
-    ids=["fourier_grid", "real_cloud_nufftax"],
+    ids=["fourier_grid"],
 )
 @pytest.mark.parametrize(
     "pose",
@@ -1144,15 +1131,3 @@ def test_spline_agrees_with_grid_at_exact_angles(
         )
     )
     np.testing.assert_allclose(proj_spline, proj_grid, atol=1e-4)
-
-
-@pytest.mark.skipif(jnufft is None, reason="jax-finufft not installed")
-def test_gaussian_vs_voxels_nopose_jax_finufft(pdb_info):
-    """RealVoxelProjection with jax-finufft must agree with GMM at identity pose."""
-    gmm_volume, real_voxel_grid, image_config = _make_gmm_voxel_scene(pdb_info)
-    gmm_integrator = cxs.GaussianMixtureProjection(sampling_mode="average")
-    cloud_volume = cxs.RealVoxelCloudVolume.from_real_voxel_grid(real_voxel_grid)
-    integrator = cxs.RealVoxelProjection(n_spread=17, backend="jax-finufft")  # type: ignore
-    proj_ref = _compute_projection(gmm_volume, gmm_integrator, image_config)
-    proj = _compute_projection(cloud_volume, integrator, image_config)
-    np.testing.assert_allclose(proj_ref, proj, atol=1e-8)

@@ -263,8 +263,7 @@ class GaussianMixtureProjection(
             If `None` (default), compute the projection with dense gaussian
             integrals evaluated over the whole grid. If an `int`, instead
             directly spread each gaussian onto only the `n_spread` nearest
-            grid points (per dimension), trading accuracy for speed, using the
-            same backend as [`cryojax.simulator.IndependentAtomProjection`][].
+            grid points (per dimension), trading accuracy for speed.
             If a `tuple` of `int`s (one value per gaussian component, i.e. of
             length `GaussianMixtureVolume.amplitudes.shape[-1]`), spread each
             gaussian component with its own width instead of one shared
@@ -450,8 +449,7 @@ class GaussianMixtureRenderFn(AbstractVolumeRenderFn[GaussianMixtureVolume], str
             If `None` (default), render the voxel grid with dense gaussian
             integrals evaluated over the whole grid. If an `int`, instead
             directly spread each gaussian onto only the `n_spread` nearest
-            grid points (per dimension), trading accuracy for speed, using
-            the same backend as [`cryojax.simulator.IndependentAtomRenderFn`][].
+            grid points (per dimension), trading accuracy for speed.
             If a `tuple` of `int`s (one value per gaussian component, i.e. of
             length `GaussianMixtureVolume.amplitudes.shape[-1]`), spread each
             gaussian component with its own width instead of one shared
