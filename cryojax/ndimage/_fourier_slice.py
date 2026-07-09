@@ -69,10 +69,8 @@ def sample_fft_slice(
         frequency_slice = im.make_frequency_slice((dim, dim), fftshifted=True)
 
         # Extract the slice and transform back to a real-space projection
-        projection = im.sample_fft_slice(
-            fourier_voxel_grid, frequency_slice
-        )
-        image = jnp.fft.irfftn(projection, s=(dim, dim))
+        projection_fft = im.sample_fft_slice(fourier_voxel_grid, frequency_slice)
+        projection = jnp.fft.irfftn(projection_fft, s=(dim, dim))
         ```
 
     !!! example "Rotating a central slice with `cryojax.rotations.SO3`"
@@ -85,16 +83,11 @@ def sample_fft_slice(
         # A half (rfft) central slice of shape (1, dim, dim//2+1, 3)
         frequency_slice = im.make_frequency_slice((dim, dim), fftshifted=True)
 
-        # Rotate the coordinate system by a random rotation. `SO3.apply`
-        # acts on a single `(3,)` vector, so vmap over the grid axes.
+        # Rotate the coordinate system by a random rotation.
         rotation = SO3.sample_uniform(jax.random.key(0))
-        rotated_slice = jax.vmap(jax.vmap(jax.vmap(rotation.apply)))(
-            frequency_slice
-        )
+        rotated_slice = rotation.apply(frequency_slice)
 
-        projection = im.sample_fft_slice(
-            fourier_voxel_grid, rotated_slice
-        )
+        projection_fft = im.sample_fft_slice(fourier_voxel_grid, rotated_slice)
         ```
 
     **Arguments:**

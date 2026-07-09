@@ -34,18 +34,15 @@ class AbstractPose(Module, strict=True):
     ]
 
     def rotate_coordinates(
-        self,
-        coordinate_grid_or_list: (
-            Float[Array, "z_dim y_dim x_dim 3"] | Float[Array, "size 3"]
-        ),
-        inverse: bool = False,
-    ) -> Float[Array, "z_dim y_dim x_dim 3"] | Float[Array, "size 3"]:
+        self, target: (Float[Array, "... 3"]), /, inverse: bool = False
+    ) -> Float[Array, "... 3"]:
         """Rotate a 3D coordinate system.
 
         **Arguments:**
 
-        - `coordinate_grid_or_list`:
-            The 3D coordinate system to rotate. This can either be a list of coordinates
+        - `target`:
+            The 3D coordinate system to rotate. This can be any array whose trailing
+            dimension has length 3, such as a list of coordinates
             of shape `(N, 3)` or a grid of coordinates `(N1, N2, N3, 3)`.
         - `inverse`:
             If `True`, compute the inverse rotation (i.e. rotation by the matrix $R^T$,
@@ -53,13 +50,13 @@ class AbstractPose(Module, strict=True):
 
         **Returns:**
 
-        The rotated version of `coordinate_grid_or_list`.
+        The rotated version of `target`.
         """
         rotation = self.rotation.inverse() if inverse else self.rotation
         # `rotation.apply` broadcasts over arbitrary leading dimensions, so it
         # handles both a list of coordinates `(N, 3)` and a grid
         # `(N1, N2, N3, 3)` directly, without explicit `jax.vmap`.
-        return rotation.apply(coordinate_grid_or_list)
+        return rotation.apply(target)
 
     def translate_image(
         self,
