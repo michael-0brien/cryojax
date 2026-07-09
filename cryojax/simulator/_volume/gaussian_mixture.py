@@ -13,10 +13,8 @@ from ..._internal import error_if_not_positive, leaf_asarray
 from ...constants import PengScatteringFactorParameters, b_factor_to_variance
 from ...jax_util import FloatLike, NDArrayLike, filter_bscan
 from ...ndimage import (
-    fftn,
     make_1d_coordinate_grid,
     resize_with_crop_or_pad,
-    rfftn,
     spread_gaussians_2d,
     spread_gaussians_3d,
 )
@@ -368,14 +366,18 @@ class GaussianMixtureProjection(
             )
         if self.shape is None:
             return (
-                projection_integral if outputs_real_space else rfftn(projection_integral)
+                projection_integral
+                if outputs_real_space
+                else jnp.fft.rfftn(projection_integral)
             )
         else:
             projection_integral = resize_with_crop_or_pad(
                 projection_integral, image_config.padded_shape
             )
             return (
-                projection_integral if outputs_real_space else rfftn(projection_integral)
+                projection_integral
+                if outputs_real_space
+                else jnp.fft.rfftn(projection_integral)
             )
 
 
@@ -545,15 +547,15 @@ class GaussianMixtureRenderFn(AbstractVolumeRenderFn[GaussianMixtureVolume], str
         else:
             if outputs_rfft:
                 return (
-                    jnp.fft.fftshift(rfftn(real_voxel_grid), axes=(0, 1))
+                    jnp.fft.fftshift(jnp.fft.rfftn(real_voxel_grid), axes=(0, 1))
                     if fftshifted
-                    else rfftn(real_voxel_grid)
+                    else jnp.fft.rfftn(real_voxel_grid)
                 )
             else:
                 return (
-                    jnp.fft.fftshift(fftn(real_voxel_grid))
+                    jnp.fft.fftshift(jnp.fft.fftn(real_voxel_grid))
                     if fftshifted
-                    else fftn(real_voxel_grid)
+                    else jnp.fft.fftn(real_voxel_grid)
                 )
 
 

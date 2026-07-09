@@ -17,7 +17,6 @@ from ...ndimage import (
     AbstractFourierOperator,
     AbstractMask,
     FourierConstant,
-    rfftn,
 )
 from .._image_model import AbstractImageModel
 from .base_noise_model import AbstractEmpiricalNoiseModel, AbstractLikelihoodNoiseModel
@@ -114,7 +113,7 @@ class AbstractGaussianNoiseModel(
         ) * simulated_image + jnp.asarray(self.signal_offset)
         if mask is not None:
             simulated_image = mask(simulated_image)
-        return simulated_image if outputs_real_space else rfftn(simulated_image)
+        return simulated_image if outputs_real_space else jnp.fft.rfftn(simulated_image)
 
     @abstractmethod
     def compute_noise(

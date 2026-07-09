@@ -22,18 +22,19 @@ class PhaseShiftFFT(AbstractImageTransform, strict=True):
 
         ```python
 
-        from cryojax.ndimage import PhaseShiftFFT, rfftn, irfftn
+        import jax.numpy as jnp
+        from cryojax.ndimage import PhaseShiftFFT
 
         offset_in_angstroms = jnp.array([50.0, -30.0])
         frequency_grid = ... # in angstroms
-        fft = rfftn(...) # e.g., fft of a real 2D image
+        fft = jnp.fft.rfftn(...) # e.g., fft of a real 2D image
 
         shift_fn = PhaseShiftFFT(
             offset=offset_in_angstroms, frequency_grid=frequency_grid
         )
 
         shifted_fft = shift_fn(fft)
-        shifted_image = irfftn(shifted_image_fft)
+        shifted_image = jnp.fft.irfftn(shifted_image_fft)
         ```
     """
 
@@ -114,7 +115,8 @@ class RotateFFT(AbstractImageTransform, strict=True):
 
         ```python
 
-        from cryojax.ndimage import RotateFFT, fftn, ifftn
+        import jax.numpy as jnp
+        from cryojax.ndimage import RotateFFT
 
         frequency_grid = ... # in pixels
         image = ... # e.g., a real 2D image
@@ -123,8 +125,8 @@ class RotateFFT(AbstractImageTransform, strict=True):
             rotation_angle=45.0, frequency_grid=frequency_grid
         )
 
-        rotated_image_fft = rotation_fn(fftn(image))
-        rotated_image = ifftn(rotated_image_fft).real
+        rotated_image_fft = rotation_fn(jnp.fft.fftn(image))
+        rotated_image = jnp.fft.ifftn(rotated_image_fft).real
         ```
     """
 

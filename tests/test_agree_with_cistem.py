@@ -7,7 +7,6 @@ from cryojax.io import read_atoms_from_pdb, write_volume_to_mrc
 from cryojax.ndimage import (
     cartesian_to_polar,
     compute_binned_powerspectrum,
-    irfftn,
     make_frequency_grid,
 )
 from cryojax.simulator import AstigmaticCTF, EulerAnglePose
@@ -165,7 +164,7 @@ def test_compute_projection_with_cistem(
     image_config = cxs.BasicImageConfig((box_size, box_size), voxel_size, 300.0)
 
     def project_impl(volume, pose, image_config):
-        return irfftn(
+        return jnp.fft.irfftn(
             (
                 projection_method.integrate(
                     volume.rotate_to_pose(pose), image_config, outputs_real_space=False

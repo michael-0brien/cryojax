@@ -21,11 +21,8 @@ from ...ndimage import (
     FourierGaussian,
     FourierSinc,
     convert_fftn_to_rfftn,
-    ifftn,
-    irfftn,
     query_efficient_grid_size,
     resize_with_crop_or_pad,
-    rfftn,
 )
 from .._image_config import AbstractImageConfig
 from .._pose import AbstractPose
@@ -347,7 +344,7 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
             )
             rendering_fft = fac * rendering_fft[indices_z, indices_y, indices_x]
         return (
-            ifftn(rendering_fft).real
+            jnp.fft.ifftn(rendering_fft).real
             if outputs_real_space
             else _prepare_fft_to_fft(
                 rendering_fft,
@@ -490,14 +487,14 @@ class GaussianFourierProjection(
         projection_fft = convert_fftn_to_rfftn(projection_fft, mode="real")
         if output_shape == shape:
             return (
-                irfftn(projection_fft, s=output_shape)
+                jnp.fft.irfftn(projection_fft, s=output_shape)
                 if outputs_real_space
                 else projection_fft
             )
         else:
-            projection = irfftn(projection_fft, s=shape)
+            projection = jnp.fft.irfftn(projection_fft, s=shape)
             projection = resize_with_crop_or_pad(projection, output_shape)
-            return projection if outputs_real_space else rfftn(projection)
+            return projection if outputs_real_space else jnp.fft.rfftn(projection)
 
 
 def _standardize_kernel_fns(

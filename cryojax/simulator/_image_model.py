@@ -19,8 +19,6 @@ from ..ndimage import (
     AbstractMask,
     compute_edge_value,
     crop_to_shape,
-    irfftn,
-    rfftn,
 )
 from ._detector import AbstractDetector
 from ._image_config import AbstractImageConfig, DoseImageConfig
@@ -150,7 +148,7 @@ class AbstractImageModel(eqx.Module, strict=True):
             if filter_c is not None:
                 fourier_image = filter_c(fourier_image)
             return (
-                irfftn(fourier_image, s=image_config.shape)
+                jnp.fft.irfftn(fourier_image, s=image_config.shape)
                 if outputs_real_space
                 else fourier_image
             )
@@ -175,7 +173,7 @@ class AbstractImageModel(eqx.Module, strict=True):
                             "was expected."
                         )
                 fourier_image = filter_c(fourier_image)
-            padded_image = irfftn(fourier_image, s=image_config.padded_shape)
+            padded_image = jnp.fft.irfftn(fourier_image, s=image_config.padded_shape)
             if image_config.padded_shape != image_config.shape:
                 image = crop_to_shape(padded_image, image_config.shape)
             else:
@@ -187,7 +185,7 @@ class AbstractImageModel(eqx.Module, strict=True):
                     image = self._bg_subtract_normalize(image, padded_image)
             if mask_c is not None:
                 image = mask_c(image)
-            return image if outputs_real_space else rfftn(image)
+            return image if outputs_real_space else jnp.fft.rfftn(image)
 
     def _phase_shift_translate(self, fourier_image: Array) -> Array:
         phase_shifts = self.pose.compute_translation_operator(
@@ -378,7 +376,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
             fourier_image = self._phase_shift_translate(fourier_image)
 
         return (
-            irfftn(fourier_image, s=self.image_config.padded_shape)
+            jnp.fft.irfftn(fourier_image, s=self.image_config.padded_shape)
             if outputs_real_space
             else fourier_image
         )
@@ -497,7 +495,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
             fourier_image = self._phase_shift_translate(fourier_image)
 
         return (
-            irfftn(fourier_image, s=self.image_config.padded_shape)
+            jnp.fft.irfftn(fourier_image, s=self.image_config.padded_shape)
             if outputs_real_space
             else fourier_image
         )
@@ -584,7 +582,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
             contrast_spectrum = self._phase_shift_translate(contrast_spectrum)
 
         return (
-            irfftn(contrast_spectrum, s=self.image_config.padded_shape)
+            jnp.fft.irfftn(contrast_spectrum, s=self.image_config.padded_shape)
             if outputs_real_space
             else contrast_spectrum
         )
@@ -662,7 +660,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
             intensity_spectrum = self._phase_shift_translate(intensity_spectrum)
 
         return (
-            irfftn(intensity_spectrum, s=self.image_config.padded_shape)
+            jnp.fft.irfftn(intensity_spectrum, s=self.image_config.padded_shape)
             if outputs_real_space
             else intensity_spectrum
         )
@@ -770,7 +768,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
             )
 
             return (
-                irfftn(fourier_detector_readout, s=self.image_config.padded_shape)
+                jnp.fft.irfftn(fourier_detector_readout, s=self.image_config.padded_shape)
                 if outputs_real_space
                 else fourier_detector_readout
             )

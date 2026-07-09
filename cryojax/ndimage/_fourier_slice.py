@@ -16,7 +16,6 @@ from jaxtyping import Array, Complex, Float
 from ..jax_util import FloatLike
 from ._coordinates import make_1d_coordinate_grid, make_1d_frequency_grid
 from ._edges import pad_to_shape
-from ._fft import rfftn
 from ._fourier_utils import make_fftshift_phase, query_efficient_grid_size
 from ._map_coordinates import (
     compute_spline_coefficients,
@@ -73,7 +72,7 @@ def sample_fft_slice(
         projection = im.sample_fft_slice(
             fourier_voxel_grid, frequency_slice
         )
-        image = im.irfftn(projection, s=(dim, dim))
+        image = jnp.fft.irfftn(projection, s=(dim, dim))
         ```
 
     !!! example "Rotating a central slice with `cryojax.rotations.SO3`"
@@ -291,7 +290,9 @@ def prepare_sampling_fft(
     # spline coefficients.
     if apply_deconvolve and not use_spline:
         real_voxel_grid_padded = _deconvolve_linear(real_voxel_grid_padded)
-    fourier_voxel_grid = _fftshift_fourier_voxel_grid(rfftn(real_voxel_grid_padded))
+    fourier_voxel_grid = _fftshift_fourier_voxel_grid(
+        jnp.fft.rfftn(real_voxel_grid_padded)
+    )
     if use_spline:
         return compute_spline_coefficients(fourier_voxel_grid)
     return fourier_voxel_grid

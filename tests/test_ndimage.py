@@ -128,14 +128,14 @@ def test_fourier_crop_downsample_matches_directly_rendered_gaussian(
 def test_fft_agrees_with_jax_numpy(shape):
     random = jnp.asarray(np.random.randn(*shape))
     # fftn
-    np.testing.assert_allclose(random, im.ifftn(im.fftn(random)).real)
+    np.testing.assert_allclose(random, jnp.fft.ifftn(jnp.fft.fftn(random)).real)
     np.testing.assert_allclose(
-        im.ifftn(im.fftn(random)).real, jnp.fft.ifftn(jnp.fft.fftn(random)).real
+        jnp.fft.ifftn(jnp.fft.fftn(random)).real, jnp.fft.ifftn(jnp.fft.fftn(random)).real
     )
     # rfftn
-    np.testing.assert_allclose(random, im.irfftn(im.rfftn(random), s=shape))
+    np.testing.assert_allclose(random, jnp.fft.irfftn(jnp.fft.rfftn(random), s=shape))
     np.testing.assert_allclose(
-        im.irfftn(im.rfftn(random), s=shape),
+        jnp.fft.irfftn(jnp.fft.rfftn(random), s=shape),
         jnp.fft.irfftn(jnp.fft.rfftn(random), s=shape),
     )
 
@@ -280,7 +280,7 @@ def test_bg_subtract():
 )
 def test_powerspectrum_jit(shape):
     pixel_size = 1.2
-    fourier_image = im.rfftn(jr.normal(jr.key(1234), shape))
+    fourier_image = jnp.fft.rfftn(jr.normal(jr.key(1234), shape))
     radial_frequency_grid = make_radial_frequency_grid(shape, pixel_size)
 
     @jax.jit
@@ -312,8 +312,8 @@ def test_frc_fsc_jit(shape):
     else:
         correlation_fn = im.compute_fourier_shell_correlation
     pixel_size = 1.1
-    fourier_image_1 = im.rfftn(jr.normal(jr.key(1234), shape))
-    fourier_image_2 = im.rfftn(jr.normal(jr.key(2345), shape))
+    fourier_image_1 = jnp.fft.rfftn(jr.normal(jr.key(1234), shape))
+    fourier_image_2 = jnp.fft.rfftn(jr.normal(jr.key(2345), shape))
     radial_frequency_grid = make_radial_frequency_grid(shape, pixel_size)
     threshold = 0.5
 

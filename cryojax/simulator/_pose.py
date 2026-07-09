@@ -93,7 +93,7 @@ class AbstractPose(Module, strict=True):
     def compute_translation_operator(
         self,
         shape: tuple[int, int],
-        pixel_size: Float[Array, ""],
+        pixel_size: Float[NDArrayLike, ""],
     ) -> Complex[Array, "y_dim x_dim//2+1"]:
         """Compute the phase shifts from the in-plane translation.
 

@@ -76,7 +76,7 @@ def compute_projection(
         volume, image_config, outputs_real_space=False
     )
     return im.crop_to_shape(
-        im.irfftn(fourier_projection, s=image_config.padded_shape),
+        jnp.fft.irfftn(fourier_projection, s=image_config.padded_shape),
         image_config.shape,
     )
 
@@ -97,7 +97,7 @@ def compute_projection_at_pose(
         image_config.pixel_size,
     )
     return im.crop_to_shape(
-        im.irfftn(
+        jnp.fft.irfftn(
             pose.translate_image(
                 fourier_projection,
                 translation_operator,
@@ -274,7 +274,7 @@ class TestIntegrateGMMToPixels:
             voltage_in_kilovolts=300.0,
         )
         integrator = cxs.GaussianMixtureProjection()
-        projection = im.irfftn(integrator.integrate(atomic_volume, image_config))
+        projection = jnp.fft.irfftn(integrator.integrate(atomic_volume, image_config))
 
         maximum_index = jnp.argmax(projection)
         maximum_position = coordinate_grid.reshape(-1, 2)[maximum_index]
@@ -294,7 +294,7 @@ class TestIntegrateGMMToPixels:
             voltage_in_kilovolts=300.0,
         )
         integrator = cxs.GaussianMixtureProjection()
-        projection = im.irfftn(integrator.integrate(atomic_volume, image_config))
+        projection = jnp.fft.irfftn(integrator.integrate(atomic_volume, image_config))
 
         integral = jnp.sum(projection) * voxel_size**2
         assert jnp.isclose(integral, jnp.sum(ff_a))
@@ -327,7 +327,7 @@ class TestIntegrateGMMToPixelsWithSpreadingBackend:
         integrator = cxs.GaussianMixtureProjection(
             sampling_mode=sampling_mode, n_spread=11
         )
-        projection = im.irfftn(integrator.integrate(atomic_volume, image_config))
+        projection = jnp.fft.irfftn(integrator.integrate(atomic_volume, image_config))
 
         maximum_index = jnp.argmax(projection)
         maximum_position = coordinate_grid.reshape(-1, 2)[maximum_index]
@@ -349,7 +349,7 @@ class TestIntegrateGMMToPixelsWithSpreadingBackend:
         integrator = cxs.GaussianMixtureProjection(
             sampling_mode=sampling_mode, n_spread=11
         )
-        projection = im.irfftn(integrator.integrate(atomic_volume, image_config))
+        projection = jnp.fft.irfftn(integrator.integrate(atomic_volume, image_config))
 
         integral = jnp.sum(projection) * voxel_size**2
         assert jnp.isclose(integral, jnp.sum(ff_a), atol=1e-4)

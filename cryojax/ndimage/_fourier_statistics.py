@@ -31,15 +31,15 @@ def compute_binned_powerspectrum(
 
         ```python
         from cryojax.coordinates import make_radial_frequency_grid
-        from cryojax.image import rfftn
+        import jax.numpy as jnp
 
         image, pixel_size = ...
-        fourier_image = rfftn(image)
+        fourier_image = jnp.fft.rfftn(image)
         radial_frequency_grid_in_angstroms = make_radial_frequency_grid(
             image.shape, pixel_size, outputs_rfftfreqs=True
         )
         powerspectrum, bins = compute_binned_powerspectrum(
-            rfftn(image), radial_frequency_grid_in_angstroms, pixel_size
+            jnp.fft.rfftn(image), radial_frequency_grid_in_angstroms, pixel_size
         )
         ```
 
@@ -201,10 +201,10 @@ def compute_fourier_shell_correlation(
 
         ```python
         from cryojax.coordinates import make_radial_frequency_grid
-        from cryojax.image import rfftn
+        import jax.numpy as jnp
 
         volume_1, volume_2, voxel_size = ...
-        fourier_volume_1, fourier_volume_2 = rfftn(volume_1), rfftn(volume_2)
+        fourier_volume_1, fourier_volume_2 = jnp.fft.rfftn(volume_1), jnp.fft.rfftn(volume_2)
         radial_frequency_grid = make_radial_frequency_grid(
             volume_1.shape, voxel_size, outputs_rfftfreqs=True
         )
