@@ -175,7 +175,7 @@ def benchmark_projection_methods(
 
                 # Benchmark Atom Projection (FFT)
                 times = []
-                integrator = cxs.IndependentAtomProjection(eps=1e-16)
+                integrator = cxs.IndependentAtomProjection(n_spread=17)
                 for _ in range(n_iterations + 1):
                     start_time = time()
                     images = simulate_image_batch(

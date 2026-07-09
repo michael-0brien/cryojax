@@ -239,23 +239,6 @@ This documentation is a collection of functions used to work with coordinate sys
 
 ---
 
-::: cryojax.ndimage.FourierExp2D
-        options:
-            members:
-                - __init__
-                - __call__
-
----
-
-::: cryojax.ndimage.FourierDC
-        options:
-            members:
-                - __init__
-                - __call__
-
-
----
-
 ::: cryojax.ndimage.CustomFourierOperator
         options:
             members:
@@ -301,6 +284,14 @@ This documentation is a collection of functions used to work with coordinate sys
 ::: cryojax.ndimage.map_coordinates_spline
 
 ::: cryojax.ndimage.compute_spline_coefficients
+
+### Spreading
+
+::: cryojax.ndimage.spread_gaussians_2d
+
+::: cryojax.ndimage.spread_gaussians_3d
+
+::: cryojax.ndimage.variance_to_nspread
 
 ### Fourier projection-slice extraction
 

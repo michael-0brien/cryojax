@@ -16,6 +16,7 @@ from ...ndimage import convert_fftn_to_rfftn, crop_to_shape, irfftn, make_coordi
 from .._image_config import AbstractImageConfig
 from .._pose import AbstractPose
 from .base_volume import AbstractVolumeIntegrator, AbstractVoxelVolume, ProjectionArray
+from .common import nspread_to_eps
 
 
 try:
@@ -213,13 +214,13 @@ class RealVoxelProjection(
 ):
     """Integrate points onto the exit plane using non-uniform FFTs."""
 
-    eps: float
+    n_spread: int
     backend: Literal["jax-finufft", "nufftax"]
 
     outputs_ewald_sphere: ClassVar[bool] = False
 
     def __init__(
-        self, *, backend: Literal["jax-finufft", "nufftax"] = "nufftax", eps: float = 1e-6
+        self, *, backend: Literal["jax-finufft", "nufftax"] = "nufftax", n_spread: int = 7
     ):
         """**Arguments:**
 
@@ -230,9 +231,12 @@ class RealVoxelProjection(
             [`finufft`](https://finufft.readthedocs.io) algorithm,
             or [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft) for
             calling `finufft` directly via `jax.ffi`.
-        - `eps`:
-            See [`finufft`](https://finufft.readthedocs.io/en/latest/opts.html#options-parameters-cpu)
-            for documentation.
+        - `n_spread`:
+            The width (number of grid points, per dimension) of the kernel
+            used to spread/interpolate. Controls speed / accuracy tradeoff:
+            larger `n_spread` is more accurate but slower. Translated into an
+            `eps` precision for the underlying non-uniform FFT implementation
+            (see [`finufft`](https://finufft.readthedocs.io/en/latest/opts.html#options-parameters-cpu)).
         """  # noqa: E501
         if backend not in ["jax-finufft", "nufftax"]:
             raise ValueError(
@@ -241,7 +245,7 @@ class RealVoxelProjection(
                 f"`backend = {backend}`."
             )
         self.backend = backend
-        self.eps = eps
+        self.n_spread = n_spread
 
     @override
     def integrate(
@@ -279,7 +283,7 @@ class RealVoxelProjection(
             volume_representation.coordinate_list_in_pixels,
             image_config.padded_shape,
             backend=self.backend,
-            eps=self.eps,
+            eps=nspread_to_eps(self.n_spread),
         )
         # Scale by voxel size for units
         fourier_projection *= image_config.pixel_size

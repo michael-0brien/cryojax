@@ -4,6 +4,7 @@ from ._api_utils import (
     load_tabulated_volume as load_tabulated_volume,
     make_image_model as make_image_model,
     render_voxel_volume as render_voxel_volume,
+    suggest_n_spread as suggest_n_spread,
 )
 from ._detector import (
     AbstractDetector as AbstractDetector,

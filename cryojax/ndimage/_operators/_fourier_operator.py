@@ -162,36 +162,6 @@ CustomFourierOperator.__init__.__doc__ = """**Arguments:**
 """
 
 
-class FourierDC(AbstractFourierOperator, strict=True):
-    """This operator returns a constant in the DC component."""
-
-    value: Float[Array, ""]
-
-    spatial_dims: ClassVar[list[int]] = [1, 2, 3]
-
-    def __init__(self, value: FloatLike = 0.0):
-        """**Arguments:**
-
-        - `value`: The value of the zero mode.
-        """
-        self.value = jnp.asarray(value)
-
-    @override
-    def __call__(self, frequencies: Float[Array, "..."]) -> Float[Array, "..."]:
-        frequencies, ndim, flag = _standardize_frequencies(frequencies)
-        if ndim == 1 and not flag:
-            return jnp.zeros(frequencies.shape).at[0].set(self.value)
-        elif ndim == 2:
-            return jnp.zeros(frequencies.shape[0:-1]).at[0, 0].set(self.value)
-        elif ndim == 3:
-            return jnp.zeros(frequencies.shape[0:-1]).at[0, 0, 0].set(self.value)
-        else:
-            raise ValueError(
-                "Could not parse the spatial dimension of `frequencies` passed to "
-                f"`FourierDC`. Got `frequencies` with shape {frequencies.shape}."
-            )
-
-
 class FourierConstant(AbstractFourierOperator, strict=True):
     """An operator that is a constant."""
 
@@ -210,65 +180,6 @@ class FourierConstant(AbstractFourierOperator, strict=True):
     def __call__(self, frequencies: Float[Array, "..."]) -> Float[Array, "..."]:
         del frequencies
         return self.value
-
-
-class FourierExp2D(AbstractFourierOperator, strict=True):
-    r"""This operator, in real space, represents a
-    function equal to an exponential decay, given by
-
-    .. math::
-        g(|r|) = \frac{\kappa}{2 \pi \xi^2} \exp(- |r| / \xi),
-
-    where :math:`|r| = \sqrt{x^2 + y^2}` is a radial coordinate.
-    Here, :math:`\xi` has dimensions of length and :math:`g(r)`
-    has dimensions of inverse area. The power spectrum from such
-    a correlation function (in two-dimensions) is given by its
-    Hankel transform pair
-
-    .. math::
-        P(|k|) = \frac{\kappa}{2 \pi \xi^3} \frac{1}{(\xi^{-2} + |k|^2)^{3/2}}.
-
-    Here :math:`\kappa` is a scale factor and :math:`\xi` is a length
-    scale.
-    """
-
-    amplitude: Float[Array, ""]
-    length_scale: Float[Array, ""]
-
-    spatial_dims: ClassVar[list[int]] = [2]
-
-    def __init__(
-        self,
-        amplitude: FloatLike = 1.0,
-        length_scale: FloatLike = 1.0,
-    ):
-        """**Arguments:**
-
-        - `amplitude`: The amplitude of the operator, equal to $\\kappa$
-                in the above equation.
-        - `length_scale`: The length scale of the operator, equal to $\\xi$
-                    in the above equation.
-        """
-        self.amplitude = jnp.asarray(amplitude, dtype=float)
-        self.length_scale = jnp.asarray(length_scale, dtype=float)
-
-    @override
-    def __call__(self, frequencies: Float[Array, "... 2"]) -> Float[Array, "..."]:
-        frequencies, ndim, _ = _standardize_frequencies(frequencies)
-        if ndim != 2:
-            raise ValueError(
-                "`cryojax.ndimage.FourierExp2D` only supports "
-                "`spatial_dim = 2`, but passed a frequency "
-                "array with `spatial_dim = 1`."
-            )
-        k_sqr = jnp.sum(frequencies**2, axis=-1)
-        scaling = (
-            1.0
-            / (k_sqr + jnp.divide(1, (error_if_not_positive(self.length_scale)) ** 2))
-            ** 1.5
-        )
-        scaling *= jnp.divide(self.amplitude, 2 * jnp.pi * self.length_scale**3)
-        return scaling
 
 
 class FourierGaussian(AbstractFourierOperator, strict=True):

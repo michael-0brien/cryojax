@@ -1,5 +1,5 @@
-from collections.abc import Callable
-from typing import Any, ClassVar, Literal, Self, TypedDict
+from collections.abc import Mapping
+from typing import ClassVar, Literal, Self
 from typing_extensions import override
 
 import equinox as eqx
@@ -9,13 +9,16 @@ import jax.scipy as jsp
 from jaxtyping import Array, Float, PyTree
 
 from ..._internal import error_if_not_positive
-from ...constants import (
-    PengScatteringFactorParameters,
-    b_factor_to_variance,
-    variance_to_b_factor,
+from ...constants import PengScatteringFactorParameters, b_factor_to_variance
+from ...jax_util import FloatLike, NDArrayLike, filter_bscan
+from ...ndimage import (
+    fftn,
+    make_1d_coordinate_grid,
+    resize_with_crop_or_pad,
+    rfftn,
+    spread_gaussians_2d,
+    spread_gaussians_3d,
 )
-from ...jax_util import FloatLike, NDArrayLike
-from ...ndimage import fftn, make_1d_coordinate_grid, resize_with_crop_or_pad, rfftn
 from .._image_config import AbstractImageConfig
 from .._pose import AbstractPose
 from .base_volume import (
@@ -25,11 +28,7 @@ from .base_volume import (
     ProjectionArray,
     VoxelArray,
 )
-
-
-class BatchOptions(TypedDict):
-    batch_size: int
-    n_batches: int
+from .common import spread_and_sum_gaussian_components
 
 
 class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
@@ -60,26 +59,26 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
         ```
     """
 
-    positions: Float[Array, "n_positions 3"]
-    amplitudes: Float[Array, "n_positions n_gaussians"]
-    variances: Float[Array, " n_positions n_gaussians"]
+    positions: Float[Array, "M 3"]
+    amplitudes: Float[Array, "M K"]
+    variances: Float[Array, " M K"]
 
     is_frame_rotation: ClassVar[bool] = False
 
     def __init__(
         self,
-        positions: Float[NDArrayLike, "n_positions 3"],
+        positions: Float[NDArrayLike, "M 3"],
         amplitudes: (
             float
             | Float[NDArrayLike, ""]
-            | Float[NDArrayLike, " n_positions"]
-            | Float[NDArrayLike, "n_positions n_gaussians"]
+            | Float[NDArrayLike, " M"]
+            | Float[NDArrayLike, "M K"]
         ),
         variances: (
             float
             | Float[NDArrayLike, ""]
-            | Float[NDArrayLike, " n_positions"]
-            | Float[NDArrayLike, "n_positions n_gaussians"]
+            | Float[NDArrayLike, " M"]
+            | Float[NDArrayLike, "M K"]
         ),
     ):
         """**Arguments:**
@@ -94,28 +93,28 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
             The variance for each gaussian. This has units of angstroms
             squared.
         """
-        n_positions = positions.shape[0]
+        M = positions.shape[0]
         if isinstance(amplitudes, NDArrayLike):
             if amplitudes.ndim == 2:
-                n_gaussians = amplitudes.shape[-1]
+                K = amplitudes.shape[-1]
             elif amplitudes.ndim == 1:
-                n_gaussians = 1
+                K = 1
                 amplitudes = amplitudes[:, None]
             elif amplitudes.ndim == 0:
-                n_gaussians = 1
+                K = 1
                 amplitudes = amplitudes[None, None]
             else:
                 raise ValueError(
                     "Passed `amplitudes` to `GaussianMixtureVolume` "
                     f"with shape {amplitudes.shape}, but must be of "
-                    "shape `()`, `(n_positions,)`, or "
-                    "`(n_positions, n_gaussians)`."
+                    "shape `()`, `(M,)`, or "
+                    "`(M, K)`."
                 )
         else:
-            n_gaussians = 1
+            K = 1
         if isinstance(variances, NDArrayLike):
             if variances.ndim == 2:
-                n_gaussians = variances.shape[-1]
+                K = variances.shape[-1]
             elif variances.ndim == 1:
                 variances = variances[:, None]
             elif variances.ndim == 0:
@@ -124,17 +123,13 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
                 raise ValueError(
                     "Passed `variances` to `GaussianMixtureVolume` "
                     f"with shape {variances.shape}, but must be of "
-                    "shape `()`, `(n_positions,)`, or "
-                    "`(n_positions, n_gaussians)`."
+                    "shape `()`, `(M,)`, or "
+                    "`(M, K)`."
                 )
 
         self.positions = jnp.asarray(positions, dtype=float)
-        self.amplitudes = jnp.broadcast_to(
-            jnp.asarray(amplitudes, dtype=float), (n_positions, n_gaussians)
-        )
-        self.variances = jnp.broadcast_to(
-            jnp.asarray(variances, dtype=float), (n_positions, n_gaussians)
-        )
+        self.amplitudes = jnp.broadcast_to(jnp.asarray(amplitudes, dtype=float), (M, K))
+        self.variances = jnp.broadcast_to(jnp.asarray(variances, dtype=float), (M, K))
 
     def __check_init__(self):
         if not (
@@ -221,19 +216,31 @@ class GaussianMixtureProjection(
     AbstractVolumeIntegrator[GaussianMixtureVolume],
     strict=True,
 ):
+    """
+    !!! example "Speed up gradients with Pallas"
+        ```python
+        integrator = cxs.GaussianMixtureProjection(
+            n_spread=7, enable_pallas={"bwd": True}
+        )
+        ```
+    """
+
     sampling_mode: Literal["average", "point"]
     shape: tuple[int, int] | None
     n_batches: int
+    n_spread: int | tuple[int, ...] | None
+    enable_pallas: bool | Mapping[str, bool] | None
 
     outputs_ewald_sphere: ClassVar[bool] = False
 
     def __init__(
         self,
         *,
-        upsampling_factor: int | None = None,
         shape: tuple[int, int] | None = None,
         sampling_mode: Literal["average", "point"] = "average",
         n_batches: int = 1,
+        n_spread: int | tuple[int, ...] | None = None,
+        enable_pallas: bool | Mapping[str, bool] | None = None,
     ):
         """**Arguments:**
 
@@ -250,14 +257,33 @@ class GaussianMixtureProjection(
             The number of batches over groups of positions
             used to evaluate the projection. By default, `n_batches = 1`,
             which computes a projection for all positions at once.
-            This is useful to decrease GPU memory usage.
+            This is useful to decrease GPU memory usage. Applies to both
+            the dense (`n_spread=None`) and spreading (`n_spread` set) backends.
+        - `n_spread`:
+            If `None` (default), compute the projection with dense gaussian
+            integrals evaluated over the whole grid. If an `int`, instead
+            directly spread each gaussian onto only the `n_spread` nearest
+            grid points (per dimension), trading accuracy for speed, using the
+            same backend as [`cryojax.simulator.IndependentAtomProjection`][].
+            If a `tuple` of `int`s (one value per gaussian component, i.e. of
+            length `GaussianMixtureVolume.amplitudes.shape[-1]`), spread each
+            gaussian component with its own width instead of one shared
+            width -- useful when a volume's gaussian components have widths
+            spanning an order of magnitude or more (e.g. X-ray/electron
+            scattering factors written as a sum of 5 gaussians), where a
+            single `n_spread` would either truncate the widest components or
+            waste computation spreading the narrowest ones too widely. See
+            [`cryojax.simulator.suggest_n_spread`][] to choose these values
+            from `volume_representation.variances`.
+        - `enable_pallas`:
+            Use the Pallas/Triton GPU backend instead of pure-JAX for the
+            `n_spread` spreading backend (ignored if `n_spread` is `None`).
+            [Pallas](https://docs.jax.dev/en/latest/pallas/index.html) is
+            JAX's framework for writing custom GPU/TPU kernels. This is most
+            advantageous for the *backward* pass -- `{"bwd": True}`. See
+            [`cryojax.ndimage.spread_gaussians_2d`][]'s `enable_pallas` for
+            the full picture. `None` (default) defers to `CRYOJAX_ENABLE_PALLAS`.
         """  # noqa: E501
-        if upsampling_factor is not None:
-            raise ValueError(
-                "`upsampling_factor` in `GaussianMixtureProjection` "
-                "has been deprecated as of cryoJAX 0.5.1. The "
-                "functionality this implemented was not as intended."
-            )
         if sampling_mode not in ["average", "point"]:
             raise ValueError(
                 "`sampling_mode` in `GaussianMixtureProjection` "
@@ -268,6 +294,8 @@ class GaussianMixtureProjection(
         self.shape = shape
         self.sampling_mode = sampling_mode
         self.n_batches = n_batches
+        self.n_spread = n_spread
+        self.enable_pallas = enable_pallas
 
     @override
     def integrate(
@@ -299,20 +327,36 @@ class GaussianMixtureProjection(
         # Grab the gaussian amplitudes and widths
         positions = volume_representation.positions
         amplitudes = volume_representation.amplitudes
-        b_factors = variance_to_b_factor(
-            error_if_not_positive(volume_representation.variances)
+        variances = error_if_not_positive(volume_representation.variances)
+        use_erf = self.sampling_mode == "average"
+        context = (
+            f"Error during projection using `{type(self).__name__}(..., n_batches=...)`"
         )
         # Compute the projection
-        use_erf = True if self.sampling_mode == "average" else False
-        projection_integral = _gaussians_to_projection(
-            shape,
-            pixel_size,
-            positions,
-            amplitudes,
-            b_factors,
-            use_erf,
-            self.n_batches,
-        )
+        if self.n_spread is None:
+            projection_integral = _gaussians_to_projection_dense(
+                shape,
+                pixel_size,
+                positions,
+                amplitudes,
+                variances,
+                use_erf,
+                self.n_batches,
+                context,
+            )
+        else:
+            projection_integral = _gaussians_to_projection_spread(
+                shape,
+                pixel_size,
+                positions,
+                amplitudes,
+                variances,
+                use_erf,
+                self.n_spread,
+                self.n_batches,
+                context,
+                self.enable_pallas,
+            )
         if self.shape is None:
             return (
                 projection_integral if outputs_real_space else rfftn(projection_integral)
@@ -366,19 +410,29 @@ class GaussianMixtureRenderFn(AbstractVolumeRenderFn[GaussianMixtureVolume], str
     where $j$ indexes the components of the spatial coordinate vector $\\mathbf{r}$. The above expression is evaluated using the error function as
 
     $$U_{\\ell} = \\frac{1}{(2 \\Delta r)^3} \\sum\\limits_{i = 1}^5 a_i \\prod\\limits_{j = 1}^3 \\textrm{erf}(\\frac{r_j^{\\ell} - r'_j + \\Delta r / 2}{\\sqrt{2 ((b_i + B) / 8\\pi^2)}}) - \\textrm{erf}(\\frac{r_j^{\\ell} - r'_j - \\Delta r / 2}{\\sqrt{2 ((b_i + B) / 8\\pi^2)}}).$$
+
+    !!! example "Speed up gradients with Pallas"
+        ```python
+        render_fn = cxs.GaussianMixtureRenderFn(
+            shape, voxel_size, n_spread=7, enable_pallas={"bwd": True}
+        )
+        ```
     """  # noqa: E501
 
     shape: tuple[int, int, int]
     voxel_size: Float[Array, ""]
-
-    batch_options: BatchOptions
+    n_batches: int
+    n_spread: int | tuple[int, ...] | None
+    enable_pallas: bool | Mapping[str, bool] | None
 
     def __init__(
         self,
         shape: tuple[int, int, int],
         voxel_size: FloatLike,
         *,
-        batch_options: dict[str, Any] = {},
+        n_batches: int = 1,
+        n_spread: int | tuple[int, ...] | None = None,
+        enable_pallas: bool | Mapping[str, bool] | None = None,
     ):
         """**Arguments:**
 
@@ -386,21 +440,42 @@ class GaussianMixtureRenderFn(AbstractVolumeRenderFn[GaussianMixtureVolume], str
             The shape of the resulting voxel grid.
         - `voxel_size`:
             The voxel size of the resulting voxel grid.
-        - `batch_options`:
-            Advanced options for controlling batching. This is a dictionary
-            with the following keys:
-            - "batch_size":
-                The number of z-planes to evaluate in parallel with
-                `jax.vmap`. By default, `1`.
-            - "n_batches":
-                The number of iterations used to evaluate the volume,
-                where the iteration is taken over groups of atoms.
-                This is useful if `batch_size = 1`
-                and GPU memory is exhausted. By default, `1`.
-        """
+        - `n_batches`:
+            The number of batches over groups of positions used to render
+            the voxel grid. By default, `n_batches = 1`, which renders the
+            voxel grid for all positions at once. This is useful to decrease
+            GPU memory usage. Applies to both the dense (`n_spread=None`) and
+            spreading (`n_spread` set) backends.
+        - `n_spread`:
+            If `None` (default), render the voxel grid with dense gaussian
+            integrals evaluated over the whole grid. If an `int`, instead
+            directly spread each gaussian onto only the `n_spread` nearest
+            grid points (per dimension), trading accuracy for speed, using
+            the same backend as [`cryojax.simulator.IndependentAtomRenderFn`][].
+            If a `tuple` of `int`s (one value per gaussian component, i.e. of
+            length `GaussianMixtureVolume.amplitudes.shape[-1]`), spread each
+            gaussian component with its own width instead of one shared
+            width -- useful when a volume's gaussian components have widths
+            spanning an order of magnitude or more (e.g. X-ray/electron
+            scattering factors written as a sum of 5 gaussians), where a
+            single `n_spread` would either truncate the widest components or
+            waste computation spreading the narrowest ones too widely. See
+            [`cryojax.simulator.suggest_n_spread`][] to choose these values
+            from `volume_representation.variances`.
+        - `enable_pallas`:
+            Use the Pallas/Triton GPU backend instead of pure-JAX for the
+            `n_spread` spreading backend (ignored if `n_spread` is `None`).
+            [Pallas](https://docs.jax.dev/en/latest/pallas/index.html) is
+            JAX's framework for writing custom GPU/TPU kernels. This is most
+            advantageous for the *backward* pass -- `{"bwd": True}`. See
+            [`cryojax.ndimage.spread_gaussians_3d`][]'s `enable_pallas` for
+            the full picture. `None` (default) defers to `CRYOJAX_ENABLE_PALLAS`.
+        """  # noqa: E501
         self.shape = shape
         self.voxel_size = jnp.asarray(voxel_size, dtype=float)
-        self.batch_options = _dict_to_batch_options(batch_options)
+        self.n_batches = n_batches
+        self.n_spread = n_spread
+        self.enable_pallas = enable_pallas
 
     @override
     def __call__(
@@ -428,14 +503,33 @@ class GaussianMixtureRenderFn(AbstractVolumeRenderFn[GaussianMixtureVolume], str
             component is in the corner. Does nothing if
             `outputs_real_space = True`.
         """
-        real_voxel_grid = _gaussians_to_real_voxels(
-            self.shape,
-            error_if_not_positive(self.voxel_size),
-            volume_representation.positions,
-            volume_representation.amplitudes,
-            variance_to_b_factor(error_if_not_positive(volume_representation.variances)),
-            **self.batch_options,
+        voxel_size = error_if_not_positive(self.voxel_size)
+        variances = error_if_not_positive(volume_representation.variances)
+        context = (
+            f"Error during rendering using `{type(self).__name__}(..., n_batches=...)`"
         )
+        if self.n_spread is None:
+            real_voxel_grid = _gaussians_to_real_voxels_dense(
+                self.shape,
+                voxel_size,
+                volume_representation.positions,
+                volume_representation.amplitudes,
+                variances,
+                self.n_batches,
+                context,
+            )
+        else:
+            real_voxel_grid = _gaussians_to_real_voxels_spread(
+                self.shape,
+                voxel_size,
+                volume_representation.positions,
+                volume_representation.amplitudes,
+                variances,
+                self.n_spread,
+                self.n_batches,
+                context,
+                self.enable_pallas,
+            )
         if outputs_real_space:
             return real_voxel_grid
         else:
@@ -453,437 +547,262 @@ class GaussianMixtureRenderFn(AbstractVolumeRenderFn[GaussianMixtureVolume], str
                 )
 
 
-def _dict_to_batch_options(d):
-    batch_size = 1 if "batch_size" not in d else d["batch_size"]
-    n_batches = 1 if "n_batches" not in d else d["n_batches"]
-    return BatchOptions(batch_size=batch_size, n_batches=n_batches)
+# ============================================================================
+# Shared atom-batching
+# ============================================================================
+#
+# Both the dense and spreading backends, for both projection and rendering,
+# reduce over atoms (and gaussian components) to produce a single
+# image/voxel-grid contribution. `_sum_over_atom_batches` computes that
+# reduction in `n_batches` chunks via a summing `filter_bscan` carry, which
+# bounds peak memory to one chunk's worth of intermediates rather than all
+# atoms at once. `n_batches = 1` (the default) skips batching/`scan` entirely.
 
 
-#
-# Projection
-#
-def _gaussians_to_projection(
-    shape: tuple[int, int],
-    pixel_size: Float[Array, ""],
-    positions: Float[Array, "n_positions 3"],
-    a: Float[Array, "n_positions n_gaussians_per_position"],
-    b: Float[Array, "n_positions n_gaussians_per_position"],
-    use_erf: bool,
+def _sum_over_atom_batches(
+    kernel_fn,
+    xs: PyTree[Array],
     n_batches: int,
-) -> Float[Array, "dim_y dim_x"]:
-    # Make the grid on which to evaluate the result
-    grid_x = make_1d_coordinate_grid(shape[1], pixel_size)
-    grid_y = make_1d_coordinate_grid(shape[0], pixel_size)
-    # Get function and pytree to compute volume over a batch of positions
-    xs = (positions, a, b)
-    kernel_fn = lambda xs: _gaussians_to_projection_kernel(
-        grid_x,
-        grid_y,
-        pixel_size,
-        xs[0],
-        xs[1],
-        xs[2],
-        use_erf,
-    )
-    # Compute projection with a call to `jax.lax.map` in batches
-    if n_batches > positions.shape[0]:
+    output_shape: tuple[int, ...],
+    *,
+    context: str,
+) -> Array:
+    M = jax.tree.leaves(xs)[0].shape[0]
+    if n_batches > M:
         raise ValueError(
-            "The `n_batches` when computing a projection must "
-            "be an integer less than or equal to the number of positions, "
-            f"which is equal to {positions.shape[0]}. Got "
+            f"{context}: `n_batches` must be an integer less than or equal "
+            f"to the number of positions, which is equal to {M}. Got "
             f"`n_batches = {n_batches}`."
         )
-    elif n_batches == 1:
-        projection = kernel_fn(xs)
-    elif n_batches > 1:
-        projection = jnp.sum(
-            _batched_map_with_contraction(kernel_fn, xs, n_batches),
-            axis=0,
-        )
-    else:
+    if n_batches < 1:
         raise ValueError(
-            "The `n_batches` argument for `GaussianMixtureProjection` must be an "
-            "integer greater than or equal to 1."
+            f"{context}: `n_batches` must be an integer greater than or equal to 1."
         )
-    return projection
+    if n_batches == 1:
+        return kernel_fn(xs)
+
+    batch_size = M // n_batches
+
+    def f_scan(carry, xs_chunk):
+        return carry + kernel_fn(xs_chunk), None
+
+    total, _ = filter_bscan(f_scan, jnp.zeros(output_shape), xs, batch_size=batch_size)
+    return total
 
 
-def _gaussians_to_projection_kernel(
+def _gaussian_weight(r: Array, variance: Array) -> Array:
+    """Normalized isotropic Gaussian marginal at physical offset `r`."""
+    return jnp.exp(-0.5 * r**2 / variance) / jnp.sqrt(2 * jnp.pi * variance)
+
+
+def _erf_weight(r: Array, variance: Array, width: Float[Array, ""]) -> Array:
+    """Average of `_gaussian_weight` over a pixel/voxel of `width` centered at
+    physical offset `r`."""
+    scaling = 1.0 / jnp.sqrt(2 * variance)
+    left, right = scaling * (r - width / 2), scaling * (r + width / 2)
+    return (jsp.special.erf(right) - jsp.special.erf(left)) / (2 * width)
+
+
+def _dense_axis_values(
+    grid: Float[Array, " dim"],
+    positions_1d: Float[Array, " M"],
+    variance: Float[Array, "M K"],
+    width: Float[Array, ""],
+    *,
+    use_erf: bool,
+) -> Float[Array, "dim M K"]:
+    """Evaluate the normalized 1D marginal kernel (see `cryojax.simulator
+    ._volume.common`) at every grid point, for every position and gaussian
+    component."""
+    r = grid[:, None, None] - positions_1d[None, :, None]
+    variance = variance[None, :, :]
+    return _erf_weight(r, variance, width) if use_erf else _gaussian_weight(r, variance)
+
+
+#
+# Projection: dense backend
+#
+def _gaussians_to_projection_dense(
+    shape: tuple[int, int],
+    pixel_size: Float[Array, ""],
+    positions: Float[Array, "M 3"],
+    amplitudes: Float[Array, "M K"],
+    variances: Float[Array, "M K"],
+    use_erf: bool,
+    n_batches: int,
+    context: str,
+) -> Float[Array, "dim_y dim_x"]:
+    grid_x = make_1d_coordinate_grid(shape[1], pixel_size)
+    grid_y = make_1d_coordinate_grid(shape[0], pixel_size)
+
+    def kernel_fn(xs):
+        _positions, _amplitudes, _variances = xs
+        return _gaussians_to_projection_dense_kernel(
+            grid_x, grid_y, pixel_size, _positions, _amplitudes, _variances, use_erf
+        )
+
+    return _sum_over_atom_batches(
+        kernel_fn, (positions, amplitudes, variances), n_batches, shape, context=context
+    )
+
+
+def _gaussians_to_projection_dense_kernel(
     grid_x: Float[Array, " dim_x"],
     grid_y: Float[Array, " dim_y"],
     pixel_size: Float[Array, ""],
-    positions: Float[Array, "n_positions 3"],
-    a: Float[Array, "n_positions n_gaussians_per_position"],
-    b: Float[Array, "n_positions n_gaussians_per_position"],
+    positions: Float[Array, "M 3"],
+    amplitudes: Float[Array, "M K"],
+    variances: Float[Array, "M K"],
     use_erf: bool,
 ) -> Float[Array, "dim_y dim_x"]:
-    # Evaluate 1D gaussian integrals for each of x, y, and z dimensions
-
-    if use_erf:
-        gaussians_times_prefactor_x, gaussians_y = _evaluate_gaussian_integrals_2d(
-            grid_x, grid_y, positions, a, b, pixel_size
-        )
-    else:
-        gaussians_times_prefactor_x, gaussians_y = _evaluate_gaussians_2d(
-            grid_x, grid_y, positions, a, b
-        )
-    projection = _evaluate_multivariate_gaussian_2d(
-        gaussians_times_prefactor_x, gaussians_y
+    values_x = amplitudes[None, :, :] * _dense_axis_values(
+        grid_x, positions[:, 0], variances, pixel_size, use_erf=use_erf
     )
-
-    return projection
-
-
-def _evaluate_multivariate_gaussian_2d(
-    gaussians_per_interval_per_position_x: Float[
-        Array, "dim_x n_positions n_gaussians_per_position"
-    ],
-    gaussians_per_interval_per_position_y: Float[
-        Array, "dim_y n_positions n_gaussians_per_position"
-    ],
-) -> Float[Array, "dim_y dim_x"]:
-    # Prepare matrices with dimensions of the number of positions and the number of grid
-    # points. There are as many matrices as number of gaussians per position
-    # gauss_x = jnp.transpose(gaussians_per_interval_per_position_x, (2, 1, 0))
-    # gauss_y = jnp.transpose(gaussians_per_interval_per_position_y, (2, 0, 1))
-    # # Compute matrix multiplication then sum over the number of gaussians per position
-    # return jnp.sum(jnp.matmul(gauss_y, gauss_x), axis=0)
-    return jnp.einsum(
-        "ikl, jkl -> ij",
-        gaussians_per_interval_per_position_y,
-        gaussians_per_interval_per_position_x,
+    values_y = _dense_axis_values(
+        grid_y, positions[:, 1], variances, pixel_size, use_erf=use_erf
     )
+    return jnp.einsum("ikl, jkl -> ij", values_y, values_x)
 
 
-def _evaluate_gaussian_integrals_2d(
-    grid_x: Float[Array, " dim_x"],
-    grid_y: Float[Array, " dim_y"],
-    positions: Float[Array, "n_positions 3"],
-    a: Float[Array, "n_positions n_gaussians_per_position"],
-    b: Float[Array, "n_positions n_gaussians_per_position"],
+#
+# Projection: spreading backend
+#
+def _gaussians_to_projection_spread(
+    shape: tuple[int, int],
     pixel_size: Float[Array, ""],
-) -> tuple[
-    Float[Array, "dim_x n_positions n_gaussians_per_position"],
-    Float[Array, "dim_y n_positions n_gaussians_per_position"],
-]:
-    """Evaluate 1D averaged gaussians in x, y, and z dimensions
-    for each position and each gaussian per position.
+    positions: Float[Array, "M 3"],
+    amplitudes: Float[Array, "M K"],
+    variances: Float[Array, "M K"],
+    use_erf: bool,
+    n_spread: int | tuple[int, ...],
+    n_batches: int,
+    context: str,
+    enable_pallas: bool | Mapping[str, bool] | None,
+) -> Float[Array, "dim_y dim_x"]:
+    """Spread each gaussian component directly onto the `n_spread` nearest
+    grid points (see `cryojax.simulator._volume.common`), rather than
+    evaluating dense gaussian integrals over the whole grid.
     """
-    # Define function to compute integrals for each dimension
-    scaling = 2 * jnp.pi / jnp.sqrt(b)
-    integration_kernel = lambda delta: (
-        jsp.special.erf(scaling[None, :, :] * (delta + pixel_size)[:, :, None])
-        - jsp.special.erf(scaling[None, :, :] * delta[:, :, None])
-    )
-    # Compute outer product of left edge of grid points minus positions
-    left_edge_grid_x, left_edge_grid_y = (
-        grid_x - pixel_size / 2,
-        grid_y - pixel_size / 2,
-    )
-    delta_x, delta_y = (
-        left_edge_grid_x[:, None] - positions[:, 0],
-        left_edge_grid_y[:, None] - positions[:, 1],
-    )
-    # Compute gaussian integrals for each grid point, each position, and
-    # each gaussian per position
-    gauss_x, gauss_y = (integration_kernel(delta_x), integration_kernel(delta_y))
-    # Compute the prefactors for each position and each gaussian per position
-    # for the volume
-    prefactor = a / (2 * pixel_size) ** 2
-    # Multiply the prefactor onto one of the gaussians for efficiency
-    return prefactor * gauss_x, gauss_y
 
+    def kernel_fn(xs):
+        _positions, _amplitudes, _variances = xs
 
-def _evaluate_gaussians_2d(
-    grid_x: Float[Array, " x_dim"],
-    grid_y: Float[Array, " y_dim"],
-    positions: Float[Array, "n_positions 3"],
-    a: Float[Array, "n_positions n_gaussians_per_position"],
-    b: Float[Array, "n_positions n_gaussians_per_position"],
-) -> tuple[
-    Float[Array, "dim_x n_positions n_gaussians_per_position"],
-    Float[Array, "dim_y n_positions n_gaussians_per_position"],
-]:
-    b_inverse = 4.0 * jnp.pi / b
-    gauss_x = jnp.exp(
-        -jnp.pi
-        * b_inverse[None, :, :]
-        * ((grid_x[:, None] - positions.T[0, :]) ** 2)[:, :, None]
-    )
-    gauss_y = jnp.exp(
-        -jnp.pi
-        * b_inverse[None, :, :]
-        * ((grid_y[:, None] - positions.T[1, :]) ** 2)[:, :, None]
-    )
-    prefactor = a[None, :, :] * b_inverse[None, :, :]
+        def spread_one_gaussian(_amplitude, _variance, _n_spread):
+            return spread_gaussians_2d(
+                _positions[:, 0],
+                _positions[:, 1],
+                _amplitude,
+                _variance,
+                shape,
+                pixel_size=pixel_size,
+                n_spread=_n_spread,
+                use_erf=use_erf,
+                enable_pallas=enable_pallas,
+            )
 
-    return prefactor * gauss_x, gauss_y
+        return spread_and_sum_gaussian_components(
+            spread_one_gaussian, _amplitudes, _variances, n_spread
+        )
+
+    return _sum_over_atom_batches(
+        kernel_fn, (positions, amplitudes, variances), n_batches, shape, context=context
+    )
 
 
 #
-# Voxel rendering
+# Voxel rendering: dense backend
 #
-@eqx.filter_jit
-def _gaussians_to_real_voxels(
+def _gaussians_to_real_voxels_dense(
     shape: tuple[int, int, int],
     voxel_size: Float[Array, ""],
-    positions: Float[Array, "n_positions 3"],
-    amplitudes: Float[Array, "n_positions n_gaussians_per_position"],
-    b_factors: Float[Array, "n_positions n_gaussians_per_position"],
-    *,
-    batch_size: int = 1,
-    n_batches: int = 1,
+    positions: Float[Array, "M 3"],
+    amplitudes: Float[Array, "M K"],
+    variances: Float[Array, "M K"],
+    n_batches: int,
+    context: str,
 ) -> Float[Array, "{shape[0]} {shape[1]} {shape[2]}"]:
-    # Make coordinate systems for each of x, y, and z dimensions
     z_dim, y_dim, x_dim = shape
     grid_x, grid_y, grid_z = [
         make_1d_coordinate_grid(dim, voxel_size) for dim in [x_dim, y_dim, z_dim]
     ]
-    # Get function to compute potential over a batch of positions
-    render_fn = lambda xs: _gaussians_to_real_voxels_kernel(
-        grid_x,
-        grid_y,
-        grid_z,
-        voxel_size,
-        xs[0],
-        xs[1],
-        xs[2],
-        batch_size,
+
+    def kernel_fn(xs):
+        _positions, _amplitudes, _variances = xs
+        return _gaussians_to_real_voxels_dense_kernel(
+            grid_x, grid_y, grid_z, voxel_size, _positions, _amplitudes, _variances
+        )
+
+    return _sum_over_atom_batches(
+        kernel_fn, (positions, amplitudes, variances), n_batches, shape, context=context
     )
-    if n_batches > positions.shape[0]:
-        raise ValueError(
-            "The `n_batches` when building a voxel grid must "
-            "be an integer less than or equal to the number of positions, "
-            f"which is equal to {positions.shape[0]}. Got "
-            f"`n_batches = {n_batches}`."
-        )
-    elif n_batches == 1:
-        real_voxel_grid = render_fn((positions, amplitudes, b_factors))
-    elif n_batches > 1:
-        real_voxel_grid = jnp.sum(
-            _batched_map_with_n_batches(
-                render_fn,
-                (positions, amplitudes, b_factors),
-                n_batches=n_batches,
-                is_batch_axis_contracted=True,
-            ),
-            axis=0,
-        )
-    else:
-        raise ValueError(
-            "The `n_batches` when building a voxel grid must be an "
-            "integer greater than or equal to 1."
-        )
-
-    return real_voxel_grid
 
 
-def _gaussians_to_real_voxels_kernel(
+def _gaussians_to_real_voxels_dense_kernel(
     grid_x: Float[Array, " dim_x"],
     grid_y: Float[Array, " dim_y"],
     grid_z: Float[Array, " dim_z"],
     voxel_size: Float[Array, ""],
-    positions: Float[Array, "n_positions_in_batch 3"],
-    amplitudes: Float[Array, "n_positions_in_batch n_gaussians_per_position"],
-    b_factors: Float[Array, "n_positions_in_batch n_gaussians_per_position"],
-    batch_size: int,
+    positions: Float[Array, "M 3"],
+    amplitudes: Float[Array, "M K"],
+    variances: Float[Array, "M K"],
 ) -> Float[Array, "dim_z dim_y dim_x"]:
-    # Evaluate 1D gaussian integrals for each of x, y, and z dimensions
-    (
-        gaussian_integrals_times_prefactor_per_interval_per_position_x,
-        gaussian_integrals_per_interval_per_position_y,
-        gaussian_integrals_per_interval_per_position_z,
-    ) = _evaluate_gaussian_integrals_3d(
-        grid_x, grid_y, grid_z, positions, amplitudes, b_factors, voxel_size
+    values_x = amplitudes[None, :, :] * _dense_axis_values(
+        grid_x, positions[:, 0], variances, voxel_size, use_erf=True
     )
-    # Get function to compute voxel grid at a single z-plane
-    render_at_z_plane = lambda gaussian_integrals_per_position_z: (
-        _evaluate_multivariate_gaussian_3d(
-            gaussian_integrals_times_prefactor_per_interval_per_position_x,
-            gaussian_integrals_per_interval_per_position_y,
-            gaussian_integrals_per_position_z,
-        )
+    values_y = _dense_axis_values(
+        grid_y, positions[:, 1], variances, voxel_size, use_erf=True
     )
-    # Map over z-planes
-    if batch_size > grid_z.size:
-        raise ValueError(
-            "The `batch_size` when building a voxel grid must be an "
-            "integer less than or equal to the z-dimension of the grid, "
-            f"which is equal to {grid_z.size}."
-        )
-    elif batch_size == 1:
-        # ... compute the volume iteratively
-        real_voxel_grid = jax.lax.map(
-            render_at_z_plane, gaussian_integrals_per_interval_per_position_z
-        )
-    elif batch_size > 1:
-        # ... compute the volume by tuning how many z-planes to batch over
-        render_at_z_planes = jax.vmap(render_at_z_plane, in_axes=0)
-        real_voxel_grid = _batched_map_with_batch_size(
-            render_at_z_planes,
-            gaussian_integrals_per_interval_per_position_z,
-            batch_size=batch_size,
-            is_batch_axis_contracted=False,
-        )
-    else:
-        raise ValueError(
-            "The `batch_size` when building a voxel grid must be an "
-            "integer greater than or equal to 1."
-        )
-
-    return real_voxel_grid
+    values_z = _dense_axis_values(
+        grid_z, positions[:, 2], variances, voxel_size, use_erf=True
+    )
+    # Compute one z-plane at a time to avoid materializing the full 3D
+    # correlation tensor at once.
+    render_at_z_plane = lambda values_z_row: jnp.einsum(
+        "ikl, jkl -> ij", values_y * values_z_row[None, :, :], values_x
+    )
+    return jax.lax.map(render_at_z_plane, values_z)
 
 
-def _evaluate_gaussian_integrals_3d(
-    grid_x: Float[Array, " dim_x"],
-    grid_y: Float[Array, " dim_y"],
-    grid_z: Float[Array, " dim_z"],
-    positions: Float[Array, "n_positions 3"],
-    amplitudes: Float[Array, "n_positions n_gaussians_per_position"],
-    b_factors: Float[Array, "n_positions n_gaussians_per_position"],
+#
+# Voxel rendering: spreading backend
+#
+def _gaussians_to_real_voxels_spread(
+    shape: tuple[int, int, int],
     voxel_size: Float[Array, ""],
-) -> tuple[
-    Float[Array, "dim_x n_positions n_gaussians_per_position"],
-    Float[Array, "dim_y n_positions n_gaussians_per_position"],
-    Float[Array, "dim_z n_positions n_gaussians_per_position"],
-]:
-    """Evaluate 1D averaged gaussians in x, y, and z dimensions
-    for each position and each gaussian per position.
-    """
-    # Define function to compute integrals for each dimension
-    scaling = 2 * jnp.pi / jnp.sqrt(b_factors)
-    integration_kernel = lambda delta: (
-        jsp.special.erf(scaling[None, :, :] * (delta + voxel_size)[:, :, None])
-        - jsp.special.erf(scaling[None, :, :] * delta[:, :, None])
-    )
-    # Compute outer product of left edge of grid points minus positions
-    left_edge_grid_x, left_edge_grid_y, left_edge_grid_z = (
-        grid_x - voxel_size / 2,
-        grid_y - voxel_size / 2,
-        grid_z - voxel_size / 2,
-    )
-    delta_x, delta_y, delta_z = (
-        left_edge_grid_x[:, None] - positions[:, 0],
-        left_edge_grid_y[:, None] - positions[:, 1],
-        left_edge_grid_z[:, None] - positions[:, 2],
-    )
-    # Compute gaussian integrals for each grid point, each position, and
-    # each gaussian per position
-    gauss_x, gauss_y, gauss_z = (
-        integration_kernel(delta_x),
-        integration_kernel(delta_y),
-        integration_kernel(delta_z),
-    )
-    # Compute the prefactors for each position and each gaussian per position
-    # for the potential
-    prefactor = amplitudes / (2 * voxel_size) ** 3
-    # Multiply the prefactor onto one of the gaussians for efficiency
-    return prefactor * gauss_x, gauss_y, gauss_z
-
-
-def _evaluate_multivariate_gaussian_3d(
-    gaussian_integrals_per_interval_per_position_x: Float[
-        Array, "dim_x n_positions n_gaussians_per_position"
-    ],
-    gaussian_integrals_per_interval_per_position_y: Float[
-        Array, "dim_y n_positions n_gaussians_per_position"
-    ],
-    gaussian_integrals_per_position_z: Float[
-        Array, "n_positions n_gaussians_per_position"
-    ],
-) -> Float[Array, "dim_y dim_x"]:
-    # Prepare matrices with dimensions of the number of positions and the number of grid
-    # points. There are as many matrices as number of gaussians per position
-    return jnp.einsum(
-        "ikl, jkl -> ij",
-        gaussian_integrals_per_interval_per_position_y
-        * gaussian_integrals_per_position_z[None, :, :],
-        gaussian_integrals_per_interval_per_position_x,
-    )
-
-
-def _batched_map_with_n_batches(
-    fun: Callable,
-    xs: PyTree[Array],
+    positions: Float[Array, "M 3"],
+    amplitudes: Float[Array, "M K"],
+    variances: Float[Array, "M K"],
+    n_spread: int | tuple[int, ...],
     n_batches: int,
-    is_batch_axis_contracted: bool = False,
-):
-    batch_dim = jax.tree.leaves(xs)[0].shape[0]
-    batch_size = batch_dim // n_batches
-    return _batched_map(
-        fun, xs, batch_dim, n_batches, batch_size, is_batch_axis_contracted
-    )
-
-
-def _batched_map_with_batch_size(
-    fun: Callable,
-    xs: PyTree[Array],
-    batch_size: int,
-    is_batch_axis_contracted: bool = False,
-):
-    batch_dim = jax.tree.leaves(xs)[0].shape[0]
-    n_batches = batch_dim // batch_size
-    return _batched_map(
-        fun, xs, batch_dim, n_batches, batch_size, is_batch_axis_contracted
-    )
-
-
-def _batched_map(
-    fun: Callable,
-    xs: PyTree[Array],
-    batch_dim: int,
-    n_batches: int,
-    batch_size: int,
-    is_batch_axis_contracted: bool = False,
-):
-    """Like `jax.lax.map`, but map over leading axis of `xs` in
-    chunks of size `batch_size`. Assumes `fun` can be evaluated in
-    parallel over this leading axis.
+    context: str,
+    enable_pallas: bool | Mapping[str, bool] | None,
+) -> Float[Array, "{shape[0]} {shape[1]} {shape[2]}"]:
+    """Spread each gaussian component directly onto the `n_spread` nearest
+    grid points (see `cryojax.simulator._volume.common`), rather than
+    evaluating dense gaussian integrals over the whole grid.
     """
-    # ... reshape into an iterative dimension and a batching dimension
-    xs_per_batch = jax.tree.map(
-        lambda x: x[: batch_dim - batch_dim % batch_size, ...].reshape(
-            (n_batches, batch_size, *x.shape[1:])
-        ),
-        xs,
-    )
-    # .. compute the result and reshape back into one leading dimension
-    result_per_batch = jax.lax.map(fun, xs_per_batch)
-    if is_batch_axis_contracted:
-        result = result_per_batch
-    else:
-        result = result_per_batch.reshape(
-            (n_batches * batch_size, *result_per_batch.shape[2:])
-        )
-    # ... if the batch dimension is not divisible by the batch size, need
-    # to take care of the remainder
-    if batch_dim % batch_size != 0:
-        remainder = fun(
-            jax.tree.map(lambda x: x[batch_dim - batch_dim % batch_size :, ...], xs)
-        )
-        if is_batch_axis_contracted:
-            remainder = remainder[None, ...]
-        result = jnp.concatenate([result, remainder], axis=0)
-    return result
 
+    def kernel_fn(xs):
+        _positions, _amplitudes, _variances = xs
 
-def _batched_map_with_contraction(fun, xs, n_batches):
-    # ... reshape into an iterative dimension and a batching dimension
-    batch_dim = jax.tree.leaves(xs)[0].shape[0]
-    batch_size = batch_dim // n_batches
-    xs_per_batch = jax.tree.map(
-        lambda x: x[: batch_dim - batch_dim % batch_size, ...].reshape(
-            (n_batches, batch_size, *x.shape[1:])
-        ),
-        xs,
+        def spread_one_gaussian(_amplitude, _variance, _n_spread):
+            return spread_gaussians_3d(
+                _positions[:, 0],
+                _positions[:, 1],
+                _positions[:, 2],
+                _amplitude,
+                _variance,
+                shape,
+                voxel_size=voxel_size,
+                n_spread=_n_spread,
+                use_erf=True,
+                enable_pallas=enable_pallas,
+            )
+
+        return spread_and_sum_gaussian_components(
+            spread_one_gaussian, _amplitudes, _variances, n_spread
+        )
+
+    return _sum_over_atom_batches(
+        kernel_fn, (positions, amplitudes, variances), n_batches, shape, context=context
     )
-    # .. compute the result and reshape back into one leading dimension
-    result = jax.lax.map(fun, xs_per_batch)
-    # ... if the batch dimension is not divisible by the batch size, need
-    # to take care of the remainder
-    if batch_dim % batch_size != 0:
-        remainder = fun(
-            jax.tree.map(lambda x: x[batch_dim - batch_dim % batch_size :, ...], xs)
-        )[None, ...]
-        result = jnp.concatenate([result, remainder], axis=0)
-    return result
