@@ -223,6 +223,6 @@ def make_fftshift_phase(
             indices = jnp.arange(n)
         p = jnp.where(indices % 2 == 0, 1.0, -1.0)
         reshape = [1] * ndim
-        reshape[ax] = n
+        reshape[ax] = indices.shape[0]
         phase = phase * p.reshape(reshape)
     return phase
