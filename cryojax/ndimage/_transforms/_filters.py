@@ -14,7 +14,6 @@ from jaxtyping import Array, Complex, Float, Inexact
 from ...jax_util import FloatLike, NDArrayLike
 from .._coordinates import make_frequency_grid
 from .._edges import resize_with_crop_or_pad
-from .._fft import irfftn, rfftn
 from .._fourier_statistics import compute_binned_powerspectrum
 from .._radial_average import radial_average_to_grid
 from ._base_transform import AbstractImageTransform
@@ -230,7 +229,7 @@ def _compute_whitening_filter(
     frequency_grid = make_frequency_grid(image_stack.shape[1:])
     # Transform to fourier space
     n_pixels = math.prod(image_stack.shape[1:])
-    fourier_image_stack = rfftn(image_stack, axes=(1, 2)) / jnp.sqrt(n_pixels)
+    fourier_image_stack = jnp.fft.rfftn(image_stack, axes=(1, 2)) / jnp.sqrt(n_pixels)
     # Compute norms
     radial_frequency_grid = jnp.linalg.norm(frequency_grid, axis=-1)
     # Compute stack of power spectra
@@ -256,9 +255,9 @@ def _compute_whitening_filter(
     # Resize to be the desired shape
     if shape is not None:
         new_shape = shape
-        binned_powerspectrum_on_grid = rfftn(
+        binned_powerspectrum_on_grid = jnp.fft.rfftn(
             resize_with_crop_or_pad(
-                irfftn(binned_powerspectrum_on_grid, s=image_stack.shape[1:]),
+                jnp.fft.irfftn(binned_powerspectrum_on_grid, s=image_stack.shape[1:]),
                 shape,
                 mode="edge",
             )

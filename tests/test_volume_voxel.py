@@ -125,7 +125,7 @@ def _projection_mean(volume, integrator, image_config) -> Array:
 def _compute_projection(volume, integrator, image_config) -> Array:
     fourier_proj = integrator.integrate(volume, image_config, outputs_real_space=False)
     return im.crop_to_shape(
-        im.irfftn(fourier_proj, s=image_config.padded_shape),
+        jnp.fft.irfftn(fourier_proj, s=image_config.padded_shape),
         image_config.shape,
     )
 
@@ -665,7 +665,9 @@ def test_grid_from_fourier_voxel_grid_matches_from_real(gmm_volume, image_config
     render_fn = cxs.GaussianMixtureRenderFn((32, 32, 32), voxel_size=1.0)
     real_grid = render_fn(gmm_volume)
     vol_real = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_grid)
-    vol_fourier = cxs.FourierVoxelGridVolume.from_fourier_voxel_grid(im.rfftn(real_grid))
+    vol_fourier = cxs.FourierVoxelGridVolume.from_fourier_voxel_grid(
+        jnp.fft.rfftn(real_grid)
+    )
     err = float(_max_abs_error(vol_real, vol_fourier, _FSE, _FSE, image_config))
     assert np.isclose(err, 0.0)
 
@@ -676,7 +678,7 @@ def test_spline_from_fourier_voxel_grid_matches_from_real(gmm_volume, image_conf
     real_grid = render_fn(gmm_volume)
     vol_real = cxs.FourierVoxelSplineVolume.from_real_voxel_grid(real_grid)
     vol_fourier = cxs.FourierVoxelSplineVolume.from_fourier_voxel_grid(
-        im.rfftn(real_grid)
+        jnp.fft.rfftn(real_grid)
     )
     err = float(_max_abs_error(vol_real, vol_fourier, _FSE, _FSE, image_config))
     assert np.isclose(err, 0.0)
@@ -961,7 +963,7 @@ def test_fourier_vs_real_agreement(sample_pdb_path):
     # rfft-truncated axis stays in rfft/corner convention) -- see
     # `_prepare_fourier_voxel_arguments` in `fourier_voxels.py`.
     real_voxel_grid = jnp.fft.fftshift(
-        im.irfftn(
+        jnp.fft.irfftn(
             jnp.fft.ifftshift(fourier_volume.fourier_voxel_grid, axes=(0, 1)),
             s=shape,
         )

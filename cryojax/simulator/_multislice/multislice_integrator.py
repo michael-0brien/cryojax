@@ -7,7 +7,7 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Complex
 
-from ...ndimage import fftn, ifftn, map_coordinates, resize_with_crop_or_pad
+from ...ndimage import map_coordinates, resize_with_crop_or_pad
 from .._image_config import AbstractImageConfig
 from .._volume import AbstractVolumeRepresentation, RealVoxelGridVolume
 
@@ -119,8 +119,8 @@ class FFTMultisliceIntegrator(
         # Prepare for iteration. First, initialize plane wave
         plane_wave = jnp.ones((y_dim, x_dim), dtype=complex)
         # ... stepping function
-        make_step = lambda n, last_exit_wave: ifftn(
-            fftn(transmission[n, :, :] * last_exit_wave) * fresnel_propagator
+        make_step = lambda n, last_exit_wave: jnp.fft.ifftn(
+            jnp.fft.fftn(transmission[n, :, :] * last_exit_wave) * fresnel_propagator
         )
         # Compute exit wave
         exit_wave = jax.lax.fori_loop(0, n_slices, make_step, plane_wave)

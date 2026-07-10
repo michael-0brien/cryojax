@@ -5,9 +5,8 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float, Inexact, PRNGKeyArray
 
-from .._internal import error_if_not_fractional
-from ..jax_util import FloatLike
-from ..ndimage import fftn, ifftn, irfftn, rfftn
+from .._internal import error_if_not_fractional, leaf_asarray
+from ..jax_util import FloatLike, NDArrayLike
 from ._image_config import AbstractImageConfig
 from ._transfer_theory import ContrastTransferTheory, WaveTransferTheory
 from ._volume import AbstractVolumeIntegrator, AbstractVolumeRepresentation
@@ -60,7 +59,7 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
         defocus_offset: FloatLike | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         # ... compute the exit wave
-        fourier_wavefunction = fftn(
+        fourier_wavefunction = jnp.fft.fftn(
             self.compute_exit_wave(volume_representation, image_config, rng_key)
         )
         # ... propagate to the detector plane
@@ -69,9 +68,9 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
             image_config,
             defocus_offset=defocus_offset,
         )
-        wavefunction = ifftn(fourier_wavefunction)
+        wavefunction = jnp.fft.ifftn(fourier_wavefunction)
         # ... get the squared wavefunction and return to fourier space
-        intensity_spectrum = rfftn((wavefunction * jnp.conj(wavefunction)).real)
+        intensity_spectrum = jnp.fft.rfftn((wavefunction * jnp.conj(wavefunction)).real)
 
         return intensity_spectrum
 
@@ -85,7 +84,7 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         """Compute the contrast at the detector plane, given the squared wavefunction."""
         # ... compute the exit wave
-        fourier_wavefunction = fftn(
+        fourier_wavefunction = jnp.fft.fftn(
             self.compute_exit_wave(volume_representation, image_config, rng_key)
         )
         # ... propagate to the detector plane
@@ -94,12 +93,12 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
             image_config,
             defocus_offset=defocus_offset,
         )
-        wavefunction = ifftn(fourier_wavefunction)
+        wavefunction = jnp.fft.ifftn(fourier_wavefunction)
         # ... get the squared wavefunction
         squared_wavefunction = (wavefunction * jnp.conj(wavefunction)).real
         # ... compute the contrast directly from the squared wavefunction
         # as C = -1 + psi^2 / 1 + psi^2
-        contrast_spectrum = rfftn(
+        contrast_spectrum = jnp.fft.rfftn(
             (-1 + squared_wavefunction) / (1 + squared_wavefunction)
         )
 
@@ -211,7 +210,7 @@ class RytovScatteringTheory(AbstractWaveScatteringTheory, strict=True):
 
     volume_integrator: AbstractVolumeIntegrator
     transfer_theory: WaveTransferTheory
-    amplitude_contrast_ratio: Float[Array, ""]
+    amplitude_contrast_ratio: Float[NDArrayLike, "..."]
 
     def __init__(
         self,
@@ -227,7 +226,9 @@ class RytovScatteringTheory(AbstractWaveScatteringTheory, strict=True):
         """
         self.volume_integrator = volume_integrator
         self.transfer_theory = transfer_theory
-        self.amplitude_contrast_ratio = jnp.asarray(amplitude_contrast_ratio, dtype=float)
+        self.amplitude_contrast_ratio = leaf_asarray(
+            amplitude_contrast_ratio, dtype=float
+        )
 
     @override
     def compute_exit_wave(
@@ -245,13 +246,13 @@ class RytovScatteringTheory(AbstractWaveScatteringTheory, strict=True):
         # rfftn
         is_proj = not self.volume_integrator.outputs_ewald_sphere
         do_ifft = lambda ft: (
-            irfftn(ft, s=image_config.padded_shape)
+            jnp.fft.irfftn(ft, s=image_config.padded_shape)
             if is_proj
-            else ifftn(ft, s=image_config.padded_shape)
+            else jnp.fft.ifftn(ft, s=image_config.padded_shape)
         )
         integrated_potential = _compute_complex_potential(
             do_ifft(fourier_in_plane_potential),
-            error_if_not_fractional(self.amplitude_contrast_ratio),
+            error_if_not_fractional(jnp.asarray(self.amplitude_contrast_ratio)),
         )
         object = image_config.interaction_constant * integrated_potential
         # Compute wavefunction, with amplitude and phase contrast

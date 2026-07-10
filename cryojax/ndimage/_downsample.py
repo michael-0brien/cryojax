@@ -12,7 +12,6 @@ from jaxtyping import Array, Complex, Float, Inexact
 from ..jax_util import NDArrayLike
 from ._coordinates import make_1d_frequency_grid, make_frequency_grid
 from ._edges import crop_to_shape
-from ._fft import fftn, ifftn, rfftn
 
 
 def block_reduce_downsample(
@@ -92,7 +91,7 @@ def block_reduce_downsample(
             else:
                 shift = jnp.full((array.ndim,), -0.5)
             phase_shift = jnp.exp(-1.0j * (2 * jnp.pi * jnp.matmul(q, shift)))
-            array = ifftn(phase_shift * fftn(array))
+            array = jnp.fft.ifftn(phase_shift * jnp.fft.fftn(array))
             if not is_complex:
                 array = array.real
     block_reduce_fn = lambda x: eqx.nn.Pool(
@@ -368,7 +367,7 @@ def _fft_ds_real_signal_to_shape(
     # compute/memory of a full `fftn`, since the input is real) instead of a
     # full complex FFT. `rfftn` stores only the non-negative-frequency half of
     # the last axis, in natural (DC-at-corner) order.
-    rfft_array = rfftn(jnp.fft.ifftshift(image_or_volume))
+    rfft_array = jnp.fft.rfftn(jnp.fft.ifftshift(image_or_volume))
     if shift is not None:
         rfft_array = (
             _phase_shift_factor(shape, shift, last_axis_is_rfft=True) * rfft_array
@@ -413,14 +412,14 @@ def _fft_ds_real_signal_to_shape(
     # before gathering `hartley_array` above): they are exact inverses of each
     # other and the Hartley combine in between is pointwise, so the shifts that
     # would otherwise bracket the crop cancel algebraically.
-    ds_array = jnp.fft.fftshift(fftn(hartley_array))
+    ds_array = jnp.fft.fftshift(jnp.fft.fftn(hartley_array))
     ds_array /= hartley_array.size
     ds_array = ds_array.real - ds_array.imag
 
     if outputs_real_space:
         return ds_array
     else:
-        return rfftn(ds_array) if outputs_rfft else fftn(ds_array)
+        return jnp.fft.rfftn(ds_array) if outputs_rfft else jnp.fft.fftn(ds_array)
 
 
 def _fft_ds_complex_signal_to_shape(
@@ -429,7 +428,7 @@ def _fft_ds_complex_signal_to_shape(
     outputs_real_space: bool = True,
     shift: tuple[float, ...] | None = None,
 ) -> Complex[Array, "_ _"] | Complex[Array, "_ _ _"]:
-    fourier_array = jnp.fft.fftshift(fftn(image_or_volume))
+    fourier_array = jnp.fft.fftshift(jnp.fft.fftn(image_or_volume))
     if shift is not None:
         fourier_array = (
             _phase_shift_factor(image_or_volume.shape, shift, last_axis_is_rfft=False)
@@ -440,6 +439,6 @@ def _fft_ds_complex_signal_to_shape(
     cropped_fourier_array = crop_to_shape(fourier_array, downsampled_shape)
 
     if outputs_real_space:
-        return ifftn(jnp.fft.ifftshift(cropped_fourier_array))
+        return jnp.fft.ifftn(jnp.fft.ifftshift(cropped_fourier_array))
     else:
         return jnp.fft.ifftshift(cropped_fourier_array)

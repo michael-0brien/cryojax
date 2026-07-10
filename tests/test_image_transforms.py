@@ -133,9 +133,9 @@ def test_rotation_fn(basic_config, voxel_volume, use_rfft):
     image_ref = image_model_ref.raw_simulate()
     if use_rfft:
         shape = basic_config.padded_shape
-        image_rot = im.irfftn(rotation_fn(im.rfftn(image_norot)), s=shape)
+        image_rot = jnp.fft.irfftn(rotation_fn(jnp.fft.rfftn(image_norot)), s=shape)
     else:
-        image_rot = im.ifftn(rotation_fn(im.fftn(image_norot))).real
+        image_rot = jnp.fft.ifftn(rotation_fn(jnp.fft.fftn(image_norot))).real
 
     corr = _get_correlation(image_ref, image_rot)
     np.testing.assert_allclose(corr.item(), 1.0, atol=1e-1)
@@ -173,11 +173,11 @@ def test_translation_fn(basic_config, voxel_volume, use_rfft):
     image_notrans = image_model_notrans.simulate()
     image_ref = image_model_ref.simulate()
     if use_rfft:
-        image_trans = im.irfftn(
-            shift_fn(im.rfftn(image_notrans)), s=basic_config.padded_shape
+        image_trans = jnp.fft.irfftn(
+            shift_fn(jnp.fft.rfftn(image_notrans)), s=basic_config.padded_shape
         )
     else:
-        image_trans = im.ifftn(shift_fn(im.fftn(image_notrans))).real
+        image_trans = jnp.fft.ifftn(shift_fn(jnp.fft.fftn(image_notrans))).real
 
     np.testing.assert_allclose(image_ref, image_trans, atol=(0.0 if use_rfft else 5e-4))
 

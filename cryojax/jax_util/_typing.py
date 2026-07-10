@@ -49,8 +49,8 @@ if hasattr(typing, "GENERATING_DOCUMENTATION"):
 
 else:
     NDArrayLike: TypeAlias = Array | np.ndarray
-    BoolLike: TypeAlias = bool | Bool[Array | np.ndarray, ""]
-    ComplexLike: TypeAlias = complex | Complex[Array | np.ndarray, ""]
-    FloatLike: TypeAlias = float | Float[Array | np.ndarray, ""]
-    InexactLike: TypeAlias = complex | float | Inexact[Array | np.ndarray, ""]
-    IntLike: TypeAlias = int | Int[Array | np.ndarray, ""]
+    BoolLike: TypeAlias = bool | Bool[Array | np.ndarray, "..."]
+    ComplexLike: TypeAlias = complex | Complex[Array | np.ndarray, "..."]
+    FloatLike: TypeAlias = float | Float[Array | np.ndarray, "..."]
+    InexactLike: TypeAlias = complex | float | Inexact[Array | np.ndarray, "..."]
+    IntLike: TypeAlias = int | Int[Array | np.ndarray, "..."]

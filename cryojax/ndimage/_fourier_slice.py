@@ -16,7 +16,6 @@ from jaxtyping import Array, Complex, Float
 from ..jax_util import FloatLike
 from ._coordinates import make_1d_coordinate_grid, make_1d_frequency_grid
 from ._edges import pad_to_shape
-from ._fft import rfftn
 from ._fourier_utils import make_fftshift_phase, query_efficient_grid_size
 from ._map_coordinates import (
     compute_spline_coefficients,
@@ -70,10 +69,8 @@ def sample_fft_slice(
         frequency_slice = im.make_frequency_slice((dim, dim), fftshifted=True)
 
         # Extract the slice and transform back to a real-space projection
-        projection = im.sample_fft_slice(
-            fourier_voxel_grid, frequency_slice
-        )
-        image = im.irfftn(projection, s=(dim, dim))
+        projection_fft = im.sample_fft_slice(fourier_voxel_grid, frequency_slice)
+        projection = jnp.fft.irfftn(projection_fft, s=(dim, dim))
         ```
 
     !!! example "Rotating a central slice with `cryojax.rotations.SO3`"
@@ -86,16 +83,11 @@ def sample_fft_slice(
         # A half (rfft) central slice of shape (1, dim, dim//2+1, 3)
         frequency_slice = im.make_frequency_slice((dim, dim), fftshifted=True)
 
-        # Rotate the coordinate system by a random rotation. `SO3.apply`
-        # acts on a single `(3,)` vector, so vmap over the grid axes.
+        # Rotate the coordinate system by a random rotation.
         rotation = SO3.sample_uniform(jax.random.key(0))
-        rotated_slice = jax.vmap(jax.vmap(jax.vmap(rotation.apply)))(
-            frequency_slice
-        )
+        rotated_slice = rotation.apply(frequency_slice)
 
-        projection = im.sample_fft_slice(
-            fourier_voxel_grid, rotated_slice
-        )
+        projection_fft = im.sample_fft_slice(fourier_voxel_grid, rotated_slice)
         ```
 
     **Arguments:**
@@ -291,7 +283,9 @@ def prepare_sampling_fft(
     # spline coefficients.
     if apply_deconvolve and not use_spline:
         real_voxel_grid_padded = _deconvolve_linear(real_voxel_grid_padded)
-    fourier_voxel_grid = _fftshift_fourier_voxel_grid(rfftn(real_voxel_grid_padded))
+    fourier_voxel_grid = _fftshift_fourier_voxel_grid(
+        jnp.fft.rfftn(real_voxel_grid_padded)
+    )
     if use_spline:
         return compute_spline_coefficients(fourier_voxel_grid)
     return fourier_voxel_grid

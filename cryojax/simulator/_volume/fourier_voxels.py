@@ -15,14 +15,10 @@ from ...ndimage import (
     compute_spline_coefficients,
     enforce_rfftn_self_conjugates,
     ewald_sphere_from_slice,
-    fftn,
-    ifftn,
-    irfftn,
     make_fftshift_phase,
     make_frequency_slice,
     prepare_sampling_fft,
     resize_with_crop_or_pad,
-    rfftn,
     sample_fft_slice,
 )
 from .._image_config import AbstractImageConfig
@@ -89,8 +85,8 @@ def _check_voxel_array_shape(
                 f"`{array_name}` passed to `{cls_name}` has shape `{shape}`, "
                 f"which is likely the full (non-rfft) FFT grid shape. Expected the "
                 f"half-space RFFT grid shape `{expected_shape}` -- did you "
-                "mean to pass `cryojax.ndimage.rfftn(real_voxel_grid)` "
-                "instead of `cryojax.ndimage.fftn(real_voxel_grid)`?"
+                "mean to pass `jax.numpy.fft.rfftn(real_voxel_grid)` "
+                "instead of `jax.numpy.fft.fftn(real_voxel_grid)`?"
             )
         raise AttributeError(
             f"`{array_name}` passed to `{cls_name}` has an invalid shape "
@@ -103,33 +99,16 @@ class FourierVoxelGridVolume(AbstractFourierVoxelVolume, strict=True):
 
     !!! note
         Prefer the class-method constructors over direct instantiation
-        via ` volume = FourierVoxelGridVolume(...)`:
+        via `volume = FourierVoxelGridVolume(...)`:
 
         - `from_real_voxel_grid`:
             Instantiate from a real-space map.
         - `from_fourier_voxel_grid`:
-            Instantiate from the output of `cryojax.ndimage.rfftn`.
+            Instantiate from the output of `jax.numpy.fft.rfftn`.
 
-        Using `__init__` directly requires `fourier_voxel_grid` and
-        `frequency_grid_in_pixels` to have the correct conventions for
-        interpolation. This is:
-
-        ```python
-        import jax.numpy as jnp
-        import cryojax.ndimage as im
-
-        # Load real voxel grid
-        real_voxel_grid = ...
-        # Prepare arguments
-        # ... verify cubic
-        dim = real_voxel_grid.shape[0]
-        assert all(d == dim for d in real_voxel_grid.shape)
-        # ... compute grid and coordinates in correct convention
-        phase = im.make_fftshift_phase((dim, dim, dim), outputs_rfft=True)
-        fourier_voxel_grid = jnp.fft.fftshift(phase * im.rfftn(real_voxel_grid), axes=(0, 1))
-        frequency_slice = im.make_frequency_slice(
-            (dim, dim), outputs_rfftfreqs=True, fftshifted=True
-        )
+        Constructing this class using `__init__` can be achieved by calling
+        [`cryojax.ndimage.prepare_sampling_fft`][] and
+        [`cryojax.ndimage.make_frequency_slice`][].
         ```
     """  # noqa: E501
 
@@ -148,7 +127,7 @@ class FourierVoxelGridVolume(AbstractFourierVoxelVolume, strict=True):
         - `fourier_voxel_grid`:
             The cubic voxel grid in fourier space, truncated to the
             half-space `(dim, dim, dim // 2 + 1)`, as returned by
-            `cryojax.ndimage.rfftn`.
+            `jax.numpy.fft.rfftn`.
         - `frequency_slice_in_pixels`:
             The frequency slice coordinate system.
         """
@@ -178,16 +157,15 @@ class FourierVoxelGridVolume(AbstractFourierVoxelVolume, strict=True):
 
         ```python
         import cryojax.simulator as cxs
-        import cryojax.ndimage import im
 
-        fourier_voxel_grid = im.rfftn(real_voxel_grid)
+        fourier_voxel_grid = jnp.fft.rfftn(real_voxel_grid)
         volume = cxs.FourierVoxelGridVolume.from_fourier_voxel_grid(fourier_voxel_grid)
         ```
 
         **Arguments:**
 
         - `fourier_voxel_grid`:
-            A voxel grid in fourier space, the output of `cryojax.ndimage.rfftn`.
+            A voxel grid in fourier space, the output of `jax.numpy.fft.rfftn`.
         """  # noqa: E501
         fourier_voxel_grid, frequency_slice = _prepare_fourier_voxel_arguments(
             jnp.asarray(fourier_voxel_grid)
@@ -284,14 +262,14 @@ class FourierVoxelSplineVolume(AbstractFourierVoxelVolume, strict=True):
         import cryojax.simulator as cxs
         import cryojax.ndimage import im
 
-        fourier_voxel_grid = im.rfftn(real_voxel_grid)
+        fourier_voxel_grid = jnp.fft.rfftn(real_voxel_grid)
         volume = cxs.FourierVoxelSplineVolume.from_fourier_voxel_grid(fourier_voxel_grid)
         ```
 
         **Arguments:**
 
         - `fourier_voxel_grid`:
-            A voxel grid in fourier space, the output of `cryojax.ndimage.rfftn`.
+            A voxel grid in fourier space, the output of `jax.numpy.fft.rfftn`.
         """  # noqa: E501
         fourier_voxel_grid, frequency_slice = _prepare_fourier_voxel_arguments(
             jnp.asarray(fourier_voxel_grid)
@@ -438,16 +416,17 @@ class FourierSliceExtraction(
 
         # Resize the image to match the AbstractImageConfig.padded_shape
         if image_config.padded_shape != (N, N):
-            fourier_projection = rfftn(
+            fourier_projection = jnp.fft.rfftn(
                 resize_with_crop_or_pad(
-                    irfftn(fourier_projection, s=(N, N)), image_config.padded_shape
+                    jnp.fft.irfftn(fourier_projection, s=(N, N)),
+                    image_config.padded_shape,
                 )
             )
         # Scale by voxel size to convert from projection to integral
         if self.outputs_integral:
             fourier_projection *= image_config.pixel_size
         return (
-            irfftn(fourier_projection, s=image_config.padded_shape)
+            jnp.fft.irfftn(fourier_projection, s=image_config.padded_shape)
             if outputs_real_space
             else fourier_projection
         )
@@ -568,16 +547,17 @@ class EwaldSphereExtraction(
 
         # Resize the image to match the AbstractImageConfig.padded_shape
         if image_config.padded_shape != (N, N):
-            ewald_sphere_surface = fftn(
+            ewald_sphere_surface = jnp.fft.fftn(
                 resize_with_crop_or_pad(
-                    ifftn(ewald_sphere_surface, s=(N, N)), image_config.padded_shape
+                    jnp.fft.ifftn(ewald_sphere_surface, s=(N, N)),
+                    image_config.padded_shape,
                 )
             )
         # Scale by voxel size to convert from projection to integral
         if self.outputs_integral:
             ewald_sphere_surface *= image_config.pixel_size
         return (
-            irfftn(ewald_sphere_surface, s=image_config.padded_shape)
+            jnp.fft.irfftn(ewald_sphere_surface, s=image_config.padded_shape)
             if outputs_real_space
             else ewald_sphere_surface
         )

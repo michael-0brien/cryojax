@@ -11,6 +11,7 @@ import nufftax
 from jaxtyping import Array, Float, PyTree
 
 from ..._config import CRYOJAX_FINUFFT_BACKEND
+from ..._internal import leaf_asarray
 from ...constants import (
     PengScatteringFactorParameters,
 )
@@ -20,11 +21,8 @@ from ...ndimage import (
     FourierGaussian,
     FourierSinc,
     convert_fftn_to_rfftn,
-    ifftn,
-    irfftn,
     query_efficient_grid_size,
     resize_with_crop_or_pad,
-    rfftn,
 )
 from .._image_config import AbstractImageConfig
 from .._pose import AbstractPose
@@ -91,7 +89,7 @@ class GaussianFourierVolume(AbstractAtomVolume, strict=True):
     loading a volume from tabulated electron scattering factors.
     """  # noqa: E501
 
-    positions: PyTree[Float[Array, "_ 3"]]
+    positions: PyTree[Float[NDArrayLike, "_ 3"]]
     kernel_fns: PyTree[FourierGaussian]
 
     is_frame_rotation: ClassVar[bool] = False
@@ -123,14 +121,16 @@ class GaussianFourierVolume(AbstractAtomVolume, strict=True):
                 "that the pytree structures of `positions` and "
                 "`kernel_fns` were not equal."
             )
-        self.positions = jax.tree.map(lambda x: jnp.asarray(x, dtype=float), positions)
+        # Convert positions to array leaves, preserving their backend (JAX
+        # arrays stay on-device, NumPy arrays stay on the host).
+        self.positions = jax.tree.map(lambda x: leaf_asarray(x, dtype=float), positions)
         self.kernel_fns = kernel_fns
 
     @override
     def rotate_to_pose(self, pose: AbstractPose) -> Self:
         """Return a new potential with rotated `positions`."""
         rotate_fn = lambda pos: pose.rotate_coordinates(
-            pos, inverse=self.is_frame_rotation
+            jnp.asarray(pos), inverse=self.is_frame_rotation
         )
         return eqx.tree_at(
             lambda x: x.positions,
@@ -141,12 +141,12 @@ class GaussianFourierVolume(AbstractAtomVolume, strict=True):
     @override
     def translate_to_pose(self, pose: AbstractPose) -> Self:
         """Return a new potential with translated `positions`."""
-        offset_in_angstroms = pose.offset_in_angstroms
+        offset_in_angstroms = jnp.asarray(pose.offset_in_angstroms)
         if pose.offset_z_in_angstroms is None:
             offset_in_angstroms = jnp.concatenate(
                 (offset_in_angstroms, jnp.atleast_1d(0.0))
             )
-        translate_fn = lambda pos: pos + offset_in_angstroms
+        translate_fn = lambda pos: jnp.asarray(pos) + offset_in_angstroms
         return eqx.tree_at(
             lambda x: x.positions,
             self,
@@ -232,7 +232,7 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
     """  # noqa: E501
 
     shape: tuple[int, int, int]
-    voxel_size: Float[Array, ""]
+    voxel_size: Float[NDArrayLike, "..."]
 
     sampling_mode: Literal["average", "point"]
     upsample_factor: float
@@ -278,7 +278,7 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
                 f"`sampling_mode = {sampling_mode}`."
             )
         self.shape = shape
-        self.voxel_size = jnp.asarray(voxel_size, dtype=float)
+        self.voxel_size = leaf_asarray(voxel_size, dtype=float)
         self.sampling_mode = sampling_mode
         self.upsample_factor = float(upsample_factor)
         self.eps = eps
@@ -310,15 +310,16 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
             component is in the corner. Does nothing if
             `outputs_real_space = True`.
         """
-        # Prepare arguments
+        # Prepare arguments, casting positions and the voxel size to JAX arrays
+        voxel_size = jnp.asarray(self.voxel_size)
         positions, kernel_fns = (
-            volume_representation.positions,
+            jax.tree.map(lambda x: jnp.asarray(x), volume_representation.positions),
             volume_representation.kernel_fns,
         )
         kernel_fns = _standardize_kernel_fns(kernel_fns, spatial_dim=3)
         (shape_u, voxel_size_u), upsampfac = _prepare_upsample(
             shape=self.shape,
-            pixel_size=self.voxel_size,
+            pixel_size=voxel_size,
             upsampfac=self.upsample_factor,
         )
         # Compute
@@ -333,7 +334,7 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
         )
         # Average within a pixel size
         if self.sampling_mode == "average":
-            box_fn = FourierSinc(box_width=self.voxel_size)
+            box_fn = FourierSinc(box_width=voxel_size)
             frequencies_1d = make_frequencies_1d(shape_u, voxel_size_u, modeord=1)
             rendering_fft *= _eval_separable_impl(box_fn, frequencies_1d)
         # Downsample by extracting fourier modes
@@ -343,7 +344,7 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
             )
             rendering_fft = fac * rendering_fft[indices_z, indices_y, indices_x]
         return (
-            ifftn(rendering_fft).real
+            jnp.fft.ifftn(rendering_fft).real
             if outputs_real_space
             else _prepare_fft_to_fft(
                 rendering_fft,
@@ -449,7 +450,7 @@ class GaussianFourierProjection(
         `AbstractImageConfig.padded_shape` and the `image_config.pixel_size`.
         """  # noqa: E501
         # Prepare arguments
-        pixel_size = image_config.pixel_size
+        pixel_size = jnp.asarray(image_config.pixel_size)
         shape = image_config.padded_shape if self.shape is None else self.shape
         output_shape = image_config.padded_shape
         positions, kernel_fns = (
@@ -486,14 +487,14 @@ class GaussianFourierProjection(
         projection_fft = convert_fftn_to_rfftn(projection_fft, mode="real")
         if output_shape == shape:
             return (
-                irfftn(projection_fft, s=output_shape)
+                jnp.fft.irfftn(projection_fft, s=output_shape)
                 if outputs_real_space
                 else projection_fft
             )
         else:
-            projection = irfftn(projection_fft, s=shape)
+            projection = jnp.fft.irfftn(projection_fft, s=shape)
             projection = resize_with_crop_or_pad(projection, output_shape)
-            return projection if outputs_real_space else rfftn(projection)
+            return projection if outputs_real_space else jnp.fft.rfftn(projection)
 
 
 def _standardize_kernel_fns(

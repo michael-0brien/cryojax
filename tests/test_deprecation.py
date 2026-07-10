@@ -1,10 +1,32 @@
 import cryojax as cx
+import cryojax.ndimage as cnd
 import cryojax.simulator as cxs
+import jax.numpy as jnp
 import pytest
 
 
+def test_fft_functions_deprecated():
+    """`cryojax.ndimage.{fftn,ifftn,rfftn,irfftn}` are deprecated in favor of
+    `jax.numpy.fft`. No removal version is committed to.
+    """
+    real = jnp.ones((4, 4))
+    fourier_full = jnp.fft.fftn(real)
+    fourier_real = jnp.fft.rfftn(real)
+    cases = [
+        (cnd.fftn, real),
+        (cnd.ifftn, fourier_full),
+        (cnd.rfftn, real),
+        (cnd.irfftn, fourier_real),
+    ]
+    for fn, array in cases:
+        with pytest.warns(FutureWarning) as record:
+            fn(array)
+        # ... users should be pointed to `jax.numpy.fft`
+        assert "jax.numpy.fft" in str(record[0].message)
+
+
 def test_future_deprecated(sample_pdb_path):
-    """Template for testing FutureWarning deprecations scheduled for a future release.
+    r"""Template for testing FutureWarning deprecations scheduled for a future release.
 
     Copy and adapt the pattern below when adding new deprecations:
 
