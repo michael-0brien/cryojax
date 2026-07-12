@@ -1,4 +1,4 @@
-from typing import Any, ClassVar, Literal
+from typing import ClassVar
 from typing_extensions import override
 
 import equinox as eqx
@@ -8,7 +8,7 @@ from jaxtyping import Array, Complex, Float
 from ...jax_util import FloatLike, NDArrayLike
 from ...rotations import SO2
 from .._fourier_utils import enforce_rfftn_self_conjugates, make_fftshift_phase
-from .._map_coordinates import map_coordinates
+from .._interpolation import map_frequencies
 from .._operators import FourierPhaseShifts
 from ._base_transform import AbstractImageTransform
 
@@ -109,33 +109,33 @@ class PhaseShiftFFT(AbstractImageTransform, strict=True):
 
 class RotateFFT(AbstractImageTransform, strict=True):
     """Rotate an image in Fourier space using interpolation.
-    Only square images are supported.
+    Only square, even-dimension images are supported.
+
+    Rotation is done by interpolating the image's fourier transform with
+    [`cryojax.ndimage.map_frequencies`][].
 
     !!! example
 
         ```python
 
         import jax.numpy as jnp
-        from cryojax.ndimage import RotateFFT
+        from cryojax.ndimage import RotateFFT, make_frequency_grid
 
-        frequency_grid = ... # in pixels
-        image = ... # e.g., a real 2D image
+        image = ...  # e.g., a real 2D image of shape (dim, dim)
+        frequency_grid = make_frequency_grid((dim, dim))  # in pixels
 
         rotation_fn = RotateFFT(
             rotation_angle=45.0, frequency_grid=frequency_grid
         )
 
-        rotated_image_fft = rotation_fn(jnp.fft.fftn(image))
-        rotated_image = jnp.fft.ifftn(rotated_image_fft).real
+        rotated_image_fft = jnp.fft.irfftn(
+            rotation_fn(jnp.fft.rfftn(image)), s=image.shape
+        )
         ```
     """
 
     rotation_angle: Float[Array, ""]
     frequency_grid: Float[Array, "_ _ 2"]
-    rotation_convention: Literal["frame", "object"]
-    map_coordinates_options: dict[str, Any]
-
-    is_rfft: bool = eqx.field(static=True)
 
     is_real_space: ClassVar[bool] = False
 
@@ -145,45 +145,27 @@ class RotateFFT(AbstractImageTransform, strict=True):
         frequency_grid: Float[NDArrayLike, "y_dim x_dim 2"],
         *,
         pixel_size: FloatLike = 1.0,
-        rotation_convention: Literal["frame", "object"] = "object",
-        map_coordinates_options: dict[str, Any] = {},
     ):
         """
         **Arguments:**
 
         - `rotation_angle`: The angle by which to rotate the image, in degrees.
-        - `frequency_grid`: The frequency grid.
+        - `frequency_grid`:
+            The frequency grid, of the half-space (rfft) shape
+            `(dim, dim // 2 + 1, 2)`, as returned by
+            [`cryojax.ndimage.make_frequency_grid`][].
         - `pixel_size`: The pixel size of the `frequency_grid`.
-        - `rotation_convention`:
-            If `'object'`, the rotation is with respect to the object in the image.
-            If `'frame'`, it is with respect to the frame. These are related by transpose.
-        - `map_coordinates_options`:
-            A dictionary of options passed to [`cryojax.ndimage.map_coordinates`][].
-        """
-        if rotation_convention not in ["object", "frame"]:
-            raise ValueError(
-                "Invalid value for the `rotation_convention` argument to `RotateFFT`. "
-                f"Found {rotation_convention}, but options are 'object' or 'frame'."
-            )
-        if _is_square_rfft_grid(frequency_grid, only_2d=True):
-            # It's worth noting that this condition is breakable and rfftn/fftn
-            # inference can fail! One can pass a grid meant for use with fftn
-            # with these exact shapes.
-            self.is_rfft = True
-        elif _is_square_fft_grid(frequency_grid, only_2d=True):
-            self.is_rfft = False
-        else:
+        """  # noqa: E501
+        if not _is_square_rfft_grid(frequency_grid, only_2d=True):
             raise ValueError(
                 "The `frequency_grid` argument to `RotateFFT` did not have a valid "
-                f"shape {frequency_grid.shape}. `RotateFFT` only supports square "
-                "2D images as input; you may have passed a grid that does not "
-                "correspond to a square image, or you may have tried to use `RotateFFT` "
-                "with a volume."
+                f"shape {frequency_grid.shape}. `RotateFFT` only supports square 2D "
+                "images stored as a half-space (rfft) DFT, so `frequency_grid` must "
+                "have shape `(dim, dim // 2 + 1, 2)` -- as returned by "
+                "`cryojax.ndimage.make_frequency_grid((dim, dim))`."
             )
         self.rotation_angle = jnp.asarray(rotation_angle, dtype=float)
-        self.rotation_convention = rotation_convention
         self.frequency_grid = jnp.asarray(frequency_grid * pixel_size, dtype=float)
-        self.map_coordinates_options = map_coordinates_options
 
     @override
     def __call__(
@@ -194,7 +176,8 @@ class RotateFFT(AbstractImageTransform, strict=True):
         **Arguments:**
 
         `image`:
-            The image in Fourier space.
+            The image in Fourier space, i.e. the output of
+            `jax.numpy.fft.rfftn`.
 
         **Returns:**
 
@@ -213,50 +196,33 @@ class RotateFFT(AbstractImageTransform, strict=True):
                 "Only even parity images are supported in `RotateFFT`. Got "
                 f"an image of shape `{image.shape}`."
             )
-        shift_axes = (0,) if self.is_rfft else (0, 1)
-        # Shift images and grid so that zero is in center
-        factors = make_fftshift_phase((dim, dim), outputs_rfft=self.is_rfft)
-        fourier_image = factors * image
-        fourier_image_c = jnp.fft.fftshift(fourier_image, axes=shift_axes)
-        frequency_grid_c = jnp.fft.fftshift(self.frequency_grid, axes=shift_axes)
+        # Shift image and grid so that zero is in the center. Only the full axis
+        # is shifted; the rfft-truncated axis stays in the corner convention.
+        factors = make_fftshift_phase((dim, dim), outputs_rfft=True)
+        fourier_image_c = jnp.fft.fftshift(factors * image, axes=(0,))
+        frequency_grid_c = jnp.fft.fftshift(self.frequency_grid, axes=(0,))
         # Rotate the grid
-        rotation_matrix = _get_rotation_matrix(
-            self.rotation_angle, self.rotation_convention
-        )
-        rotated_grid = frequency_grid_c @ rotation_matrix
-        # Interpolate at new coordinates
-        logical_grid = _frequencies_to_indices(rotated_grid, self.is_rfft)
-        k_x, k_y = jnp.transpose(logical_grid, axes=[2, 0, 1])
-        rotated_image_c = map_coordinates(
-            fourier_image_c, (k_y, k_x), **self.map_coordinates_options
-        )
+        rotated_grid = frequency_grid_c @ _get_rotation_matrix(self.rotation_angle)
+        # Interpolate at the rotated frequencies. `q_x` may be negative -- those
+        # frequencies are not stored in the half space, but `map_frequencies`
+        # recovers them exactly from the DFT's Hermitian symmetry.
+        rotated_image_c = map_frequencies(fourier_image_c, rotated_grid)
         # Shift back, ensure that rfft components are real-valued where they
         # should be, and return
-        rotated_image = jnp.fft.ifftshift(rotated_image_c, axes=shift_axes)
-        if self.is_rfft:
-            dim = rotated_image.shape[0]
-            rotated_image = enforce_rfftn_self_conjugates(
-                rotated_image, (dim, dim), includes_dc=True, mode="real"
-            )
+        rotated_image = jnp.fft.ifftshift(rotated_image_c, axes=(0,))
+        rotated_image = enforce_rfftn_self_conjugates(
+            rotated_image, (dim, dim), includes_dc=True, mode="real"
+        )
         return factors * rotated_image
 
 
-def _get_rotation_matrix(angle, convention):
-    if convention == "object":
-        angle *= -1.0
-    angle = jnp.deg2rad(angle)
+def _get_rotation_matrix(angle):
+    """The in-plane rotation matrix for `angle` degrees, in the 'object'
+    convention: the rotation is with respect to the object in the image."""
+    angle = jnp.deg2rad(-angle)
     c, s = jnp.cos(angle), jnp.sin(angle)
     rotation = SO2([c, s])
     return rotation.as_matrix()
-
-
-def _frequencies_to_indices(freqs, is_rfft):
-    dim = freqs.shape[0]
-    if is_rfft:
-        freqsx, freqsy = freqs[..., 0], freqs[..., 1]
-        return jnp.stack([freqsx * dim, freqsy * dim + dim // 2], axis=-1)
-    else:
-        return dim * freqs + dim // 2
 
 
 def _is_square_rfft_grid(grid, only_2d: bool = False):

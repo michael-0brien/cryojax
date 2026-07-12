@@ -16,7 +16,6 @@ from .base_volume import (
 from .fourier_voxels import (
     FourierSliceExtraction,
     FourierVoxelGridVolume,
-    FourierVoxelSplineVolume,
 )
 from .gaussian_fourier import (
     GaussianFourierProjection,
@@ -45,7 +44,7 @@ class AutoVolumeProjection(
         | :-------------------- | :------------------ | :------------------ |
         | [`cryojax.simulator.GaussianMixtureVolume`][] | [`cryojax.simulator.GaussianMixtureProjection`][] | atom |
         | [`cryojax.simulator.GaussianFourierVolume`][] | [`cryojax.simulator.GaussianFourierProjection`][] | atom |
-        | [`cryojax.simulator.FourierVoxelGridVolume`][] or [`cryojax.simulator.FourierVoxelSplineVolume`][] | [`cryojax.simulator.FourierSliceExtraction`][] | voxel |
+        | [`cryojax.simulator.FourierVoxelGridVolume`][] | [`cryojax.simulator.FourierSliceExtraction`][] | voxel |
 
         Note that [`cryojax.simulator.RealVoxelGridVolume`][] does not have an associated projection method.
 
@@ -58,7 +57,7 @@ class AutoVolumeProjection(
     def _select_projection_method(
         self, volume: AbstractVolumeRepresentation
     ) -> AbstractVolumeIntegrator:
-        if isinstance(volume, (FourierVoxelGridVolume, FourierVoxelSplineVolume)):
+        if isinstance(volume, FourierVoxelGridVolume):
             integrator = FourierSliceExtraction()
         elif isinstance(volume, GaussianMixtureVolume):
             integrator = GaussianMixtureProjection()

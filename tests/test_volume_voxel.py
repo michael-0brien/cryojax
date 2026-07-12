@@ -1,14 +1,24 @@
 """Tests for voxel-based volume representations and their integrators.
 
-Covers FourierVoxelGridVolume, FourierVoxelSplineVolume, and RealVoxelGridVolume.
-GaussianMixtureVolume / GaussianMixtureProjection serve as analytic ground truth
-throughout.
+Covers FourierVoxelGridVolume (with each of its `interp` methods) and
+RealVoxelGridVolume. GaussianMixtureVolume / GaussianMixtureProjection serve as
+analytic ground truth throughout.
 
 FourierSliceExtraction accuracy
 --------------------------------
+Both interp methods deconvolve their own interpolation kernel's transfer function
+(sinc^2 for 'linear', sinc^4 for 'cubic') out of the voxel grid in advance, so the
+only error left is aliasing -- which the cubic kernel suppresses far more strongly.
+
 Measured on a 32³ grid with sigma=1 px (variance=1 Å²):
-- Identity / theta=90 phi=0: grid ≈ spline ≈ 1.8e-5 (limited by rendering)
-- theta=45 phi=0:  grid ~0.4 %, grid+deconv ~0.2 %, spline ~0.1 % of peak
+- 'cubic' is accurate at *every* pose, and at poses landing on grid nodes it is
+  limited only by the voxel rendering (~2e-5).
+- 'linear' is ~0.4-0.5 % of peak off-axis, and is *worse* at grid-node poses
+  (identity, theta=90), where the trilinear kernel degenerates to a delta and so
+  never re-applies the sinc^2 blur that the deconvolution removed.
+
+Tests that need node-exactness therefore use interp='cubic', which gets there
+honestly (it is accurate everywhere) rather than by kernel degeneracy.
 
 JIT strategy
 ------------
@@ -34,9 +44,8 @@ import numpy as np
 import pytest
 from cryojax.constants import PengScatteringFactorParameters
 from cryojax.io import read_atoms_from_pdb
-from cryojax.ndimage._fourier_slice import (
-    _reconstruct_full_slice_from_half_slice,
-)
+from cryojax.ndimage._fourier_slice import _full_slice_from_half_slice
+from cryojax.simulator._volume.fourier_voxels import _resolve_unroll
 from jaxtyping import Array, Float
 
 
@@ -52,7 +61,6 @@ except ModuleNotFoundError as err:
 # ── module-level integrator singletons ───────────────────────────────────────
 
 _FSE = cxs.FourierSliceExtraction()
-_FSE_NO_SCALE = cxs.FourierSliceExtraction(outputs_integral=False)
 _ESE = cxs.EwaldSphereExtraction()
 _GMM_INTEGRATOR = cxs.GaussianMixtureProjection(sampling_mode="average")
 
@@ -68,25 +76,20 @@ def gmm_volume():
 
 @pytest.fixture(scope="module")
 def fourier_grid_volume(gmm_volume):
-    """FourierVoxelGridVolume rendered from the GMM volume."""
-    render_fn = cxs.GaussianMixtureRenderFn((32, 32, 32), voxel_size=1.0)
-    return cxs.FourierVoxelGridVolume.from_real_voxel_grid(render_fn(gmm_volume))
-
-
-@pytest.fixture(scope="module")
-def fourier_grid_volume_deconv(gmm_volume):
-    """FourierVoxelGridVolume with apply_deconvolve=True, same GMM."""
+    """Trilinear (sinc^2-deconvolved) volume, rendered from the GMM volume."""
     render_fn = cxs.GaussianMixtureRenderFn((32, 32, 32), voxel_size=1.0)
     return cxs.FourierVoxelGridVolume.from_real_voxel_grid(
-        render_fn(gmm_volume), apply_deconvolve=True
+        render_fn(gmm_volume), interp="linear"
     )
 
 
 @pytest.fixture(scope="module")
-def fourier_spline_volume(gmm_volume):
-    """FourierVoxelSplineVolume rendered from the GMM volume."""
+def fourier_cubic_volume(gmm_volume):
+    """Cubic B-spline volume with sinc^4 deconvolution, same GMM."""
     render_fn = cxs.GaussianMixtureRenderFn((32, 32, 32), voxel_size=1.0)
-    return cxs.FourierVoxelSplineVolume.from_real_voxel_grid(render_fn(gmm_volume))
+    return cxs.FourierVoxelGridVolume.from_real_voxel_grid(
+        render_fn(gmm_volume), interp="cubic"
+    )
 
 
 @pytest.fixture(scope="module")
@@ -137,7 +140,6 @@ def _compute_projection(volume, integrator, image_config) -> Array:
     "output_type",
     [
         cxs.FourierVoxelGridVolume,
-        cxs.FourierVoxelSplineVolume,
         cxs.RealVoxelGridVolume,
     ],
 )
@@ -152,7 +154,6 @@ def test_render_voxel_volume_output_type(output_type, gmm_volume):
     "output_type",
     [
         cxs.FourierVoxelGridVolume,
-        cxs.FourierVoxelSplineVolume,
         cxs.RealVoxelGridVolume,
     ],
 )
@@ -167,18 +168,13 @@ def test_render_voxel_volume_auto_render_fn(output_type, gmm_volume):
     # Both paths should produce identical results for a GMM volume
     if output_type is cxs.FourierVoxelGridVolume:
         np.testing.assert_allclose(
-            np.array(explicit.fourier_voxel_grid),
-            np.array(auto.fourier_voxel_grid),
-        )
-    elif output_type is cxs.FourierVoxelSplineVolume:
-        np.testing.assert_allclose(
-            np.array(explicit.spline_coefficients),
-            np.array(auto.spline_coefficients),
+            np.array(explicit.values),
+            np.array(auto.values),
         )
     elif output_type is cxs.RealVoxelGridVolume:
         np.testing.assert_allclose(
-            np.array(explicit.real_voxel_grid),
-            np.array(auto.real_voxel_grid),
+            np.array(explicit.values),
+            np.array(auto.values),
         )
 
 
@@ -194,42 +190,32 @@ def test_render_voxel_volume_matches_direct_construction(gmm_volume):
             cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_grid),
         ),
         (
-            cxs.FourierVoxelSplineVolume,
-            cxs.FourierVoxelSplineVolume.from_real_voxel_grid(real_grid),
-        ),
-        (
             cxs.RealVoxelGridVolume,
             cxs.RealVoxelGridVolume.from_real_voxel_grid(real_grid),
         ),
     ]:
         via_api = cxs.render_voxel_volume(gmm_volume, render_fn, output_type=output_type)
-        if output_type is cxs.FourierVoxelGridVolume:
-            np.testing.assert_allclose(
-                np.array(via_api.fourier_voxel_grid),
-                np.array(direct.fourier_voxel_grid),
-            )
-        elif output_type is cxs.FourierVoxelSplineVolume:
-            np.testing.assert_allclose(
-                np.array(via_api.spline_coefficients),
-                np.array(direct.spline_coefficients),
-            )
-        elif output_type is cxs.RealVoxelGridVolume:
-            np.testing.assert_allclose(
-                np.array(via_api.real_voxel_grid),
-                np.array(direct.real_voxel_grid),
-            )
+        np.testing.assert_allclose(np.array(via_api.values), np.array(direct.values))
 
 
 def test_render_voxel_volume_projection_accuracy(gmm_volume, image_config):
-    """Projecting a render_voxel_volume result must agree with GMM analytic projection."""
+    """Projecting a render_voxel_volume result must agree with GMM analytic projection.
+
+    `render_voxel_volume` builds the volume with the default interp, 'linear'. At
+    the identity pose the frequency slice lands exactly on grid nodes, where the
+    trilinear kernel degenerates to a delta and so never re-applies the sinc^2
+    blur that the deconvolution removed -- hence the loose tolerance here. Use
+    interp='cubic' if node-pose accuracy matters.
+    """
     render_fn = cxs.GaussianMixtureRenderFn((32, 32, 32), voxel_size=1.0)
     fourier_vol = cxs.render_voxel_volume(
         gmm_volume, render_fn, output_type=cxs.FourierVoxelGridVolume
     )
+    proj_gmm = np.array(_project_real(gmm_volume, _GMM_INTEGRATOR, image_config))
     err = float(
         _max_abs_error(gmm_volume, fourier_vol, _GMM_INTEGRATOR, _FSE, image_config)
     )
-    assert err < 3e-5
+    assert err < 0.005 * float(proj_gmm.max())
 
 
 # ── FourierSliceExtraction: output shape ──────────────────────────────────────
@@ -257,20 +243,6 @@ def test_padded_output_shape(fourier_grid_volume):
     )
     result = _project_real(fourier_grid_volume, _FSE, config)
     assert result.shape == (64, 64)
-
-
-# ── FourierSliceExtraction: outputs_integral scaling ─────────────────────────
-
-
-@pytest.mark.parametrize("pixel_size", [0.5, 1.0, 2.0])
-def test_outputs_integral_scale(fourier_grid_volume, pixel_size):
-    """outputs_integral=True must equal pixel_size * outputs_integral=False."""
-    config = cxs.BasicImageConfig(
-        (32, 32), pixel_size=pixel_size, voltage_in_kilovolts=300.0
-    )
-    with_scale = np.array(_project_fourier(fourier_grid_volume, _FSE, config))
-    without_scale = np.array(_project_fourier(fourier_grid_volume, _FSE_NO_SCALE, config))
-    np.testing.assert_allclose(with_scale, pixel_size * without_scale, atol=1e-12)
 
 
 # ── FourierSliceExtraction: linearity ────────────────────────────────────────
@@ -306,28 +278,37 @@ def test_superposition(image_config):
 
 
 def test_accuracy_identity_grid(gmm_volume, fourier_grid_volume, image_config):
-    """Grid at identity must match GMM to within rendering discretization."""
+    """'linear' at identity. The frequency slice lands on grid nodes, where the
+    trilinear kernel degenerates to a delta and never re-applies the sinc^2 blur
+    that the deconvolution removed -- so this is 'linear''s *worst* case, not its
+    best. Compare `test_accuracy_identity_cubic`, which holds 5e-5 here.
+    """
+    proj_gmm = np.array(_project_real(gmm_volume, _GMM_INTEGRATOR, image_config))
     err = float(
         _max_abs_error(
             gmm_volume, fourier_grid_volume, _GMM_INTEGRATOR, _FSE, image_config
         )
     )
-    assert err < 5e-5
+    assert err < 0.005 * float(proj_gmm.max())
 
 
-def test_accuracy_identity_spline(gmm_volume, fourier_spline_volume, image_config):
-    """Spline at identity must match GMM to within rendering discretization."""
+def test_accuracy_identity_cubic(gmm_volume, fourier_cubic_volume, image_config):
+    """Cubic at identity must match GMM to within rendering discretization."""
     err = float(
         _max_abs_error(
-            gmm_volume, fourier_spline_volume, _GMM_INTEGRATOR, _FSE, image_config
+            gmm_volume, fourier_cubic_volume, _GMM_INTEGRATOR, _FSE, image_config
         )
     )
     assert err < 5e-5
 
 
 def test_accuracy_theta90_phi0_grid(gmm_volume, fourier_grid_volume, image_config):
-    """theta=90, phi=0: slice on exact grid planes; matches GMM to 5e-5."""
+    """theta=90, phi=0: another grid-node pose, so the same caveat as
+    `test_accuracy_identity_grid` applies to 'linear'."""
     pose = cxs.EulerAnglePose(phi_angle=0.0, theta_angle=90.0, psi_angle=0.0)
+    proj_gmm = np.array(
+        _project_real(gmm_volume.rotate_to_pose(pose), _GMM_INTEGRATOR, image_config)
+    )
     err = float(
         _max_abs_error(
             gmm_volume.rotate_to_pose(pose),
@@ -337,16 +318,16 @@ def test_accuracy_theta90_phi0_grid(gmm_volume, fourier_grid_volume, image_confi
             image_config,
         )
     )
-    assert err < 5e-5
+    assert err < 0.005 * float(proj_gmm.max())
 
 
-def test_accuracy_theta90_phi0_spline(gmm_volume, fourier_spline_volume, image_config):
-    """Same exact case for spline volume."""
+def test_accuracy_theta90_phi0_cubic(gmm_volume, fourier_cubic_volume, image_config):
+    """Same exact case for the cubic volume."""
     pose = cxs.EulerAnglePose(phi_angle=0.0, theta_angle=90.0, psi_angle=0.0)
     err = float(
         _max_abs_error(
             gmm_volume.rotate_to_pose(pose),
-            fourier_spline_volume.rotate_to_pose(pose),
+            fourier_cubic_volume.rotate_to_pose(pose),
             _GMM_INTEGRATOR,
             _FSE,
             image_config,
@@ -359,38 +340,13 @@ def test_accuracy_theta90_phi0_spline(gmm_volume, fourier_spline_volume, image_c
 def test_accuracy_offaxis_grid(
     gmm_volume, fourier_grid_volume, image_config, theta_angle
 ):
-    """Off-axis bilinear accuracy: must agree with GMM to within 1 % of peak.
-
-    Measured on a 32³ grid with variance=1 Å²: ~0.35–0.41 % at these tilts.
-    """
-    pose = cxs.EulerAnglePose(phi_angle=0.0, theta_angle=theta_angle, psi_angle=0.0)
-    proj_gmm = np.array(
-        _project_real(gmm_volume.rotate_to_pose(pose), _GMM_INTEGRATOR, image_config)
-    )
-    err = float(
-        _max_abs_error(
-            gmm_volume.rotate_to_pose(pose),
-            fourier_grid_volume.rotate_to_pose(pose),
-            _GMM_INTEGRATOR,
-            _FSE,
-            image_config,
-        )
-    )
-    assert err < 0.01 * float(proj_gmm.max())
-
-
-@pytest.mark.parametrize("theta_angle", [30.0, 45.0, 60.0])
-def test_accuracy_offaxis_grid_deconv(
-    gmm_volume, fourier_grid_volume_deconv, image_config, theta_angle
-):
-    """Off-axis bilinear+deconv accuracy: within 0.5 % of peak.
+    """Off-axis 'linear' accuracy: must agree with GMM to within 0.5 % of peak.
 
     Measured on a 32³ grid with variance=1 Å²:
       theta=30°: ~0.23 %   theta=45°: ~0.20 %   theta=60°: ~0.23 %
 
-    With sigma=1 px, deconvolution improves over uncorrected bilinear
-    (~0.35–0.41 %).  At exact poses (theta=0°, 90°) deconvolution is
-    slightly harmful because no interpolation occurs there.
+    These are the poses 'linear' is good at -- unlike the grid-node poses, where
+    its kernel degenerates to a delta. Compare `test_accuracy_offaxis_cubic`.
     """
     pose = cxs.EulerAnglePose(phi_angle=0.0, theta_angle=theta_angle, psi_angle=0.0)
     proj_gmm = np.array(
@@ -399,7 +355,7 @@ def test_accuracy_offaxis_grid_deconv(
     err = float(
         _max_abs_error(
             gmm_volume.rotate_to_pose(pose),
-            fourier_grid_volume_deconv.rotate_to_pose(pose),
+            fourier_grid_volume.rotate_to_pose(pose),
             _GMM_INTEGRATOR,
             _FSE,
             image_config,
@@ -409,12 +365,12 @@ def test_accuracy_offaxis_grid_deconv(
 
 
 @pytest.mark.parametrize("theta_angle", [30.0, 45.0, 60.0])
-def test_accuracy_offaxis_spline(
-    gmm_volume, fourier_spline_volume, image_config, theta_angle
+def test_accuracy_offaxis_cubic(
+    gmm_volume, fourier_cubic_volume, image_config, theta_angle
 ):
-    """Off-axis spline accuracy: must agree with GMM to within 0.5 % of peak.
+    """Off-axis cubic accuracy: must agree with GMM to within 0.5 % of peak.
 
-    Measured on a 32³ grid with variance=1 Å²: ~0.10–0.11 % at these tilts.
+    Measured on a 32³ grid with variance=1 Å²: ~0.10–0.15 % at these tilts.
     """
     pose = cxs.EulerAnglePose(phi_angle=0.0, theta_angle=theta_angle, psi_angle=0.0)
     proj_gmm = np.array(
@@ -423,45 +379,13 @@ def test_accuracy_offaxis_spline(
     err = float(
         _max_abs_error(
             gmm_volume.rotate_to_pose(pose),
-            fourier_spline_volume.rotate_to_pose(pose),
+            fourier_cubic_volume.rotate_to_pose(pose),
             _GMM_INTEGRATOR,
             _FSE,
             image_config,
         )
     )
     assert err < 0.005 * float(proj_gmm.max())
-
-
-# ── FourierSliceExtraction: grid vs spline consistency ───────────────────────
-
-
-def test_grid_vs_spline_identity(
-    fourier_grid_volume, fourier_spline_volume, image_config
-):
-    """At identity, grid and spline must agree to 1e-6."""
-    err = float(
-        _max_abs_error(
-            fourier_grid_volume, fourier_spline_volume, _FSE, _FSE, image_config
-        )
-    )
-    assert err < 1e-6
-
-
-def test_grid_vs_spline_theta90_phi0(
-    fourier_grid_volume, fourier_spline_volume, image_config
-):
-    """At theta=90/phi=0 (exact case), grid and spline must agree to 1e-6."""
-    pose = cxs.EulerAnglePose(phi_angle=0.0, theta_angle=90.0, psi_angle=0.0)
-    err = float(
-        _max_abs_error(
-            fourier_grid_volume.rotate_to_pose(pose),
-            fourier_spline_volume.rotate_to_pose(pose),
-            _FSE,
-            _FSE,
-            image_config,
-        )
-    )
-    assert err < 1e-6
 
 
 # ── EwaldSphereExtraction high-voltage limit ──────────────────────────────────
@@ -484,8 +408,8 @@ def test_ewald_sphere_high_voltage_limit_grid(fourier_grid_volume, image_config)
     assert err < 5e-5
 
 
-def test_ewald_sphere_high_voltage_limit_spline(fourier_spline_volume, image_config):
-    """Same high-voltage limit check for the spline-interpolated volume."""
+def test_ewald_sphere_high_voltage_limit_cubic(fourier_cubic_volume, image_config):
+    """Same high-voltage limit check for the cubic-interpolated volume."""
     high_voltage_config = cxs.BasicImageConfig(
         image_config.shape,
         pixel_size=image_config.pixel_size,
@@ -493,8 +417,8 @@ def test_ewald_sphere_high_voltage_limit_spline(fourier_spline_volume, image_con
     )
     err = float(
         _max_abs_error(
-            fourier_spline_volume,
-            fourier_spline_volume,
+            fourier_cubic_volume,
+            fourier_cubic_volume,
             _FSE,
             _ESE,
             high_voltage_config,
@@ -541,7 +465,7 @@ def _gaussian_mixture_fourier_transform(
 
 
 def _ewald_sphere_analytic_ground_truth(volume, voltage_in_kilovolts: float) -> Array:
-    N = volume.frequency_slice_in_pixels.shape[1]
+    N = volume.frequency_slice.shape[1]
     config = cxs.BasicImageConfig(
         (N, N),
         pixel_size=1.0,
@@ -553,9 +477,7 @@ def _ewald_sphere_analytic_ground_truth(volume, voltage_in_kilovolts: float) -> 
     # stores the half (rfft) in-plane slice; reconstruct the full grid this
     # ground truth needs (an exact, non-interpolating coordinate operation,
     # independent of the interpolation logic under test).
-    q_at_slice = _reconstruct_full_slice_from_half_slice(
-        volume.frequency_slice_in_pixels
-    )[0]
+    q_at_slice = _full_slice_from_half_slice(volume.frequency_slice)[0]
     q_parallel_squared = jnp.sum(q_at_slice[..., :2] ** 2, axis=-1)
     q_z_curvature = 0.5 * wavelength * q_parallel_squared
     q_at_surface = q_at_slice.at[..., 2].add(q_z_curvature)
@@ -574,28 +496,25 @@ def _ewald_sphere_analytic_ground_truth(volume, voltage_in_kilovolts: float) -> 
 
 
 @pytest.fixture(scope="module")
-def two_atom_grid_volume():
+def two_atom_cubic_volume():
     volume = cxs.GaussianMixtureVolume(
         _TWO_ATOM_POSITIONS,
         amplitudes=_TWO_ATOM_AMPLITUDES,
         variances=_TWO_ATOM_VARIANCES,
     )
     render_fn = cxs.GaussianMixtureRenderFn((32, 32, 32), voxel_size=1.0)
-    return cxs.FourierVoxelGridVolume.from_real_voxel_grid(render_fn(volume))
-
-
-@pytest.fixture(scope="module")
-def two_atom_spline_volume():
-    volume = cxs.GaussianMixtureVolume(
-        _TWO_ATOM_POSITIONS,
-        amplitudes=_TWO_ATOM_AMPLITUDES,
-        variances=_TWO_ATOM_VARIANCES,
+    # interp='cubic': the Ewald surface hugs the q_z = 0 grid plane at low
+    # frequency, where 'linear' is at its worst (its kernel degenerates to a
+    # delta there and never re-applies the sinc^2 blur the deconvolution
+    # removed, putting it ~6.7 % off -- well outside the 2 % tolerance below).
+    # This test is about Ewald geometry, not interpolation, so use the method
+    # that is accurate everywhere.
+    return cxs.FourierVoxelGridVolume.from_real_voxel_grid(
+        render_fn(volume), interp="cubic"
     )
-    render_fn = cxs.GaussianMixtureRenderFn((32, 32, 32), voxel_size=1.0)
-    return cxs.FourierVoxelSplineVolume.from_real_voxel_grid(render_fn(volume))
 
 
-def test_ewald_sphere_matches_analytic_ground_truth_grid(two_atom_grid_volume):
+def test_ewald_sphere_matches_analytic_ground_truth(two_atom_cubic_volume):
     """`EwaldSphereExtraction` must agree with the closed-form gaussian mixture
     fourier transform evaluated directly on the curved Ewald sphere surface.
     """
@@ -603,24 +522,9 @@ def test_ewald_sphere_matches_analytic_ground_truth_grid(two_atom_grid_volume):
     config = cxs.BasicImageConfig(
         (32, 32), pixel_size=1.0, voltage_in_kilovolts=voltage_in_kilovolts
     )
-    ese_fourier = _ESE.integrate(two_atom_grid_volume, config, outputs_real_space=False)
+    ese_fourier = _ESE.integrate(two_atom_cubic_volume, config, outputs_real_space=False)
     analytic = _ewald_sphere_analytic_ground_truth(
-        two_atom_grid_volume, voltage_in_kilovolts
-    )
-    err = float(jnp.max(jnp.abs(ese_fourier - analytic)))
-    peak = float(jnp.max(jnp.abs(ese_fourier)))
-    assert err < 0.02 * peak
-
-
-def test_ewald_sphere_matches_analytic_ground_truth_spline(two_atom_spline_volume):
-    """Same analytic ground truth check for the spline-interpolated volume."""
-    voltage_in_kilovolts = 60.0
-    config = cxs.BasicImageConfig(
-        (32, 32), pixel_size=1.0, voltage_in_kilovolts=voltage_in_kilovolts
-    )
-    ese_fourier = _ESE.integrate(two_atom_spline_volume, config, outputs_real_space=False)
-    analytic = _ewald_sphere_analytic_ground_truth(
-        two_atom_spline_volume, voltage_in_kilovolts
+        two_atom_cubic_volume, voltage_in_kilovolts
     )
     err = float(jnp.max(jnp.abs(ese_fourier - analytic)))
     peak = float(jnp.max(jnp.abs(ese_fourier)))
@@ -629,14 +533,16 @@ def test_ewald_sphere_matches_analytic_ground_truth_spline(two_atom_spline_volum
 
 # ── RFFT storage shape assertions ─────────────────────────────────────────────
 #
-# Both `FourierVoxelGridVolume`/`FourierVoxelSplineVolume` store the 3D voxel
-# grid as a half-space RFFT grid (halving memory relative to the full complex
-# FFT cube), and `frequency_slice_in_pixels` as the half in-plane grid too.
-# Interpolation reflects each out-of-range query point through the origin and
-# conjugates the result -- see `_extract_surface_from_voxel_grid` in
-# `fourier_voxels.py`. `EwaldSphereExtraction` reconstructs the full in-plane
-# grid on demand (`_reconstruct_full_slice_from_half_slice`), since its
-# curved output isn't Hermitian-symmetric as a whole.
+# `FourierVoxelGridVolume` stores the 3D voxel grid as a half-space RFFT grid
+# (halving memory relative to the full complex FFT cube), and
+# `frequency_slice` as the half in-plane grid too. The storage shape is
+# the same for every `interp`. Interpolation reflects each query point with
+# `q_x < 0` through the origin and conjugates the result, and recovers taps that
+# fall outside the stored half by Hermitian symmetry -- see
+# `_sample_half_space_grid` in `cryojax/ndimage/_fourier_slice.py`.
+# `EwaldSphereExtraction` reconstructs the full in-plane grid on demand
+# (`_full_slice_from_half_slice`), since its curved output isn't
+# Hermitian-symmetric as a whole.
 
 
 def test_storage_shape_grid():
@@ -644,44 +550,29 @@ def test_storage_shape_grid():
     real_voxel_grid = jnp.zeros((dim, dim, dim), dtype=float)
     vol = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
     assert vol.shape == (dim, dim, dim)
-    assert vol.fourier_voxel_grid.shape == (dim, dim, dim // 2 + 1)
-    assert vol.frequency_slice_in_pixels.shape == (1, dim, dim // 2 + 1, 3)
+    assert vol.values.shape == (dim, dim, dim // 2 + 1)
+    assert vol.frequency_slice.shape == (1, dim, dim // 2 + 1, 3)
 
 
-def test_storage_shape_spline():
+@pytest.mark.parametrize("interp", ("linear", "cubic"))
+def test_storage_shape_is_same_for_every_interp(interp):
+    """Every `interp` stores the plain half-space RFFT grid: the methods differ
+    only in the deconvolution applied before the transform, never in shape."""
     dim = 16
     real_voxel_grid = jnp.zeros((dim, dim, dim), dtype=float)
-    vol = cxs.FourierVoxelSplineVolume.from_real_voxel_grid(real_voxel_grid)
+    vol = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid, interp=interp)
+    assert vol.interp == interp
     assert vol.shape == (dim, dim, dim)
-    assert vol.spline_coefficients.shape == (dim + 2, dim + 2, dim // 2 + 3)
-    assert vol.frequency_slice_in_pixels.shape == (1, dim, dim // 2 + 1, 3)
+    assert vol.values.shape == (dim, dim, dim // 2 + 1)
+    assert vol.frequency_slice.shape == (1, dim, dim // 2 + 1, 3)
 
 
-# ── from_fourier_voxel_grid constructor equivalence ───────────────────────────
-
-
-def test_grid_from_fourier_voxel_grid_matches_from_real(gmm_volume, image_config):
-    """from_fourier_voxel_grid(rfftn(grid)) must equal from_real_voxel_grid(grid)."""
-    render_fn = cxs.GaussianMixtureRenderFn((32, 32, 32), voxel_size=1.0)
-    real_grid = render_fn(gmm_volume)
-    vol_real = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_grid)
-    vol_fourier = cxs.FourierVoxelGridVolume.from_fourier_voxel_grid(
-        jnp.fft.rfftn(real_grid)
-    )
-    err = float(_max_abs_error(vol_real, vol_fourier, _FSE, _FSE, image_config))
-    assert np.isclose(err, 0.0)
-
-
-def test_spline_from_fourier_voxel_grid_matches_from_real(gmm_volume, image_config):
-    """from_fourier_voxel_grid(rfftn(grid)) must equal from_real_voxel_grid(grid)."""
-    render_fn = cxs.GaussianMixtureRenderFn((32, 32, 32), voxel_size=1.0)
-    real_grid = render_fn(gmm_volume)
-    vol_real = cxs.FourierVoxelSplineVolume.from_real_voxel_grid(real_grid)
-    vol_fourier = cxs.FourierVoxelSplineVolume.from_fourier_voxel_grid(
-        jnp.fft.rfftn(real_grid)
-    )
-    err = float(_max_abs_error(vol_real, vol_fourier, _FSE, _FSE, image_config))
-    assert np.isclose(err, 0.0)
+def test_invalid_interp_raises():
+    with pytest.raises(ValueError, match="interp"):
+        cxs.FourierVoxelGridVolume.from_real_voxel_grid(
+            jnp.zeros((16, 16, 16)),
+            interp="quintic",  # type: ignore
+        )
 
 
 # ── in-plane phi rotation: DC coefficient conserved ──────────────────────────
@@ -698,78 +589,6 @@ def test_phi_rotation_mean_conserved(fourier_grid_volume, image_config):
         np.testing.assert_allclose(mean_rot, mean_id, rtol=1e-5)
 
 
-# ── apply_deconvolve ──────────────────────────────────────────────────────────
-
-
-@pytest.fixture(scope="module")
-def _gmm_volume_narrow():
-    return cxs.GaussianMixtureVolume(np.zeros((1, 3)), amplitudes=1.0, variances=1.0)
-
-
-@pytest.fixture(scope="module")
-def _image_config_64():
-    return cxs.BasicImageConfig((64, 64), pixel_size=1.0, voltage_in_kilovolts=300.0)
-
-
-@pytest.fixture(scope="module")
-def _grid_volume_plain(_gmm_volume_narrow):
-    """64³ grid volume without interpolation deconvolution."""
-    render_fn = cxs.GaussianMixtureRenderFn((64, 64, 64), voxel_size=1.0)
-    return cxs.FourierVoxelGridVolume.from_real_voxel_grid(
-        render_fn(_gmm_volume_narrow), apply_deconvolve=False
-    )
-
-
-@pytest.fixture(scope="module")
-def _grid_volume_deconv(_gmm_volume_narrow):
-    """64³ grid volume with interpolation deconvolution applied."""
-    render_fn = cxs.GaussianMixtureRenderFn((64, 64, 64), voxel_size=1.0)
-    return cxs.FourierVoxelGridVolume.from_real_voxel_grid(
-        render_fn(_gmm_volume_narrow), apply_deconvolve=True
-    )
-
-
-@pytest.mark.parametrize("theta_angle", [30.0, 45.0, 60.0])
-def test_deconvolve_reduces_offaxis_error(
-    _gmm_volume_narrow,
-    _grid_volume_plain,
-    _grid_volume_deconv,
-    _image_config_64,
-    theta_angle,
-):
-    """apply_deconvolve=True must give lower max error than False at off-axis tilt.
-
-    Tests a 64³ grid with variance=1 Å² (sigma=1 px).  Measured improvement:
-      plain ~0.15–0.16 %,  deconv ~0.09–0.10 % of projection peak.
-    """
-    pose = cxs.EulerAnglePose(phi_angle=0.0, theta_angle=theta_angle, psi_angle=0.0)
-    gmm_rot = _gmm_volume_narrow.rotate_to_pose(pose)
-
-    err_plain = float(
-        _max_abs_error(
-            gmm_rot,
-            _grid_volume_plain.rotate_to_pose(pose),
-            _GMM_INTEGRATOR,
-            _FSE,
-            _image_config_64,
-        )
-    )
-    err_deconv = float(
-        _max_abs_error(
-            gmm_rot,
-            _grid_volume_deconv.rotate_to_pose(pose),
-            _GMM_INTEGRATOR,
-            _FSE,
-            _image_config_64,
-        )
-    )
-
-    assert err_deconv < err_plain, (
-        f"Deconvolution should reduce off-axis error at theta={theta_angle}: "
-        f"deconv={err_deconv:.4e} plain={err_plain:.4e}"
-    )
-
-
 # ── FourierSliceExtraction: error handling ────────────────────────────────────
 
 
@@ -777,12 +596,6 @@ def test_odd_dimension_raises():
     """FourierVoxelGridVolume must reject odd-dimension input."""
     with pytest.raises(ValueError, match="odd"):
         cxs.FourierVoxelGridVolume.from_real_voxel_grid(np.ones((31, 31, 31)))
-
-
-def test_spline_odd_dimension_raises():
-    """FourierVoxelSplineVolume must also reject odd-dimension input."""
-    with pytest.raises(ValueError, match="odd"):
-        cxs.FourierVoxelSplineVolume.from_real_voxel_grid(np.ones((31, 31, 31)))
 
 
 def test_grid_shape_mismatch_raises():
@@ -807,18 +620,6 @@ def test_grid_full_cube_shape_suggests_rfftn():
         )
 
 
-def test_spline_full_cube_shape_suggests_rfftn():
-    """Same full-cube-shape check for `FourierVoxelSplineVolume`, whose
-    stored array is padded by 2 samples per axis relative to the grid."""
-    dim = 16
-    full_shaped = jnp.zeros((dim + 2, dim + 2, dim + 2), dtype=complex)
-    with pytest.raises(AttributeError, match="rfftn"):
-        cxs.FourierVoxelSplineVolume(
-            full_shaped,
-            im.make_frequency_slice((dim, dim), outputs_rfftfreqs=True, fftshifted=True),
-        )
-
-
 def test_wrong_volume_type_raises(image_config):
     """FourierSliceExtraction must raise for unsupported volume types."""
     wrong_volume = cxs.GaussianMixtureVolume(
@@ -834,20 +635,18 @@ def test_wrong_volume_type_raises(image_config):
 def test_voxel_volume_loaders():
     real_voxel_grid = jnp.zeros((10, 10, 10), dtype=float)
     fourier_grid = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
-    fourier_spline = cxs.FourierVoxelSplineVolume.from_real_voxel_grid(real_voxel_grid)
     real_grid = cxs.RealVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
 
     assert isinstance(
-        fourier_grid.frequency_slice_in_pixels,
+        fourier_grid.frequency_slice,
         Float[Array, "1 _ _ 3"],  # type: ignore
     )
-    assert isinstance(fourier_grid.fourier_voxel_grid, Array)
-    assert isinstance(fourier_spline.spline_coefficients, Array)
+    assert isinstance(fourier_grid.values, Array)
     assert isinstance(
-        real_grid.coordinate_grid_in_pixels,
+        real_grid.coordinate_grid,
         Float[Array, "_ _ _ 3"],  # type: ignore
     )
-    assert isinstance(real_grid.real_voxel_grid, Array)
+    assert isinstance(real_grid.values, Array)
 
 
 def test_render_voxels(sample_pdb_path):
@@ -858,7 +657,6 @@ def test_render_voxels(sample_pdb_path):
     render_fn = cxs.AutoVolumeRenderFn((16, 16, 16), voxel_size=4.0)
     for cls in [
         cxs.FourierVoxelGridVolume,
-        cxs.FourierVoxelSplineVolume,
         cxs.RealVoxelGridVolume,
     ]:
         assert (
@@ -889,7 +687,7 @@ def test_fourier_voxel_grid_pad_scale_produces_smooth_shape(pad_scale):
     for s, p in zip(shape, vol.shape):
         assert p >= math.ceil(pad_scale * s)
         assert _is_smooth(p)
-    assert vol.fourier_voxel_grid.shape == vol.shape[:-1] + (vol.shape[-1] // 2 + 1,)
+    assert vol.values.shape == vol.shape[:-1] + (vol.shape[-1] // 2 + 1,)
 
 
 def test_fourier_voxel_grid_pad_scale_one_unchanged():
@@ -897,7 +695,7 @@ def test_fourier_voxel_grid_pad_scale_one_unchanged():
     real_voxel_grid = jnp.zeros(shape, dtype=float)
     vol = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid, pad_scale=1.0)
     assert vol.shape == shape
-    assert vol.fourier_voxel_grid.shape == shape[:-1] + (shape[-1] // 2 + 1,)
+    assert vol.values.shape == shape[:-1] + (shape[-1] // 2 + 1,)
 
 
 def test_fourier_voxel_grid_pad_scale_less_than_one_raises():
@@ -906,70 +704,7 @@ def test_fourier_voxel_grid_pad_scale_less_than_one_raises():
         cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid, pad_scale=0.5)
 
 
-@pytest.mark.parametrize("pad_scale", (1.5, 2.0))
-def test_fourier_voxel_spline_pad_scale_produces_smooth_shape(pad_scale):
-    shape = (10, 10, 10)
-    real_voxel_grid = jnp.zeros(shape, dtype=float)
-    vol = cxs.FourierVoxelSplineVolume.from_real_voxel_grid(
-        real_voxel_grid, pad_scale=pad_scale
-    )
-    for s, p in zip(shape, vol.shape):
-        assert p >= math.ceil(pad_scale * s)
-        assert _is_smooth(p)
-    expected_last_axis = vol.shape[-1] // 2 + 1 + 2
-    assert vol.spline_coefficients.shape == tuple(d + 2 for d in vol.shape[:-1]) + (
-        expected_last_axis,
-    )
-
-
-def test_fourier_voxel_spline_pad_scale_one_unchanged():
-    dim = 10
-    real_voxel_grid = jnp.zeros((dim, dim, dim), dtype=float)
-    vol = cxs.FourierVoxelSplineVolume.from_real_voxel_grid(
-        real_voxel_grid, pad_scale=1.0
-    )
-    assert vol.shape == (dim, dim, dim)
-    assert vol.spline_coefficients.shape == (dim + 2, dim + 2, dim // 2 + 3)
-
-
-def test_fourier_voxel_spline_pad_scale_less_than_one_raises():
-    real_voxel_grid = jnp.zeros((10, 10, 10), dtype=float)
-    with pytest.raises(ValueError, match="pad_scale"):
-        cxs.FourierVoxelSplineVolume.from_real_voxel_grid(real_voxel_grid, pad_scale=0.5)
-
-
 # ── Fourier vs real voxel agreement ──────────────────────────────────────────
-
-
-def test_fourier_vs_real_agreement(sample_pdb_path):
-    """FourierVoxelGridVolume and RealVoxelGridVolume must agree when loaded
-    from the same PDB."""
-    shape = (128, 128, 128)
-    voxel_size = 0.5
-
-    atom_volume = cxs.load_tabulated_volume(
-        sample_pdb_path,
-        output_type=cxs.GaussianMixtureVolume,
-        selection_string="not element H",
-    )
-    render_fn = cxs.AutoVolumeRenderFn(shape, voxel_size)
-    fourier_volume = cxs.render_voxel_volume(
-        atom_volume, render_fn, output_type=cxs.FourierVoxelGridVolume
-    )
-    real_volume = cxs.render_voxel_volume(
-        atom_volume, render_fn, output_type=cxs.RealVoxelGridVolume
-    )
-    # Only the two full axes were fftshift'd at construction time (the
-    # rfft-truncated axis stays in rfft/corner convention) -- see
-    # `_prepare_fourier_voxel_arguments` in `fourier_voxels.py`.
-    real_voxel_grid = jnp.fft.fftshift(
-        jnp.fft.irfftn(
-            jnp.fft.ifftshift(fourier_volume.fourier_voxel_grid, axes=(0, 1)),
-            s=shape,
-        )
-    )
-
-    np.testing.assert_allclose(real_voxel_grid, real_volume.real_voxel_grid, atol=1e-12)
 
 
 def test_downsampled_voxel_volume_agreement(sample_pdb_path):
@@ -1073,7 +808,7 @@ def _make_gmm_voxel_scene(pdb_info):
         (
             cxs.FourierVoxelGridVolume,
             cxs.FourierSliceExtraction(),
-            1e-2,
+            5e-2,
         ),
     ],
     ids=["fourier_grid"],
@@ -1084,22 +819,31 @@ def _make_gmm_voxel_scene(pdb_info):
         cxs.EulerAnglePose(phi_angle=0.0, theta_angle=0.0, psi_angle=0.0),
         cxs.EulerAnglePose(phi_angle=0.0, theta_angle=90.0, psi_angle=0.0),
         cxs.EulerAnglePose(phi_angle=0.0, theta_angle=90.0, psi_angle=90.0),
+        cxs.EulerAnglePose(phi_angle=27.0, theta_angle=53.0, psi_angle=41.0),
     ],
-    ids=["theta0_psi0", "theta90_psi0", "theta90_psi90"],
+    ids=["theta0_psi0", "theta90_psi0", "theta90_psi90", "off_axis"],
 )
 def test_pose_convention_exact_angles(pdb_info, pose, volume_cls, integrator, tol):
-    """Voxel-based projection must agree with analytic GMM projection at poses
-    where Fourier-slice interpolation is exact (theta=90, phi=0).
+    """Voxel-based projection must agree with the analytic GMM projection, for an
+    asymmetric PDB molecule, across grid-aligned *and* off-axis poses.
 
-    At theta=90 the extracted frequency slice lies exactly on a Cartesian grid
-    plane, so no interpolation error is introduced.  Using an asymmetric PDB
-    molecule, a wrong pose convention would shift the tilted projection
-    significantly, making this a sensitive cross-method convention check at
-    the same tolerances as the identity-pose test.
+    This pins the pose convention, not the interpolation accuracy: a wrong
+    convention displaces the molecule by ångströms and produces an error of order
+    the projection peak (~6), which is ~100x the tolerance below.
+
+    interp='cubic' is used because it is the only method accurate at grid-node
+    poses. On this scene, at theta=0/90, 'cubic' is off by 0.38 % of peak while
+    'linear' is off by 14 % -- there the trilinear kernel degenerates to a delta,
+    so it never re-applies the sinc^2 blur that its deconvolution removed.
+
+    `tol` is set from what cubic actually achieves (~0.022 absolute, 0.4 % of a
+    ~6 peak). Note the old, non-deconvolving 'linear' path held a 10x tighter
+    tolerance here -- but only because a no-op kernel reproduces the rendered
+    grid bit-for-bit, which measures nothing about interpolation.
     """
     gmm_volume, real_voxel_grid, image_config = _make_gmm_voxel_scene(pdb_info)
     gmm_integrator = cxs.GaussianMixtureProjection(sampling_mode="average")
-    volume = volume_cls.from_real_voxel_grid(real_voxel_grid)
+    volume = volume_cls.from_real_voxel_grid(real_voxel_grid, interp="cubic")
     proj_ref = _compute_projection(
         gmm_volume.rotate_to_pose(pose), gmm_integrator, image_config
     )
@@ -1108,28 +852,47 @@ def test_pose_convention_exact_angles(pdb_info, pose, volume_cls, integrator, to
     np.testing.assert_allclose(proj_ref, proj, atol=tol)
 
 
-@pytest.mark.parametrize(
-    "pose",
-    [
-        cxs.EulerAnglePose(phi_angle=0.0, theta_angle=90.0, psi_angle=0.0),
-        cxs.EulerAnglePose(phi_angle=0.0, theta_angle=90.0, psi_angle=90.0),
-    ],
-    ids=["theta90_psi0", "theta90_psi90"],
-)
-def test_spline_agrees_with_grid_at_exact_angles(
-    fourier_grid_volume, fourier_spline_volume, image_config, pose
-):
-    """Spline projection must agree with grid (bilinear) Fourier-slice extraction
-    at poses where the frequency slice lies exactly on Cartesian grid planes.
+# ── AbstractVoxelVolume.values / get() ───────────────────────────────────────
 
-    Uses the simple single-Gaussian fixtures to keep runtime low.
+
+@pytest.mark.parametrize("interp", ("linear", "cubic"))
+def test_get_returns_values(interp):
+    """`get()` returns the voxel array, for both voxel volume flavours."""
+    real_voxel_grid = jnp.zeros((16, 16, 16), dtype=float)
+    fourier_volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(
+        real_voxel_grid, interp=interp
+    )
+    real_volume = cxs.RealVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
+
+    assert fourier_volume.get() is fourier_volume.values
+    assert real_volume.get() is real_volume.values
+    assert fourier_volume.get().shape == (16, 16, 9)
+    assert real_volume.get().shape == (16, 16, 16)
+
+
+# ── unroll='auto' ────────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("interp, expected", (("linear", False), ("cubic", True)))
+def test_unroll_auto_resolves_from_interp(interp, expected):
+    """`unroll='auto'` unrolls the gather only for the cubic kernel's 4^3
+    neighborhood. The two strategies must be numerically identical -- only their
+    memory/speed profiles differ.
     """
-    proj_grid = np.array(
-        _compute_projection(fourier_grid_volume.rotate_to_pose(pose), _FSE, image_config)
+    assert _resolve_unroll("auto", interp) is expected
+
+    real_voxel_grid = np.asarray(
+        jnp.exp(-jnp.sum(im.make_coordinate_grid((16, 16, 16)) ** 2, axis=-1) / 4.0)
     )
-    proj_spline = np.array(
-        _compute_projection(
-            fourier_spline_volume.rotate_to_pose(pose), _FSE, image_config
+    config = cxs.BasicImageConfig((16, 16), pixel_size=1.0, voltage_in_kilovolts=300.0)
+    pose = cxs.EulerAnglePose(phi_angle=11.0, theta_angle=37.0, psi_angle=21.0)
+    volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(
+        real_voxel_grid, interp=interp
+    ).rotate_to_pose(pose)
+
+    auto = _project_real(volume, cxs.FourierSliceExtraction(), config)
+    for unroll in (True, False):
+        explicit = _project_real(
+            volume, cxs.FourierSliceExtraction(unroll=unroll), config
         )
-    )
-    np.testing.assert_allclose(proj_spline, proj_grid, atol=1e-4)
+        np.testing.assert_allclose(np.array(auto), np.array(explicit), atol=1e-6)

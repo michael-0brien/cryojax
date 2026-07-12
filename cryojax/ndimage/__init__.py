@@ -42,10 +42,9 @@ from ._fourier_utils import (
     make_fftshift_phase as make_fftshift_phase,
     query_efficient_grid_size as query_efficient_grid_size,
 )
-from ._map_coordinates import (
-    compute_spline_coefficients as compute_spline_coefficients,
+from ._interpolation import (
     map_coordinates as map_coordinates,
-    map_coordinates_spline as map_coordinates_spline,
+    map_frequencies as map_frequencies,
 )
 from ._normalize import (
     background_subtract_image as background_subtract_image,
@@ -105,6 +104,18 @@ _RENAMED = {
     "downsample_to_shape_with_fourier_cropping": "fourier_crop_to_shape",
     "normalize_image": "standardize_image",
 }
+_REMOVED = {
+    "map_coordinates_spline": (
+        "Use `map_coordinates(..., order=3)`, which interpolates the array "
+        "directly rather than precomputed spline coefficients."
+    ),
+    "compute_spline_coefficients": (
+        "Prefiltering for cubic interpolation was removed. For fourier slice "
+        "extraction, use `prepare_sampling_fft(..., interp='cubic')`, which "
+        "deconvolves the cubic kernel's `sinc^4` transfer function instead of "
+        "solving for spline coefficients."
+    ),
+}
 _FLATTENED_SUBMODULES = {"operators", "transforms"}
 
 
@@ -113,6 +124,8 @@ def __getattr__(name: str) -> _Any:
         raise AttributeError(
             f"'{name}' was removed in cryoJAX 0.6.0. Use '{_RENAMED[name]}' instead."
         )
+    if name in _REMOVED:
+        raise AttributeError(f"'{name}' was removed in cryoJAX 0.6.0. {_REMOVED[name]}")
     if name in _FLATTENED_SUBMODULES:
         raise AttributeError(
             f"Submodule `cryojax.ndimage.{name}` was removed in cryoJAX 0.6.0. "

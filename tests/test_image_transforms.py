@@ -115,30 +115,93 @@ def test_whitening_filter(image_shape, filter_shape, mode, square):
     _ = f.get()
 
 
-@pytest.mark.parametrize("use_rfft", [False])
-def test_rotation_fn(basic_config, voxel_volume, use_rfft):
+def test_rotation_fn(basic_config, voxel_volume):
+    """Rotating an image in fourier space must agree with rotating the object
+    itself (via its pose) before projecting it."""
     rotation_angle = 35.0
     pose_norot = cxs.EulerAnglePose(theta_angle=90.0, psi_angle=0.0)
     pose_ref = cxs.EulerAnglePose(theta_angle=90.0, psi_angle=rotation_angle)
     image_model_norot = cxs.make_image_model(voxel_volume, basic_config, pose=pose_norot)
     image_model_ref = cxs.make_image_model(voxel_volume, basic_config, pose=pose_ref)
 
-    if use_rfft:
-        grid = basic_config.get_frequency_grid(physical=False, padding=True)
-    else:
-        grid = basic_config.get_frequency_grid(physical=False, full=True, padding=True)
+    grid = basic_config.get_frequency_grid(physical=False, padding=True)
     rotation_fn = im.RotateFFT(rotation_angle, grid)
 
     image_norot = image_model_norot.raw_simulate()
     image_ref = image_model_ref.raw_simulate()
-    if use_rfft:
-        shape = basic_config.padded_shape
-        image_rot = jnp.fft.irfftn(rotation_fn(jnp.fft.rfftn(image_norot)), s=shape)
-    else:
-        image_rot = jnp.fft.ifftn(rotation_fn(jnp.fft.fftn(image_norot))).real
+    shape = basic_config.padded_shape
+    image_rot = jnp.fft.irfftn(rotation_fn(jnp.fft.rfftn(image_norot)), s=shape)
 
     corr = _get_correlation(image_ref, image_rot)
     np.testing.assert_allclose(corr.item(), 1.0, atol=1e-1)
+
+
+def test_rotation_fn_rejects_full_fft_grid(basic_config):
+    """`RotateFFT` only interpolates the half-space (rfft) DFT: the frequencies
+    the half space does not store are recovered from Hermitian symmetry, and a
+    full (fftn) grid has no truncated axis for that to apply to."""
+    full_grid = basic_config.get_frequency_grid(physical=False, full=True, padding=True)
+    with pytest.raises(ValueError, match="rfft"):
+        im.RotateFFT(35.0, full_grid)
+
+
+def test_rotation_fn_matches_analytic_rotation():
+    """Rotating a sum of gaussians must match rendering those gaussians at
+    rotated centers.
+
+    This is the case the old code got badly wrong: ~20 % of a rotated grid's query
+    points ask for `q_x < 0`, which the half space does not store, and resolving
+    them without the Hermitian fold put the result ~20 % of peak off. (The rfft
+    path was disabled in the test above rather than fixed.)
+
+    `RotateFFT` does not deconvolve the linear kernel's `sinc^2` transfer
+    function, because doing so needs a real-space visit and an `irfftn`/`rfftn`
+    round-trip costs several times more than the interpolation itself. But a user
+    who wants that accuracy can pay *nothing* for it: divide the real-space image
+    by `sinc^2` before the `rfftn` they were going to do anyway. This test
+    documents that recipe, and pins that it helps.
+    """
+    dim, sigma, angle = 64, 2.0, 37.0
+    grid = im.make_coordinate_grid((dim, dim))
+    centers = np.array([[6.0, 3.0], [-9.0, 11.0], [12.0, -8.0]])
+    amplitudes = np.array([1.0, 0.6, 0.8])
+
+    def render(cs):
+        out = jnp.zeros((dim, dim))
+        for c, a in zip(cs, amplitudes):
+            r_squared = (grid[..., 0] - c[0]) ** 2 + (grid[..., 1] - c[1]) ** 2
+            out = out + a * jnp.exp(-r_squared / (2 * sigma**2))
+        return out
+
+    theta = np.deg2rad(angle)
+    rotation = np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
+    image, expected = render(centers), render(centers @ rotation.T)
+
+    # The recipe: divide the real-space image by the linear kernel's `sinc^2`
+    # transfer function. Interpolating the DFT of `f / sinc^2` at rotated
+    # coordinates yields `(f / sinc^2)(Ru) * sinc^2(Ru) = f(Ru)` -- the exactly
+    # rotated image. It must be applied to the *input*, in the unrotated frame:
+    # correcting the output would need `sinc^2` rotated, and `sinc^2` is not
+    # rotationally symmetric.
+    x = im.make_1d_coordinate_grid(dim)
+    sinc_squared = jnp.sinc(x / dim) ** 2
+    deconvolved = image / (sinc_squared[:, None] * sinc_squared[None, :])
+
+    rotation_fn = im.RotateFFT(angle, im.make_frequency_grid((dim, dim)))
+    peak = float(jnp.abs(image).max())
+
+    def rotate(img):
+        rotated = jnp.fft.irfftn(rotation_fn(jnp.fft.rfftn(img)), s=(dim, dim))
+        return float(jnp.abs(rotated - expected).max()) / peak
+
+    error_raw, error_deconvolved = rotate(image), rotate(deconvolved)
+
+    # Both must be far below the ~20 % that the un-folded Hermitian bug produced.
+    assert error_raw < 0.15, f"{100 * error_raw:.2f} % of peak"
+    # ...and deconvolving the kernel must measurably improve on that, for free.
+    assert error_deconvolved < 0.6 * error_raw, (
+        f"raw {100 * error_raw:.2f} %, deconvolved {100 * error_deconvolved:.2f} %"
+    )
 
 
 @pytest.mark.parametrize("use_rfft", [True, False])

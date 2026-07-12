@@ -68,17 +68,7 @@ There are many different volume representations of biological structures for cry
             members:
                 - __init__
                 - from_real_voxel_grid
-                - to_representation
-                - rotate_to_pose
-                - shape
-
----
-
-::: cryojax.simulator.FourierVoxelSplineVolume
-        options:
-            members:
-                - __init__
-                - from_real_voxel_grid
+                - from_fourier_voxel_grid
                 - to_representation
                 - rotate_to_pose
                 - shape

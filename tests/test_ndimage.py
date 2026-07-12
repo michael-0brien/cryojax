@@ -650,38 +650,55 @@ def test_spread_3d_custom_vjp(points_3d, use_erf, scalar_variance):
 # These exercise the `cryojax.ndimage` API contracts directly. The actual
 # slice/Ewald extraction accuracy is covered end-to-end in
 # `test_volume_voxel.py`, so we deliberately avoid re-testing that here.
+@pytest.mark.parametrize("interp", ("linear", "cubic"))
 @pytest.mark.parametrize(
-    "use_spline, pad_scale, expected_shape",
-    (
-        (False, 1.0, (8, 8, 5)),
-        (True, 1.0, (10, 10, 7)),
-        (False, 2.0, (16, 16, 9)),
-        (True, 2.0, (18, 18, 11)),
-    ),
+    "pad_scale, expected_shape", ((1.0, (8, 8, 5)), (2.0, (16, 16, 9)))
 )
-def test_prepare_sampling_fft_shapes(use_spline, pad_scale, expected_shape):
+def test_prepare_sampling_fft_shapes(interp, pad_scale, expected_shape):
+    # Every `interp` stores the same plain half-space (rfft) grid: the methods
+    # differ only in which sinc power is deconvolved out of it beforehand.
     real_voxel_grid = jr.normal(jr.key(0), (8, 8, 8))
     prepared = im.prepare_sampling_fft(
-        real_voxel_grid, pad_scale=pad_scale, use_spline=use_spline
+        real_voxel_grid, pad_scale=pad_scale, interp=interp
     )
     assert prepared.shape == expected_shape
 
 
-def test_prepare_sampling_fft_deconvolve_ignored_for_spline():
-    # `apply_deconvolve` compensates for trilinear interpolation, so it must
-    # be a no-op for spline coefficients but change the raw fourier grid.
-    real_voxel_grid = jr.normal(jr.key(0), (8, 8, 8))
-    spline_on = im.prepare_sampling_fft(
-        real_voxel_grid, use_spline=True, apply_deconvolve=True
+@pytest.mark.parametrize("interp, sinc_power", (("linear", 2), ("cubic", 4)))
+def test_prepare_sampling_fft_deconvolves_per_interp(interp, sinc_power):
+    # Each interp divides the real-space grid by its own kernel's transfer
+    # function, sinc^(p+1), before the transform: sinc^2 for 'linear' and sinc^4
+    # for 'cubic'. Check that against an independently written sinc factor.
+    dim = 8
+    real_voxel_grid = jr.normal(jr.key(0), (dim, dim, dim))
+    x = im.make_1d_coordinate_grid(dim)
+    sinc = jnp.sinc(x / dim)
+    factor = (
+        sinc[:, None, None] * sinc[None, :, None] * sinc[None, None, :]
+    ) ** sinc_power
+    expected = jnp.fft.fftshift(
+        im.make_fftshift_phase((dim, dim, dim), outputs_rfft=True)
+        * jnp.fft.rfftn(real_voxel_grid / factor),
+        axes=(0, 1),
     )
-    spline_off = im.prepare_sampling_fft(
-        real_voxel_grid, use_spline=True, apply_deconvolve=False
+    prepared = im.prepare_sampling_fft(real_voxel_grid, interp=interp)
+    np.testing.assert_allclose(
+        np.asarray(prepared), np.asarray(expected), rtol=1e-5, atol=1e-5
     )
-    np.testing.assert_array_equal(spline_on, spline_off)
 
-    grid_on = im.prepare_sampling_fft(real_voxel_grid, apply_deconvolve=True)
-    grid_off = im.prepare_sampling_fft(real_voxel_grid, apply_deconvolve=False)
-    assert not jnp.allclose(grid_on, grid_off)
+
+def test_prepare_sampling_fft_interps_differ():
+    # sinc^2 and sinc^4 are different factors, so the two prepared grids must
+    # not coincide -- otherwise the deconvolution is silently a no-op.
+    real_voxel_grid = jr.normal(jr.key(0), (8, 8, 8))
+    linear = im.prepare_sampling_fft(real_voxel_grid, interp="linear")
+    cubic = im.prepare_sampling_fft(real_voxel_grid, interp="cubic")
+    assert not jnp.allclose(linear, cubic)
+
+
+def test_prepare_sampling_fft_rejects_bad_interp():
+    with pytest.raises(ValueError, match="interp"):
+        im.prepare_sampling_fft(jr.normal(jr.key(0), (8, 8, 8)), interp="quintic")
 
 
 def test_prepare_sampling_fft_invalid_pad_scale():
@@ -705,16 +722,12 @@ def test_sample_fft_slice_rejects_odd_dim():
         im.sample_fft_slice(grid, odd_frequency_slice)
 
 
-@pytest.mark.parametrize("use_spline", (False, True))
-def test_sample_fft_slice_shape_check(use_spline):
-    # Passing a grid with `use_spline=True` (or spline coefficients with
-    # `use_spline=False`) must be rejected, since the expected shapes differ.
-    real_voxel_grid = jr.normal(jr.key(0), (8, 8, 8))
-    # Deliberately mismatched: prepare the *wrong* representation.
-    mismatched = im.prepare_sampling_fft(real_voxel_grid, use_spline=not use_spline)
-    frequency_slice = im.make_frequency_slice((8, 8), fftshifted=True)
-    with pytest.raises(ValueError, match="use_spline"):
-        im.sample_fft_slice(mismatched, frequency_slice, use_spline=use_spline)
+def test_sample_fft_slice_shape_check():
+    # A grid whose shape doesn't match the frequency slice must be rejected.
+    grid = im.prepare_sampling_fft(jr.normal(jr.key(0), (8, 8, 8)))
+    frequency_slice = im.make_frequency_slice((16, 16), fftshifted=True)
+    with pytest.raises(ValueError, match="rfft"):
+        im.sample_fft_slice(grid, frequency_slice)
 
 
 def test_ewald_sphere_from_slice_curvature():
@@ -736,3 +749,279 @@ def test_ewald_sphere_from_slice_curvature():
     q_squared = flat[..., 0] ** 2 + flat[..., 1] ** 2
     predicted_z = (wavelength / voxel_size) * q_squared / 2
     np.testing.assert_allclose(surface[..., 2], predicted_z, atol=1e-6)
+
+
+#
+# Interpolation kernels: `map_coordinates(..., order=...)`
+#
+# `map_coordinates` always corresponds to scipy's `prefilter=False` case: the
+# array is convolved with the interpolation kernel directly, never prefiltered
+# so that the interpolant passes through the samples.
+@pytest.mark.parametrize("order", (1, 3))
+@pytest.mark.parametrize("ndim", (2, 3))
+def test_map_coordinates_matches_scipy_without_prefilter(order, ndim):
+    scipy_ndimage = pytest.importorskip("scipy.ndimage")
+    shape = (12,) * ndim
+    array = np.asarray(jr.normal(jr.key(0), shape), dtype=np.float64)
+    # Stay well inside the array so that the two libraries' (differing)
+    # boundary conventions never enter.
+    coords = np.asarray(
+        jr.uniform(jr.key(1), (ndim, 50), minval=3.0, maxval=8.0), dtype=np.float64
+    )
+    expected = scipy_ndimage.map_coordinates(array, coords, order=order, prefilter=False)
+    got = im.map_coordinates(
+        jnp.asarray(array), tuple(jnp.asarray(c) for c in coords), order=order
+    )
+    np.testing.assert_allclose(np.asarray(got), expected, rtol=1e-5, atol=1e-5)
+
+
+@pytest.mark.parametrize("order", (1, 3))
+def test_map_coordinates_kernel_is_partition_of_unity(order):
+    # Both kernels' weights sum to 1 at every coordinate, so a constant array
+    # must be reproduced exactly, at integer and non-integer coordinates alike.
+    array = jnp.full((10, 10, 10), 2.5)
+    coords = jr.uniform(jr.key(0), (3, 40), minval=3.0, maxval=6.0)
+    got = im.map_coordinates(array, tuple(coords), order=order)
+    np.testing.assert_allclose(np.asarray(got), 2.5, rtol=1e-6)
+
+
+@pytest.mark.parametrize("order", (1, 3))
+@pytest.mark.parametrize("unroll", (True, False))
+def test_map_coordinates_unroll_agrees(order, unroll):
+    # The unrolled-loop and single-gather strategies must be numerically
+    # identical; only their memory/speed profiles differ.
+    array = jr.normal(jr.key(0), (10, 10, 10))
+    coords = jr.uniform(jr.key(1), (3, 30), minval=-1.0, maxval=11.0)
+    a = im.map_coordinates(array, tuple(coords), order=order, unroll=True)
+    b = im.map_coordinates(array, tuple(coords), order=order, unroll=False)
+    np.testing.assert_allclose(np.asarray(a), np.asarray(b), rtol=1e-6, atol=1e-6)
+
+
+def test_map_coordinates_rejects_bad_order():
+    array = jr.normal(jr.key(0), (8, 8))
+    coords = (jnp.zeros(3), jnp.zeros(3))
+    with pytest.raises(ValueError, match="order"):
+        im.map_coordinates(array, coords, order=2)
+
+
+#
+# `sample_fft_slice` boundary handling
+#
+# The fourier voxel grid is a real volume's DFT stored in the half space, so its
+# values obey two exact symmetries: periodicity (`F[k + dim] == F[k]`) and
+# Hermitian symmetry (`F[-k] == conj(F[k])`). Together these determine *every*
+# interpolation tap, including taps that run off the end of the stored array.
+#
+# This matters enormously for `interp="cubic"`, whose kernel always reaches one
+# node below the query's cell -- including at `q_x ~ 0`, where that node is not
+# stored and carries 1/6 of the kernel weight on the volume's brightest
+# coefficients (DC among them). Naively zero-filling it costs ~16% error.
+def _reference_full_grid_slice(real_voxel_grid, frequency_slice, order, sinc_power):
+    """Interpolate the FULL (non-truncated) complex grid, which needs no
+    Hermitian symmetry logic at all. Ground truth for the half-grid sampler."""
+    dim = real_voxel_grid.shape[0]
+    grid = real_voxel_grid
+    if sinc_power > 0:
+        x = im.make_1d_coordinate_grid(dim)
+        s = jnp.sinc(x / dim)
+        grid = (
+            grid / (s[:, None, None] * s[None, :, None] * s[None, None, :]) ** sinc_power
+        )
+    phase = im.make_fftshift_phase((dim, dim, dim), outputs_rfft=False)
+    full = jnp.fft.fftshift(phase * jnp.fft.fftn(grid))
+    k = frequency_slice * dim + dim // 2
+    kx, ky, kz = k[..., 0], k[..., 1], k[..., 2]
+    in_box = (
+        (jnp.abs(kx - dim // 2) <= dim // 2)
+        & (ky >= 0)
+        & (ky <= dim)
+        & (kz >= 0)
+        & (kz <= dim)
+    )
+    # Periodic boundary conditions: taps wrap modulo `dim`.
+    out = im.map_coordinates(
+        full,
+        (kz % dim, ky % dim, kx % dim),
+        order=order,
+        mode="promise_in_bounds",
+    )
+    return jnp.where(in_box, out, 0.0)
+
+
+@pytest.mark.parametrize(
+    "interp, order, sinc_power",
+    (("linear", 1, 2), ("cubic", 3, 4)),
+)
+def test_sample_fft_slice_matches_full_grid_reference(interp, order, sinc_power):
+    """The half-space sampler must reproduce, exactly, an interpolation of the
+    full (non-truncated) complex grid. This is what pins down the Hermitian
+    fold: without it, `interp="cubic"` is off by ~16 % near the q_x = 0 plane.
+    """
+    from cryojax.rotations import SO3
+
+    dim = 16
+    real_voxel_grid = jr.normal(jr.key(0), (dim, dim, dim))
+    frequency_slice = SO3.sample_uniform(jr.key(3)).apply(
+        im.make_frequency_slice((dim, dim), fftshifted=True)
+    )
+    grid = im.prepare_sampling_fft(real_voxel_grid, interp=interp)
+
+    # Undo the output-side fftshift/phase that `sample_fft_slice` applies, to
+    # compare the raw interpolated F(q) against the reference.
+    got = im.sample_fft_slice(grid, frequency_slice, interp=interp)
+    got = im.make_fftshift_phase((dim, dim), outputs_rfft=True) * jnp.fft.fftshift(
+        got, axes=(0,)
+    )
+    expected = _reference_full_grid_slice(
+        real_voxel_grid, frequency_slice, order, sinc_power
+    )[0]
+    scale = float(jnp.max(jnp.abs(expected)))
+    np.testing.assert_allclose(np.asarray(got), np.asarray(expected), atol=1e-4 * scale)
+
+
+def test_sample_fft_slice_cubic_reconstructs_exact_transform():
+    """`interp="cubic"` deconvolves the cubic kernel's sinc^4 transfer function,
+    so interpolating the prepared grid reconstructs the volume's *exact*
+    continuous fourier transform, up to aliasing -- not merely an approximation
+    of it. Checked against a direct non-uniform DFT, inside the fourier box.
+
+    This is the entire reason cubic beats a prefiltered spline interpolation:
+    measured here, cubic is ~2 orders of magnitude more accurate than linear.
+
+    The residual aliasing (and hence the tolerance below) depends on how
+    compactly the density sits inside the box -- the deconvolution assumes a
+    compactly supported volume, as real, masked cryo-EM maps are. A narrow,
+    centered gaussian is used for that reason.
+    """
+    from cryojax.rotations import SO3
+
+    dim = 16
+    real_voxel_grid = np.asarray(
+        jnp.exp(-jnp.sum(im.make_coordinate_grid((dim, dim, dim)) ** 2, axis=-1) / 2.0),
+        dtype=np.float64,
+    )
+    frequency_slice = SO3.sample_uniform(jr.key(5)).apply(
+        im.make_frequency_slice((dim, dim), fftshifted=True)
+    )
+    q = np.asarray(frequency_slice, dtype=np.float64).reshape(-1, 3)
+    interior = np.linalg.norm(q, axis=-1) <= 0.4
+
+    # Exact non-uniform DFT of the volume at the (continuous) slice coordinates.
+    axis = np.arange(dim) - dim // 2
+    zz, yy, xx = np.meshgrid(axis, axis, axis, indexing="ij")
+    points = np.stack([xx.ravel(), yy.ravel(), zz.ravel()], axis=-1).astype(np.float64)
+    exact = np.exp(-2j * np.pi * (q[interior] @ points.T)) @ real_voxel_grid.ravel()
+    scale = np.max(np.abs(exact))
+
+    errors = {}
+    for interp in ("linear", "cubic"):
+        grid = im.prepare_sampling_fft(real_voxel_grid, interp=interp)
+        got = im.sample_fft_slice(grid, frequency_slice, interp=interp)
+        got = im.make_fftshift_phase((dim, dim), outputs_rfft=True) * jnp.fft.fftshift(
+            got, axes=(0,)
+        )
+        got = np.asarray(got).reshape(-1)[interior]
+        errors[interp] = np.max(np.abs(got - exact)) / scale
+
+    assert errors["cubic"] < 1e-3, errors
+    assert errors["cubic"] < errors["linear"] / 50, errors
+
+
+@pytest.mark.parametrize("order", (1, 3))
+def test_map_coordinates_negative_indices_obey_mode(order):
+    """A tap index below the low edge must obey `mode`, not silently wrap around
+    to the far edge of the array.
+
+    JAX's gather modes only treat `index >= size` as out of bounds; a negative
+    index gets numpy's wrap-around meaning under *every* mode. `map_coordinates`
+    corrects for that, or a coordinate below zero reads the opposite edge.
+    """
+    array = jnp.arange(1.0, 6.0)[:, None] * jnp.ones((1, 5))  # rows 1..5
+    column = jnp.array([2.0])
+
+    # Half a pixel below the array: the tap at row -1 must be filled with 0, not
+    # read as row 4 (= 5.0).
+    filled = im.map_coordinates(
+        array, (jnp.array([-0.5]), column), order=order, mode="fill", cval=0.0
+    )
+    assert float(filled[0]) < 1.0, "row -1 wrapped to the far edge instead of filling"
+
+    # "clip" must clamp to the *near* edge (row 0 = 1.0), not the far one (5.0).
+    # For order=3 this is not exactly 1.0: the kernel also reaches row 1 (= 2.0),
+    # which is legitimately in bounds and carries a small weight.
+    clipped = float(
+        im.map_coordinates(array, (jnp.array([-0.5]), column), order=order, mode="clip")[
+            0
+        ]
+    )
+    assert abs(clipped - 1.0) < 0.1, f"clipped to the far edge instead: {clipped}"
+
+
+def test_map_coordinates_cubic_interior_not_corrupted_by_low_edge():
+    """The cubic kernel always reaches `floor(coordinate) - 1`, so a query point
+    comfortably *inside* the array still gathers a tap at index -1. If that tap
+    wrapped to the far edge it would corrupt an interior, in-bounds point.
+    """
+    array = jnp.arange(1.0, 6.0)[:, None] * jnp.ones((1, 5))  # a linear ramp
+    coordinates = (jnp.array([0.2]), jnp.array([2.0]))
+    linear = float(im.map_coordinates(array, coordinates, order=1, mode="fill")[0])
+    cubic = float(im.map_coordinates(array, coordinates, order=3, mode="fill")[0])
+    # On a linear ramp both kernels should land near 1.2. A far-edge wrap of the
+    # -1 tap (row 4 = 5.0) would drag the cubic result well above it.
+    np.testing.assert_allclose(linear, 1.2, atol=1e-6)
+    assert abs(cubic - 1.2) < 0.25, f"interior cubic point corrupted: {cubic}"
+
+
+#
+# `map_frequencies`
+#
+@pytest.mark.parametrize("order", (1, 3))
+@pytest.mark.parametrize("ndim", (2, 3))
+def test_map_frequencies_matches_full_grid(order, ndim):
+    """Interpolating the half-space (rfft) DFT must reproduce, exactly, the same
+    interpolation of the *full* (non-truncated) DFT, which needs no Hermitian
+    symmetry logic at all. This is what pins the fold down.
+    """
+    dim = 16
+    real_array = jr.normal(jr.key(0), (dim,) * ndim)
+
+    half = jnp.fft.fftshift(jnp.fft.rfftn(real_array), axes=tuple(range(ndim - 1)))
+    full = jnp.fft.fftshift(jnp.fft.fftn(real_array))
+
+    # Query points straddling `q_x = 0`, so that roughly half of them ask for
+    # frequencies the half space does not store -- that is what exercises the
+    # Hermitian fold. They stay clear of the *centered* axes' edges, where the two
+    # boundary conventions legitimately differ: the rfft grid wraps periodically,
+    # as the DFT requires, while the full-grid reference is only given `fill`.
+    keys = jr.split(jr.key(1), ndim)
+    coords_centered = [
+        jr.uniform(k, (400,), minval=2.0, maxval=float(dim - 3)) for k in keys[:-1]
+    ]
+    coord_x = jr.uniform(
+        keys[-1], (400,), minval=-float(dim // 2 - 2), maxval=float(dim // 2 - 3)
+    )
+    assert float((coord_x < 0).mean()) > 0.3, "test does not exercise the fold"
+
+    # `map_frequencies` takes frequencies in cycles/pixel, ordered
+    # `(q_x, q_y[, q_z])` -- truncated axis first, the reverse of array-axis order.
+    frequencies = jnp.stack(
+        [coord_x / dim, *[(c - dim // 2) / dim for c in reversed(coords_centered)]],
+        axis=-1,
+    )
+    got = im.map_frequencies(half, frequencies, order=order, mode="fill")
+    # On the full grid the truncated axis is centered too, so shift the query.
+    expected = im.map_coordinates(
+        full,
+        (*coords_centered, coord_x + dim // 2),
+        order=order,
+        mode="fill",
+    )
+    scale = float(jnp.max(jnp.abs(expected)))
+    np.testing.assert_allclose(np.asarray(got), np.asarray(expected), atol=1e-4 * scale)
+
+
+@pytest.mark.parametrize("shape", ((16, 16), (16, 10), (15, 8)))
+def test_map_frequencies_rejects_non_rfft_shape(shape):
+    # A square (non-truncated) grid, a wrongly-truncated one, and an odd dimension.
+    with pytest.raises(ValueError, match="rfft"):
+        im.map_frequencies(jnp.zeros(shape, dtype=complex), jnp.zeros((3, 2)))

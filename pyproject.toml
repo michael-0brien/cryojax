@@ -21,7 +21,6 @@ dependencies = [
     "jax",
     "equinox>=0.11.0",
     "jaxtyping>=0.2.23",
-    "lineax",
     "nufftax>=0.6.0",
     "mrcfile",
     "pandas",
@@ -50,6 +49,7 @@ docs = [
 tests = [
     "pytest",
     "pytest-cov",
+    "lineax",  # optional at runtime; only `jax_util.make_linear_operator` uses it
     "pycistem==0.4.1; sys_platform == 'linux' and python_version < '3.12'",
     "typeguard==2.13.3"
 ]

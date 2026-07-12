@@ -125,7 +125,7 @@ def test_simulate_equality(image_model):
     linear_operator, vector = jxu.make_linear_operator(
         fn=lambda x: x.simulate(),
         args=image_model,
-        where_vector=lambda x: x.volume.fourier_voxel_grid,
+        where_vector=lambda x: x.volume.values,
     )
     image_cxs = image_model.simulate()
     image_lx = linear_operator.mv(vector)
@@ -133,7 +133,7 @@ def test_simulate_equality(image_model):
 
 
 def test_linear_transpose(image_model):
-    where_vector = lambda x: x.volume.fourier_voxel_grid
+    where_vector = lambda x: x.volume.values
     linear_operator, _ = jxu.make_linear_operator(
         fn=lambda x: x.simulate(),
         args=image_model,
