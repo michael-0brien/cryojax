@@ -9,6 +9,7 @@ from cryojax.ndimage import (
     compute_binned_powerspectrum,
     make_frequency_grid,
 )
+from cryojax.ndimage._interpolation import deconvolve_interpolation_kernel
 from cryojax.simulator import AstigmaticCTF, EulerAnglePose
 
 
@@ -182,7 +183,10 @@ def test_compute_projection_with_cistem(
     # pycistem projection — write rendered grid to a temp MRC for loading
     mrc_path = str(tmp_path / "volume.mrc")
     write_volume_to_mrc(
-        np.array(real_voxel_grid, dtype=np.float32),
+        np.array(
+            deconvolve_interpolation_kernel(real_voxel_grid, sinc_power=2),
+            dtype=np.float32,
+        ),
         voxel_size,
         mrc_path,
         overwrite=True,
