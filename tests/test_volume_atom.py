@@ -36,9 +36,11 @@ try:
 except ModuleNotFoundError:
     jnufft = None
 
-_jax_finufft = pytest.mark.skipif(jnufft is None, reason="jax-finufft not installed")
+_skip_without_jax_finufft = pytest.mark.skipif(
+    jnufft is None, reason="jax-finufft not installed"
+)
 _backends = pytest.mark.parametrize(
-    "backend", ["nufftax", pytest.param("jax-finufft", marks=_jax_finufft)]
+    "backend", ["nufftax", pytest.param("jax-finufft", marks=_skip_without_jax_finufft)]
 )
 
 
@@ -918,7 +920,7 @@ def test_fft_atom_projection_custom_upsampfac(upsampfac):
     assert result.shape == (shape[0], shape[1] // 2 + 1)
 
 
-@_jax_finufft
+@_skip_without_jax_finufft
 @pytest.mark.parametrize("upsampfac", (1.25, 2.0))
 def test_fft_atom_projection_custom_upsampfac_jax_finufft(monkeypatch, upsampfac):
     """Smoke test: custom opts via options (jax-finufft) runs without error."""
@@ -1054,7 +1056,7 @@ def test_fft_atom_render_custom_upsampfac(upsampfac):
     assert result.shape == shape
 
 
-@_jax_finufft
+@_skip_without_jax_finufft
 @pytest.mark.parametrize("upsampfac", (1.25, 2.0))
 def test_fft_atom_render_custom_upsampfac_jax_finufft(monkeypatch, upsampfac):
     """Smoke test: custom opts via options (jax-finufft) runs without error."""
