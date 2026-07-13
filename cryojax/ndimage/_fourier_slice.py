@@ -26,7 +26,6 @@ from ._interpolation import (
 
 def sample_fft_slice(
     sampling_fft: Complex[Array, "dim dim dim//2+1"],
-    /,
     frequency_slice: Float[Array, "1 dim dim//2+1 3"] | Float[Array, "1 dim dim 3"],
     *,
     interp: Literal["linear", "cubic"] = "linear",
@@ -44,8 +43,8 @@ def sample_fft_slice(
     `cryojax.simulator.FourierVoxelGridVolume`).
 
     The output is returned in the rfft/DC-in-corner convention, so it can be
-    passed directly to `cryojax.ndimage.irfftn` (for a half slice) or
-    `cryojax.ndimage.ifftn` (for a full Ewald sphere surface).
+    passed directly to `jax.numpy.fft.irfftn` (for a half slice) or
+    `jax.numpy.fft.ifftn` (for a full Ewald sphere surface).
 
     !!! example "Preparing the voxel grid and extracting a central slice"
 
@@ -195,9 +194,7 @@ def prepare_sampling_fft(
         frequency_slice = im.make_frequency_slice(
             sampling_fft.shape[:2], fftshifted=True
         )
-        projection = im.sample_fft_slice(
-            sampling_fft, frequency_slice
-        )
+        projection_fft = im.sample_fft_slice(sampling_fft, frequency_slice)
         ```
 
     **Arguments:**
