@@ -33,7 +33,12 @@ dependencies = [
 dev = [
     "pre-commit"
 ]
+extras = [
+    "jax-finufft>=1.2.0",
+    "lineax"
+]
 docs = [
+    "cryojax[extras]",
     "hippogriffe==0.2.2", # following Equinox documentation
     "griffe==1.7.3",
     "mkdocs==1.6.1",
@@ -49,12 +54,8 @@ docs = [
 tests = [
     "pytest",
     "pytest-cov",
-    "lineax",  # optional at runtime; only `jax_util.make_linear_operator` uses it
     "pycistem==0.4.1; sys_platform == 'linux' and python_version < '3.12'",
     "typeguard==2.13.3"
-]
-extras = [
-    "jax-finufft>=1.2.0"
 ]
 
 [build-system]
