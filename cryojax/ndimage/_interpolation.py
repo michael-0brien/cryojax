@@ -123,7 +123,7 @@ def map_coordinates(
 
 def map_frequencies(
     input: Array,
-    frequencies: Array,
+    frequencies: Sequence[Array],
     order: int = 1,
     mode: str = "fill",
     unroll: bool = True,
@@ -144,10 +144,11 @@ def map_frequencies(
         [`cryojax.ndimage.prepare_sampling_fft`][]. Shape `(dim, dim // 2 + 1)`
         or `(dim, dim, dim // 2 + 1)`.
     - `frequencies`:
-        The frequencies to interpolate at, in cycles/pixel, of shape
-        `(..., ndim)` and ordered `(q_x, q_y)` or `(q_x, q_y, q_z)` --- as
-        returned by [`cryojax.ndimage.make_frequency_grid`][]. `q_x` may be
-        negative.
+        A sequence of length `input.ndim`, one frequency array per axis in
+        array-axis order --- `(q_y, q_x)` or `(q_z, q_y, q_x)` --- in
+        cycles/pixel, as in [`cryojax.ndimage.map_coordinates`][]. Each must be
+        broadcastable to the same shape. The last entry is the truncated (rfft)
+        axis, `q_x`, which may be negative.
     - `order`:
         The order of the interpolation kernel: `1` for linear, `3` for cubic
         B-spline.
@@ -160,12 +161,12 @@ def map_frequencies(
 
     **Returns:**
 
-    The interpolated values, of shape `frequencies.shape[:-1]`.
+    The interpolated values, with the shape that the frequency arrays broadcast
+    to.
     """
     input_arr = jnp.asarray(input)
-    frequencies = jnp.asarray(frequencies)
+    frequency_arrs = _check_coordinates(input_arr, frequencies)
     ndim = input_arr.ndim
-    _check_ndim(ndim)
     dim = input_arr.shape[0]
     nyquist = dim // 2
     expected_shape = (dim,) * (ndim - 1) + (nyquist + 1,)
@@ -176,20 +177,13 @@ def map_frequencies(
             f"got an array of shape `{input_arr.shape}` (expected "
             f"`{expected_shape}`)."
         )
-    if frequencies.shape[-1] != ndim:
-        raise ValueError(
-            f"`map_frequencies` expects `frequencies` of shape `(..., {ndim})`, "
-            f"but got shape `{frequencies.shape}`."
-        )
 
     # Frequencies (cycles/pixel) to index coordinates. The truncated axis is in
     # the rfft/corner convention (no offset); the others are `fftshift`ed to the
-    # center convention. Array axes run (z, y, x), so the centered coordinates are
-    # the frequency components in reverse order.
-    coordinate_x = frequencies[..., 0] * dim
-    coordinates_centered = [
-        frequencies[..., i] * dim + nyquist for i in reversed(range(1, ndim))
-    ]
+    # center convention.
+    *frequencies_centered, frequency_x = frequency_arrs
+    coordinate_x = frequency_x * dim
+    coordinates_centered = [f * dim + nyquist for f in frequencies_centered]
 
     # Only `q_x >= 0` is stored. Reflect the query through the origin whenever it
     # is negative, and conjugate the result to correct for it. This is exact: it

@@ -1002,11 +1002,11 @@ def test_map_frequencies_matches_full_grid(order, ndim):
     )
     assert float((coord_x < 0).mean()) > 0.3, "test does not exercise the fold"
 
-    # `map_frequencies` takes frequencies in cycles/pixel, ordered
-    # `(q_x, q_y[, q_z])` -- truncated axis first, the reverse of array-axis order.
-    frequencies = jnp.stack(
-        [coord_x / dim, *[(c - dim // 2) / dim for c in reversed(coords_centered)]],
-        axis=-1,
+    # `map_frequencies` takes frequencies in cycles/pixel, one array per axis
+    # in array-axis order -- the truncated axis (`q_x`) last.
+    frequencies = (
+        *[(c - dim // 2) / dim for c in coords_centered],
+        coord_x / dim,
     )
     got = im.map_frequencies(half, frequencies, order=order, mode="fill")
     # On the full grid the truncated axis is centered too, so shift the query.
@@ -1024,4 +1024,6 @@ def test_map_frequencies_matches_full_grid(order, ndim):
 def test_map_frequencies_rejects_non_rfft_shape(shape):
     # A square (non-truncated) grid, a wrongly-truncated one, and an odd dimension.
     with pytest.raises(ValueError, match="rfft"):
-        im.map_frequencies(jnp.zeros(shape, dtype=complex), jnp.zeros((3, 2)))
+        im.map_frequencies(
+            jnp.zeros(shape, dtype=complex), (jnp.zeros((3,)), jnp.zeros((3,)))
+        )

@@ -125,7 +125,7 @@ def test_rotation_fn(basic_config, voxel_volume):
     image_model_ref = cxs.make_image_model(voxel_volume, basic_config, pose=pose_ref)
 
     grid = basic_config.get_frequency_grid(physical=False, padding=True)
-    rotation_fn = im.RotateFFT(rotation_angle, grid)
+    rotation_fn = im.RotateFFT(rotation_angle, frequency_grid=grid)
 
     image_norot = image_model_norot.raw_simulate()
     image_ref = image_model_ref.raw_simulate()
@@ -142,7 +142,7 @@ def test_rotation_fn_rejects_full_fft_grid(basic_config):
     full (fftn) grid has no truncated axis for that to apply to."""
     full_grid = basic_config.get_frequency_grid(physical=False, full=True, padding=True)
     with pytest.raises(ValueError, match="rfft"):
-        im.RotateFFT(35.0, full_grid)
+        im.RotateFFT(35.0, frequency_grid=full_grid)
 
 
 def test_rotation_fn_matches_analytic_rotation():
@@ -187,7 +187,7 @@ def test_rotation_fn_matches_analytic_rotation():
     sinc_squared = jnp.sinc(x / dim) ** 2
     deconvolved = image / (sinc_squared[:, None] * sinc_squared[None, :])
 
-    rotation_fn = im.RotateFFT(angle, im.make_frequency_grid((dim, dim)))
+    rotation_fn = im.RotateFFT(angle, frequency_grid=im.make_frequency_grid((dim, dim)))
     peak = float(jnp.abs(image).max())
 
     def rotate(img):
@@ -223,14 +223,9 @@ def test_translation_fn(basic_config, voxel_volume, use_rfft):
         basic_config,
         pose=pose_translate,
     )
-    if use_rfft:
-        grid = basic_config.get_frequency_grid(physical=True)
-    else:
-        grid = basic_config.get_frequency_grid(physical=True, full=True)
-
     shift_fn = im.PhaseShiftFFT(
         offset=jnp.array([10.0, -5.0]),
-        frequency_grid=grid,
+        pixel_size=basic_config.pixel_size,
     )
 
     image_notrans = image_model_notrans.simulate()

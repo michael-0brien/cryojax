@@ -138,7 +138,11 @@ def sample_fft_slice(
         )
     surface = map_frequencies(
         sampling_fft,
-        frequency_slice,
+        (
+            frequency_slice[..., 2],
+            frequency_slice[..., 1],
+            frequency_slice[..., 0],
+        ),
         order=order,
         mode=boundary,
         unroll=unroll,
