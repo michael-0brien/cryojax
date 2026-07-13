@@ -2,7 +2,7 @@ import math
 from typing import Literal
 
 import jax.numpy as jnp
-from jaxtyping import Array, Complex
+from jaxtyping import Array, Complex, Float
 
 
 def convert_fftn_to_rfftn(
@@ -162,6 +162,43 @@ def enforce_rfftn_self_conjugates(
     else:  # mode == "real"
         rfftn_array = jnp.where(sc_mask, rfftn_array.real, rfftn_array)
     return rfftn_array
+
+
+def make_rfftn_multiplicity(
+    shape: tuple[int, ...],
+) -> Float[Array, " {shape[-1]}//2+1"]:
+    """Multiplicity of each mode in an `rfftn` output.
+
+    `jax.numpy.fft.rfftn` stores only the non-negative frequencies along the
+    last axis, relying on Hermitian symmetry $F(-k) = F^*(k)$ for the rest.
+    Each retained mode along that axis therefore represents either one or two
+    modes of the full `fftn` grid:
+
+    - the zero-frequency column represents a single mode (multiplicity 1),
+    - for an even-sized last axis, the Nyquist column is self-conjugate and
+      also has multiplicity 1,
+    - every other column represents a conjugate pair (multiplicity 2).
+
+    Weighting by this multiplicity recovers full-grid reductions (such as an
+    L2 norm or a variance) from an `rfftn` array. The other axes are not
+    reduced by `rfftn`, so the returned array varies only along the last axis
+    and broadcasts against the leading axes.
+
+    **Arguments:**
+
+    - `shape`:
+        The shape of the array in real space.
+
+    **Returns:**
+
+    A 1D array of length `shape[-1] // 2 + 1` giving the multiplicity of each
+    mode along the last (real-transformed) axis.
+    """
+    width = shape[-1]
+    multiplicity = jnp.full(width // 2 + 1, 2.0).at[0].set(1.0)
+    if width % 2 == 0:
+        multiplicity = multiplicity.at[-1].set(1.0)
+    return multiplicity
 
 
 def query_efficient_grid_size(

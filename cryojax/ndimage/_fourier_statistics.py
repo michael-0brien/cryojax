@@ -7,6 +7,7 @@ import math
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float, Inexact
 
+from ._fourier_utils import make_rfftn_multiplicity
 from ._radial_average import compute_binned_radial_average
 
 
@@ -21,6 +22,7 @@ def compute_binned_powerspectrum(
     *,
     minimum_frequency: float = 0.0,
     maximum_frequency: float = math.sqrt(2) / 2,
+    real_shape: tuple[int, ...] | None = None,
 ) -> tuple[Float[Array, " n_bins"], Float[Array, " n_bins"]]:
     """Compute the power spectrum of an image averaged on a set
     of radial bins.
@@ -64,6 +66,11 @@ def compute_binned_powerspectrum(
         Maximum frequency bin. By default, `math.sqrt(2) / 2`. This is
         not measured in inverse angstroms, even if `radial_frequency_grid`
         is in inverse angstroms.
+    - `real_shape`:
+        The real-space shape of `fourier_image_or_volume`, which is an
+        `rfftn` array. This is used to weight each mode by its Hermitian
+        multiplicity so that the radial average matches a full-grid average.
+        If `None`, the last (real-transformed) axis is assumed to be odd.
 
     **Returns:**
 
@@ -81,9 +88,13 @@ def compute_binned_powerspectrum(
         maximum_frequency,
         pixel_or_voxel_size,
     )
-    # Compute radially averaged power spectrum as a 1D profile
+    # Compute radially averaged power spectrum as a 1D profile, weighting each
+    # rfft mode by its Hermitian multiplicity
     radially_binned_powerspectrum = compute_binned_radial_average(
-        squared_fourier_amplitudes, radial_frequency_grid, frequency_bins
+        squared_fourier_amplitudes,
+        radial_frequency_grid,
+        frequency_bins,
+        weights=_resolve_rfftn_multiplicity(fourier_image_or_volume.shape, real_shape),
     )
 
     return radially_binned_powerspectrum, frequency_bins
@@ -98,6 +109,7 @@ def compute_fourier_ring_correlation(
     *,
     minimum_frequency: float = 0.0,
     maximum_frequency: float = math.sqrt(2) / 2,
+    real_shape: tuple[int, ...] | None = None,
 ) -> tuple[Float[Array, " n_bins"], Float[Array, " n_bins"], Float[Array, ""]]:
     """Compute the fourier ring correlation for two images.
 
@@ -124,6 +136,10 @@ def compute_fourier_ring_correlation(
         Maximum frequency bin. By default, `math.sqrt(2) / 2`. This is
         not measured in inverse angstroms, even if `radial_frequency_grid`
         is in inverse angstroms.
+    - `real_shape`:
+        The real-space shape of the `rfftn` input images. Used to weight
+        each mode by its Hermitian multiplicity. If `None`, the last
+        (real-transformed) axis is assumed to be odd.
 
     **Returns:**
 
@@ -144,6 +160,7 @@ def compute_fourier_ring_correlation(
         threshold=threshold,
         minimum_frequency=minimum_frequency,
         maximum_frequency=maximum_frequency,
+        real_shape=real_shape,
     )
     return frc_curve, frequency_bins, frequency_threshold
 
@@ -157,6 +174,7 @@ def compute_fourier_shell_correlation(
     *,
     minimum_frequency: float = 0.0,
     maximum_frequency: float = math.sqrt(2) / 2,
+    real_shape: tuple[int, ...] | None = None,
 ) -> tuple[Float[Array, " n_bins"], Float[Array, " n_bins"], Float[Array, ""]]:
     """Compute the fourier shell correlation for two voxel maps.
 
@@ -180,6 +198,10 @@ def compute_fourier_shell_correlation(
         By default, `threshold = 0.5` for two 'known' volumes according to
         the half-bit criterion. If using half-maps derived from ab initio
         refinements, set `threshold = 0.143` by convention.
+    - `real_shape`:
+        The real-space shape of the `rfftn` input volumes. Used to weight
+        each mode by its Hermitian multiplicity. If `None`, the last
+        (real-transformed) axis is assumed to be odd.
 
     **Returns:**
 
@@ -225,6 +247,7 @@ def compute_fourier_shell_correlation(
         threshold=threshold,
         minimum_frequency=minimum_frequency,
         maximum_frequency=maximum_frequency,
+        real_shape=real_shape,
     )
     return fsc_curve, frequency_bins, frequency_threshold
 
@@ -239,6 +262,7 @@ def _compute_fourier_correlation(
     threshold: float | Float[Array, ""],
     minimum_frequency: float,
     maximum_frequency: float,
+    real_shape: tuple[int, ...] | None,
 ) -> tuple[Float[Array, " n_bins"], Float[Array, " n_bins"], Float[Array, ""]]:
     # Compute FSC/FRC radially averaged 1D profile
     correlation_map = (
@@ -252,6 +276,7 @@ def _compute_fourier_correlation(
         correlation_map,
         radial_frequency_grid,
         frequency_bins,
+        weights=_resolve_rfftn_multiplicity(fourier_array_1.shape, real_shape),
     )
     # Find where FSC/FRC drops below the specified threshold
     # TODO: Add van heel criterion.
@@ -278,3 +303,13 @@ def _make_radial_frequency_bins(shape, minimum_frequency, maximum_frequency, pix
     q_step = 1.0 / max(*shape)
     n_bins = 1 + int((q_max - q_min) / q_step)
     return jnp.linspace(q_min, q_max, n_bins) / pixel_size
+
+
+def _resolve_rfftn_multiplicity(rfftn_shape, real_shape):
+    # Hermitian multiplicity of each mode of an `rfftn` array, broadcasting
+    # along the last axis. When `real_shape` is not given, assume the last
+    # (real-transformed) axis is odd, i.e. the final rfft column is an ordinary
+    # conjugate-pair mode rather than a self-conjugate Nyquist mode.
+    if real_shape is None:
+        real_shape = (*rfftn_shape[:-1], 2 * rfftn_shape[-1] - 1)
+    return make_rfftn_multiplicity(real_shape)

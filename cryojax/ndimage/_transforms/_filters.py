@@ -15,6 +15,7 @@ from ...jax_util import FloatLike, NDArrayLike
 from .._coordinates import make_frequency_grid
 from .._edges import resize_with_crop_or_pad
 from .._fourier_statistics import compute_binned_powerspectrum
+from .._fourier_utils import make_rfftn_multiplicity
 from .._radial_average import radial_average_to_grid
 from ._base_transform import AbstractImageTransform
 
@@ -141,8 +142,10 @@ class WhiteningFilter(AbstractFilter, strict=True):
     to be the inverse square root of the 2D radially averaged
     power spectrum.
 
-    This implementation follows the cisTEM whitening filter
-    algorithm.
+    The filter is normalized to preserve the mean and variance of
+    the image it is applied to: the zero-frequency (mean) mode is
+    left unchanged and the remaining modes are rescaled so that a
+    white-noise input maps to the identity filter.
     """
 
     array: Inexact[Array, "y_dim x_dim"]
@@ -152,8 +155,8 @@ class WhiteningFilter(AbstractFilter, strict=True):
         images: Float[NDArrayLike, "_ _"] | Float[NDArrayLike, "_ _ _"],
         shape: tuple[int, int] | None = None,
         *,
-        interpolation_mode: str = "linear",
-        outputs_squared: bool = False,
+        interp: str = "linear",
+        squared: bool = False,
     ):
         """**Arguments:**
 
@@ -162,19 +165,22 @@ class WhiteningFilter(AbstractFilter, strict=True):
         - `shape`:
             The shape of the resulting filter. This downsamples or
             upsamples the filter by cropping or padding in real space.
-        - `interpolation_mode`:
+        - `interp`:
             The method of interpolating the binned, radially averaged
             power spectrum onto a 2D grid. Either `nearest` or `linear`.
-        - `outputs_squared`:
+        - `squared`:
             If `False`, the whitening filter is the inverse square root of the image
             power. If `True`, the filter is the inverse of the image power.
         """
-        images = jnp.expand_dims(images, 0) if images.ndim == 2 else jnp.asarray(images)
+        images = jnp.asarray(images)
+        if images.ndim not in (2, 3):
+            raise ValueError(
+                "`WhiteningFilter` expects a single image or a stack of images, i.e. "
+                f"an array of dimension 2 or 3, but got an array of shape {images.shape}."
+            )
+        images = jnp.expand_dims(images, 0) if images.ndim == 2 else images
         self.array = _compute_whitening_filter(
-            images,
-            shape,
-            interpolation_mode=interpolation_mode,
-            outputs_squared=outputs_squared,
+            images, shape, interp=interp, squared=squared
         )
 
     @override
@@ -219,70 +225,71 @@ def _compute_lowpass_filter(
 
 
 def _compute_whitening_filter(
-    image_stack: Float[Array, "n_images y_dim x_dim"],
+    images: Float[Array, "n_images y_dim x_dim"],
     shape: tuple[int, int] | None,
     *,
-    interpolation_mode: str,
-    outputs_squared: bool,
+    interp: str,
+    squared: bool,
 ) -> Float[Array, "{shape[0]} {shape[1]}"]:
-    # Make coordinates
-    frequency_grid = make_frequency_grid(image_stack.shape[1:])
-    # Transform to fourier space
-    n_pixels = math.prod(image_stack.shape[1:])
-    fourier_image_stack = jnp.fft.rfftn(image_stack, axes=(1, 2)) / jnp.sqrt(n_pixels)
-    # Compute norms
-    radial_frequency_grid = jnp.linalg.norm(frequency_grid, axis=-1)
-    # Compute stack of power spectra
-    compute_powerspectrum_stack = jax.vmap(
+    # Radially average the power spectrum over the image stack
+    radial_freqs = jnp.linalg.norm(make_frequency_grid(images.shape[1:]), axis=-1)
+    n_pixels = math.prod(images.shape[1:])
+    fourier_images = jnp.fft.rfftn(images, axes=(1, 2)) / jnp.sqrt(n_pixels)
+    compute_power_stack = jax.vmap(
         lambda im, freq: compute_binned_powerspectrum(
-            im, freq, maximum_frequency=math.sqrt(2) / 2
+            im,
+            freq,
+            maximum_frequency=math.sqrt(2) / 2,
+            real_shape=(images.shape[1], images.shape[2]),
         ),
         in_axes=[0, None],
         out_axes=(0, None),
     )
-    binned_powerspectrum_stack, frequency_bins = compute_powerspectrum_stack(
-        fourier_image_stack, radial_frequency_grid
+    power_stack, freq_bins = compute_power_stack(fourier_images, radial_freqs)
+    radial_power = jnp.mean(power_stack, axis=0)
+    # Interpolate the radial profile onto a 2D grid, optionally resampling
+    # it to a different shape
+    power = radial_average_to_grid(
+        radial_power, freq_bins, radial_freqs, interpolation_mode=interp
     )
-    # Take the mean over the stack
-    binned_powerspectrum = jnp.mean(binned_powerspectrum_stack, axis=0)
-    # Put onto a grid
-    binned_powerspectrum_on_grid = radial_average_to_grid(
-        binned_powerspectrum,
-        frequency_bins,
-        radial_frequency_grid,
-        interpolation_mode=interpolation_mode,
-    )
-    # Resize to be the desired shape
+    out_shape = shape if shape is not None else (images.shape[1], images.shape[2])
     if shape is not None:
-        new_shape = shape
-        binned_powerspectrum_on_grid = jnp.fft.rfftn(
-            resize_with_crop_or_pad(
-                jnp.fft.irfftn(binned_powerspectrum_on_grid, s=image_stack.shape[1:]),
-                shape,
-                mode="edge",
-            )
-        ).real
-        # ... resizing and going back to fourier space can introduce negative values
-        binned_powerspectrum_on_grid = jnp.where(
-            binned_powerspectrum_on_grid < 0,
-            0.0,
-            binned_powerspectrum_on_grid,
-        )
-    else:
-        new_shape = image_stack.shape[1], image_stack.shape[2]
-    # Compute inverse square root (or inverse square)
-    inverse_fn = jax.lax.reciprocal if outputs_squared else jax.lax.rsqrt
-    whitening_filter = jnp.where(
-        jnp.isclose(binned_powerspectrum_on_grid, 0.0),
-        0.0,
-        inverse_fn(binned_powerspectrum_on_grid),
-    )
-    # Set zero mode to 0, defining the filter to zero out these modes
-    whitening_filter = whitening_filter.at[0, 0].set(0.0)
-    # If the image size is even, there can be an issue with the nyquist corner
-    if new_shape[0] % 2 == 0 and new_shape[1] % 2 == 0:
-        whitening_filter = whitening_filter.at[new_shape[0] // 2, new_shape[1] // 2].set(
-            0.0
-        )
+        power = _resize_power_spectrum(power, (images.shape[1], images.shape[2]), shape)
+    # Invert the power to get the (unnormalized) whitening filter, guarding
+    # against division by zero
+    inverse_fn = jax.lax.reciprocal if squared else jax.lax.rsqrt
+    is_zero = jnp.isclose(power, 0.0)
+    whitening_filter = jnp.where(is_zero, 0.0, inverse_fn(power))
+    # Normalize to preserve the mean and variance of the filtered image: keep
+    # the zero-frequency (mean) mode at unity and rescale the remaining modes
+    # so that a white-noise input (flat power) maps to the identity filter.
+    # The mean power is weighted by the Hermitian multiplicity of each rfft
+    # mode (see `_rfft_mode_multiplicity`) so that the total image variance,
+    # which sums over the full frequency grid, is preserved exactly.
+    is_ac = is_zero.at[0, 0].set(True)  # exclude DC and empty modes
+    weights = jnp.where(is_ac, 0.0, make_rfftn_multiplicity(out_shape))
+    mean_power = jnp.sum(weights * power) / jnp.sum(weights)
+    scale = mean_power if squared else jnp.sqrt(mean_power)
+    whitening_filter = (scale * whitening_filter).at[0, 0].set(1.0)
 
     return whitening_filter
+
+
+def _resize_power_spectrum(
+    power: Float[Array, "y_dim x_dim//2+1"],
+    source_shape: tuple[int, int],
+    target_shape: tuple[int, int],
+) -> Float[Array, "{target_shape[0]} {target_shape[1]}//2+1"]:
+    # Resample the (radially symmetric) power spectrum to a new shape by
+    # cropping/padding its real-space autocorrelation kernel. The kernel must
+    # be centered (fftshift) before resizing so its zero-lag peak sits at the
+    # array center, otherwise the crop/pad (which operates about the center)
+    # discards the peak. This shift used to be baked into the
+    # `cryojax.ndimage.irfftn`/`rfftn` wrappers and is now applied explicitly.
+    kernel = jnp.fft.fftshift(jnp.fft.irfftn(power, s=source_shape))
+    resized = jnp.fft.ifftshift(
+        resize_with_crop_or_pad(kernel, target_shape, mode="edge")
+    )
+    power = jnp.fft.rfftn(resized).real
+    # ... resampling can introduce small negative values
+    return jnp.where(power < 0, 0.0, power)

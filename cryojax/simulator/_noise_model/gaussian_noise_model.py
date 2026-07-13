@@ -17,6 +17,7 @@ from ...ndimage import (
     AbstractFourierOperator,
     AbstractMask,
     FourierConstant,
+    make_rfftn_multiplicity,
 )
 from .._image_model import AbstractImageModel
 from .base_noise_model import AbstractEmpiricalNoiseModel, AbstractLikelihoodNoiseModel
@@ -388,15 +389,12 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
         log_likelihood_per_mode = (
             squared_standard_normal_per_mode + jnp.log(2 * jnp.pi * variance) / 2
         )
-        # Compute log-likelihood, throwing away the zero mode. Need to take care
-        # to compute the loss function in fourier space for a real-valued function.
-        log_likelihood = (
-            -1.0
-            * (
-                jnp.sum(log_likelihood_per_mode[1:, 0])
-                + 2 * jnp.sum(log_likelihood_per_mode[:, 1:])
-            )
-            / n_pixels
-        )
+        # Sum over fourier modes, throwing away the zero (mean) mode. Since the
+        # observed data is real-valued, each rfft mode is weighted by its
+        # Hermitian multiplicity (interior columns count twice; the zero and
+        # even-width Nyquist columns count once).
+        multiplicity = make_rfftn_multiplicity(self.image_model.image_config.shape)
+        log_likelihood_per_mode = log_likelihood_per_mode.at[0, 0].set(0.0)
+        log_likelihood = -jnp.sum(multiplicity * log_likelihood_per_mode) / n_pixels
 
         return log_likelihood

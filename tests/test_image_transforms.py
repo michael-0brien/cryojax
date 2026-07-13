@@ -109,10 +109,78 @@ def test_custom_filter_and_mask_initialization():
 def test_whitening_filter(image_shape, filter_shape, mode, square):
     rng_key = jax.random.key(1234)
     image = jax.random.normal(rng_key, image_shape)
-    f = im.WhiteningFilter(
-        image, shape=filter_shape, interpolation_mode=mode, outputs_squared=square
+    f = im.WhiteningFilter(image, shape=filter_shape, interp=mode, squared=square)
+    array = f.get()
+    # Output is an rfft-shaped filter of the (resized) spatial shape
+    spatial_shape = filter_shape if filter_shape is not None else image_shape[-2:]
+    assert array.shape == (spatial_shape[0], spatial_shape[1] // 2 + 1)
+    assert jnp.all(jnp.isfinite(array))
+    # The mean (zero-frequency) mode is preserved
+    assert array[0, 0] == 1.0
+
+
+def test_whitening_filter_wrong_ndim_raises():
+    with pytest.raises(ValueError, match="dimension 2 or 3"):
+        im.WhiteningFilter(jnp.zeros((2, 3, 10, 10)))
+
+
+@pytest.mark.parametrize("squared", [False, True])
+def test_whitening_filter_white_noise_is_identity(squared):
+    # A white-noise input has a flat power spectrum, so a mean- and
+    # variance-preserving whitening filter should reduce to the identity.
+    images = jax.random.normal(jax.random.key(0), (128, 64, 64))
+    array = im.WhiteningFilter(images, squared=squared).get()
+    assert array[0, 0] == 1.0
+    assert jnp.abs(jnp.mean(array) - 1.0) < 0.02
+    assert jnp.std(array) < 0.1
+
+
+def test_whitening_filter_preserves_mean():
+    # The zero-frequency mode is unity, so filtering leaves the mean unchanged
+    noise = jax.random.normal(jax.random.key(1), (64, 64, 64))
+    images = jnp.cumsum(noise, axis=1)
+    whitening_filter = im.WhiteningFilter(images).get()
+    filtered = jnp.fft.irfftn(
+        jnp.fft.rfftn(images, axes=(1, 2)) * whitening_filter, s=(64, 64), axes=(1, 2)
     )
-    _ = f.get()
+    assert jnp.allclose(jnp.mean(filtered), jnp.mean(images), atol=1e-5)
+
+
+@pytest.mark.parametrize("shape", [(48, 48), (64, 63), (33, 40)])
+def test_whitening_filter_variance_normalization_is_exact(shape):
+    # The filter is normalized so that an input matching the estimated power
+    # spectrum has its total variance preserved exactly. Since the variance
+    # sums over the full frequency grid, the weighted mean of 1 / filter**2
+    # (weighting each rfft mode by its Hermitian multiplicity) must be exactly
+    # one. This fails if the normalization ignores the multiplicity.
+    images = jax.random.normal(jax.random.key(1), (64, *shape))
+    array = np.asarray(im.WhiteningFilter(images).get())
+    # Independently derived Hermitian multiplicity of each rfft mode
+    x_size = shape[1] // 2 + 1
+    multiplicity = np.full(x_size, 2.0)
+    multiplicity[0] = 1.0
+    if shape[1] % 2 == 0:
+        multiplicity[-1] = 1.0
+    multiplicity = np.broadcast_to(multiplicity, array.shape).copy()
+    is_ac = ~np.isclose(array, 0.0)
+    is_ac[0, 0] = False
+    inverse_power = np.where(is_ac, 1.0 / np.where(is_ac, array, 1.0) ** 2, 0.0)
+    weighted_mean = np.sum(multiplicity * inverse_power) / np.sum(multiplicity * is_ac)
+    assert weighted_mean == pytest.approx(1.0, abs=1e-4)
+
+
+def test_whitening_filter_downsample_regression():
+    # Regression test for the resize path: the real-space autocorrelation
+    # kernel must be centered before cropping. Without the fftshift/ifftshift,
+    # downsampling discards the kernel peak and the white-noise filter is no
+    # longer close to the identity.
+    images = jax.random.normal(jax.random.key(2), (128, 64, 64))
+    array = im.WhiteningFilter(images, shape=(32, 32)).get()
+    assert array.shape == (32, 32 // 2 + 1)
+    assert jnp.all(jnp.isfinite(array))
+    assert array[0, 0] == 1.0
+    assert jnp.abs(jnp.mean(array) - 1.0) < 0.05
+    assert jnp.std(array) < 0.15
 
 
 @pytest.mark.parametrize("use_rfft", [False])

@@ -345,6 +345,31 @@ def test_frc_fsc_jit(shape):
         )
 
 
+@pytest.mark.parametrize(
+    "shape, expected",
+    [
+        ((8, 8), [1.0, 2.0, 2.0, 2.0, 1.0]),  # even width: Nyquist column weight 1
+        ((8, 7), [1.0, 2.0, 2.0, 2.0]),  # odd width: last column weight 2
+        ((5, 6, 10), [1.0, 2.0, 2.0, 2.0, 2.0, 1.0]),  # 3D uses the last axis
+    ],
+)
+def test_rfftn_multiplicity(shape, expected):
+    np.testing.assert_array_equal(im.make_rfftn_multiplicity(shape), np.array(expected))
+
+
+@pytest.mark.parametrize("shape", [(8, 8), (8, 7), (7, 7), (6, 10)])
+def test_standardize_fft_matches_real_space(shape):
+    # Standardizing in Fourier space must give unit real-space standard
+    # deviation. This requires the correct Hermitian mode multiplicity; for
+    # even widths the old accounting (Nyquist column weighted twice) was wrong.
+    image = jr.normal(jr.key(0), shape)
+    fourier_image = jnp.fft.rfftn(image)
+    standardized = jnp.fft.irfftn(
+        im.standardize_fft(fourier_image, real_shape=shape), s=shape
+    )
+    assert float(jnp.std(standardized)) == pytest.approx(1.0, abs=1e-5)
+
+
 # #
 # # Pixel size rescaling
 # #
