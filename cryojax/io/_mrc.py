@@ -2,6 +2,7 @@
 Routines for working with MRC files.
 """
 
+import builtins
 import pathlib
 from typing import Literal, cast, overload
 
@@ -9,6 +10,8 @@ import mrcfile
 import numpy as np
 from jaxtyping import Array, Float
 
+
+_LFS_POINTER_PREFIX = b"version https://git-lfs.github.com/spec/v1"
 
 @overload
 def read_array_from_mrc(
@@ -233,9 +236,8 @@ def _validate_filename_and_return_suffix(filename: str | pathlib.Path):
 
 def _check_for_lfs_pointer(filename: str | pathlib.Path) -> None:
     """Check if a file is a Git LFS pointer and raise a helpful error if so."""
-    _LFS_POINTER_PREFIX = b"version https://git-lfs.github.com/spec/v1"
     try:
-        with open(filename, "rb") as f:
+        with builtins.open(filename, "rb") as f:
             header_bytes = f.read(len(_LFS_POINTER_PREFIX))
     except OSError:
         return
