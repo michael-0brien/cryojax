@@ -1,5 +1,6 @@
 import cryojax.simulator as cxs
 import equinox as eqx
+import jax
 import numpy as np
 import pytest
 from cryojax.io import read_array_from_mrc, read_atoms_from_pdb
@@ -10,6 +11,9 @@ from cryojax.ndimage import (
     crop_to_shape,
     pad_to_shape,
 )
+
+
+jax.config.update("jax_enable_x64", True)
 
 
 @pytest.fixture
@@ -271,6 +275,73 @@ def test_bg_subtract(voxel_info):
     )
     image = compute_image(image_model)
     np.testing.assert_allclose(image[:, 0], 0.0, atol=5e-2)
+
+
+@pytest.mark.parametrize(
+    "crops, masked, uses_fast_path",
+    [
+        (False, False, True),  # fourier fast path via standardize_fft
+        (True, False, False),  # cropping forces the real-space round trip
+        (False, True, False),  # masking forces the real-space round trip
+    ],
+)
+def test_postprocess_fourier_matches_real_space(
+    crops, masked, uses_fast_path, voxel_info, monkeypatch
+):
+    # For a mean-normalized model, a fourier-space output must equal the rfftn
+    # of the real-space output regardless of whether the optimized
+    # `standardize_fft` path or the real-space round trip is taken. We also
+    # assert that the intended path actually runs, since both paths agree
+    # numerically and equivalence alone would not catch a broken condition.
+    import cryojax.simulator._image_model as image_model_module
+
+    real_standardize_fft = image_model_module.standardize_fft
+    call_count = 0
+
+    def standardize_fft_spy(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        return real_standardize_fft(*args, **kwargs)
+
+    monkeypatch.setattr(image_model_module, "standardize_fft", standardize_fft_spy)
+
+    real_voxels, voxel_size = voxel_info
+    dim = real_voxels.shape[0]
+    image_config = cxs.BasicImageConfig(
+        shape=(dim, dim),
+        pixel_size=voxel_size,
+        voltage_in_kilovolts=300.0,
+        padded_shape=(dim + 4, dim + 4) if crops else (dim, dim),
+    )
+    voxel_volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxels)
+    image_model = cxs.make_image_model(
+        voxel_volume,
+        image_config,
+        pose=cxs.EulerAnglePose(),
+        transfer_theory=cxs.ContrastTransferTheory(cxs.AstigmaticCTF()),
+        normalizes_signal=True,
+        signal_centering="mean",
+    )
+    mask = (
+        CircularCosineMask(
+            image_config.get_coordinate_grid(physical=False), radius=10, rolloff_width=0
+        )
+        if masked
+        else None
+    )
+    real_image = image_model.simulate(outputs_real_space=True, mask=mask)
+    # ... a real-space output never takes the fourier fast path
+    assert call_count == 0
+    fourier_image = image_model.simulate(outputs_real_space=False, mask=mask)
+    # ... the fourier fast path calls `standardize_fft` exactly when the round
+    # trip can be skipped
+    assert (call_count == 1) == uses_fast_path
+    # The tests run under `jax_enable_x64`, so the fast path (a genuinely
+    # different computation) agrees with the real-space path to float64
+    # machine precision, and the round-trip cases are bit-identical.
+    np.testing.assert_allclose(
+        fourier_image, np.fft.rfftn(real_image), atol=1e-10, rtol=1e-10
+    )
 
 
 @eqx.filter_jit

@@ -19,6 +19,7 @@ from ..ndimage import (
     AbstractMask,
     compute_edge_value,
     crop_to_shape,
+    standardize_fft,
 )
 from ._detector import AbstractDetector
 from ._image_config import AbstractImageConfig, DoseImageConfig
@@ -173,6 +174,20 @@ class AbstractImageModel(eqx.Module, strict=True):
                             "was expected."
                         )
                 fourier_image = filter_c(fourier_image)
+            # ... zero-mean, unit-standard-deviation normalization over the
+            # whole image is reproduced exactly in fourier space by
+            # `standardize_fft`. When there is no cropping or masking and a
+            # fourier-space image is requested, use it to avoid a round trip
+            # to real space.
+            if (
+                not outputs_real_space
+                and mask_c is None
+                and image_config.padded_shape == image_config.shape
+                and self.normalizes_signal
+                and self.signal_centering == "mean"
+                and self.signal_region is None
+            ):
+                return standardize_fft(fourier_image, real_shape=image_config.shape)
             padded_image = jnp.fft.irfftn(fourier_image, s=image_config.padded_shape)
             if image_config.padded_shape != image_config.shape:
                 image = crop_to_shape(padded_image, image_config.shape)
