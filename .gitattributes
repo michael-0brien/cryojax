@@ -1,4 +1,2 @@
 *.ipynb linguist-vendored
-docs/examples/data/*.mrc filter=lfs diff=lfs merge=lfs -text
-docs/examples/data/*.mrcs filter=lfs diff=lfs merge=lfs -text
 docs/examples/data/*.pdb filter=lfs diff=lfs merge=lfs -text

@@ -61,6 +61,9 @@ def read_array_from_mrc(
     """
     # Validate filename as MRC path
     _ = _validate_filename_and_return_suffix(filename)
+    # Check for Git LFS pointer files, which occur when the repository is cloned
+    # without Git LFS installed or without running `git lfs pull`.
+    _check_for_lfs_pointer(filename)
     # Read MRC
     open = mrcfile.mmap if mmap else mrcfile.open
     with open(filename, mode="r", permissive=permissive) as mrc:
@@ -226,3 +229,20 @@ def _validate_filename_and_return_suffix(filename: str | pathlib.Path):
             f"Filename should include .mrc or .mrcs suffix. Got filename {filename}."
         )
     return suffixes[0]
+
+
+def _check_for_lfs_pointer(filename: str | pathlib.Path) -> None:
+    """Check if a file is a Git LFS pointer and raise a helpful error if so."""
+    _LFS_POINTER_PREFIX = b"version https://git-lfs.github.com/spec/v1"
+    try:
+        with open(filename, "rb") as f:
+            header_bytes = f.read(len(_LFS_POINTER_PREFIX))
+    except OSError:
+        return
+    if header_bytes == _LFS_POINTER_PREFIX:
+        raise OSError(
+            f"'{filename}' appears to be a Git LFS pointer file rather than actual "
+            "MRC data. This happens when the repository is cloned without Git LFS "
+            "installed. To fix this, install Git LFS (https://git-lfs.com) and run "
+            "`git lfs pull` in the repository root."
+        )
