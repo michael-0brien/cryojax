@@ -135,72 +135,62 @@ class AbstractImageModel(eqx.Module, strict=True):
     ) -> Array:
         """Return an image postprocessed with filters, cropping, masking,
         and normalization in either real or fourier space.
+
+        A `filter` is given at `image_config.padded_shape` (as an `rfftn`
+        array) and is applied in fourier space before cropping, so that it
+        precedes normalization and masking.
         """
         image_config = self.image_config
-        mask_c, filter_c = self._compose_transform(mask, filter)
-        if (
-            mask_c is None
-            and image_config.padded_shape == image_config.shape
-            and not self.normalizes_signal
-        ):
-            # ... if there are no masks, we don't need to crop, and we are
-            # not normalizing, minimize moving back and forth between real
-            # and fourier space
-            if filter_c is not None:
-                fourier_image = filter_c(fourier_image)
+        shape, padded_shape = image_config.shape, image_config.padded_shape
+        config_name = image_config.__class__.__name__
+        composed_mask, composed_filter = self._compose_transform(mask, filter)
+        crops_image = padded_shape != shape
+        padded_rfft_shape = (padded_shape[0], padded_shape[1] // 2 + 1)
+        if filter is not None and filter.get().shape != padded_rfft_shape:
+            raise ValueError(
+                f"Found that the `filter` was shape {filter.get().shape}, but "
+                f"expected it to be shape {padded_rfft_shape}. You may have "
+                f"passed a filter according to the `{config_name}.shape`, when "
+                f"the `{config_name}.padded_shape` was expected."
+            )
+        # ... masking, bg-centering, and normalizing over a `signal_region` all
+        # read real-space pixels. Without them, every remaining step can be done
+        # in fourier space.
+        can_finish_in_fourier = composed_mask is None and (
+            not self.normalizes_signal
+            or (self.signal_centering == "mean" and self.signal_region is None)
+        )
+        # ... apply the filter in fourier space, before any crop
+        if composed_filter is not None:
+            fourier_image = composed_filter(fourier_image)
+        # ... fast path: with no crop the image is already in fourier space at
+        # `shape`, so avoid moving back and forth between real and fourier
+        # space. Any normalization that remains is a plain zero-mean,
+        # unit-standard-deviation rescaling, which `standardize_fft` reproduces
+        # exactly in fourier space.
+        if not crops_image and can_finish_in_fourier:
+            if self.normalizes_signal:
+                fourier_image = standardize_fft(fourier_image, real_shape=shape)
             return (
-                jnp.fft.irfftn(fourier_image, s=image_config.shape)
+                jnp.fft.irfftn(fourier_image, s=shape)
                 if outputs_real_space
                 else fourier_image
             )
-        else:
-            # ... otherwise, apply filter, crop, and mask, again trying to
-            # minimize moving back and forth between real and fourier space
-            padded_rfft_shape = (
-                image_config.padded_shape[0],
-                image_config.padded_shape[1] // 2 + 1,
-            )
-            if filter_c is not None:
-                # ... apply the filter
-                if filter is not None:
-                    if not filter.get().shape == padded_rfft_shape:
-                        raise ValueError(
-                            "Found that the `filter` was shape "
-                            f"{filter.get().shape}, but expected it to be "
-                            f"shape {padded_rfft_shape}. You may have passed a "
-                            f"filter according to the "
-                            f"`{image_config.__class__.__name__}.shape`, "
-                            f"when the `{image_config.__class__.__name__}.padded_shape` "
-                            "was expected."
-                        )
-                fourier_image = filter_c(fourier_image)
-            # ... zero-mean, unit-standard-deviation normalization over the
-            # whole image is reproduced exactly in fourier space by
-            # `standardize_fft`. When there is no cropping or masking and a
-            # fourier-space image is requested, use it to avoid a round trip
-            # to real space.
-            if (
-                not outputs_real_space
-                and mask_c is None
-                and image_config.padded_shape == image_config.shape
-                and self.normalizes_signal
-                and self.signal_centering == "mean"
-                and self.signal_region is None
-            ):
-                return standardize_fft(fourier_image, real_shape=image_config.shape)
-            padded_image = jnp.fft.irfftn(fourier_image, s=image_config.padded_shape)
-            if image_config.padded_shape != image_config.shape:
-                image = crop_to_shape(padded_image, image_config.shape)
-            else:
-                image = padded_image
-            if self.normalizes_signal:
-                if self.signal_centering == "mean":
-                    image = self._mean_subtract_normalize(image)
-                elif self.signal_centering == "bg":
-                    image = self._bg_subtract_normalize(image, padded_image)
-            if mask_c is not None:
-                image = mask_c(image)
-            return image if outputs_real_space else jnp.fft.rfftn(image)
+        # ... otherwise go to real space, both to crop and to make the padded
+        # image available for background estimation
+        padded_image = jnp.fft.irfftn(fourier_image, s=padded_shape)
+        image = crop_to_shape(padded_image, shape) if crops_image else padded_image
+        if self.normalizes_signal:
+            if self.signal_centering == "mean":
+                image = self._mean_subtract_normalize(image)
+            elif self.signal_centering == "bg":
+                # ... the filter is applied before the `irfftn` above, so the
+                # padded image carries it and its background correctly describes
+                # the filtered image
+                image = self._bg_subtract_normalize(image, padded_image)
+        if composed_mask is not None:
+            image = composed_mask(image)
+        return image if outputs_real_space else jnp.fft.rfftn(image)
 
     def _phase_shift_translate(self, fourier_image: Array) -> Array:
         phase_shifts = self.pose.compute_translation_operator(
@@ -254,12 +244,12 @@ class AbstractImageModel(eqx.Module, strict=True):
 
         return image
 
-    def _bg_subtract_normalize(self, image: Array, padded_image: Array) -> Array:
+    def _bg_subtract_normalize(self, image: Array, background_image: Array) -> Array:
         signal_region = (
             None if self.signal_region is None else jnp.asarray(self.signal_region)
         )
         bg_value, std = (
-            compute_edge_value(padded_image),
+            compute_edge_value(background_image),
             jnp.std(image, where=signal_region),
         )
         image = (image - bg_value) / std

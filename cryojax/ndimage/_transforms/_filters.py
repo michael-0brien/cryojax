@@ -97,7 +97,7 @@ class LowpassFilter(AbstractFilter, strict=True):
 
 
 class HighpassFilter(AbstractFilter, strict=True):
-    """Apply a low-pass filter to an image or volume, with
+    """Apply a high-pass filter to an image or volume, with
     a cosine soft-edge.
     """
 

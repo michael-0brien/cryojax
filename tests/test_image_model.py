@@ -329,12 +329,12 @@ def test_postprocess_fourier_matches_real_space(
         if masked
         else None
     )
+    # ... normalization is reproduced in fourier space by `standardize_fft`
+    # whenever no real-space step remains, for a real *or* fourier output
     real_image = image_model.simulate(outputs_real_space=True, mask=mask)
-    # ... a real-space output never takes the fourier fast path
-    assert call_count == 0
+    assert (call_count == 1) == uses_fast_path
+    call_count = 0
     fourier_image = image_model.simulate(outputs_real_space=False, mask=mask)
-    # ... the fourier fast path calls `standardize_fft` exactly when the round
-    # trip can be skipped
     assert (call_count == 1) == uses_fast_path
     # The tests run under `jax_enable_x64`, so the fast path (a genuinely
     # different computation) agrees with the real-space path to float64

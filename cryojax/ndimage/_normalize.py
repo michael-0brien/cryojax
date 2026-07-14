@@ -115,7 +115,10 @@ def rescale_fft(
     # Nyquist mode).
     real_shape = real_shape if real_shape is not None else (n1, 2 * n2 - 1)
     n_pixels = math.prod(real_shape) if input_is_rfft else n1 * n2
-    fourier_image_zero_mean = fourier_image.at[0, 0].set(0.0)
+    # Mask the zero-frequency mode with an iota-derived `where` rather than an
+    # `at[...].set(...)`, which scatters and can break fusion
+    is_zero_mode = (jnp.arange(n1)[:, None] == 0) & (jnp.arange(n2)[None, :] == 0)
+    fourier_image_zero_mean = jnp.where(is_zero_mode, 0.0, fourier_image)
     if input_is_rfft:
         # The full-grid L2 norm weights each rfft mode by its Hermitian
         # multiplicity (interior columns count twice; the zero and even-width
@@ -128,7 +131,7 @@ def rescale_fft(
         image_std = jnp.linalg.norm(fourier_image_zero_mean)
     image_std = image_std / n_pixels
     normalized_image = fourier_image_zero_mean / image_std
-    rescaled_image = (normalized_image * std).at[0, 0].set(mean * n_pixels)
+    rescaled_image = jnp.where(is_zero_mode, mean * n_pixels, normalized_image * std)
 
     return rescaled_image
 
