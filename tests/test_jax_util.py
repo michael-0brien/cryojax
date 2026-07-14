@@ -9,6 +9,14 @@ from cryojax.io import read_array_from_mrc
 from jaxtyping import Array
 
 
+try:
+    import lineax as lx
+except ModuleNotFoundError:
+    lx = None
+
+_skip_without_lineax = pytest.mark.skipif(lx is None, reason="lineax not installed")
+
+
 #
 # Test PyTree transforms
 #
@@ -121,19 +129,21 @@ def image_model(voxel_volume, image_config):
     return cxs.make_image_model(voxel_volume, image_config, pose)
 
 
+@_skip_without_lineax
 def test_simulate_equality(image_model):
     linear_operator, vector = jxu.make_linear_operator(
         fn=lambda x: x.simulate(),
         args=image_model,
-        where_vector=lambda x: x.volume.fourier_voxel_grid,
+        where_vector=lambda x: x.volume.values,
     )
     image_cxs = image_model.simulate()
     image_lx = linear_operator.mv(vector)
     np.testing.assert_allclose(image_cxs, image_lx)
 
 
+@_skip_without_lineax
 def test_linear_transpose(image_model):
-    where_vector = lambda x: x.volume.fourier_voxel_grid
+    where_vector = lambda x: x.volume.values
     linear_operator, _ = jxu.make_linear_operator(
         fn=lambda x: x.simulate(),
         args=image_model,
@@ -146,6 +156,7 @@ def test_linear_transpose(image_model):
     assert voxel_grid.shape == backprojection.shape
 
 
+@_skip_without_lineax
 def test_bad_linear_transpose(sample_pdb_path, image_config):
     image_model = cxs.make_image_model(
         cxs.load_tabulated_volume(sample_pdb_path, output_type=cxs.GaussianMixtureVolume),

@@ -171,6 +171,13 @@ class AbstractVoxelVolume(AbstractVolumeRepresentation, strict=True):
         to the different pixel size.
     """
 
+    values: eqx.AbstractVar[Inexact[Array, "..."]]
+
+    def get(self) -> Inexact[Array, "..."]:
+        """The voxel array, i.e. `self.values`. Whether it is a real-space or a
+        fourier-space array depends on the concrete class."""
+        return self.values
+
     @property
     @abc.abstractmethod
     def shape(self) -> tuple[int, ...]:
@@ -180,7 +187,7 @@ class AbstractVoxelVolume(AbstractVolumeRepresentation, strict=True):
     @classmethod
     @abc.abstractmethod
     def from_real_voxel_grid(
-        cls, real_voxel_grid: Float[NDArrayLike, "dim dim dim"]
+        cls, real_voxel_grid: Float[NDArrayLike, "dim dim dim"], /
     ) -> Self:
         """Load an `AbstractVoxelVolume` from a 3D grid in
         real-space.

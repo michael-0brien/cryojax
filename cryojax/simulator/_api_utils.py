@@ -1,5 +1,5 @@
 import pathlib
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Any, Literal, overload
 
 import equinox.internal as eqxi
@@ -15,7 +15,6 @@ from ..io import mmdf_to_atoms
 from ..jax_util import FloatLike, NDArrayLike
 from ..ndimage import (
     AbstractImageTransform,
-    make_coordinate_grid,
     variance_to_nspread,
 )
 from ._detector import AbstractDetector
@@ -38,7 +37,6 @@ from ._volume import (
     AbstractVolumeRenderFn,
     AutoVolumeProjection,
     FourierVoxelGridVolume,
-    FourierVoxelSplineVolume,
     GaussianFourierVolume,
     GaussianMixtureVolume,
     RealVoxelGridVolume,
@@ -619,6 +617,7 @@ def render_voxel_volume(  # pyright: ignore[reportOverlappingOverload]
     render_fn: AbstractVolumeRenderFn,
     *,
     output_type: type[FourierVoxelGridVolume] = FourierVoxelGridVolume,
+    options: Mapping[str, Any] = {},
 ) -> FourierVoxelGridVolume: ...
 
 
@@ -627,16 +626,8 @@ def render_voxel_volume(
     atom_volume: AbstractAtomVolume,
     render_fn: AbstractVolumeRenderFn,
     *,
-    output_type: type[FourierVoxelSplineVolume] = FourierVoxelSplineVolume,
-) -> FourierVoxelSplineVolume: ...
-
-
-@overload
-def render_voxel_volume(
-    atom_volume: AbstractAtomVolume,
-    render_fn: AbstractVolumeRenderFn,
-    *,
     output_type: type[RealVoxelGridVolume] = RealVoxelGridVolume,
+    options: Mapping[str, Any] = {},
 ) -> RealVoxelGridVolume: ...
 
 
@@ -645,9 +636,10 @@ def render_voxel_volume(
     render_fn: AbstractVolumeRenderFn,
     *,
     output_type: type[
-        FourierVoxelGridVolume | FourierVoxelSplineVolume | RealVoxelGridVolume
+        FourierVoxelGridVolume | RealVoxelGridVolume
     ] = FourierVoxelGridVolume,
-) -> FourierVoxelGridVolume | FourierVoxelSplineVolume | RealVoxelGridVolume:
+    options: Mapping[str, Any] = {},
+) -> FourierVoxelGridVolume | RealVoxelGridVolume:
     """Render a voxel volume representation from an atomistic one.
 
     !!! example "Simulate an image with Fourier slice extraction"
@@ -680,10 +672,12 @@ def render_voxel_volume(
     - `output_type`:
         The [`cryojax.simulator.AbstractVoxelVolume`][]
         implementation to output.
-        Either [`cryojax.simulator.FourierVoxelGridVolume`][] /
-        [`cryojax.simulator.FourierVoxelSplineVolume`][] for
-        fourier-space representations, or
+        Either [`cryojax.simulator.FourierVoxelGridVolume`][] for a
+        fourier-space representation, or
         [`cryojax.simulator.RealVoxelGridVolume`][] for real-space.
+    - `options`:
+        Options passed to the class constructor. See
+        `from_real_voxel_grid` for documentation.
 
 
     **Returns:**
@@ -698,22 +692,15 @@ def render_voxel_volume(
             "`render_fn.shape = (N, N, N)`. Got "
             f"`render_fn.shape = {render_fn.shape}`."
         )
-    if output_type == FourierVoxelGridVolume or output_type == FourierVoxelSplineVolume:
-        fourier_voxel_grid = render_fn(
-            atom_volume, outputs_real_space=False, outputs_rfft=True
-        )
-        if output_type == FourierVoxelGridVolume:
-            return FourierVoxelGridVolume.from_fourier_voxel_grid(fourier_voxel_grid)
-        else:
-            return FourierVoxelSplineVolume.from_fourier_voxel_grid(fourier_voxel_grid)
+    real_voxel_grid = render_fn(atom_volume, outputs_real_space=True)
+    if output_type == FourierVoxelGridVolume:
+        return FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid, **options)
     elif output_type == RealVoxelGridVolume:
-        coordinate_grid = make_coordinate_grid(render_fn.shape)
-        real_voxel_grid = render_fn(atom_volume, outputs_real_space=True)
-        return RealVoxelGridVolume(real_voxel_grid, coordinate_grid)
+        return RealVoxelGridVolume.from_real_voxel_grid(real_voxel_grid, **options)
     else:
         raise ValueError(
             f"Got `output_type = {output_type}`, but this is "
             "not supported by `render_voxel_volume(..., output_type=...)`."
-            "Valid values for `output_type` are `FourierVoxelGridVolume`, "
-            "`FourierVoxelSplineVolume`, or `RealVoxelGridVolume`."
+            "Valid values for `output_type` are `FourierVoxelGridVolume` "
+            "or `RealVoxelGridVolume`."
         )

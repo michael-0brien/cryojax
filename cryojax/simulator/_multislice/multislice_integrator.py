@@ -135,11 +135,11 @@ class FFTMultisliceIntegrator(
 
 def _sample_voxel_grid(volume: RealVoxelGridVolume):
     # Convert to logical coordinates
-    z_dim, y_dim, x_dim = volume.real_voxel_grid.shape
+    z_dim, y_dim, x_dim = volume.values.shape
     logical_coordinate_grid = (
-        volume.coordinate_grid_in_pixels
+        volume.coordinate_grid
         + jnp.asarray((x_dim // 2, y_dim // 2, z_dim // 2))[None, None, None, :]
     )
     # Convert arguments to map_coordinates convention and compute
     x, y, z = jnp.transpose(logical_coordinate_grid, axes=[3, 0, 1, 2])
-    return map_coordinates(volume.real_voxel_grid, (z, y, x), out_of_bounds_mode="fill")
+    return map_coordinates(volume.values, (z, y, x), mode="fill")

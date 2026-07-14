@@ -64,7 +64,6 @@ from ._volume import (
     EwaldSphereExtraction as EwaldSphereExtraction,
     FourierSliceExtraction as FourierSliceExtraction,
     FourierVoxelGridVolume as FourierVoxelGridVolume,
-    FourierVoxelSplineVolume as FourierVoxelSplineVolume,
     GaussianFourierProjection as GaussianFourierProjection,
     GaussianFourierRenderFn as GaussianFourierRenderFn,
     GaussianFourierVolume as GaussianFourierVolume,
@@ -88,6 +87,9 @@ _REMOVED = {
     "UncorrelatedGaussianNoiseModel": "GaussianWhiteNoiseModel",
     "CorrelatedGaussianNoiseModel": "GaussianColoredNoiseModel",
     "DiscreteStructuralEnsemble": None,
+    "FourierVoxelSplineVolume": (
+        'FourierVoxelGridVolume.from_real_voxel_grid(..., interp="cubic")'
+    ),
 }
 _MOVED = {
     "PengScatteringFactorParameters": "cryojax.constants",
