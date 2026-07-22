@@ -26,8 +26,7 @@ def compute_binned_powerspectrum(
     of radial bins.
 
     !!! warning
-        `radial_frequency_grid` must be built *without* a `grid_spacing`, so
-        that it is in units of inverse grid spacings:
+        `radial_frequency_grid` must be built in pixel-units:
 
         ```python
         from cryojax.ndimage import make_radial_frequency_grid
@@ -36,14 +35,16 @@ def compute_binned_powerspectrum(
         image, pixel_size = ...
         radial_frequency_grid = make_radial_frequency_grid(image.shape)
         powerspectrum, frequency_bins = compute_binned_powerspectrum(
-            jnp.fft.rfftn(image), radial_frequency_grid, pixel_size
+            jnp.fft.rfftn(image), radial_frequency_grid,
         )
         ```
 
-        The returned `frequency_bins` are in inverse angstroms, so that they
-        may be plotted directly. This is also true of the other fourier
-        statistics in `cryojax.ndimage`, such as
-        `compute_fourier_shell_correlation`.
+        When `grid_spacing` is also passed, the `frequency_bins` are
+        returned in inverse angstroms.
+
+        This convention is also true of
+        [`cryojax.ndimage.compute_fourier_shell_correlation`][] and
+        [`cryojax.ndimage.compute_fourier_ring_correlation`][].
 
     **Arguments:**
 
@@ -51,7 +52,7 @@ def compute_binned_powerspectrum(
         An image or volume in Fourier space.
     - `radial_frequency_grid`:
         The radial frequency coordinate system of `fourier_grid`, built
-        without a `grid_spacing`.
+        in pixel-units.
     - `grid_spacing`:
         The grid spacing (i.e. pixel or voxel size) of `fourier_grid`. This
         converts the returned `frequency_bins` to inverse angstroms, and does
@@ -166,29 +167,6 @@ def compute_fourier_shell_correlation(
     real_shape: tuple[int, ...] | None = None,
 ) -> tuple[Float[Array, " n_bins"], Float[Array, " n_bins"], Float[Array, ""]]:
     """Compute the fourier shell correlation for two voxel maps.
-
-    !!! warning
-        `radial_frequency_grid` must be in voxel units, i.e. it must be built
-        without a grid spacing:
-
-        ```python
-        from cryojax.ndimage import make_radial_frequency_grid
-        import jax.numpy as jnp
-
-        volume_1, volume_2, voxel_size = ...
-        radial_frequency_grid = make_radial_frequency_grid(volume_1.shape)
-        fsc_curve, frequency_bins, frequency_threshold = (
-            compute_fourier_shell_correlation(
-                jnp.fft.rfftn(volume_1),
-                jnp.fft.rfftn(volume_2),
-                radial_frequency_grid,
-                voxel_size,
-            )
-        )
-        ```
-
-        The returned `frequency_bins` and `frequency_threshold` are in inverse
-        angstroms, so that they may be plotted directly.
 
     **Arguments:**
 
