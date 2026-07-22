@@ -135,6 +135,27 @@ def test_whitening_filter_white_noise_is_identity(squared):
     assert jnp.std(array) < 0.1
 
 
+@pytest.mark.parametrize("shape", [None, (32, 32), (96, 96), (50, 50)])
+@pytest.mark.parametrize("offset", [0.0, 5.0])
+def test_whitening_filter_white_noise_is_identity_when_resized(shape, offset):
+    # Resizing must not break the identity: a white-noise input still has a flat
+    # power spectrum after the filter is resampled to a smaller or larger shape.
+    # `offset` gives the images a non-zero mean, which makes the zero-frequency
+    # mode far larger than any noise mode. That mode is the image mean rather
+    # than part of the power spectrum, so it must not leak into the lowest
+    # frequency bin, where it would otherwise wreck the whole filter.
+    images = jax.random.normal(jax.random.key(0), (128, 64, 64)) + offset
+    array = im.WhiteningFilter(images, shape=shape).get()
+    expected_shape = (64, 33) if shape is None else (shape[0], shape[1] // 2 + 1)
+    assert array.shape == expected_shape
+    assert bool(jnp.all(jnp.isfinite(array)))
+    assert array[0, 0] == 1.0
+    # ... exclude the zero-frequency mode, which is unity by construction
+    ac_modes = array[1:, 1:]
+    assert jnp.abs(jnp.mean(ac_modes) - 1.0) < 0.02
+    assert jnp.std(ac_modes) < 0.1
+
+
 def test_whitening_filter_preserves_mean():
     # The zero-frequency mode is unity, so filtering leaves the mean unchanged
     noise = jax.random.normal(jax.random.key(1), (64, 64, 64))
@@ -310,3 +331,27 @@ def test_translation_fn(basic_config, voxel_volume, use_rfft):
 
 def _get_correlation(im1, im2):
     return jnp.abs(jnp.sum(im1 * im2)) / (jnp.linalg.norm(im1) * jnp.linalg.norm(im2))
+
+
+@pytest.mark.parametrize("batch_shape", [(), (7,), (2, 3)])
+def test_filters_and_masks_accept_batch_dimensions(batch_shape):
+    # Filters and masks broadcast against leading batch dimensions, and doing so
+    # must agree with applying them to each image one at a time.
+    shape = (16, 16)
+    filter = im.LowpassFilter(im.make_frequency_grid(shape))
+    mask = im.CircularCosineMask(
+        im.make_coordinate_grid(shape), radius=5, rolloff_width=1
+    )
+    images = jax.random.normal(jax.random.key(0), (*batch_shape, *shape))
+
+    masked = mask(images)
+    assert masked.shape == images.shape
+
+    fourier_images = jnp.fft.rfftn(images, axes=(-2, -1))
+    filtered = filter(fourier_images)
+    assert filtered.shape == fourier_images.shape
+
+    # ... equals applying the transform to each image individually
+    flat = fourier_images.reshape(-1, *fourier_images.shape[-2:])
+    expected = jnp.stack([filter(image) for image in flat])
+    assert jnp.allclose(filtered.reshape(expected.shape), expected)

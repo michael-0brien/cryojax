@@ -100,7 +100,7 @@ def rescale_fft(
     - `real_shape`:
         The real-space shape of `fourier_image` when `input_is_rfft` is
         `True`. If `None`, the last (real-transformed) axis is assumed to
-        be odd.
+        be even.
 
 
     **Returns:**
@@ -110,10 +110,10 @@ def rescale_fft(
     """
     fourier_image = jnp.asarray(fourier_image)
     n1, n2 = fourier_image.shape
-    # Recover the real-space shape. If it is not given, assume an odd width
-    # (the ambiguous case where the last rfft column is *not* a self-conjugate
+    # Recover the real-space shape. If it is not given, assume an even width
+    # (the ambiguous case where the last rfft column *is* a self-conjugate
     # Nyquist mode).
-    real_shape = real_shape if real_shape is not None else (n1, 2 * n2 - 1)
+    real_shape = real_shape if real_shape is not None else (n1, 2 * (n2 - 1))
     n_pixels = math.prod(real_shape) if input_is_rfft else n1 * n2
     # Mask the zero-frequency mode with an iota-derived `where` rather than an
     # `at[...].set(...)`, which scatters and can break fusion
@@ -153,7 +153,7 @@ def standardize_fft(
     - `real_shape`:
         The real-space shape of `fourier_image` when `input_is_rfft` is
         `True`. If `None`, the last (real-transformed) axis is assumed to
-        be odd.
+        be even.
 
 
     **Returns:**

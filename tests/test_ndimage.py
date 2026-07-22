@@ -281,7 +281,9 @@ def test_bg_subtract():
 def test_powerspectrum_jit(shape):
     pixel_size = 1.2
     fourier_image = jnp.fft.rfftn(jr.normal(jr.key(1234), shape))
-    radial_frequency_grid = make_radial_frequency_grid(shape, pixel_size)
+    # ... the radial frequency grid must be in pixel units; `pixel_size` only
+    # converts the returned frequency bins to inverse angstroms
+    radial_frequency_grid = make_radial_frequency_grid(shape)
 
     @jax.jit
     def compute_powerspectrum_jit(image, radial_freqs, ps):
@@ -314,7 +316,9 @@ def test_frc_fsc_jit(shape):
     pixel_size = 1.1
     fourier_image_1 = jnp.fft.rfftn(jr.normal(jr.key(1234), shape))
     fourier_image_2 = jnp.fft.rfftn(jr.normal(jr.key(2345), shape))
-    radial_frequency_grid = make_radial_frequency_grid(shape, pixel_size)
+    # ... the radial frequency grid must be in pixel units; `pixel_size` only
+    # converts the returned frequency bins to inverse angstroms
+    radial_frequency_grid = make_radial_frequency_grid(shape)
     threshold = 0.5
 
     @jax.jit
@@ -723,7 +727,7 @@ def test_prepare_sampling_fft_interps_differ():
 
 def test_prepare_sampling_fft_rejects_bad_interp():
     with pytest.raises(ValueError, match="interp"):
-        im.prepare_sampling_fft(jr.normal(jr.key(0), (8, 8, 8)), interp="quintic")
+        im.prepare_sampling_fft(jr.normal(jr.key(0), (8, 8, 8)), interp="quintic")  # type: ignore
 
 
 def test_prepare_sampling_fft_invalid_pad_scale():

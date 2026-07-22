@@ -16,7 +16,11 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 from cryojax.constants import wavelength_from_kilovolts
-from cryojax.ndimage import compute_binned_powerspectrum, make_frequency_grid
+from cryojax.ndimage import (
+    compute_binned_powerspectrum,
+    make_frequency_grid,
+    make_radial_frequency_grid,
+)
 from cryojax.simulator import AstigmaticCTF, EulerAnglePose
 
 
@@ -51,19 +55,21 @@ def test_ctf_with_cistem(index):
         )
     )
     # Compare the radially averaged power spectrum too, which is more sensitive
-    # to a systematic bias than the pointwise comparison
-    radial_frequency_grid = jnp.linalg.norm(frequency_grid, axis=-1)
+    # to a systematic bias than the pointwise comparison. The CTF needs a
+    # frequency grid in inverse angstroms, but the power spectrum needs one in
+    # pixel units, with `pixel_size` only converting the returned bins.
+    radial_frequency_grid = make_radial_frequency_grid((grid_size, grid_size))
     spectrum1D, _ = compute_binned_powerspectrum(
         ctf,
         radial_frequency_grid,
         pixel_size,
-        maximum_frequency=1 / (2 * pixel_size),
+        maximum_frequency=0.5,
     )
     cisTEM_spectrum1D, _ = compute_binned_powerspectrum(
         jnp.asarray(cistem_ctf),
         radial_frequency_grid,
         pixel_size,
-        maximum_frequency=1 / (2 * pixel_size),
+        maximum_frequency=0.5,
     )
 
     np.testing.assert_allclose(ctf, cistem_ctf, atol=1e-3)

@@ -11,7 +11,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from ...jax_util import FloatLike, NDArrayLike
-from ._base_transform import AbstractImageTransform
+from .base_transform import AbstractImageTransform
 
 
 class AbstractMask(AbstractImageTransform, strict=True):
@@ -24,8 +24,14 @@ class AbstractMask(AbstractImageTransform, strict=True):
         raise NotImplementedError
 
     def __call__(
-        self, image: Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]
-    ) -> Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]:
+        self,
+        image: (
+            Float[Array, "*batch y_dim x_dim"] | Float[Array, "*batch z_dim y_dim x_dim"]
+        ),
+    ) -> Float[Array, "*batch y_dim x_dim"] | Float[Array, "*batch z_dim y_dim x_dim"]:
+        """Apply the mask to an image or volume, which may carry leading batch
+        dimensions. The mask is broadcast against them.
+        """
         return image * self.get()
 
 

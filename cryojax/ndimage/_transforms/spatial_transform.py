@@ -11,7 +11,7 @@ from .._coordinates import make_1d_frequency_grid, make_frequency_grid
 from .._fourier_utils import enforce_rfftn_self_conjugates, make_fftshift_phase
 from .._interpolation import map_frequencies
 from .._operators import FourierPhaseShifts
-from ._base_transform import AbstractImageTransform
+from .base_transform import AbstractImageTransform
 
 
 class PhaseShiftFFT(AbstractImageTransform, strict=True):

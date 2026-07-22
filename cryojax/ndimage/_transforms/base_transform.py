@@ -21,8 +21,8 @@ class AbstractImageTransform(eqx.Module, strict=True):
 
     @abc.abstractmethod
     def __call__(
-        self, image: Inexact[Array, "_ _"] | Inexact[Array, "_ _ _"]
-    ) -> Inexact[Array, "_ _"] | Inexact[Array, "_ _ _"]:
+        self, image: Inexact[Array, "*batch _ _"] | Inexact[Array, "*batch _ _ _"]
+    ) -> Inexact[Array, "*batch _ _"] | Inexact[Array, "*batch _ _ _"]:
         raise NotImplementedError
 
     def __mul__(self, other) -> "AbstractImageTransform":
@@ -57,8 +57,8 @@ class _AbstractProductImageTransform(AbstractImageTransform, strict=True):
 
     @override
     def __call__(
-        self, image: Inexact[Array, "_ _"] | Inexact[Array, "_ _ _"]
-    ) -> Inexact[Array, "_ _"] | Inexact[Array, "_ _ _"]:
+        self, image: Inexact[Array, "*batch _ _"] | Inexact[Array, "*batch _ _ _"]
+    ) -> Inexact[Array, "*batch _ _"] | Inexact[Array, "*batch _ _ _"]:
         return self.transform1(self.transform2(image))
 
     def __repr__(self):
@@ -85,6 +85,12 @@ class ScaleImage(AbstractImageTransform, strict=True):
 
     @override
     def __call__(
-        self, image: Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"]
-    ) -> Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"]:
+        self,
+        image: (
+            Inexact[Array, "*batch y_dim x_dim"]
+            | Inexact[Array, "*batch z_dim y_dim x_dim"]
+        ),
+    ) -> (
+        Inexact[Array, "*batch y_dim x_dim"] | Inexact[Array, "*batch z_dim y_dim x_dim"]
+    ):
         return jnp.asarray(self.scale) * image + jnp.asarray(self.offset)

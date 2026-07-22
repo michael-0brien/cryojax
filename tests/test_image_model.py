@@ -237,17 +237,17 @@ def test_filter_padded_shape(voxel_info, basic_config):
         basic_config,
         pose=cxs.EulerAnglePose(),
     )
+    # ... `physical=False` gives a grid in pixel units, which is what
+    # `LowpassFilter` requires
     _ = image_model.simulate(
         filter=LowpassFilter(
             basic_config.get_frequency_grid(padding=True, physical=False),
-            grid_spacing=basic_config.pixel_size,
         )
     )
     with pytest.raises(ValueError):
         _ = image_model.simulate(
             filter=LowpassFilter(
                 basic_config.get_frequency_grid(physical=False),
-                grid_spacing=basic_config.pixel_size,
             )
         )
 

@@ -17,7 +17,7 @@ from .._edges import resize_with_crop_or_pad
 from .._fourier_statistics import compute_binned_powerspectrum
 from .._fourier_utils import make_rfftn_multiplicity
 from .._radial_average import radial_average_to_grid
-from ._base_transform import AbstractImageTransform
+from .base_transform import AbstractImageTransform
 
 
 class AbstractFilter(AbstractImageTransform, strict=True):
@@ -31,8 +31,17 @@ class AbstractFilter(AbstractImageTransform, strict=True):
 
     @override
     def __call__(
-        self, image: Complex[Array, "y_dim x_dim"] | Complex[Array, "z_dim y_dim x_dim"]
-    ) -> Complex[Array, "y_dim x_dim"] | Complex[Array, "z_dim y_dim x_dim"]:
+        self,
+        image: (
+            Complex[Array, "*batch y_dim x_dim"]
+            | Complex[Array, "*batch z_dim y_dim x_dim"]
+        ),
+    ) -> (
+        Complex[Array, "*batch y_dim x_dim"] | Complex[Array, "*batch z_dim y_dim x_dim"]
+    ):
+        """Apply the filter to an image or volume, which may carry leading
+        batch dimensions. The filter is broadcast against them.
+        """
         return image * self.get()
 
 
@@ -64,19 +73,16 @@ class LowpassFilter(AbstractFilter, strict=True):
 
     def __init__(
         self,
-        frequency_grid_in_angstroms_or_pixels: (
+        frequency_grid: (
             Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
         ),
-        grid_spacing: FloatLike = 1.0,
         frequency_cutoff_fraction: FloatLike = 0.95,
         rolloff_width_fraction: FloatLike = 0.05,
     ):
         """**Arguments:**
 
-        - `frequency_grid_in_angstroms_or_pixels`:
-            The frequency grid of the image or volume.
-        - `grid_spacing`:
-            The pixel or voxel size of `frequency_grid_in_angstroms_or_pixels`.
+        - `frequency_grid`:
+            The frequency grid of the image or volume, in pixel-units.
         - `frequency_cutoff_fraction`:
             The cutoff frequency as a fraction of the Nyquist frequency.
             By default, `0.95`.
@@ -85,8 +91,7 @@ class LowpassFilter(AbstractFilter, strict=True):
             By default, ``0.05``.
         """
         self.array = _compute_lowpass_filter(
-            frequency_grid_in_angstroms_or_pixels,
-            jnp.asarray(grid_spacing),
+            frequency_grid,
             jnp.asarray(frequency_cutoff_fraction),
             jnp.asarray(rolloff_width_fraction),
         )
@@ -105,19 +110,17 @@ class HighpassFilter(AbstractFilter, strict=True):
 
     def __init__(
         self,
-        frequency_grid_in_angstroms_or_pixels: (
+        frequency_grid: (
             Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
         ),
-        grid_spacing: FloatLike = 1.0,
         frequency_cutoff_fraction: FloatLike = 0.95,
         rolloff_width_fraction: FloatLike = 0.05,
     ):
         """**Arguments:**
 
-        - `frequency_grid_in_angstroms_or_pixels`:
-            The frequency grid of the image or volume.
-        - `grid_spacing`:
-            The pixel or voxel size of `frequency_grid_in_angstroms_or_pixels`.
+        - `frequency_grid`:
+            The frequency grid of the image or volume, in
+            pixel-units.
         - `frequency_cutoff_fraction`:
             The cutoff frequency as a fraction of the Nyquist frequency.
             By default, `0.95`.
@@ -126,8 +129,7 @@ class HighpassFilter(AbstractFilter, strict=True):
             By default, ``0.05``.
         """
         self.array = 1.0 - _compute_lowpass_filter(
-            frequency_grid_in_angstroms_or_pixels,
-            jnp.asarray(grid_spacing),
+            frequency_grid,
             jnp.asarray(frequency_cutoff_fraction),
             jnp.asarray(rolloff_width_fraction),
         )
@@ -190,11 +192,10 @@ class WhiteningFilter(AbstractFilter, strict=True):
 
 def _compute_lowpass_filter(
     frequency_grid: Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"],
-    grid_spacing: Float[Array, ""],
     cutoff_fraction: Float[Array, ""],
     rolloff_width_fraction: Float[Array, ""],
 ) -> Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]:
-    k_max = 1.0 / (2.0 * grid_spacing)
+    k_max = 0.5
     cutoff_radius = cutoff_fraction * k_max
     rolloff_width = rolloff_width_fraction * k_max
 

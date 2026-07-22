@@ -13,7 +13,7 @@ from typing import Literal
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
-from ..jax_util import FloatLike
+from ..jax_util import FloatLike, NDArrayLike
 from ._coordinates import make_1d_frequency_grid
 from ._edges import pad_to_shape
 from ._fourier_utils import make_fftshift_phase, query_efficient_grid_size
@@ -25,8 +25,8 @@ from ._interpolation import (
 
 
 def sample_fft_slice(
-    sampling_fft: Complex[Array, "dim dim dim//2+1"],
-    frequency_slice: Float[Array, "1 dim dim//2+1 3"] | Float[Array, "1 dim dim 3"],
+    sampling_fft: Complex[NDArrayLike, "dim dim dim//2+1"],
+    frequency_slice: Float[NDArrayLike, "1 dim dim//2+1 3"] | Float[Array, "1 dim dim 3"],
     *,
     interp: Literal["linear", "cubic"] = "linear",
     boundary: str = "fill",
@@ -136,6 +136,10 @@ def sample_fft_slice(
             f"dimension `{N}` it is expected to have the half-space (rfft) "
             f"shape `{expected_shape}`."
         )
+    sampling_fft, frequency_slice = (
+        jnp.asarray(sampling_fft),
+        jnp.asarray(frequency_slice),
+    )
     surface = map_frequencies(
         sampling_fft,
         (
@@ -163,7 +167,7 @@ def sample_fft_slice(
 
 
 def prepare_sampling_fft(
-    real_voxel_grid: Float[Array, "dim dim dim"],
+    real_voxel_grid: Float[NDArrayLike, "dim dim dim"],
     *,
     interp: Literal["linear", "cubic"] = "linear",
     pad_scale: float = 1.0,

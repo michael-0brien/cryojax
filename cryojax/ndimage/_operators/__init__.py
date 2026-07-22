@@ -1,4 +1,4 @@
-from ._fourier_operator import (
+from .fourier_operator import (
     AbstractFourierOperator as AbstractFourierOperator,
     CustomFourierOperator as CustomFourierOperator,
     FourierConstant as FourierConstant,
@@ -7,7 +7,7 @@ from ._fourier_operator import (
     FourierSinc as FourierSinc,
     PeakedFourierGaussian as PeakedFourierGaussian,
 )
-from ._real_operator import (
+from .real_operator import (
     AbstractRealOperator as AbstractRealOperator,
     RealConstant as RealConstant,
     RealGaussian as RealGaussian,
