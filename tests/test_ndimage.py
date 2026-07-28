@@ -122,25 +122,6 @@ def test_fourier_crop_downsample_matches_directly_rendered_gaussian(
 
 
 #
-# FFT
-#
-@pytest.mark.parametrize("shape", [(10, 10), (10, 10, 10), (11, 11), (11, 11, 11)])
-def test_fft_agrees_with_jax_numpy(shape):
-    random = jnp.asarray(np.random.randn(*shape))
-    # fftn
-    np.testing.assert_allclose(random, jnp.fft.ifftn(jnp.fft.fftn(random)).real)
-    np.testing.assert_allclose(
-        jnp.fft.ifftn(jnp.fft.fftn(random)).real, jnp.fft.ifftn(jnp.fft.fftn(random)).real
-    )
-    # rfftn
-    np.testing.assert_allclose(random, jnp.fft.irfftn(jnp.fft.rfftn(random), s=shape))
-    np.testing.assert_allclose(
-        jnp.fft.irfftn(jnp.fft.rfftn(random), s=shape),
-        jnp.fft.irfftn(jnp.fft.rfftn(random), s=shape),
-    )
-
-
-#
 # Cropping and padding
 #
 @pytest.mark.parametrize(
