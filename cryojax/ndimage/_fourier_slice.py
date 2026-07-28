@@ -156,11 +156,16 @@ def sample_fft_slice(
     # half in-plane slice -- an Ewald sphere surface is always a full grid),
     # in which case only the first axis is shifted, mirroring the same
     # convention used for the 3D volume storage.
+    #
+    # The phase is `(-1)^k` in the *frequency* index `k`, so it must be applied
+    # only once `surface` is in the corner (DC-at-zero) convention, i.e. after
+    # the shift. Applying it to a centered axis instead reads index `k + N // 2`
+    # and contributes a spurious global `(-1)^(N // 2)` per centered axis.
     if surface.shape[0] == surface.shape[1]:
-        surface = jnp.fft.ifftshift(make_fftshift_phase(surface.shape) * surface)
+        surface = make_fftshift_phase(surface.shape) * jnp.fft.ifftshift(surface)
     else:
-        surface = jnp.fft.ifftshift(
-            make_fftshift_phase((N, N), outputs_rfft=True) * surface, axes=(0,)
+        surface = make_fftshift_phase((N, N), outputs_rfft=True) * jnp.fft.ifftshift(
+            surface, axes=(0,)
         )
 
     return surface

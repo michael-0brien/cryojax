@@ -937,6 +937,34 @@ def test_sample_fft_slice_cubic_reconstructs_exact_transform():
     assert errors["cubic"] < errors["linear"] / 50, errors
 
 
+@pytest.mark.parametrize("dim", (8, 10, 12, 14, 16, 18))
+def test_sample_fft_slice_sign_independent_of_dim_parity(dim):
+    """An unrotated central slice must equal the `rfftn` of the real-space
+    projection for *every* even `dim`, not only those divisible by four.
+
+    The output-side `(-1)^k` phase is a function of the *frequency* index, so it
+    has to be applied in the corner (DC-at-zero) convention. Applying it while
+    the first axis is still centered offsets that index by `dim // 2`, negating
+    the whole slice whenever `dim // 2` is odd (`dim = 6, 10, 14, ...`). The
+    full-grid Ewald branch shifts both axes, so the two offsets cancel there and
+    the bug is invisible unless the half slice is checked on its own.
+    """
+    # A narrow, centered gaussian: compactly supported, so the deconvolution's
+    # assumption holds and the extracted slice is accurate enough to compare
+    # against a directly computed projection.
+    coordinate_grid = im.make_coordinate_grid((dim, dim, dim))
+    real_voxel_grid = jnp.exp(-jnp.sum(coordinate_grid**2, axis=-1) / 2.0)
+    # An unrotated slice is the q_z = 0 plane, i.e. the projection along axis 0.
+    expected = jnp.fft.rfftn(jnp.sum(real_voxel_grid, axis=0))
+
+    frequency_slice = im.make_frequency_slice((dim, dim), fftshifted=True)
+    grid = im.prepare_sampling_fft(real_voxel_grid, interp="cubic")
+    got = im.sample_fft_slice(grid, frequency_slice, interp="cubic")
+
+    scale = float(jnp.max(jnp.abs(expected)))
+    np.testing.assert_allclose(np.asarray(got), np.asarray(expected), atol=1e-2 * scale)
+
+
 @pytest.mark.parametrize("order", (1, 3))
 def test_map_coordinates_negative_indices_obey_mode(order):
     """A tap index below the low edge must obey `mode`, not silently wrap around
