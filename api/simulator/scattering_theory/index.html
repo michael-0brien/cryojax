@@ -1337,7 +1337,7 @@
 
 <h4 id="cryojax.simulator.AbstractScatteringTheory" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.AbstractScatteringTheory</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_scattering_theory.py#L16-L37"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_scattering_theory.py#L15-L36"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.AbstractScatteringTheory" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1410,6 +1410,327 @@
     </div>
 
 </div></details>
+<h1 id="weak-phase-approximation">Weak-phase approximation<a class="headerlink" href="#weak-phase-approximation" title="Permanent link">¤</a></h1>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="cryojax.simulator.WeakPhaseScatteringTheory" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.WeakPhaseScatteringTheory(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractScatteringTheory">cryojax.simulator.AbstractScatteringTheory</a>)</code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_scattering_theory.py#L108-L181"><code class='hippogriffe-repo-url'></code></a>
+
+
+<a href="#cryojax.simulator.WeakPhaseScatteringTheory" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+
+        <p>Base linear image formation theory.</p>
+
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.WeakPhaseScatteringTheory.__init__" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">volume_integrator</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractVolumeIntegrator</span><span class="p">,</span> <span class="n">transfer_theory</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">ContrastTransferTheory</span><span class="p">)</span></code>
+  
+
+
+<a href="#cryojax.simulator.WeakPhaseScatteringTheory.__init__" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p><strong>Arguments:</strong></p>
+<ul>
+<li><code>volume_integrator</code>: The method for integrating the scattering potential.</li>
+<li><code>transfer_theory</code>: The contrast transfer theory.</li>
+</ul>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.WeakPhaseScatteringTheory.compute_object_spectrum" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">compute_object_spectrum</span><span class="p">(</span><span class="n">volume_representation</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractVolumeRepresentation</span><span class="p">,</span> <span class="n">image_config</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractImageConfig</span><span class="p">,</span> <span class="n">rng_key</span><span class="p">:</span> <span class="n">PRNGKeyArray</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> {image_config.padded_x_dim//2+1}&#39;</span><span class="p">]</span></code>
+  
+
+
+<a href="#cryojax.simulator.WeakPhaseScatteringTheory.compute_object_spectrum" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.WeakPhaseScatteringTheory.compute_contrast_spectrum" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">compute_contrast_spectrum</span><span class="p">(</span><span class="n">volume_representation</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractVolumeRepresentation</span><span class="p">,</span> <span class="n">image_config</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractImageConfig</span><span class="p">,</span> <span class="n">rng_key</span><span class="p">:</span> <span class="n">PRNGKeyArray</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">defocus_offset</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> {image_config.padded_x_dim//2+1}&#39;</span><span class="p">]</span></code>
+  
+
+
+<a href="#cryojax.simulator.WeakPhaseScatteringTheory.compute_contrast_spectrum" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.WeakPhaseScatteringTheory.compute_intensity_spectrum" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">compute_intensity_spectrum</span><span class="p">(</span><span class="n">volume_representation</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractVolumeRepresentation</span><span class="p">,</span> <span class="n">image_config</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractImageConfig</span><span class="p">,</span> <span class="n">rng_key</span><span class="p">:</span> <span class="n">PRNGKeyArray</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">defocus_offset</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> {image_config.padded_x_dim//2+1}&#39;</span><span class="p">]</span></code>
+  
+
+
+<a href="#cryojax.simulator.WeakPhaseScatteringTheory.compute_intensity_spectrum" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Compute the squared wavefunction at the detector plane, given the
+contrast.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div><h1 id="explicit-wavefunction-methods">Explicit wavefunction methods<a class="headerlink" href="#explicit-wavefunction-methods" title="Permanent link">¤</a></h1>
+<details class="abstract">
+<summary><code>cryojax.simulator.AbstractWaveScatteringTheory</code></summary>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="cryojax.simulator.AbstractScatteringTheory" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.AbstractScatteringTheory</code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_scattering_theory.py#L15-L36"><code class='hippogriffe-repo-url'></code></a>
+
+
+<a href="#cryojax.simulator.AbstractScatteringTheory" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+
+        <p>Base class for a scattering theory.</p>
+
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div></details>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="cryojax.simulator.RytovScatteringTheory" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.RytovScatteringTheory(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractScatteringTheory">cryojax.simulator.AbstractScatteringTheory</a>)</code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_scattering_theory.py#L184-L259"><code class='hippogriffe-repo-url'></code></a>
+
+
+<a href="#cryojax.simulator.RytovScatteringTheory" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+
+        <p>Scattering theory for a weakly scattering object with significant phase
+shifts. This is based on what is called the Rytov approximation to the
+underlying wave equation.</p>
+<p>This is the simplest model for multiple scattering through the specimen.</p>
+<div class="admonition info">
+<p class="admonition-title">Info</p>
+<p>Unlike in the weak-phase approximation, it is not possible to absorb a model
+for amplitude contrast (here via the amplitude contrast ratio) into the CTF.
+Instead, it is necessary to compute a complex scattering potential, where the
+imaginary part captures inelastic scattering.</p>
+<p>In particular, given a projected electrostatic potential <span class="arithmatex">\(u(x, y)\)</span>, the
+complex potential <span class="arithmatex">\(\phi(x, y)\)</span> for amplitude contrast ratio <span class="arithmatex">\(\alpha\)</span> is</p>
+<div class="arithmatex">\[\phi(x, y) = \sqrt{1 - \alpha^2} \ u(x, y) + i \alpha \ u(x, y).\]</div>
+</div>
+<p><strong>References:</strong></p>
+<ul>
+<li>See Chapter 69, Page 2012, from <em>Hawkes, Peter W., and Erwin Kasper.
+  Principles of Electron Optics, Volume 4: Advanced Wave Optics. Academic
+  Press, 2022.</em></li>
+<li>See Section 3.4, Page 61, from <em>Spence, John CH. High-resolution electron
+  microscopy. OUP Oxford, 2013.</em></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.RytovScatteringTheory.__init__" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">volume_integrator</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractVolumeIntegrator</span><span class="p">,</span> <span class="n">transfer_theory</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">WaveTransferTheory</span><span class="p">,</span> <span class="n">amplitude_contrast_ratio</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">)</span></code>
+  
+
+
+<a href="#cryojax.simulator.RytovScatteringTheory.__init__" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p><strong>Arguments:</strong></p>
+<ul>
+<li><code>volume_integrator</code>: The method for integrating the scattering potential.</li>
+<li><code>transfer_theory</code>: The wave transfer theory.</li>
+<li><code>amplitude_contrast_ratio</code>: The amplitude contrast ratio.</li>
+</ul>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.RytovScatteringTheory.compute_exit_wave" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">compute_exit_wave</span><span class="p">(</span><span class="n">volume_representation</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractVolumeRepresentation</span><span class="p">,</span> <span class="n">image_config</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractImageConfig</span><span class="p">,</span> <span class="n">rng_key</span><span class="p">:</span> <span class="n">PRNGKeyArray</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> </span><span class="si">{image_config.padded_x_dim}</span><span class="s1">&#39;</span><span class="p">]</span></code>
+  
+
+
+<a href="#cryojax.simulator.RytovScatteringTheory.compute_exit_wave" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.RytovScatteringTheory.compute_contrast_spectrum" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">compute_contrast_spectrum</span><span class="p">(</span><span class="n">volume_representation</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractVolumeRepresentation</span><span class="p">,</span> <span class="n">image_config</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractImageConfig</span><span class="p">,</span> <span class="n">rng_key</span><span class="p">:</span> <span class="n">PRNGKeyArray</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">defocus_offset</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> {image_config.padded_x_dim//2+1}&#39;</span><span class="p">]</span></code>
+  
+
+
+<a href="#cryojax.simulator.RytovScatteringTheory.compute_contrast_spectrum" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Compute the contrast at the detector plane, given the squared wavefunction.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.RytovScatteringTheory.compute_intensity_spectrum" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">compute_intensity_spectrum</span><span class="p">(</span><span class="n">volume_representation</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractVolumeRepresentation</span><span class="p">,</span> <span class="n">image_config</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractImageConfig</span><span class="p">,</span> <span class="n">rng_key</span><span class="p">:</span> <span class="n">PRNGKeyArray</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">defocus_offset</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> {image_config.padded_x_dim//2+1}&#39;</span><span class="p">]</span></code>
+  
+
+
+<a href="#cryojax.simulator.RytovScatteringTheory.compute_intensity_spectrum" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
 
 
 

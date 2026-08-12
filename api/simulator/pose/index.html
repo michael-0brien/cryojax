@@ -1392,7 +1392,7 @@ angles in degrees, e.g.</p>
 
 <h4 id="cryojax.simulator.AbstractPose" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.AbstractPose</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_pose.py#L22-L201"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_pose.py#L26-L201"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.AbstractPose" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1508,7 +1508,7 @@ representation.</p>
 
 <h4 id="cryojax.simulator.EulerAnglePose" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.EulerAnglePose(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractPose">cryojax.simulator.AbstractPose</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_pose.py#L204-L293"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_pose.py#L204-L296"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.EulerAnglePose" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1604,7 +1604,7 @@ simply <strong>negate each euler angle</strong>.</p>
 
 
 <h5 id="cryojax.simulator.EulerAnglePose.compute_translation_operator" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">compute_translation_operator</span><span class="p">(</span><span class="n">frequency_grid_in_angstroms</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim 2&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim&#39;</span><span class="p">]</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">compute_translation_operator</span><span class="p">(</span><span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">pixel_size</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim//2+1&#39;</span><span class="p">]</span></code>
   
 
 
@@ -1613,12 +1613,13 @@ simply <strong>negate each euler angle</strong>.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Compute the phase shifts from the in-plane translation,
-given a frequency grid coordinate system.</p>
+        <p>Compute the phase shifts from the in-plane translation.</p>
 <p><strong>Arguments:</strong></p>
 <ul>
-<li><code>frequency_grid_in_angstroms</code>:
-    A grid of in-plane frequency coordinates <span class="arithmatex">\((q_x, q_y)\)</span></li>
+<li><code>shape</code>:
+    The real-space image shape <span class="arithmatex">\((N_y, N_x)\)</span>.</li>
+<li><code>pixel_size</code>:
+    The pixel size in Angstroms.</li>
 </ul>
 <p><strong>Returns:</strong></p>
 <p>From the vector <span class="arithmatex">\((t_x, t_y)\)</span> (given by <code>self.offset_in_angstroms</code>), returns the
@@ -1667,7 +1668,7 @@ artifacts when applying the phase shifts.</p>
 
 
 <h5 id="cryojax.simulator.EulerAnglePose.rotate_coordinates" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">rotate_coordinates</span><span class="p">(</span><span class="n">coordinate_grid_or_list</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;z_dim y_dim x_dim 3&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;size 3&#39;</span><span class="p">],</span> <span class="n">inverse</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;z_dim y_dim x_dim 3&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;size 3&#39;</span><span class="p">]</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">rotate_coordinates</span><span class="p">(</span><span class="n">target</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;... 3&#39;</span><span class="p">],</span> <span class="o">/</span><span class="p">,</span> <span class="n">inverse</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;... 3&#39;</span><span class="p">]</span></code>
   
 
 
@@ -1679,15 +1680,16 @@ artifacts when applying the phase shifts.</p>
         <p>Rotate a 3D coordinate system.</p>
 <p><strong>Arguments:</strong></p>
 <ul>
-<li><code>coordinate_grid_or_list</code>:
-    The 3D coordinate system to rotate. This can either be a list of coordinates
+<li><code>target</code>:
+    The 3D coordinate system to rotate. This can be any array whose trailing
+    dimension has length 3, such as a list of coordinates
     of shape <code>(N, 3)</code> or a grid of coordinates <code>(N1, N2, N3, 3)</code>.</li>
 <li><code>inverse</code>:
     If <code>True</code>, compute the inverse rotation (i.e. rotation by the matrix <span class="arithmatex">\(R^T\)</span>,
     where <span class="arithmatex">\(R\)</span> is the rotation matrix).</li>
 </ul>
 <p><strong>Returns:</strong></p>
-<p>The rotated version of <code>coordinate_grid_or_list</code>.</p>
+<p>The rotated version of <code>target</code>.</p>
 
 
     </div>
@@ -1720,7 +1722,7 @@ artifacts when applying the phase shifts.</p>
 
 
 <h5 id="cryojax.simulator.EulerAnglePose.from_rotation_and_translation" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">from_rotation_and_translation</span><span class="p">(</span><span class="n">rotation</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">rotations</span><span class="o">.</span><span class="n">SO3</span><span class="p">,</span> <span class="n">offset_in_angstroms</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;2&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;3&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">from_rotation_and_translation</span><span class="p">(</span><span class="n">rotation</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">rotations</span><span class="o">.</span><span class="n">SO3</span><span class="p">,</span> <span class="n">offset_in_angstroms</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;... 2&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;... 3&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
   
 
 
@@ -1774,7 +1776,7 @@ translation vector.</p>
 
 <h4 id="cryojax.simulator.QuaternionPose" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.QuaternionPose(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractPose">cryojax.simulator.AbstractPose</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_pose.py#L296-L353"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_pose.py#L299-L357"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.QuaternionPose" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1832,7 +1834,7 @@ translation vector.</p>
 
 
 <h5 id="cryojax.simulator.QuaternionPose.__init__" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">offset_x_in_angstroms</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">offset_y_in_angstroms</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">wxyz</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;4&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span> <span class="o">*</span><span class="p">,</span> <span class="n">offset_z_in_angstroms</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">offset_x_in_angstroms</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">offset_y_in_angstroms</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">wxyz</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;... 4&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span> <span class="o">*</span><span class="p">,</span> <span class="n">offset_z_in_angstroms</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span></code>
   
 
 
@@ -1859,7 +1861,7 @@ translation vector.</p>
 
 
 <h5 id="cryojax.simulator.QuaternionPose.compute_translation_operator" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">compute_translation_operator</span><span class="p">(</span><span class="n">frequency_grid_in_angstroms</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim 2&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim&#39;</span><span class="p">]</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">compute_translation_operator</span><span class="p">(</span><span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">pixel_size</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim//2+1&#39;</span><span class="p">]</span></code>
   
 
 
@@ -1868,12 +1870,13 @@ translation vector.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Compute the phase shifts from the in-plane translation,
-given a frequency grid coordinate system.</p>
+        <p>Compute the phase shifts from the in-plane translation.</p>
 <p><strong>Arguments:</strong></p>
 <ul>
-<li><code>frequency_grid_in_angstroms</code>:
-    A grid of in-plane frequency coordinates <span class="arithmatex">\((q_x, q_y)\)</span></li>
+<li><code>shape</code>:
+    The real-space image shape <span class="arithmatex">\((N_y, N_x)\)</span>.</li>
+<li><code>pixel_size</code>:
+    The pixel size in Angstroms.</li>
 </ul>
 <p><strong>Returns:</strong></p>
 <p>From the vector <span class="arithmatex">\((t_x, t_y)\)</span> (given by <code>self.offset_in_angstroms</code>), returns the
@@ -1922,7 +1925,7 @@ artifacts when applying the phase shifts.</p>
 
 
 <h5 id="cryojax.simulator.QuaternionPose.rotate_coordinates" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">rotate_coordinates</span><span class="p">(</span><span class="n">coordinate_grid_or_list</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;z_dim y_dim x_dim 3&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;size 3&#39;</span><span class="p">],</span> <span class="n">inverse</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;z_dim y_dim x_dim 3&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;size 3&#39;</span><span class="p">]</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">rotate_coordinates</span><span class="p">(</span><span class="n">target</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;... 3&#39;</span><span class="p">],</span> <span class="o">/</span><span class="p">,</span> <span class="n">inverse</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;... 3&#39;</span><span class="p">]</span></code>
   
 
 
@@ -1934,15 +1937,16 @@ artifacts when applying the phase shifts.</p>
         <p>Rotate a 3D coordinate system.</p>
 <p><strong>Arguments:</strong></p>
 <ul>
-<li><code>coordinate_grid_or_list</code>:
-    The 3D coordinate system to rotate. This can either be a list of coordinates
+<li><code>target</code>:
+    The 3D coordinate system to rotate. This can be any array whose trailing
+    dimension has length 3, such as a list of coordinates
     of shape <code>(N, 3)</code> or a grid of coordinates <code>(N1, N2, N3, 3)</code>.</li>
 <li><code>inverse</code>:
     If <code>True</code>, compute the inverse rotation (i.e. rotation by the matrix <span class="arithmatex">\(R^T\)</span>,
     where <span class="arithmatex">\(R\)</span> is the rotation matrix).</li>
 </ul>
 <p><strong>Returns:</strong></p>
-<p>The rotated version of <code>coordinate_grid_or_list</code>.</p>
+<p>The rotated version of <code>target</code>.</p>
 
 
     </div>
@@ -1975,7 +1979,7 @@ artifacts when applying the phase shifts.</p>
 
 
 <h5 id="cryojax.simulator.QuaternionPose.from_rotation_and_translation" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">from_rotation_and_translation</span><span class="p">(</span><span class="n">rotation</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">rotations</span><span class="o">.</span><span class="n">SO3</span><span class="p">,</span> <span class="n">offset_in_angstroms</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;2&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;3&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">from_rotation_and_translation</span><span class="p">(</span><span class="n">rotation</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">rotations</span><span class="o">.</span><span class="n">SO3</span><span class="p">,</span> <span class="n">offset_in_angstroms</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;... 2&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;... 3&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
   
 
 
@@ -2029,7 +2033,7 @@ translation vector.</p>
 
 <h4 id="cryojax.simulator.AxisAnglePose" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.AxisAnglePose(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractPose">cryojax.simulator.AbstractPose</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_pose.py#L356-L427"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_pose.py#L360-L432"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.AxisAnglePose" class="headerlink" title="Permanent link">¤</a></h4>
@@ -2092,7 +2096,7 @@ the matrix exponential.</p>
 
 
 <h5 id="cryojax.simulator.AxisAnglePose.__init__" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">offset_x_in_angstroms</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">offset_y_in_angstroms</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">euler_vector</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;3&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span> <span class="o">*</span><span class="p">,</span> <span class="n">offset_z_in_angstroms</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">offset_x_in_angstroms</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">offset_y_in_angstroms</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">euler_vector</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;... 3&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span> <span class="o">*</span><span class="p">,</span> <span class="n">offset_z_in_angstroms</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span></code>
   
 
 
@@ -2120,7 +2124,7 @@ the matrix exponential.</p>
 
 
 <h5 id="cryojax.simulator.AxisAnglePose.compute_translation_operator" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">compute_translation_operator</span><span class="p">(</span><span class="n">frequency_grid_in_angstroms</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim 2&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim&#39;</span><span class="p">]</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">compute_translation_operator</span><span class="p">(</span><span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">pixel_size</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;y_dim x_dim//2+1&#39;</span><span class="p">]</span></code>
   
 
 
@@ -2129,12 +2133,13 @@ the matrix exponential.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Compute the phase shifts from the in-plane translation,
-given a frequency grid coordinate system.</p>
+        <p>Compute the phase shifts from the in-plane translation.</p>
 <p><strong>Arguments:</strong></p>
 <ul>
-<li><code>frequency_grid_in_angstroms</code>:
-    A grid of in-plane frequency coordinates <span class="arithmatex">\((q_x, q_y)\)</span></li>
+<li><code>shape</code>:
+    The real-space image shape <span class="arithmatex">\((N_y, N_x)\)</span>.</li>
+<li><code>pixel_size</code>:
+    The pixel size in Angstroms.</li>
 </ul>
 <p><strong>Returns:</strong></p>
 <p>From the vector <span class="arithmatex">\((t_x, t_y)\)</span> (given by <code>self.offset_in_angstroms</code>), returns the
@@ -2183,7 +2188,7 @@ artifacts when applying the phase shifts.</p>
 
 
 <h5 id="cryojax.simulator.AxisAnglePose.rotate_coordinates" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">rotate_coordinates</span><span class="p">(</span><span class="n">coordinate_grid_or_list</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;z_dim y_dim x_dim 3&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;size 3&#39;</span><span class="p">],</span> <span class="n">inverse</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;z_dim y_dim x_dim 3&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;size 3&#39;</span><span class="p">]</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">rotate_coordinates</span><span class="p">(</span><span class="n">target</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;... 3&#39;</span><span class="p">],</span> <span class="o">/</span><span class="p">,</span> <span class="n">inverse</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;... 3&#39;</span><span class="p">]</span></code>
   
 
 
@@ -2195,15 +2200,16 @@ artifacts when applying the phase shifts.</p>
         <p>Rotate a 3D coordinate system.</p>
 <p><strong>Arguments:</strong></p>
 <ul>
-<li><code>coordinate_grid_or_list</code>:
-    The 3D coordinate system to rotate. This can either be a list of coordinates
+<li><code>target</code>:
+    The 3D coordinate system to rotate. This can be any array whose trailing
+    dimension has length 3, such as a list of coordinates
     of shape <code>(N, 3)</code> or a grid of coordinates <code>(N1, N2, N3, 3)</code>.</li>
 <li><code>inverse</code>:
     If <code>True</code>, compute the inverse rotation (i.e. rotation by the matrix <span class="arithmatex">\(R^T\)</span>,
     where <span class="arithmatex">\(R\)</span> is the rotation matrix).</li>
 </ul>
 <p><strong>Returns:</strong></p>
-<p>The rotated version of <code>coordinate_grid_or_list</code>.</p>
+<p>The rotated version of <code>target</code>.</p>
 
 
     </div>
@@ -2236,7 +2242,7 @@ artifacts when applying the phase shifts.</p>
 
 
 <h5 id="cryojax.simulator.AxisAnglePose.from_rotation_and_translation" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">from_rotation_and_translation</span><span class="p">(</span><span class="n">rotation</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">rotations</span><span class="o">.</span><span class="n">SO3</span><span class="p">,</span> <span class="n">offset_in_angstroms</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;2&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;3&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">from_rotation_and_translation</span><span class="p">(</span><span class="n">rotation</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">rotations</span><span class="o">.</span><span class="n">SO3</span><span class="p">,</span> <span class="n">offset_in_angstroms</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;... 2&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;... 3&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
   
 
 

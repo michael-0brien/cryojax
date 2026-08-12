@@ -1326,12 +1326,11 @@
 <span class="p">)</span>
 <span class="n">transfer_theory</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">ContrastTransferTheory</span><span class="p">(</span><span class="n">ctf</span><span class="p">,</span> <span class="n">amplitude_contrast_ratio</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
 <span class="c1"># Then the configuration. Add padding with respect to the final image shape.</span>
-<span class="n">pad_options</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="n">volume</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">2</span><span class="p">])</span>
 <span class="n">config</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">BasicImageConfig</span><span class="p">(</span>
     <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">80</span><span class="p">,</span> <span class="mi">80</span><span class="p">),</span>
     <span class="n">pixel_size</span><span class="o">=</span><span class="n">voxel_size</span><span class="p">,</span>
     <span class="n">voltage_in_kilovolts</span><span class="o">=</span><span class="mf">300.0</span><span class="p">,</span>
-    <span class="n">pad_options</span><span class="o">=</span><span class="n">pad_options</span><span class="p">,</span>
+    <span class="n">padded_shape</span><span class="o">=</span><span class="n">volume</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">2</span><span class="p">],</span>
 <span class="p">)</span>
 <span class="c1"># Make the image model. By default, cryoJAX will simulate</span>
 <span class="c1"># the contrast in physical units. Rather, normalize the image.</span>
@@ -1460,7 +1459,7 @@ Simulate an image with JIT
 <span class="n">images</span> <span class="o">=</span> <span class="n">simulate_batch_fn</span><span class="p">(</span><span class="n">model_vmap</span><span class="p">,</span> <span class="n">model_novmap</span><span class="p">)</span>
 <span class="n">plot_image_stack</span><span class="p">(</span><span class="n">images</span><span class="p">)</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/af19b923aa864949879cfc2d3d29d5cf.png" /></p>
+<p><img alt="img" src="../_data/f58efc18aea64f89b4346c3d573f0566.png" /></p>
 <p>Here, we use a <code>eqx.filter_vmap</code> for model instantiation and image simulation.</p>
 <div class="admonition info">
 <p class="admonition-title">Why do we set <code>out_axes=(0, None)</code>?</p>

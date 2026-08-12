@@ -1369,7 +1369,7 @@
 
 <h4 id="cryojax.rotations.SO3" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.rotations.SO3</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/rotations/_lie_group.py#L79-L348"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/rotations/_lie_group.py#L82-L394"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.rotations.SO3" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1406,7 +1406,7 @@ SO3 matrix lie group.</p>
 
 
 <h5 id="cryojax.rotations.SO3.__init__" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">wxyz</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;4&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">float</span><span class="p">])</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">wxyz</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;... 4&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">float</span><span class="p">])</span></code>
   
 
 
@@ -1418,7 +1418,8 @@ SO3 matrix lie group.</p>
         <p><strong>Arguments:</strong></p>
 <ul>
 <li><code>wxyz</code>:
-    A quaternion represented as <span class="arithmatex">\((q_w, q_x, q_y, q_z)\)</span>.</li>
+    A quaternion represented as <span class="arithmatex">\((q_w, q_x, q_y, q_z)\)</span>. A leading batch
+    dimension is supported, e.g. of shape <code>(..., 4)</code>.</li>
 </ul>
 
 
@@ -1430,7 +1431,7 @@ SO3 matrix lie group.</p>
 
 
 <h5 id="cryojax.rotations.SO3.apply" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">apply</span><span class="p">(</span><span class="n">target</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;3&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;3&#39;</span><span class="p">]</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">apply</span><span class="p">(</span><span class="n">target</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;... 3&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;... 3&#39;</span><span class="p">]</span></code>
   
 
 
@@ -1521,7 +1522,7 @@ SO3 matrix lie group.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Generates a x-axis rotation.</p>
+        <p>Generates a y-axis rotation.</p>
 
 
     </div>
@@ -1545,7 +1546,7 @@ SO3 matrix lie group.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Generates a x-axis rotation.</p>
+        <p>Generates a z-axis rotation.</p>
 
 
     </div>
@@ -1578,7 +1579,7 @@ SO3 matrix lie group.</p>
 
 
 <h5 id="cryojax.rotations.SO3.from_matrix" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">from_matrix</span><span class="p">(</span><span class="n">matrix</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;3 3&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">from_matrix</span><span class="p">(</span><span class="n">matrix</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;... 3 3&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
   
 
 
@@ -1600,7 +1601,7 @@ SO3 matrix lie group.</p>
 
 
 <h5 id="cryojax.rotations.SO3.as_matrix" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">as_matrix</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;3 3&#39;</span><span class="p">]</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">as_matrix</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;... 3 3&#39;</span><span class="p">]</span></code>
   
 
 
@@ -1618,7 +1619,7 @@ SO3 matrix lie group.</p>
 
 
 <h5 id="cryojax.rotations.SO3.exp" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">exp</span><span class="p">(</span><span class="n">tangent</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;3&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">exp</span><span class="p">(</span><span class="n">tangent</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;... 3&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
   
 
 
@@ -1640,7 +1641,7 @@ SO3 matrix lie group.</p>
 
 
 <h5 id="cryojax.rotations.SO3.log" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">log</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;3&#39;</span><span class="p">]</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">log</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;... 3&#39;</span><span class="p">]</span></code>
   
 
 
@@ -1708,7 +1709,7 @@ SO3 matrix lie group.</p>
 
 <h4 id="cryojax.rotations.SO2" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.rotations.SO2</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/rotations/_lie_group.py#L351-L456"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/rotations/_lie_group.py#L397-L518"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.rotations.SO2" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1745,7 +1746,7 @@ SO2 matrix lie group.</p>
 
 
 <h5 id="cryojax.rotations.SO2.__init__" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">unit_complex</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;2&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">float</span> <span class="o">|</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">NDArrayLike</span><span class="p">])</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">unit_complex</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;... 2&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">float</span> <span class="o">|</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">NDArrayLike</span><span class="p">])</span></code>
   
 
 
@@ -1758,7 +1759,8 @@ SO2 matrix lie group.</p>
 <ul>
 <li><code>unit_complex</code>:
     A complex number represented as a 2-vector
-    <span class="arithmatex">\((cos \theta, sin \theta)\)</span>.</li>
+    <span class="arithmatex">\((cos \theta, sin \theta)\)</span>. A leading batch dimension is supported,
+    e.g. of shape <code>(..., 2)</code>.</li>
 </ul>
 
 
@@ -1770,7 +1772,7 @@ SO2 matrix lie group.</p>
 
 
 <h5 id="cryojax.rotations.SO2.apply" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">apply</span><span class="p">(</span><span class="n">target</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;2&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;2&#39;</span><span class="p">]</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">apply</span><span class="p">(</span><span class="n">target</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;... 2&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;... 2&#39;</span><span class="p">]</span></code>
   
 
 
@@ -1890,7 +1892,7 @@ SO2 matrix lie group.</p>
 
 
 <h5 id="cryojax.rotations.SO2.from_matrix" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">from_matrix</span><span class="p">(</span><span class="n">matrix</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;2 2&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">from_matrix</span><span class="p">(</span><span class="n">matrix</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;... 2 2&#39;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
   
 
 
@@ -1912,7 +1914,7 @@ SO2 matrix lie group.</p>
 
 
 <h5 id="cryojax.rotations.SO2.as_matrix" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">as_matrix</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;2 2&#39;</span><span class="p">]</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">as_matrix</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;... 2 2&#39;</span><span class="p">]</span></code>
   
 
 
@@ -1952,7 +1954,7 @@ SO2 matrix lie group.</p>
 
 
 <h5 id="cryojax.rotations.SO2.log" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">log</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">log</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;...&#39;</span><span class="p">]</span></code>
   
 
 

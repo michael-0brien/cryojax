@@ -928,9 +928,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#cryojax.simulator.RealVoxelProjection" class="md-nav__link">
+  <a href="#cryojax.simulator.EwaldSphereExtraction" class="md-nav__link">
     <span class="md-ellipsis">
-      <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;RealVoxelProjection
+      <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;EwaldSphereExtraction
     </span>
   </a>
   
@@ -961,9 +961,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#cryojax.simulator.FFTAtomProjection" class="md-nav__link">
+  <a href="#cryojax.simulator.GaussianFourierProjection" class="md-nav__link">
     <span class="md-ellipsis">
-      <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;FFTAtomProjection
+      <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;GaussianFourierProjection
     </span>
   </a>
   
@@ -1413,7 +1413,7 @@
 
 <h4 id="cryojax.simulator.AbstractVolumeIntegrator" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.AbstractVolumeIntegrator</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_volume/base_volume.py#L191-L205"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_volume/base_volume.py#L198-L212"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.AbstractVolumeIntegrator" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1477,7 +1477,7 @@ the exit plane.</p>
 
 <h4 id="cryojax.simulator.AutoVolumeProjection" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.AutoVolumeProjection(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractVolumeIntegrator">cryojax.simulator.AbstractVolumeIntegrator</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_volume/auto_select.py#L34-L114"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_volume/auto_select.py#L32-L103"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.AutoVolumeProjection" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1508,32 +1508,20 @@ In particular,</p>
 <td style="text-align: left;">atom</td>
 </tr>
 <tr>
-<td style="text-align: left;"><a class="autorefs autorefs-internal" href="../volume/#cryojax.simulator.IndependentAtomVolume"><code>cryojax.simulator.IndependentAtomVolume</code></a></td>
-<td style="text-align: left;"><a class="autorefs autorefs-internal" href="#cryojax.simulator.FFTAtomProjection"><code>cryojax.simulator.FFTAtomProjection</code></a></td>
+<td style="text-align: left;"><a class="autorefs autorefs-internal" href="../volume/#cryojax.simulator.GaussianFourierVolume"><code>cryojax.simulator.GaussianFourierVolume</code></a></td>
+<td style="text-align: left;"><a class="autorefs autorefs-internal" href="#cryojax.simulator.GaussianFourierProjection"><code>cryojax.simulator.GaussianFourierProjection</code></a></td>
 <td style="text-align: left;">atom</td>
 </tr>
 <tr>
-<td style="text-align: left;"><a class="autorefs autorefs-internal" href="../volume/#cryojax.simulator.FourierVoxelGridVolume"><code>cryojax.simulator.FourierVoxelGridVolume</code></a> or <a class="autorefs autorefs-internal" href="../volume/#cryojax.simulator.FourierVoxelSplineVolume"><code>cryojax.simulator.FourierVoxelSplineVolume</code></a></td>
+<td style="text-align: left;"><a class="autorefs autorefs-internal" href="../volume/#cryojax.simulator.FourierVoxelGridVolume"><code>cryojax.simulator.FourierVoxelGridVolume</code></a></td>
 <td style="text-align: left;"><a class="autorefs autorefs-internal" href="#cryojax.simulator.FourierSliceExtraction"><code>cryojax.simulator.FourierSliceExtraction</code></a></td>
-<td style="text-align: left;">voxel</td>
-</tr>
-<tr>
-<td style="text-align: left;"><a class="autorefs autorefs-internal" href="../volume/#cryojax.simulator.RealVoxelCloudVolume"><code>cryojax.simulator.RealVoxelCloudVolume</code></a></td>
-<td style="text-align: left;"><a class="autorefs autorefs-internal" href="#cryojax.simulator.RealVoxelProjection"><code>cryojax.simulator.RealVoxelProjection</code></a></td>
 <td style="text-align: left;">voxel</td>
 </tr>
 </tbody>
 </table>
-<p>Note that <a class="autorefs autorefs-internal" href="../volume/#cryojax.simulator.RealVoxelGridVolume"><code>cryojax.simulator.RealVoxelGridVolume</code></a> does not have an associated projection method. To
-compute projections from real-space voxels, use <a class="autorefs autorefs-internal" href="../volume/#cryojax.simulator.RealVoxelCloudVolume"><code>cryojax.simulator.RealVoxelCloudVolume</code></a>.</p>
+<p>Note that <a class="autorefs autorefs-internal" href="../volume/#cryojax.simulator.RealVoxelGridVolume"><code>cryojax.simulator.RealVoxelGridVolume</code></a> does not have an associated projection method.</p>
 <p>To use advanced options for a given projection method,
 instantiate each respective class directly.</p>
-</div>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>If using <a class="autorefs autorefs-internal" href="../volume/#cryojax.simulator.FFTAtomRenderFn"><code>cryojax.simulator.FFTAtomRenderFn</code></a> or <a class="autorefs autorefs-internal" href="#cryojax.simulator.RealVoxelProjection"><code>cryojax.simulator.RealVoxelProjection</code></a>, <a href="https://github.com/flatironinstitute/jax-finufft"><code>jax-finufft</code></a>
-must be installed. See the cryoJAX <a href="https://github.com/michael-0brien/cryojax?tab=readme-ov-file#installation">installation instructions</a>
-for installing <code>jax-finufft</code>.</p>
 </div>
 
 
@@ -1629,7 +1617,7 @@ volume representation.</p>
 
 <h4 id="cryojax.simulator.FourierSliceExtraction" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.FourierSliceExtraction(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractVolumeIntegrator">cryojax.simulator.AbstractVolumeIntegrator</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_volume/fourier_voxels.py#L229-L342"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_volume/fourier_voxels.py#L153-L250"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.FourierSliceExtraction" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1640,9 +1628,7 @@ volume representation.</p>
 
         <p>Integrate points to the exit plane using the Fourier
 projection-slice theorem.</p>
-<p>This extracts slices using interpolation methods housed in
-<code>cryojax.ndimage.map_coordinates</code> and
-<code>cryojax.ndimage.map_coordinates_spline</code>.</p>
+<p>The interpolation method is read from <code>FourierVoxelGridVolume.interp</code>.</p>
 
 
 
@@ -1667,7 +1653,7 @@ projection-slice theorem.</p>
 
 
 <h5 id="cryojax.simulator.FourierSliceExtraction.__init__" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">outputs_integral</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">out_of_bounds_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;fill&#39;</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="nb">complex</span> <span class="o">=</span> <span class="mi">0</span><span class="n">j</span><span class="p">)</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">boundary</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;fill&#39;</span><span class="p">,</span> <span class="n">unroll</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">|</span> <span class="n">Literal</span><span class="p">[</span><span class="s1">&#39;auto&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;auto&#39;</span><span class="p">)</span></code>
   
 
 
@@ -1678,17 +1664,12 @@ projection-slice theorem.</p>
 
         <p><strong>Arguments:</strong></p>
 <ul>
-<li><code>outputs_integral</code>:
-    If <code>True</code>, return the fourier slice
-    <em>multiplied by the voxel size</em>. Including the voxel size
-    numerical approximates the projection integral and is
-    necessary for simulating images in physical units.</li>
-<li><code>out_of_bounds_mode</code>:
-    Specify how to handle out of bounds indexing. See
-    <code>cryojax.ndimage.map_coordinates</code> for documentation.</li>
-<li><code>fill_value</code>:
-    Value for filling out-of-bounds indices. Used only when
-    <code>out_of_bounds_mode = "fill"</code>.</li>
+<li><code>boundary</code>:
+    What to return for frequencies outside the fourier box. See
+    <code>cryojax.ndimage.sample_fft_slice</code>.</li>
+<li><code>unroll</code>:
+    Passed to <code>cryojax.ndimage.sample_fft_slice</code>. With <code>"auto"</code> (the
+    default), this is <code>True</code> for <code>interp="cubic"</code> and <code>False</code> otherwise.</li>
 </ul>
 
 
@@ -1700,7 +1681,7 @@ projection-slice theorem.</p>
 
 
 <h5 id="cryojax.simulator.FourierSliceExtraction.integrate" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">integrate</span><span class="p">(</span><span class="n">volume_representation</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelGridVolume</span> <span class="o">|</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelSplineVolume</span><span class="p">,</span> <span class="n">image_config</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractImageConfig</span><span class="p">,</span> <span class="n">outputs_real_space</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> {image_config.padded_x_dim//2+1}&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> </span><span class="si">{image_config.padded_x_dim}</span><span class="s1">&#39;</span><span class="p">]</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">integrate</span><span class="p">(</span><span class="n">volume_representation</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelGridVolume</span><span class="p">,</span> <span class="n">image_config</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractImageConfig</span><span class="p">,</span> <span class="n">outputs_real_space</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> {image_config.padded_x_dim//2+1}&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> </span><span class="si">{image_config.padded_x_dim}</span><span class="s1">&#39;</span><span class="p">]</span></code>
   
 
 
@@ -1744,18 +1725,20 @@ using fourier slice extraction.</p>
 
 
 
-<h4 id="cryojax.simulator.RealVoxelProjection" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.RealVoxelProjection(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractVolumeIntegrator">cryojax.simulator.AbstractVolumeIntegrator</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_volume/real_voxels.py#L208-L285"><code class='hippogriffe-repo-url'></code></a>
+<h4 id="cryojax.simulator.EwaldSphereExtraction" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.EwaldSphereExtraction(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractVolumeIntegrator">cryojax.simulator.AbstractVolumeIntegrator</a>)</code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_volume/fourier_voxels.py#L253-L357"><code class='hippogriffe-repo-url'></code></a>
 
 
-<a href="#cryojax.simulator.RealVoxelProjection" class="headerlink" title="Permanent link">¤</a></h4>
+<a href="#cryojax.simulator.EwaldSphereExtraction" class="headerlink" title="Permanent link">¤</a></h4>
 
 
     <div class="doc doc-contents first">
 
 
-        <p>Integrate points onto the exit plane using non-uniform FFTs.</p>
+        <p>Integrate points to the exit plane by extracting a surface of
+the ewald sphere in fourier space.</p>
+<p>The interpolation method is read from <code>FourierVoxelGridVolume.interp</code>.</p>
 
 
 
@@ -1779,26 +1762,24 @@ using fourier slice extraction.</p>
 <div class="doc doc-object doc-function">
 
 
-<h5 id="cryojax.simulator.RealVoxelProjection.__init__" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">eps</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-06</span><span class="p">,</span> <span class="n">opts</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span></code>
+<h5 id="cryojax.simulator.EwaldSphereExtraction.__init__" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">boundary</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;fill&#39;</span><span class="p">,</span> <span class="n">unroll</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">|</span> <span class="n">Literal</span><span class="p">[</span><span class="s1">&#39;auto&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;auto&#39;</span><span class="p">)</span></code>
   
 
 
-<a href="#cryojax.simulator.RealVoxelProjection.__init__" class="headerlink" title="Permanent link">¤</a></h5>
+<a href="#cryojax.simulator.EwaldSphereExtraction.__init__" class="headerlink" title="Permanent link">¤</a></h5>
 
 
     <div class="doc doc-contents ">
 
         <p><strong>Arguments:</strong></p>
 <ul>
-<li><code>eps</code>:
-    See <a href="https://github.com/flatironinstitute/jax-finufft"><code>jax-finufft</code></a>
-    for documentation.</li>
-<li><code>opts</code>:
-    A <code>jax_finufft.options.Opts</code> or <code>jax_finufft.options.NestedOpts</code>
-    dataclass.
-    See <a href="https://github.com/flatironinstitute/jax-finufft"><code>jax-finufft</code></a>
-    for documentation.</li>
+<li><code>boundary</code>:
+    What to return for frequencies outside the fourier box. See
+    <code>cryojax.ndimage.sample_fft_slice</code>.</li>
+<li><code>unroll</code>:
+    Passed to <code>cryojax.ndimage.sample_fft_slice</code>. With <code>"auto"</code> (the
+    default), this is <code>True</code> for <code>interp="cubic"</code> and <code>False</code> otherwise.</li>
 </ul>
 
 
@@ -1809,18 +1790,17 @@ using fourier slice extraction.</p>
 <div class="doc doc-object doc-function">
 
 
-<h5 id="cryojax.simulator.RealVoxelProjection.integrate" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">integrate</span><span class="p">(</span><span class="n">volume_representation</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">RealVoxelCloudVolume</span><span class="p">,</span> <span class="n">image_config</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractImageConfig</span><span class="p">,</span> <span class="n">outputs_real_space</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> {image_config.padded_x_dim//2+1}&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> </span><span class="si">{image_config.padded_x_dim}</span><span class="s1">&#39;</span><span class="p">]</span></code>
+<h5 id="cryojax.simulator.EwaldSphereExtraction.integrate" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">integrate</span><span class="p">(</span><span class="n">volume_representation</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">FourierVoxelGridVolume</span><span class="p">,</span> <span class="n">image_config</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractImageConfig</span><span class="p">,</span> <span class="n">outputs_real_space</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> </span><span class="si">{image_config.padded_x_dim}</span><span class="s1">&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> </span><span class="si">{image_config.padded_x_dim}</span><span class="s1">&#39;</span><span class="p">]</span></code>
   
 
 
-<a href="#cryojax.simulator.RealVoxelProjection.integrate" class="headerlink" title="Permanent link">¤</a></h5>
+<a href="#cryojax.simulator.EwaldSphereExtraction.integrate" class="headerlink" title="Permanent link">¤</a></h5>
 
 
     <div class="doc doc-contents ">
 
-        <p>Integrate the volume at the <code>AbstractImageConfig</code> settings
-of a voxel-based representation in real-space, using non-uniform FFTs.</p>
+        <p>Extract the ewald sphere surface.</p>
 <p><strong>Arguments:</strong></p>
 <ul>
 <li><code>volume_representation</code>:
@@ -1828,12 +1808,13 @@ of a voxel-based representation in real-space, using non-uniform FFTs.</p>
 <li><code>image_config</code>:
     The image configuration.</li>
 <li><code>outputs_real_space</code>:
-    If <code>True</code>, return the image in real space. Otherwise,
-    return in Fourier.</li>
+    If <code>True</code>, return the Ewald sphere surface in
+    real space. Otherwise, return in Fourier.</li>
 </ul>
 <p><strong>Returns:</strong></p>
-<p>The volume projection in real or Fourier space, at the
-<code>image_config.padded_shape</code>.</p>
+<p>The Ewald sphere surface in the real-space or fourier-space at the
+<code>image_config.padded_shape</code>, <code>image_config.pixel_size</code>,
+and <code>image_config.voltage_in_kilovolts</code>.</p>
 
 
     </div>
@@ -1855,7 +1836,7 @@ of a voxel-based representation in real-space, using non-uniform FFTs.</p>
 
 <h4 id="cryojax.simulator.GaussianMixtureProjection" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.GaussianMixtureProjection(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractVolumeIntegrator">cryojax.simulator.AbstractVolumeIntegrator</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_volume/gaussian_volume.py#L244-L359"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_volume/gaussian_mixture.py#L223-L381"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.GaussianMixtureProjection" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1864,7 +1845,13 @@ of a voxel-based representation in real-space, using non-uniform FFTs.</p>
     <div class="doc doc-contents first">
 
 
-        <p>GaussianMixtureProjection(*, upsampling_factor: int | None = None, shape: tuple[int, int] | None = None, sampling_mode: Literal['average', 'point'] = 'average', use_error_functions: bool = False, n_batches: int = 1)</p>
+        <div class="admonition example">
+<p class="admonition-title">Speed up gradients with Pallas</p>
+</div>
+<div class="highlight"><pre><span></span><code><span class="n">integrator</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">GaussianMixtureProjection</span><span class="p">(</span>
+    <span class="n">n_spread</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span> <span class="n">enable_pallas</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;bwd&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">}</span>
+<span class="p">)</span>
+</code></pre></div>
 
 
 
@@ -1889,7 +1876,7 @@ of a voxel-based representation in real-space, using non-uniform FFTs.</p>
 
 
 <h5 id="cryojax.simulator.GaussianMixtureProjection.__init__" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">upsampling_factor</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">sampling_mode</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s1">&#39;average&#39;</span><span class="p">,</span> <span class="s1">&#39;point&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;average&#39;</span><span class="p">,</span> <span class="n">use_error_functions</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">n_batches</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">sampling_mode</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s1">&#39;average&#39;</span><span class="p">,</span> <span class="s1">&#39;point&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;average&#39;</span><span class="p">,</span> <span class="n">n_batches</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> <span class="n">n_spread</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">enable_pallas</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">|</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bool</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span></code>
   
 
 
@@ -1913,7 +1900,31 @@ of a voxel-based representation in real-space, using non-uniform FFTs.</p>
     The number of batches over groups of positions
     used to evaluate the projection. By default, <code>n_batches = 1</code>,
     which computes a projection for all positions at once.
-    This is useful to decrease GPU memory usage.</li>
+    This is useful to decrease GPU memory usage. Applies to both
+    the dense (<code>n_spread=None</code>) and spreading (<code>n_spread</code> set) backends.</li>
+<li><code>n_spread</code>:
+    If <code>None</code> (default), compute the projection with dense gaussian
+    integrals evaluated over the whole grid. If an <code>int</code>, instead
+    directly spread each gaussian onto only the <code>n_spread</code> nearest
+    grid points (per dimension), trading accuracy for speed.
+    If a <code>tuple</code> of <code>int</code>s (one value per gaussian component, i.e. of
+    length <code>GaussianMixtureVolume.amplitudes.shape[-1]</code>), spread each
+    gaussian component with its own width instead of one shared
+    width -- useful when a volume's gaussian components have widths
+    spanning an order of magnitude or more (e.g. X-ray/electron
+    scattering factors written as a sum of 5 gaussians), where a
+    single <code>n_spread</code> would either truncate the widest components or
+    waste computation spreading the narrowest ones too widely. See
+    <a class="autorefs autorefs-internal" href="../entry-point/#cryojax.simulator.suggest_n_spread"><code>cryojax.simulator.suggest_n_spread</code></a> to choose these values
+    from <code>volume_representation.variances</code>.</li>
+<li><code>enable_pallas</code>:
+    Use the Pallas/Triton GPU backend instead of pure-JAX for the
+    <code>n_spread</code> spreading backend (ignored if <code>n_spread</code> is <code>None</code>).
+    <a href="https://docs.jax.dev/en/latest/pallas/index.html">Pallas</a> is
+    JAX's framework for writing custom GPU/TPU kernels. This is most
+    advantageous for the <em>backward</em> pass -- <code>{"bwd": True}</code>. See
+    <a class="autorefs autorefs-internal" href="../../ndimage/#cryojax.ndimage.spread_gaussians_2d"><code>cryojax.ndimage.spread_gaussians_2d</code></a>'s <code>enable_pallas</code> for
+    the full picture. <code>None</code> (default) defers to <code>CRYOJAX_ENABLE_PALLAS</code>.</li>
 </ul>
 
 
@@ -1967,19 +1978,32 @@ of a voxel-based representation in real-space, using non-uniform FFTs.</p>
 
 
 
-<h4 id="cryojax.simulator.FFTAtomProjection" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.FFTAtomProjection(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractVolumeIntegrator">cryojax.simulator.AbstractVolumeIntegrator</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_volume/independent_atom_volume.py#L410-L571"><code class='hippogriffe-repo-url'></code></a>
+<h4 id="cryojax.simulator.GaussianFourierProjection" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.GaussianFourierProjection(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractVolumeIntegrator">cryojax.simulator.AbstractVolumeIntegrator</a>)</code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_volume/gaussian_fourier.py#L357-L497"><code class='hippogriffe-repo-url'></code></a>
 
 
-<a href="#cryojax.simulator.FFTAtomProjection" class="headerlink" title="Permanent link">¤</a></h4>
+<a href="#cryojax.simulator.GaussianFourierProjection" class="headerlink" title="Permanent link">¤</a></h4>
 
 
     <div class="doc doc-contents first">
 
 
-        <p>Integrate atomic parametrization of a volume onto
-the exit plane using non-uniform FFTs plus convolution.</p>
+        <p>Integrate atomic parametrization of a volume onto the exit plane from
+a <code>GaussianFourierVolume</code> using non-uniform FFTs and Fourier-domain
+convolution. Good when kernels span at least a couple pixels; see
+<code>cryojax.simulator.GaussianMixtureProjection</code> for an alternative that
+directly spreads narrow kernels onto the grid.</p>
+<div class="admonition info">
+<p class="admonition-title">Info</p>
+<p>By default, the non-uniform FFT runs on a pure-JAX backend using
+<a href="https://github.com/GragasLab/nufftax/tree/custom-kernel-spread"><code>nufftax</code></a>.
+Setting the environment variable <code>CRYOJAX_FINUFFT_BACKEND=jax-finufft</code> switches to
+<a href="https://github.com/flatironinstitute/jax-finufft"><code>jax-finufft</code></a>, which
+can be more computationally efficient and less memory-demanding, at the
+cost of being trickier to install and having more limited integration
+with multi-GPU JAX.</p>
+</div>
 
 
 
@@ -2003,12 +2027,12 @@ the exit plane using non-uniform FFTs plus convolution.</p>
 <div class="doc doc-object doc-function">
 
 
-<h5 id="cryojax.simulator.FFTAtomProjection.__init__" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">sampling_mode</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s1">&#39;average&#39;</span><span class="p">,</span> <span class="s1">&#39;point&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;average&#39;</span><span class="p">,</span> <span class="n">upsample_factor</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">eps</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-06</span><span class="p">,</span> <span class="n">opts</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span></code>
+<h5 id="cryojax.simulator.GaussianFourierProjection.__init__" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">sampling_mode</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s1">&#39;average&#39;</span><span class="p">,</span> <span class="s1">&#39;point&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;average&#39;</span><span class="p">,</span> <span class="n">upsample_factor</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">eps</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-06</span><span class="p">,</span> <span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">options</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{})</span></code>
   
 
 
-<a href="#cryojax.simulator.FFTAtomProjection.__init__" class="headerlink" title="Permanent link">¤</a></h5>
+<a href="#cryojax.simulator.GaussianFourierProjection.__init__" class="headerlink" title="Permanent link">¤</a></h5>
 
 
     <div class="doc doc-contents ">
@@ -2021,24 +2045,17 @@ the exit plane using non-uniform FFTs plus convolution.</p>
     underlying continuous function. If <code>'point'</code>, the volume at
     a pixel will be point sampled.</li>
 <li><code>upsample_factor</code>:
-    If provided, first compute an upsampled version of the
-    image at pixel size <code>image_config.pixel_size / upsample_factor</code>.
-    Then, downsample with <code>cryojax.ndimage.block_reduce_downsample</code>
-    to locally average to the correct pixel size. This is useful
-    for reducing aliasing.</li>
+    How much to upsample the grid on which atoms are spread onto.</li>
+<li><code>eps</code>:
+    The precision of the underlying non-uniform FFT implementation.
+    See <a href="https://finufft.readthedocs.io/en/latest/opts.html#options-parameters-cpu"><code>finufft</code></a>
+    for documentation.</li>
 <li><code>shape</code>:
     If given, first compute the image at <code>shape</code>, then
     pad or crop to <code>image_config.padded_shape</code>.</li>
-<li><code>eps</code>:
-    See <a href="https://github.com/flatironinstitute/jax-finufft"><code>jax-finufft</code></a>
-    for documentation.</li>
-<li><code>opts</code>:
-    A <code>jax_finufft.options.Opts</code> or <code>jax_finufft.options.NestedOpts</code>
-    dataclass. These provide advanced options for controlling the
-    behavior of the non-uniform FFT (
-    see <a href="https://github.com/flatironinstitute/jax-finufft"><code>jax-finufft</code></a>
-    for documentation). If passing these advanced options, do not change
-    <code>modeord=False</code> for both the forward and the backward pass.</li>
+<li><code>options</code>:
+    A dictionary of options for advanced usage, passed directly to
+    the underlying non-uniform FFT implementation.</li>
 </ul>
 
 
@@ -2049,18 +2066,18 @@ the exit plane using non-uniform FFTs plus convolution.</p>
 <div class="doc doc-object doc-function">
 
 
-<h5 id="cryojax.simulator.FFTAtomProjection.integrate" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">integrate</span><span class="p">(</span><span class="n">volume_representation</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">IndependentAtomVolume</span><span class="p">,</span> <span class="n">image_config</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractImageConfig</span><span class="p">,</span> <span class="n">outputs_real_space</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> {image_config.padded_x_dim//2+1}&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> </span><span class="si">{image_config.padded_x_dim}</span><span class="s1">&#39;</span><span class="p">]</span></code>
+<h5 id="cryojax.simulator.GaussianFourierProjection.integrate" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">integrate</span><span class="p">(</span><span class="n">volume_representation</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">GaussianFourierVolume</span><span class="p">,</span> <span class="n">image_config</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractImageConfig</span><span class="p">,</span> <span class="n">outputs_real_space</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> {image_config.padded_x_dim//2+1}&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> </span><span class="si">{image_config.padded_x_dim}</span><span class="s1">&#39;</span><span class="p">]</span></code>
   
 
 
-<a href="#cryojax.simulator.FFTAtomProjection.integrate" class="headerlink" title="Permanent link">¤</a></h5>
+<a href="#cryojax.simulator.GaussianFourierProjection.integrate" class="headerlink" title="Permanent link">¤</a></h5>
 
 
     <div class="doc doc-contents ">
 
         <p>Compute a projection from scattering factors per atom type
-from the <code>IndependentAtomVolume</code>.</p>
+from the <code>GaussianFourierVolume</code>.</p>
 <p><strong>Arguments:</strong></p>
 <ul>
 <li><code>volume_representation</code>:

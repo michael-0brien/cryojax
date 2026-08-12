@@ -1353,43 +1353,6 @@ simulating an image, such as the pose, the volume, and the CTF and 2) Images are
 <span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">image_model</span><span class="p">)</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code>LinearImageModel(
-  volume_parametrization=FourierVoxelGridVolume(
-    fourier_voxel_grid=c64[160,160,160],
-    frequency_slice_in_pixels=f32[1,160,160,3]
-  ),
-  pose=EulerAnglePose(
-    offset_in_angstroms=f32[2],
-    phi_angle=f32[],
-    theta_angle=f32[],
-    psi_angle=f32[]
-  ),
-  volume_integrator=AutoVolumeProjection(options={}),
-  transfer_theory=ContrastTransferTheory(
-    ctf=AstigmaticCTF(
-      defocus_in_angstroms=f32[],
-      astigmatism_in_angstroms=f32[],
-      astigmatism_angle=f32[],
-      spherical_aberration_in_mm=f32[]
-    ),
-    envelope=None,
-    amplitude_contrast_ratio=weak_f32[],
-    phase_shift=f32[]
-  ),
-  image_config=BasicImageConfig(
-    shape=(80, 80),
-    pixel_size=f32[],
-    voltage_in_kilovolts=f32[],
-    grid_helper=None,
-    pad_options={&#39;shape&#39;: (160, 160), &#39;grid_helper&#39;: None}
-  ),
-  transform=None,
-  normalizes_signal=True,
-  signal_region=None,
-  signal_centering=&#39;mean&#39;,
-  translate_mode=&#39;fft&#39;
-)
-</code></pre></div>
 <p>Now, in JAX-style functional programming we need to define a function to simulate an image. We think about the <code>image_model</code> as a collection of arguments to pass a function for image simulation.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">equinox</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">eqx</span>
 
@@ -1412,7 +1375,7 @@ simulating an image, such as the pose, the volume, and the CTF and 2) Images are
 <span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/1b0a21e310244b3c99100bb21f5d4a64.png" /></p>
+<p><img alt="img" src="../_data/9108a5e76a7d4992a7e69bcb195d7a37.png" /></p>
 <p>Alternatively, the user can simulate an image with noise from a particular statistical distribution. In this example, we use the <code>GaussianWhiteNoiseModel</code>.</p>
 <p>Here, we will directly control image SNR by transforming the final image output using a <code>cryojax.ndimage.ImageScaling</code>.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">cryojax.ndimage</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">im</span>
@@ -1457,7 +1420,7 @@ simulating an image, such as the pose, the volume, and the CTF and 2) Images are
 <span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 </code></pre></div>
-<p><img alt="img" src="../_data/d6eef19118d54606a22088e817cae78c.png" /></p>
+<p><img alt="img" src="../_data/0ff1bbc5be6c4e4e90e2437f47be5c33.png" /></p>
 <div class="highlight"><pre><span></span><code>
 </code></pre></div>
 

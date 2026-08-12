@@ -956,9 +956,27 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#cryojax.simulator.AbstractTransferTheory" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;AbstractTransferTheory
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#cryojax.simulator.ContrastTransferTheory" class="md-nav__link">
     <span class="md-ellipsis">
       <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;ContrastTransferTheory
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cryojax.simulator.WaveTransferTheory" class="md-nav__link">
+    <span class="md-ellipsis">
+      <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;WaveTransferTheory
     </span>
   </a>
   
@@ -1413,7 +1431,7 @@
 
 <h4 id="cryojax.simulator.AbstractCTF" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.AbstractCTF</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_transfer_theory/transfer_function.py#L15-L79"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_transfer_theory/transfer_function.py#L15-L79"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.AbstractCTF" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1476,7 +1494,7 @@
 
 <h4 id="cryojax.simulator.AstigmaticCTF" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.AstigmaticCTF(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractCTF">cryojax.simulator.AbstractCTF</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_transfer_theory/transfer_function.py#L82-L169"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_transfer_theory/transfer_function.py#L82-L173"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.AstigmaticCTF" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1626,6 +1644,56 @@ spatial frequency <span class="arithmatex">\(\boldsymbol{q}\)</span>.</p>
     </div>
 
 </div><h2 id="transfer-theories">Transfer Theories<a class="headerlink" href="#transfer-theories" title="Permanent link">¤</a></h2>
+<details class="abstract">
+<summary><code>cryojax.simulator.AbstractTransferTheory</code></summary>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="cryojax.simulator.AbstractTransferTheory" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.AbstractTransferTheory</code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_transfer_theory/transfer_theory.py#L12-L19"><code class='hippogriffe-repo-url'></code></a>
+
+
+<a href="#cryojax.simulator.AbstractTransferTheory" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+
+        <p>A transfer theory for the weak-phase approximation. This class
+propagates the fourier spectrum of the object from a plane directly below it to
+the plane of the detector. In other terms, it computes a noiseless cryo-EM
+image from a 2D projection.</p>
+
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div></details>
 
 
 <div class="doc doc-object doc-class">
@@ -1633,8 +1701,8 @@ spatial frequency <span class="arithmatex">\(\boldsymbol{q}\)</span>.</p>
 
 
 <h4 id="cryojax.simulator.ContrastTransferTheory" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.ContrastTransferTheory</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_transfer_theory/transfer_theory.py#L22-L122"><code class='hippogriffe-repo-url'></code></a>
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.ContrastTransferTheory(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractTransferTheory">cryojax.simulator.AbstractTransferTheory</a>)</code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_transfer_theory/transfer_theory.py#L22-L138"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.ContrastTransferTheory" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1697,7 +1765,7 @@ image from a 2D projection.</p>
 
 
 <h5 id="cryojax.simulator.ContrastTransferTheory.propagate_object" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">propagate_object</span><span class="p">(</span><span class="n">object_spectrum</span><span class="p">:</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> {image_config.padded_x_dim//2+1}&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> </span><span class="si">{image_config.padded_x_dim}</span><span class="s1">&#39;</span><span class="p">],</span> <span class="n">image_config</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractImageConfig</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">defocus_offset</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">input_is_ewald_sphere</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> {image_config.padded_x_dim//2+1}&#39;</span><span class="p">]</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">propagate_object</span><span class="p">(</span><span class="n">object_spectrum</span><span class="p">:</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> {image_config.padded_x_dim//2+1}&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> </span><span class="si">{image_config.padded_x_dim}</span><span class="s1">&#39;</span><span class="p">],</span> <span class="n">image_config</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractImageConfig</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">defocus_offset</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">is_ewald_sphere</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> {image_config.padded_x_dim//2+1}&#39;</span><span class="p">]</span></code>
   
 
 
@@ -1714,7 +1782,7 @@ image from a 2D projection.</p>
     below it.</li>
 <li><code>image_config</code>:
     The configuration of the resulting image.</li>
-<li><code>input_is_ewald_sphere</code>:
+<li><code>is_ewald_sphere</code>:
     If <code>False</code>, the <code>object_spectrum</code> is a projection
     approximation and is therefore the fourier transform of a real-valued
     array. If <code>True</code>, <code>object_spectrum</code> is extracted from
@@ -1724,6 +1792,94 @@ image from a 2D projection.</p>
     An optional defocus offset to apply to the CTF defocus at
     runtime.</li>
 </ul>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div><hr />
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="cryojax.simulator.WaveTransferTheory" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.WaveTransferTheory(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractTransferTheory">cryojax.simulator.AbstractTransferTheory</a>)</code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_transfer_theory/transfer_theory.py#L141-L180"><code class='hippogriffe-repo-url'></code></a>
+
+
+<a href="#cryojax.simulator.WaveTransferTheory" class="headerlink" title="Permanent link">¤</a></h4>
+
+
+    <div class="doc doc-contents first">
+
+
+        <p>An optics model that propagates the exit wave to the detector plane.</p>
+
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.WaveTransferTheory.__init__" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">ctf</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractCTF</span><span class="p">)</span></code>
+  
+
+
+<a href="#cryojax.simulator.WaveTransferTheory.__init__" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p><strong>Arguments:</strong></p>
+<ul>
+<li><code>ctf</code>: The contrast transfer function model.</li>
+</ul>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="cryojax.simulator.WaveTransferTheory.propagate_exit_wave" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">propagate_exit_wave</span><span class="p">(</span><span class="n">wavefunction_spectrum</span><span class="p">:</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> </span><span class="si">{image_config.padded_x_dim}</span><span class="s1">&#39;</span><span class="p">],</span> <span class="n">image_config</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractImageConfig</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">defocus_offset</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{image_config.padded_y_dim}</span><span class="s1"> </span><span class="si">{image_config.padded_x_dim}</span><span class="s1">&#39;</span><span class="p">]</span></code>
+  
+
+
+<a href="#cryojax.simulator.WaveTransferTheory.propagate_exit_wave" class="headerlink" title="Permanent link">¤</a></h5>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Apply the wave transfer function to the wavefunction in the exit plane.</p>
 
 
     </div>

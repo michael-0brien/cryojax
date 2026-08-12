@@ -1382,7 +1382,7 @@
 
 <h4 id="cryojax.simulator.AbstractImageModel" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.AbstractImageModel</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_image_model.py#L55-L246"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_image_model.py#L55-L257"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.AbstractImageModel" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1446,7 +1446,7 @@
 
 <h4 id="cryojax.simulator.LinearImageModel" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.LinearImageModel(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractImageModel">cryojax.simulator.AbstractImageModel</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_image_model.py#L249-L376"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_image_model.py#L260-L387"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.LinearImageModel" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1609,6 +1609,9 @@ Ignored if <code>normalizes_signal = False</code>.</li>
 
         <p>Return an image postprocessed with filters, cropping, masking,
 and normalization in either real or fourier space.</p>
+<p>A <code>filter</code> is given at <code>image_config.padded_shape</code> (as an <code>rfftn</code>
+array) and is applied in fourier space before cropping, so that it
+precedes normalization and masking.</p>
 
 
     </div>
@@ -1630,7 +1633,7 @@ and normalization in either real or fourier space.</p>
 
 <h4 id="cryojax.simulator.ProjectionImageModel" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.ProjectionImageModel(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractImageModel">cryojax.simulator.AbstractImageModel</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_image_model.py#L379-L495"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_image_model.py#L390-L506"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.ProjectionImageModel" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1792,6 +1795,9 @@ Ignored if <code>normalizes_signal = False</code>.</li>
 
         <p>Return an image postprocessed with filters, cropping, masking,
 and normalization in either real or fourier space.</p>
+<p>A <code>filter</code> is given at <code>image_config.padded_shape</code> (as an <code>rfftn</code>
+array) and is applied in fourier space before cropping, so that it
+precedes normalization and masking.</p>
 
 
     </div>
@@ -1813,7 +1819,7 @@ and normalization in either real or fourier space.</p>
 
 <h4 id="cryojax.simulator.ContrastImageModel" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.ContrastImageModel(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractImageModel">cryojax.simulator.AbstractImageModel</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_image_model.py#L506-L582"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_image_model.py#L517-L593"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.ContrastImageModel" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1977,6 +1983,9 @@ Ignored if <code>normalizes_signal = False</code>.</li>
 
         <p>Return an image postprocessed with filters, cropping, masking,
 and normalization in either real or fourier space.</p>
+<p>A <code>filter</code> is given at <code>image_config.padded_shape</code> (as an <code>rfftn</code>
+array) and is applied in fourier space before cropping, so that it
+precedes normalization and masking.</p>
 
 
     </div>
@@ -1998,7 +2007,7 @@ and normalization in either real or fourier space.</p>
 
 <h4 id="cryojax.simulator.IntensityImageModel" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.IntensityImageModel(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractImageModel">cryojax.simulator.AbstractImageModel</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_image_model.py#L585-L660"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_image_model.py#L596-L671"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.IntensityImageModel" class="headerlink" title="Permanent link">¤</a></h4>
@@ -2162,6 +2171,9 @@ Ignored if <code>normalizes_signal = False</code>.</li>
 
         <p>Return an image postprocessed with filters, cropping, masking,
 and normalization in either real or fourier space.</p>
+<p>A <code>filter</code> is given at <code>image_config.padded_shape</code> (as an <code>rfftn</code>
+array) and is applied in fourier space before cropping, so that it
+precedes normalization and masking.</p>
 
 
     </div>
@@ -2183,7 +2195,7 @@ and normalization in either real or fourier space.</p>
 
 <h4 id="cryojax.simulator.ElectronCountsImageModel" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.ElectronCountsImageModel(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractImageModel">cryojax.simulator.AbstractImageModel</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_image_model.py#L663-L768"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_image_model.py#L674-L779"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.ElectronCountsImageModel" class="headerlink" title="Permanent link">¤</a></h4>
@@ -2347,6 +2359,9 @@ Ignored if <code>normalizes_signal = False</code>.</li>
 
         <p>Return an image postprocessed with filters, cropping, masking,
 and normalization in either real or fourier space.</p>
+<p>A <code>filter</code> is given at <code>image_config.padded_shape</code> (as an <code>rfftn</code>
+array) and is applied in fourier space before cropping, so that it
+precedes normalization and masking.</p>
 
 
     </div>

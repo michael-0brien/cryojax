@@ -1298,6 +1298,24 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#can-i-give-parameters-a-batch-dimension" class="md-nav__link">
+    <span class="md-ellipsis">
+      Can I give parameters a batch dimension?
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-are-my-parameters-on-the-cpu-versus-the-gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      When are my parameters on the CPU versus the GPU?
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1342,6 +1360,68 @@
 <p>CryoJAX implements internal runtime checks for things such as if positive quantities (e.g. pixel size) have somehow become negative, such as during gradient descent. By default, cryoJAX will not perform these checks, but enable them by setting the environmental variable <code>CRYOJAX_ENABLE_CHECKS=true</code>.</p>
 <p>These checks are performed using the function <a class="autorefs autorefs-internal" href="../api/jax_util/#cryojax.jax_util.maybe_error_if"><code>cryojax.jax_util.maybe_error_if</code></a>, which wraps <a href="https://docs.kidger.site/equinox/api/errors/#equinox.error_if"><code>equinox.error_if</code></a>. To change the behavior of run-time error checks, see the <code>error_if</code> documentation to learn about the <code>EQX_ON_ERROR</code> environmental variable.</p>
 <p>Also, note that <a class="autorefs autorefs-internal" href="../api/jax_util/#cryojax.jax_util.maybe_error_if"><code>cryojax.jax_util.maybe_error_if</code></a> is public API so that developers of downstream cryoJAX libraries may also use <code>CRYOJAX_ENABLE_CHECKS</code>!</p>
+<h2 id="can-i-give-parameters-a-batch-dimension">Can I give parameters a batch dimension?<a class="headerlink" href="#can-i-give-parameters-a-batch-dimension" title="Permanent link">¤</a></h2>
+<p>Yes. Classes such as the
+<a class="autorefs autorefs-internal" href="../api/simulator/pose/#cryojax.simulator.EulerAnglePose"><code>cryojax.simulator.EulerAnglePose</code></a>, <a class="autorefs autorefs-internal" href="../api/simulator/transfer_theory/#cryojax.simulator.AstigmaticCTF"><code>cryojax.simulator.AstigmaticCTF</code></a>, and <a class="autorefs autorefs-internal" href="../api/simulator/config/#cryojax.simulator.BasicImageConfig"><code>cryojax.simulator.BasicImageConfig</code></a> accept array parameters with a leading batch dimension. For example,</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">cryojax.simulator</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">cxs</span>
+
+<span class="c1"># A &quot;stack&quot; of 100 poses</span>
+<span class="n">pose</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">EulerAnglePose</span><span class="p">(</span><span class="n">phi_angle</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">360.0</span><span class="p">,</span> <span class="mi">100</span><span class="p">))</span>
+</code></pre></div>
+<p>is a perfectly valid object to construct.</p>
+<div class="admonition warning">
+<p class="admonition-title">Batched objects must be used inside <code>vmap</code></p>
+<p>A batched object like the one above can only be <em>used</em> to simulate an image
+inside a <code>jax.vmap</code> (or <code>equinox.filter_vmap</code>) region, which maps over the
+batch dimension. Passing a batched object directly to a simulation routine
+outside of <code>vmap</code> is a common gotcha: it will either raise a shape error
+or—more dangerously—<strong>silently produce an incorrect result</strong>, because the
+compute-time code assumes its array leaves are unbatched.</p>
+<p>For a concrete example, consider building 100 poses and simulating an image
+for each. The following is <strong>wrong</strong>:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># 100 poses, each with a different phi angle</span>
+<span class="n">pose</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">EulerAnglePose</span><span class="p">(</span><span class="n">phi_angle</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">360.0</span><span class="p">,</span> <span class="mi">100</span><span class="p">))</span>
+<span class="n">image_model</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">make_image_model</span><span class="p">(</span><span class="n">volume</span><span class="p">,</span> <span class="n">image_config</span><span class="p">,</span> <span class="n">pose</span><span class="p">,</span> <span class="n">transfer_theory</span><span class="p">)</span>
+
+<span class="c1"># WRONG: `pose` is batched but `simulate` is not mapped over the batch.</span>
+<span class="c1"># Inside the compute code, `pose.offset_in_angstroms[0]` now indexes the</span>
+<span class="c1"># *batch* axis instead of the x-component, so the phase-shift translation is</span>
+<span class="c1"># silently computed from the wrong numbers. You get a single (H, W) image</span>
+<span class="c1"># back with no error, even though 100 were intended.</span>
+<span class="n">image</span> <span class="o">=</span> <span class="n">image_model</span><span class="o">.</span><span class="n">simulate</span><span class="p">()</span>
+</code></pre></div>
+<p>Instead, map over the batch dimension explicitly. The <strong>correct</strong> version:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">equinox</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">eqx</span>
+
+<span class="c1"># Batch only over the leaves that actually have a batch dimension (the pose)</span>
+<span class="nd">@eqx</span><span class="o">.</span><span class="n">filter_vmap</span><span class="p">(</span><span class="n">in_axes</span><span class="o">=</span><span class="p">(</span><span class="n">eqx</span><span class="o">.</span><span class="n">if_array</span><span class="p">(</span><span class="mi">0</span><span class="p">),))</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">simulate_stack</span><span class="p">(</span><span class="n">pose</span><span class="p">):</span>
+    <span class="n">image_model</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">make_image_model</span><span class="p">(</span>
+        <span class="n">volume</span><span class="p">,</span> <span class="n">image_config</span><span class="p">,</span> <span class="n">pose</span><span class="p">,</span> <span class="n">transfer_theory</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">image_model</span><span class="o">.</span><span class="n">simulate</span><span class="p">()</span>
+
+<span class="n">images</span> <span class="o">=</span> <span class="n">simulate_stack</span><span class="p">(</span><span class="n">pose</span><span class="p">)</span>  <span class="c1"># shape (100, H, W), as intended</span>
+</code></pre></div>
+</div>
+<h2 id="when-are-my-parameters-on-the-cpu-versus-the-gpu">When are my parameters on the CPU versus the GPU?<a class="headerlink" href="#when-are-my-parameters-on-the-cpu-versus-the-gpu" title="Permanent link">¤</a></h2>
+<p>CryoJAX classes do not move their inputs between the host (CPU) and a
+device (e.g. GPU) at construction time. Instead, they store array parameters as
+<a class="autorefs autorefs-internal" href="../api/jax_util/#cryojax.jax_util.NDArrayLike"><code>cryojax.jax_util.NDArrayLike</code></a> leaves and preserve the backend of whatever
+you pass in:</p>
+<ul>
+<li>A <strong>JAX array</strong> (including a tracer inside <code>jit</code>/<code>vmap</code>) is kept on its
+  device.</li>
+<li>A <strong>NumPy array</strong> is kept on the host.</li>
+<li>A <strong>Python scalar/sequence</strong> (such as a default argument) is converted to a
+  NumPy array on the host.</li>
+</ul>
+<p>Both NumPy and JAX arrays are treated as <em>traced</em>
+parameters by Equinox's filtered transformations (e.g. <code>equinox.filter_jit</code>),
+so both backends behave as parameters. The stored leaves
+are cast to JAX arrays at compute time, so a NumPy leaf built inside a JIT trace
+is simply lifted onto the device where it is used.</p>
 
 
 

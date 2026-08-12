@@ -893,9 +893,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#cryojax.simulator.IndependentAtomVolume" class="md-nav__link">
+  <a href="#cryojax.simulator.GaussianFourierVolume" class="md-nav__link">
     <span class="md-ellipsis">
-      <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;IndependentAtomVolume
+      <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;GaussianFourierVolume
     </span>
   </a>
   
@@ -944,15 +944,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#cryojax.simulator.FourierVoxelSplineVolume" class="md-nav__link">
-    <span class="md-ellipsis">
-      <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;FourierVoxelSplineVolume
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#real-space" class="md-nav__link">
     <span class="md-ellipsis">
       Real-space
@@ -965,15 +956,6 @@
   <a href="#cryojax.simulator.RealVoxelGridVolume" class="md-nav__link">
     <span class="md-ellipsis">
       <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;RealVoxelGridVolume
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#cryojax.simulator.RealVoxelCloudVolume" class="md-nav__link">
-    <span class="md-ellipsis">
-      <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;RealVoxelCloudVolume
     </span>
   </a>
   
@@ -1027,9 +1009,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#cryojax.simulator.FFTAtomRenderFn" class="md-nav__link">
+  <a href="#cryojax.simulator.GaussianFourierRenderFn" class="md-nav__link">
     <span class="md-ellipsis">
-      <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;FFTAtomRenderFn
+      <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;GaussianFourierRenderFn
     </span>
   </a>
   
@@ -1549,7 +1531,7 @@
 
 <h4 id="cryojax.simulator.AbstractVolumeParametrization" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.AbstractVolumeParametrization</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_volume/base_volume.py#L43-L109"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_volume/base_volume.py#L43-L109"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.AbstractVolumeParametrization" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1663,7 +1645,7 @@ the volume for analysis and how to represent it for imaging.</p>
 
 <h4 id="cryojax.simulator.AbstractVolumeRepresentation" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.AbstractVolumeRepresentation(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractVolumeParametrization">cryojax.simulator.AbstractVolumeParametrization</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_volume/base_volume.py#L112-L139"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_volume/base_volume.py#L112-L139"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.AbstractVolumeRepresentation" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1736,7 +1718,7 @@ classes for imaging.</p>
 
 <h4 id="cryojax.simulator.AbstractAtomVolume" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.AbstractAtomVolume(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractVolumeRepresentation">cryojax.simulator.AbstractVolumeRepresentation</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_volume/base_volume.py#L142-L147"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_volume/base_volume.py#L142-L147"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.AbstractAtomVolume" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1799,7 +1781,7 @@ classes for imaging.</p>
 
 <h4 id="cryojax.simulator.GaussianMixtureVolume" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.GaussianMixtureVolume(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractAtomVolume">cryojax.simulator.AbstractAtomVolume</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_volume/gaussian_volume.py#L36-L241"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_volume/gaussian_mixture.py#L41-L220"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.GaussianMixtureVolume" class="headerlink" title="Permanent link">¤</a></h4>
@@ -1855,7 +1837,7 @@ from these tabulated electron scattering factors.</p>
 
 
 <h5 id="cryojax.simulator.GaussianMixtureVolume.__init__" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">positions</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;n_positions 3&#39;</span><span class="p">],</span> <span class="n">amplitudes</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;n_positions&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;n_positions n_gaussians&#39;</span><span class="p">],</span> <span class="n">variances</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;n_positions&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;n_positions n_gaussians&#39;</span><span class="p">])</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">positions</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;M 3&#39;</span><span class="p">],</span> <span class="n">amplitudes</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;M&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;M K&#39;</span><span class="p">],</span> <span class="n">variances</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;M&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;M K&#39;</span><span class="p">])</span></code>
   
 
 
@@ -2007,12 +1989,12 @@ per atom.</p>
 
 
 
-<h4 id="cryojax.simulator.IndependentAtomVolume" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.IndependentAtomVolume(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractAtomVolume">cryojax.simulator.AbstractAtomVolume</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_volume/independent_atom_volume.py#L110-L264"><code class='hippogriffe-repo-url'></code></a>
+<h4 id="cryojax.simulator.GaussianFourierVolume" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.GaussianFourierVolume(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractAtomVolume">cryojax.simulator.AbstractAtomVolume</a>)</code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_volume/gaussian_fourier.py#L52-L215"><code class='hippogriffe-repo-url'></code></a>
 
 
-<a href="#cryojax.simulator.IndependentAtomVolume" class="headerlink" title="Permanent link">¤</a></h4>
+<a href="#cryojax.simulator.GaussianFourierVolume" class="headerlink" title="Permanent link">¤</a></h4>
 
 
     <div class="doc doc-contents first">
@@ -2020,7 +2002,9 @@ per atom.</p>
 
         <p>A representation of a volume that accepts an array of
 atom positions and an electron scattering factor for these
-atoms.</p>
+atoms, projected/rendered via non-uniform FFTs (see
+<a class="autorefs autorefs-internal" href="../integrator/#cryojax.simulator.GaussianFourierProjection"><code>cryojax.simulator.GaussianFourierProjection</code></a>/
+<a class="autorefs autorefs-internal" href="#cryojax.simulator.GaussianFourierRenderFn"><code>cryojax.simulator.GaussianFourierRenderFn</code></a>).</p>
 <div class="admonition example">
 <p class="admonition-title">A Gaussian at each atom</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">cryojax.simulator</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">cxs</span>
@@ -2028,12 +2012,12 @@ atoms.</p>
 
 <span class="n">positions</span> <span class="o">=</span> <span class="o">...</span> <span class="c1"># load atom positions</span>
 <span class="n">b_factor</span> <span class="o">=</span> <span class="o">...</span>  <span class="c1"># ... and a B-factor</span>
-<span class="n">volume</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">IndependentAtomVolume</span><span class="p">(</span>
-    <span class="n">positions</span><span class="o">=</span><span class="n">positions</span><span class="p">,</span> <span class="n">scattering_factors</span><span class="o">=</span><span class="n">im</span><span class="o">.</span><span class="n">FourierGaussian</span><span class="p">(</span><span class="n">b_factor</span><span class="o">=</span><span class="n">b_factor</span><span class="p">)</span>
+<span class="n">volume</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">GaussianFourierVolume</span><span class="p">(</span>
+    <span class="n">positions</span><span class="o">=</span><span class="n">positions</span><span class="p">,</span> <span class="n">kernel_fns</span><span class="o">=</span><span class="n">im</span><span class="o">.</span><span class="n">FourierGaussian</span><span class="p">(</span><span class="n">b_factor</span><span class="o">=</span><span class="n">b_factor</span><span class="p">)</span>
 <span class="p">)</span>
 </code></pre></div>
 </div>
-<p>The arguments <code>positions</code> and <code>scattering_factors</code> may also be
+<p>The arguments <code>positions</code> and <code>kernel_fns</code> may also be
 pytrees of arrays and scattering factors, where each tree leaf represents
 a different atom type.</p>
 <div class="admonition example">
@@ -2043,13 +2027,13 @@ a different atom type.</p>
 
 <span class="n">positions_1</span><span class="p">,</span> <span class="n">positions_2</span> <span class="o">=</span> <span class="o">...</span>
 <span class="n">b_factor_1</span><span class="p">,</span> <span class="n">b_factor_2</span> <span class="o">=</span> <span class="o">...</span>
-<span class="n">volume</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">IndependentAtomVolume</span><span class="p">(</span>
+<span class="n">volume</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">GaussianFourierVolume</span><span class="p">(</span>
     <span class="n">positions</span><span class="o">=</span><span class="p">(</span><span class="n">positions_1</span><span class="p">,</span> <span class="n">positions_2</span><span class="p">),</span>
-    <span class="n">scattering_factors</span><span class="o">=</span><span class="p">(</span><span class="n">im</span><span class="o">.</span><span class="n">FourierGaussian</span><span class="p">(</span><span class="n">b_factor</span><span class="o">=</span><span class="n">b_factor_1</span><span class="p">),</span> <span class="n">im</span><span class="o">.</span><span class="n">FourierGaussian</span><span class="p">(</span><span class="n">b_factor</span><span class="o">=</span><span class="n">b_factor_2</span><span class="p">))</span>
+    <span class="n">kernel_fns</span><span class="o">=</span><span class="p">(</span><span class="n">im</span><span class="o">.</span><span class="n">FourierGaussian</span><span class="p">(</span><span class="n">b_factor</span><span class="o">=</span><span class="n">b_factor_1</span><span class="p">),</span> <span class="n">im</span><span class="o">.</span><span class="n">FourierGaussian</span><span class="p">(</span><span class="n">b_factor</span><span class="o">=</span><span class="n">b_factor_2</span><span class="p">))</span>
 <span class="p">)</span>
 </code></pre></div>
 </div>
-<p>See <a class="autorefs autorefs-internal" href="#cryojax.simulator.IndependentAtomVolume.from_tabulated_parameters"><code>cryojax.simulator.IndependentAtomVolume.from_tabulated_parameters</code></a> for
+<p>See <a class="autorefs autorefs-internal" href="#cryojax.simulator.GaussianFourierVolume.from_tabulated_parameters"><code>cryojax.simulator.GaussianFourierVolume.from_tabulated_parameters</code></a> for
 loading a volume from tabulated electron scattering factors.</p>
 
 
@@ -2074,12 +2058,12 @@ loading a volume from tabulated electron scattering factors.</p>
 <div class="doc doc-object doc-function">
 
 
-<h5 id="cryojax.simulator.IndependentAtomVolume.__init__" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">positions</span><span class="p">:</span> <span class="n">PyTree</span><span class="p">[</span><span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;_ 3&#39;</span><span class="p">],</span> <span class="s1">&#39;T&#39;</span><span class="p">],</span> <span class="n">scattering_factors</span><span class="p">:</span> <span class="n">PyTree</span><span class="p">[</span><span class="n">cryojax</span><span class="o">.</span><span class="n">ndimage</span><span class="o">.</span><span class="n">AbstractFourierOperator</span><span class="p">,</span> <span class="s1">&#39;T&#39;</span><span class="p">])</span></code>
+<h5 id="cryojax.simulator.GaussianFourierVolume.__init__" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">positions</span><span class="p">:</span> <span class="n">PyTree</span><span class="p">[</span><span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;_ 3&#39;</span><span class="p">],</span> <span class="s1">&#39;T&#39;</span><span class="p">],</span> <span class="n">kernel_fns</span><span class="p">:</span> <span class="n">PyTree</span><span class="p">[</span><span class="n">cryojax</span><span class="o">.</span><span class="n">ndimage</span><span class="o">.</span><span class="n">FourierGaussian</span><span class="p">,</span> <span class="s1">&#39;T&#39;</span><span class="p">])</span></code>
   
 
 
-<a href="#cryojax.simulator.IndependentAtomVolume.__init__" class="headerlink" title="Permanent link">¤</a></h5>
+<a href="#cryojax.simulator.GaussianFourierVolume.__init__" class="headerlink" title="Permanent link">¤</a></h5>
 
 
     <div class="doc doc-contents ">
@@ -2088,10 +2072,14 @@ loading a volume from tabulated electron scattering factors.</p>
 <ul>
 <li><code>positions</code>:
     A pytree of atom positions.</li>
-<li><code>scattering_factors</code>:
-    A pytree of scattering factors with the same tree structure
+<li><code>kernel_fns</code>:
+    A pytree of functions with the same tree structure
     as <code>positions</code>, where each leaf is a
-    <a class="autorefs autorefs-internal" href="../../ndimage/#cryojax.ndimage.AbstractFourierOperator"><code>cryojax.ndimage.AbstractFourierOperator</code></a>.</li>
+    <a class="autorefs autorefs-internal" href="../../ndimage/#cryojax.ndimage.FourierGaussian"><code>cryojax.ndimage.FourierGaussian</code></a> representing the atom
+    type's scattering factor. These may have amplitudes and
+    b-factors with a batch dimension to simulate form factors. To
+    use a different amplitude for each atom position, use
+    <a class="autorefs autorefs-internal" href="#cryojax.simulator.GaussianMixtureVolume"><code>cryojax.simulator.GaussianMixtureVolume</code></a> instead.</li>
 </ul>
 
 
@@ -2102,8 +2090,8 @@ loading a volume from tabulated electron scattering factors.</p>
 <div class="doc doc-object doc-function">
 
 
-<h5 id="cryojax.simulator.IndependentAtomVolume.from_tabulated_parameters" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">from_tabulated_parameters</span><span class="p">(</span><span class="n">positions_by_element</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;_ 3&#39;</span><span class="p">],</span> <span class="o">...</span><span class="p">],</span> <span class="n">parameters</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">constants</span><span class="o">.</span><span class="n">PengScatteringFactorParameters</span> <span class="o">|</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">constants</span><span class="o">.</span><span class="n">LobatoScatteringFactorParameters</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">b_factor_by_element</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
+<h5 id="cryojax.simulator.GaussianFourierVolume.from_tabulated_parameters" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">from_tabulated_parameters</span><span class="p">(</span><span class="n">positions_by_element</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;_ 3&#39;</span><span class="p">],</span> <span class="o">...</span><span class="p">],</span> <span class="n">parameters</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">constants</span><span class="o">.</span><span class="n">PengScatteringFactorParameters</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">b_factor_by_element</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
   
 
 
@@ -2111,7 +2099,7 @@ loading a volume from tabulated electron scattering factors.</p>
       <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
   </span>
 
-<a href="#cryojax.simulator.IndependentAtomVolume.from_tabulated_parameters" class="headerlink" title="Permanent link">¤</a></h5>
+<a href="#cryojax.simulator.GaussianFourierVolume.from_tabulated_parameters" class="headerlink" title="Permanent link">¤</a></h5>
 
 
     <div class="doc doc-contents ">
@@ -2124,12 +2112,12 @@ loading a volume from tabulated electron scattering factors.</p>
 <div class="doc doc-object doc-function">
 
 
-<h5 id="cryojax.simulator.IndependentAtomVolume.to_representation" class="doc doc-heading">
+<h5 id="cryojax.simulator.GaussianFourierVolume.to_representation" class="doc doc-heading">
   <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">to_representation</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">PRNGKeyArray</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
   
 
 
-<a href="#cryojax.simulator.IndependentAtomVolume.to_representation" class="headerlink" title="Permanent link">¤</a></h5>
+<a href="#cryojax.simulator.GaussianFourierVolume.to_representation" class="headerlink" title="Permanent link">¤</a></h5>
 
 
     <div class="doc doc-contents ">
@@ -2150,12 +2138,12 @@ loading a volume from tabulated electron scattering factors.</p>
 <div class="doc doc-object doc-function">
 
 
-<h5 id="cryojax.simulator.IndependentAtomVolume.rotate_to_pose" class="doc doc-heading">
+<h5 id="cryojax.simulator.GaussianFourierVolume.rotate_to_pose" class="doc doc-heading">
   <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">rotate_to_pose</span><span class="p">(</span><span class="n">pose</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractPose</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
   
 
 
-<a href="#cryojax.simulator.IndependentAtomVolume.rotate_to_pose" class="headerlink" title="Permanent link">¤</a></h5>
+<a href="#cryojax.simulator.GaussianFourierVolume.rotate_to_pose" class="headerlink" title="Permanent link">¤</a></h5>
 
 
     <div class="doc doc-contents ">
@@ -2170,12 +2158,12 @@ loading a volume from tabulated electron scattering factors.</p>
 <div class="doc doc-object doc-function">
 
 
-<h5 id="cryojax.simulator.IndependentAtomVolume.translate_to_pose" class="doc doc-heading">
+<h5 id="cryojax.simulator.GaussianFourierVolume.translate_to_pose" class="doc doc-heading">
   <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">translate_to_pose</span><span class="p">(</span><span class="n">pose</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractPose</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
   
 
 
-<a href="#cryojax.simulator.IndependentAtomVolume.translate_to_pose" class="headerlink" title="Permanent link">¤</a></h5>
+<a href="#cryojax.simulator.GaussianFourierVolume.translate_to_pose" class="headerlink" title="Permanent link">¤</a></h5>
 
 
     <div class="doc doc-contents ">
@@ -2205,7 +2193,7 @@ loading a volume from tabulated electron scattering factors.</p>
 
 <h4 id="cryojax.simulator.AbstractVoxelVolume" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.AbstractVoxelVolume(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractVolumeRepresentation">cryojax.simulator.AbstractVolumeRepresentation</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_volume/base_volume.py#L150-L188"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_volume/base_volume.py#L150-L195"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.AbstractVoxelVolume" class="headerlink" title="Permanent link">¤</a></h4>
@@ -2320,7 +2308,7 @@ component in the center of the box.</p>
 
 <h4 id="cryojax.simulator.FourierVoxelGridVolume" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.FourierVoxelGridVolume(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractVoxelVolume">cryojax.simulator.AbstractVoxelVolume</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_volume/fourier_voxels.py#L55-L140"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_volume/fourier_voxels.py#L62-L150"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.FourierVoxelGridVolume" class="headerlink" title="Permanent link">¤</a></h4>
@@ -2329,7 +2317,13 @@ component in the center of the box.</p>
     <div class="doc doc-contents first">
 
 
-        <p>A 3D voxel grid in fourier-space.</p>
+        <p>A volume representation for a 3D voxel grid in fourier-space.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Prefer the class-method constructor <code>from_real_voxel_grid</code> over direct
+instantiation. This prepares values for interpolation; only use <code>__init__</code>
+assumes if more control is desired.</p>
+</div>
 
 
 
@@ -2364,7 +2358,7 @@ component in the center of the box.</p>
 
     <div class="doc doc-contents ">
 
-        <p>The shape of the <code>fourier_voxel_grid</code>.</p>
+        <p>The cubic shape of the volume in real-space.</p>
 
     </div>
 
@@ -2376,7 +2370,7 @@ component in the center of the box.</p>
 
 
 <h5 id="cryojax.simulator.FourierVoxelGridVolume.__init__" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">fourier_voxel_grid</span><span class="p">:</span> <span class="n">Complex</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;dim dim dim&#39;</span><span class="p">],</span> <span class="n">frequency_slice_in_pixels</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;1 dim dim 3&#39;</span><span class="p">])</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">values</span><span class="p">:</span> <span class="n">Complex</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;dim dim dim//2+1&#39;</span><span class="p">],</span> <span class="n">frequency_slice</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;1 dim dim//2+1 3&#39;</span><span class="p">],</span> <span class="n">interp</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s1">&#39;linear&#39;</span><span class="p">,</span> <span class="s1">&#39;cubic&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;linear&#39;</span><span class="p">)</span></code>
   
 
 
@@ -2387,10 +2381,17 @@ component in the center of the box.</p>
 
         <p><strong>Arguments:</strong></p>
 <ul>
-<li><code>fourier_voxel_grid</code>:
-    The cubic voxel grid in fourier space.</li>
-<li><code>frequency_slice_in_pixels</code>:
-    The frequency slice coordinate system.</li>
+<li><code>values</code>:
+    The cubic voxel grid in fourier space, truncated to the half-space
+    <code>(dim, dim, dim // 2 + 1)</code> and already prepared for interpolation by
+    <a class="autorefs autorefs-internal" href="../../ndimage/#cryojax.ndimage.prepare_sampling_fft"><code>cryojax.ndimage.prepare_sampling_fft</code></a>.</li>
+<li><code>frequency_slice</code>:
+    The frequency slice coordinate system, in pixel units. This should be
+    the output of <a class="autorefs autorefs-internal" href="../../ndimage/#cryojax.ndimage.make_frequency_slice"><code>cryojax.ndimage.make_frequency_slice</code></a>.</li>
+<li><code>interp</code>:
+    The interpolation method used for fourier slice extraction, either
+    <code>"linear"</code> (the default) or <code>"cubic"</code>. This should be the same value
+    passed to <a class="autorefs autorefs-internal" href="../../ndimage/#cryojax.ndimage.prepare_sampling_fft"><code>cryojax.ndimage.prepare_sampling_fft</code></a>.</li>
 </ul>
 
 
@@ -2402,7 +2403,7 @@ component in the center of the box.</p>
 
 
 <h5 id="cryojax.simulator.FourierVoxelGridVolume.from_real_voxel_grid" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">from_real_voxel_grid</span><span class="p">(</span><span class="n">real_voxel_grid</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;dim dim dim&#39;</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">sinc_correction</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">pad_scale</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">pad_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;constant&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">from_real_voxel_grid</span><span class="p">(</span><span class="n">real_voxel_grid</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;dim dim dim&#39;</span><span class="p">],</span> <span class="o">/</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">interp</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s1">&#39;linear&#39;</span><span class="p">,</span> <span class="s1">&#39;cubic&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;linear&#39;</span><span class="p">,</span> <span class="n">pad_scale</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
   
 
 
@@ -2420,15 +2421,15 @@ component in the center of the box.</p>
 <ul>
 <li><code>real_voxel_grid</code>:
     A voxel grid in real space.</li>
-<li><code>sinc_correction</code>:
-    If <code>True</code>, apply a <a class="autorefs autorefs-internal" href="../../ndimage/#cryojax.ndimage.SincCorrectionMask"><code>cryojax.ndimage.SincCorrectionMask</code></a>
-    to correct for errors incurred from linear interpolation in
-    the Fourier domain via <a class="autorefs autorefs-internal" href="../integrator/#cryojax.simulator.FourierSliceExtraction"><code>cryojax.simulator.FourierSliceExtraction</code></a>.</li>
+<li><code>interp</code>:
+    The interpolation method used for fourier slice extraction, either
+    <code>"linear"</code> (the default) or <code>"cubic"</code>. The corresponding
+    interpolation kernel is deconvolved out of the voxel grid here,
+    which is what makes slice extraction accurate --- see
+    <a class="autorefs autorefs-internal" href="../../ndimage/#cryojax.ndimage.prepare_sampling_fft"><code>cryojax.ndimage.prepare_sampling_fft</code></a>.</li>
 <li><code>pad_scale</code>:
     Scale factor at which to pad <code>real_voxel_grid</code> before fourier
     transform. Must be a value greater than <code>1.0</code>.</li>
-<li><code>pad_mode</code>:
-    Padding method. See <code>jax.numpy.pad</code> for documentation.</li>
 </ul>
 
 
@@ -2475,181 +2476,7 @@ component in the center of the box.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Return a new volume with a rotated <code>frequency_slice_in_pixels</code>.</p>
-
-
-    </div>
-
-</div>
-
-
-
-  </div>
-
-    </div>
-
-</div><hr />
-
-
-<div class="doc doc-object doc-class">
-
-
-
-<h4 id="cryojax.simulator.FourierVoxelSplineVolume" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.FourierVoxelSplineVolume(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractVoxelVolume">cryojax.simulator.AbstractVoxelVolume</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_volume/fourier_voxels.py#L143-L226"><code class='hippogriffe-repo-url'></code></a>
-
-
-<a href="#cryojax.simulator.FourierVoxelSplineVolume" class="headerlink" title="Permanent link">¤</a></h4>
-
-
-    <div class="doc doc-contents first">
-
-
-        <p>A 3D voxel grid in fourier-space, represented
-by spline coefficients.</p>
-
-
-
-
-
-
-
-
-
-
-  <div class="doc doc-children">
-
-
-
-
-
-
-
-<div class="doc doc-object doc-attribute">
-
-
-
-<h5 id="cryojax.simulator.FourierVoxelSplineVolume.shape" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <code class="highlight language-python"><span class="n">shape</span></code>
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-property"><code>property</code></small>
-  </span>
-
-<a href="#cryojax.simulator.FourierVoxelSplineVolume.shape" class="headerlink" title="Permanent link">¤</a></h5>
-
-
-    <div class="doc doc-contents ">
-
-        <p>The shape of the original <code>fourier_voxel_grid</code> from which
-<code>coefficients</code> were computed.</p>
-
-    </div>
-
-</div>
-
-
-
-<div class="doc doc-object doc-function">
-
-
-<h5 id="cryojax.simulator.FourierVoxelSplineVolume.__init__" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">spline_coefficients</span><span class="p">:</span> <span class="n">Complex</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;coeff_dim coeff_dim coeff_dim&#39;</span><span class="p">],</span> <span class="n">frequency_slice_in_pixels</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;1 dim dim 3&#39;</span><span class="p">])</span></code>
-  
-
-
-<a href="#cryojax.simulator.FourierVoxelSplineVolume.__init__" class="headerlink" title="Permanent link">¤</a></h5>
-
-
-    <div class="doc doc-contents ">
-
-        <p><strong>Arguments:</strong></p>
-<ul>
-<li><code>spline_coefficients</code>:
-    The spline coefficents computed from the cubic voxel grid
-    in fourier space. See <code>cryojax.ndimage.compute_spline_coefficients</code>.</li>
-<li><code>frequency_slice_in_pixels</code>:
-    Frequency slice coordinate system.
-    See <code>cryojax.coordinates.make_frequency_slice</code>.</li>
-</ul>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h5 id="cryojax.simulator.FourierVoxelSplineVolume.from_real_voxel_grid" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">from_real_voxel_grid</span><span class="p">(</span><span class="n">real_voxel_grid</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;dim dim dim&#39;</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">pad_scale</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">pad_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;constant&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
-  
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
-  </span>
-
-<a href="#cryojax.simulator.FourierVoxelSplineVolume.from_real_voxel_grid" class="headerlink" title="Permanent link">¤</a></h5>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Load from a real-valued 3D voxel grid.</p>
-<p><strong>Arguments:</strong></p>
-<ul>
-<li><code>real_voxel_grid</code>: A voxel grid in real space.</li>
-<li><code>pad_scale</code>: Scale factor at which to pad <code>real_voxel_grid</code> before fourier
-             transform. Must be a value greater than <code>1.0</code>.</li>
-<li><code>pad_mode</code>: Padding method. See <code>jax.numpy.pad</code> for documentation.</li>
-</ul>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h5 id="cryojax.simulator.FourierVoxelSplineVolume.to_representation" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">to_representation</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">PRNGKeyArray</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
-  
-
-
-<a href="#cryojax.simulator.FourierVoxelSplineVolume.to_representation" class="headerlink" title="Permanent link">¤</a></h5>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Since this class is itself an
-<code>AbstractVolumeRepresentation</code>, this function maps to the identity.</p>
-<p><strong>Arguments:</strong></p>
-<ul>
-<li><code>rng_key</code>:
-    Not used in this implementation.</li>
-</ul>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h5 id="cryojax.simulator.FourierVoxelSplineVolume.rotate_to_pose" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">rotate_to_pose</span><span class="p">(</span><span class="n">pose</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractPose</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
-  
-
-
-<a href="#cryojax.simulator.FourierVoxelSplineVolume.rotate_to_pose" class="headerlink" title="Permanent link">¤</a></h5>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Return a new volume with a rotated <code>frequency_slice_in_pixels</code>.</p>
+        <p>Return a new volume with a rotated <code>frequency_slice</code>.</p>
 
 
     </div>
@@ -2667,8 +2494,7 @@ by spline coefficients.</p>
 <p class="admonition-title">Real-space projections</p>
 <p>The <a class="autorefs autorefs-internal" href="#cryojax.simulator.RealVoxelGridVolume"><code>cryojax.simulator.RealVoxelGridVolume</code></a> does not have an associated
 method in cryoJAX for computing projections and therefore
-cannot be used with with <a class="autorefs autorefs-internal" href="../entry-point/#cryojax.simulator.make_image_model"><code>cryojax.simulator.make_image_model</code></a>. Instead,
-use <a class="autorefs autorefs-internal" href="#cryojax.simulator.RealVoxelCloudVolume"><code>cryojax.simulator.RealVoxelCloudVolume</code></a>.</p>
+cannot be used with with <a class="autorefs autorefs-internal" href="../entry-point/#cryojax.simulator.make_image_model"><code>cryojax.simulator.make_image_model</code></a>.</p>
 </div>
 
 
@@ -2678,7 +2504,7 @@ use <a class="autorefs autorefs-internal" href="#cryojax.simulator.RealVoxelClou
 
 <h4 id="cryojax.simulator.RealVoxelGridVolume" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.RealVoxelGridVolume(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractVoxelVolume">cryojax.simulator.AbstractVoxelVolume</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_volume/real_voxels.py#L33-L105"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_volume/real_voxels.py#L18-L87"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.RealVoxelGridVolume" class="headerlink" title="Permanent link">¤</a></h4>
@@ -2722,7 +2548,7 @@ use <a class="autorefs autorefs-internal" href="#cryojax.simulator.RealVoxelClou
 
     <div class="doc doc-contents ">
 
-        <p>The shape of the <code>real_voxel_grid</code>.</p>
+        <p>The shape of the voxel grid.</p>
 
     </div>
 
@@ -2734,7 +2560,7 @@ use <a class="autorefs autorefs-internal" href="#cryojax.simulator.RealVoxelClou
 
 
 <h5 id="cryojax.simulator.RealVoxelGridVolume.__init__" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">real_voxel_grid</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;dim dim dim&#39;</span><span class="p">],</span> <span class="n">coordinate_grid_in_pixels</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;dim dim dim 3&#39;</span><span class="p">])</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">values</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;dim dim dim&#39;</span><span class="p">],</span> <span class="n">coordinate_grid</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;dim dim dim 3&#39;</span><span class="p">])</span></code>
   
 
 
@@ -2745,8 +2571,8 @@ use <a class="autorefs autorefs-internal" href="#cryojax.simulator.RealVoxelClou
 
         <p><strong>Arguments:</strong></p>
 <ul>
-<li><code>real_voxel_grid</code>: The voxel grid in real space.</li>
-<li><code>coordinate_grid_in_pixels</code>: A coordinate grid.</li>
+<li><code>values</code>: The voxel grid in real space.</li>
+<li><code>coordinate_grid</code>: A coordinate grid, in pixel units.</li>
 </ul>
 
 
@@ -2758,7 +2584,7 @@ use <a class="autorefs autorefs-internal" href="#cryojax.simulator.RealVoxelClou
 
 
 <h5 id="cryojax.simulator.RealVoxelGridVolume.from_real_voxel_grid" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">from_real_voxel_grid</span><span class="p">(</span><span class="n">real_voxel_grid</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;dim dim dim&#39;</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">coordinate_grid_in_pixels</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;dim dim dim 3&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">crop_scale</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">from_real_voxel_grid</span><span class="p">(</span><span class="n">real_voxel_grid</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;dim dim dim&#39;</span><span class="p">],</span> <span class="o">/</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">coordinate_grid</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;dim dim dim 3&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">crop_scale</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
   
 
 
@@ -2775,6 +2601,8 @@ use <a class="autorefs autorefs-internal" href="#cryojax.simulator.RealVoxelClou
 <p><strong>Arguments:</strong></p>
 <ul>
 <li><code>real_voxel_grid</code>: A voxel grid in real space.</li>
+<li><code>coordinate_grid</code>: A coordinate grid, in pixel units. Built from
+                     <code>real_voxel_grid</code>'s shape if not given.</li>
 <li><code>crop_scale</code>: Scale factor at which to crop <code>real_voxel_grid</code>.
                 Must be a value greater than <code>1</code>.</li>
 </ul>
@@ -2823,191 +2651,7 @@ use <a class="autorefs autorefs-internal" href="#cryojax.simulator.RealVoxelClou
 
     <div class="doc doc-contents ">
 
-        <p>Return a new volume with a rotated
-<code>coordinate_grid_in_pixels</code>.</p>
-
-
-    </div>
-
-</div>
-
-
-
-  </div>
-
-    </div>
-
-</div><hr />
-
-
-<div class="doc doc-object doc-class">
-
-
-
-<h4 id="cryojax.simulator.RealVoxelCloudVolume" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.RealVoxelCloudVolume(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractVoxelVolume">cryojax.simulator.AbstractVoxelVolume</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_volume/real_voxels.py#L108-L205"><code class='hippogriffe-repo-url'></code></a>
-
-
-<a href="#cryojax.simulator.RealVoxelCloudVolume" class="headerlink" title="Permanent link">¤</a></h4>
-
-
-    <div class="doc doc-contents first">
-
-
-        <p>A 3D cloud of voxels in real-space.</p>
-
-
-
-
-
-
-
-
-
-
-  <div class="doc doc-children">
-
-
-
-
-
-
-
-<div class="doc doc-object doc-attribute">
-
-
-
-<h5 id="cryojax.simulator.RealVoxelCloudVolume.shape" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <code class="highlight language-python"><span class="n">shape</span></code>
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-property"><code>property</code></small>
-  </span>
-
-<a href="#cryojax.simulator.RealVoxelCloudVolume.shape" class="headerlink" title="Permanent link">¤</a></h5>
-
-
-    <div class="doc doc-contents ">
-
-        <p>The shape of the unflattened voxel grid.</p>
-
-    </div>
-
-</div>
-
-
-
-<div class="doc doc-object doc-function">
-
-
-<h5 id="cryojax.simulator.RealVoxelCloudVolume.__init__" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">weights</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;N&#39;</span><span class="p">],</span> <span class="n">coordinate_list_in_pixels</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;N 3&#39;</span><span class="p">],</span> <span class="n">box_dim</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span></code>
-  
-
-
-<a href="#cryojax.simulator.RealVoxelCloudVolume.__init__" class="headerlink" title="Permanent link">¤</a></h5>
-
-
-    <div class="doc doc-contents ">
-
-        <p><strong>Arguments:</strong></p>
-<ul>
-<li><code>weights</code>:
-    The intensity of each voxel.</li>
-<li>
-<p><code>coordinate_list_in_pixels</code>:
-    The coordinate for each voxel in pixel units, e.g.</p>
-<p><div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">cryojax.ndimage</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">im</span>
-
-<span class="n">box_dim</span> <span class="o">=</span> <span class="mi">128</span>
-<span class="n">shape</span> <span class="o">=</span> <span class="p">(</span><span class="n">box_dim</span><span class="p">,</span> <span class="n">box_dim</span><span class="p">,</span> <span class="n">box_dim</span><span class="p">)</span>
-<span class="n">coordinate_grid</span> <span class="o">=</span> <span class="n">im</span><span class="o">.</span><span class="n">make_coordinate_grid</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span>
-<span class="n">n_voxels</span> <span class="o">=</span>
-<span class="n">coordinate_list_in_pixels</span> <span class="o">=</span> <span class="n">coordinate_grid</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="n">math</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">shape</span><span class="p">),</span> <span class="mi">3</span><span class="p">))</span>
-</code></pre></div>
-- <code>box_dim</code>:
-The box dimension of the original unflattened voxel array.</p>
-</li>
-</ul>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h5 id="cryojax.simulator.RealVoxelCloudVolume.from_real_voxel_grid" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">from_real_voxel_grid</span><span class="p">(</span><span class="n">real_voxel_grid</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">NDArrayLike</span><span class="p">,</span> <span class="s1">&#39;dim dim dim&#39;</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">coordinate_grid_in_pixels</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;dim dim dim 3&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">crop_scale</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
-  
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
-  </span>
-
-<a href="#cryojax.simulator.RealVoxelCloudVolume.from_real_voxel_grid" class="headerlink" title="Permanent link">¤</a></h5>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Load a <code>RealVoxelCloudVolume</code> from a real-valued 3D voxel grid.</p>
-<p><strong>Arguments:</strong></p>
-<ul>
-<li><code>real_voxel_grid</code>: A voxel grid in real space.</li>
-<li><code>crop_scale</code>: Scale factor at which to crop <code>real_voxel_grid</code>.
-                Must be a value greater than <code>1</code>.</li>
-</ul>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h5 id="cryojax.simulator.RealVoxelCloudVolume.to_representation" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">to_representation</span><span class="p">(</span><span class="n">rng_key</span><span class="p">:</span> <span class="n">PRNGKeyArray</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
-  
-
-
-<a href="#cryojax.simulator.RealVoxelCloudVolume.to_representation" class="headerlink" title="Permanent link">¤</a></h5>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Since this class is itself an
-<code>AbstractVolumeRepresentation</code>, this function maps to the identity.</p>
-<p><strong>Arguments:</strong></p>
-<ul>
-<li><code>rng_key</code>:
-    Not used in this implementation.</li>
-</ul>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h5 id="cryojax.simulator.RealVoxelCloudVolume.rotate_to_pose" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">rotate_to_pose</span><span class="p">(</span><span class="n">pose</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">AbstractPose</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Self</span></code>
-  
-
-
-<a href="#cryojax.simulator.RealVoxelCloudVolume.rotate_to_pose" class="headerlink" title="Permanent link">¤</a></h5>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Return a new volume with a rotated
-<code>coordinate_grid_in_pixels</code>.</p>
+        <p>Return a new volume with a rotated <code>coordinate_grid</code>.</p>
 
 
     </div>
@@ -3031,7 +2675,7 @@ The box dimension of the original unflattened voxel array.</p>
 
 <h4 id="cryojax.simulator.AbstractVolumeRenderFn" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.AbstractVolumeRenderFn</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_volume/base_volume.py#L208-L223"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_volume/base_volume.py#L215-L230"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.AbstractVolumeRenderFn" class="headerlink" title="Permanent link">¤</a></h4>
@@ -3095,7 +2739,7 @@ The box dimension of the original unflattened voxel array.</p>
 
 <h4 id="cryojax.simulator.AutoVolumeRenderFn" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.AutoVolumeRenderFn(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractVolumeRenderFn">cryojax.simulator.AbstractVolumeRenderFn</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_volume/auto_select.py#L125-L204"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_volume/auto_select.py#L114-L188"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.AutoVolumeRenderFn" class="headerlink" title="Permanent link">¤</a></h4>
@@ -3124,19 +2768,13 @@ In particular,</p>
 <td style="text-align: left;"><a class="autorefs autorefs-internal" href="#cryojax.simulator.GaussianMixtureRenderFn"><code>cryojax.simulator.GaussianMixtureRenderFn</code></a></td>
 </tr>
 <tr>
-<td style="text-align: left;"><a class="autorefs autorefs-internal" href="#cryojax.simulator.IndependentAtomVolume"><code>cryojax.simulator.IndependentAtomVolume</code></a></td>
-<td style="text-align: left;"><a class="autorefs autorefs-internal" href="#cryojax.simulator.FFTAtomRenderFn"><code>cryojax.simulator.FFTAtomRenderFn</code></a></td>
+<td style="text-align: left;"><a class="autorefs autorefs-internal" href="#cryojax.simulator.GaussianFourierVolume"><code>cryojax.simulator.GaussianFourierVolume</code></a></td>
+<td style="text-align: left;"><a class="autorefs autorefs-internal" href="#cryojax.simulator.GaussianFourierRenderFn"><code>cryojax.simulator.GaussianFourierRenderFn</code></a></td>
 </tr>
 </tbody>
 </table>
 <p>To use advanced options for a given rendering function,
 see each respective class.</p>
-</div>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>If using <a class="autorefs autorefs-internal" href="#cryojax.simulator.FFTAtomRenderFn"><code>cryojax.simulator.FFTAtomRenderFn</code></a>, <a href="https://github.com/flatironinstitute/jax-finufft"><code>jax-finufft</code></a>
-must be installed. See the cryoJAX <a href="https://github.com/michael-0brien/cryojax?tab=readme-ov-file#installation">installation instructions</a>
-for installing <code>jax-finufft</code>.</p>
 </div>
 
 
@@ -3220,7 +2858,7 @@ for installing <code>jax-finufft</code>.</p>
 
 <h4 id="cryojax.simulator.GaussianMixtureRenderFn" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.GaussianMixtureRenderFn(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractVolumeRenderFn">cryojax.simulator.AbstractVolumeRenderFn</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_volume/gaussian_volume.py#L362-L486"><code class='hippogriffe-repo-url'></code></a>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_volume/gaussian_mixture.py#L384-L559"><code class='hippogriffe-repo-url'></code></a>
 
 
 <a href="#cryojax.simulator.GaussianMixtureRenderFn" class="headerlink" title="Permanent link">¤</a></h4>
@@ -3255,6 +2893,13 @@ the potential is evaluated as the average value inside the voxel</p>
 <div class="arithmatex">\[U_{\ell} = \frac{1}{\Delta r^3} \sum\limits_{i = 1}^5 a_i \prod\limits_{j = 1}^3 \int_{r^{\ell}_j-\Delta r/2}^{r^{\ell}_j+\Delta r/2} dr_j \ \frac{1}{{\sqrt{2\pi ((b_i + B) / 8 \pi^2)}}} \exp(- \frac{(r_j - r'_j)^2}{2 ((b_i + B) / 8 \pi^2)}),\]</div>
 <p>where <span class="arithmatex">\(j\)</span> indexes the components of the spatial coordinate vector <span class="arithmatex">\(\mathbf{r}\)</span>. The above expression is evaluated using the error function as</p>
 <div class="arithmatex">\[U_{\ell} = \frac{1}{(2 \Delta r)^3} \sum\limits_{i = 1}^5 a_i \prod\limits_{j = 1}^3 \textrm{erf}(\frac{r_j^{\ell} - r'_j + \Delta r / 2}{\sqrt{2 ((b_i + B) / 8\pi^2)}}) - \textrm{erf}(\frac{r_j^{\ell} - r'_j - \Delta r / 2}{\sqrt{2 ((b_i + B) / 8\pi^2)}}).\]</div>
+<div class="admonition example">
+<p class="admonition-title">Speed up gradients with Pallas</p>
+<div class="highlight"><pre><span></span><code><span class="n">render_fn</span> <span class="o">=</span> <span class="n">cxs</span><span class="o">.</span><span class="n">GaussianMixtureRenderFn</span><span class="p">(</span>
+    <span class="n">shape</span><span class="p">,</span> <span class="n">voxel_size</span><span class="p">,</span> <span class="n">n_spread</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span> <span class="n">enable_pallas</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;bwd&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">}</span>
+<span class="p">)</span>
+</code></pre></div>
+</div>
 
 
 
@@ -3279,7 +2924,7 @@ the potential is evaluated as the average value inside the voxel</p>
 
 
 <h5 id="cryojax.simulator.GaussianMixtureRenderFn.__init__" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">voxel_size</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">batch_options</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{})</span></code>
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">voxel_size</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">n_batches</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> <span class="n">n_spread</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">enable_pallas</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">|</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bool</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span></code>
   
 
 
@@ -3294,19 +2939,35 @@ the potential is evaluated as the average value inside the voxel</p>
     The shape of the resulting voxel grid.</li>
 <li><code>voxel_size</code>:
     The voxel size of the resulting voxel grid.</li>
-<li><code>batch_options</code>:
-    Advanced options for controlling batching. This is a dictionary
-    with the following keys:<ul>
-<li>"batch_size":
-    The number of z-planes to evaluate in parallel with
-    <code>jax.vmap</code>. By default, <code>1</code>.</li>
-<li>"n_batches":
-    The number of iterations used to evaluate the volume,
-    where the iteration is taken over groups of atoms.
-    This is useful if <code>batch_size = 1</code>
-    and GPU memory is exhausted. By default, <code>1</code>.</li>
-</ul>
-</li>
+<li><code>n_batches</code>:
+    The number of batches over groups of positions used to render
+    the voxel grid. By default, <code>n_batches = 1</code>, which renders the
+    voxel grid for all positions at once. This is useful to decrease
+    GPU memory usage. Applies to both the dense (<code>n_spread=None</code>) and
+    spreading (<code>n_spread</code> set) backends.</li>
+<li><code>n_spread</code>:
+    If <code>None</code> (default), render the voxel grid with dense gaussian
+    integrals evaluated over the whole grid. If an <code>int</code>, instead
+    directly spread each gaussian onto only the <code>n_spread</code> nearest
+    grid points (per dimension), trading accuracy for speed.
+    If a <code>tuple</code> of <code>int</code>s (one value per gaussian component, i.e. of
+    length <code>GaussianMixtureVolume.amplitudes.shape[-1]</code>), spread each
+    gaussian component with its own width instead of one shared
+    width -- useful when a volume's gaussian components have widths
+    spanning an order of magnitude or more (e.g. X-ray/electron
+    scattering factors written as a sum of 5 gaussians), where a
+    single <code>n_spread</code> would either truncate the widest components or
+    waste computation spreading the narrowest ones too widely. See
+    <a class="autorefs autorefs-internal" href="../entry-point/#cryojax.simulator.suggest_n_spread"><code>cryojax.simulator.suggest_n_spread</code></a> to choose these values
+    from <code>volume_representation.variances</code>.</li>
+<li><code>enable_pallas</code>:
+    Use the Pallas/Triton GPU backend instead of pure-JAX for the
+    <code>n_spread</code> spreading backend (ignored if <code>n_spread</code> is <code>None</code>).
+    <a href="https://docs.jax.dev/en/latest/pallas/index.html">Pallas</a> is
+    JAX's framework for writing custom GPU/TPU kernels. This is most
+    advantageous for the <em>backward</em> pass -- <code>{"bwd": True}</code>. See
+    <a class="autorefs autorefs-internal" href="../../ndimage/#cryojax.ndimage.spread_gaussians_3d"><code>cryojax.ndimage.spread_gaussians_3d</code></a>'s <code>enable_pallas</code> for
+    the full picture. <code>None</code> (default) defers to <code>CRYOJAX_ENABLE_PALLAS</code>.</li>
 </ul>
 
 
@@ -3363,18 +3024,31 @@ the potential is evaluated as the average value inside the voxel</p>
 
 
 
-<h4 id="cryojax.simulator.FFTAtomRenderFn" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.FFTAtomRenderFn(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractVolumeRenderFn">cryojax.simulator.AbstractVolumeRenderFn</a>)</code>
-  <a href="https://github.com/michael-0brien/cryojax/blob/b729cc40de59fa6245d8cb6083e2fa5085c9142b/cryojax/simulator/_volume/independent_atom_volume.py#L267-L407"><code class='hippogriffe-repo-url'></code></a>
+<h4 id="cryojax.simulator.GaussianFourierRenderFn" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>    <code>cryojax.simulator.GaussianFourierRenderFn(<a class="autorefs autorefs-internal" href="#cryojax.simulator.AbstractVolumeRenderFn">cryojax.simulator.AbstractVolumeRenderFn</a>)</code>
+  <a href="https://github.com/michael-0brien/cryojax/blob/202a8685c09be2181c5045297671158a8a7003a5/cryojax/simulator/_volume/gaussian_fourier.py#L218-L354"><code class='hippogriffe-repo-url'></code></a>
 
 
-<a href="#cryojax.simulator.FFTAtomRenderFn" class="headerlink" title="Permanent link">¤</a></h4>
+<a href="#cryojax.simulator.GaussianFourierRenderFn" class="headerlink" title="Permanent link">¤</a></h4>
 
 
     <div class="doc doc-contents first">
 
 
-        <p>Render a voxel grid using non-uniform FFTs and convolution.</p>
+        <p>Render a voxel grid from a <code>GaussianFourierVolume</code> using non-uniform FFTs
+and Fourier-domain convolution. Good when kernels span at least a
+couple pixels; see <code>cryojax.simulator.GaussianMixtureRenderFn</code> for an
+alternative that directly spreads narrow kernels onto the grid.</p>
+<div class="admonition info">
+<p class="admonition-title">Info</p>
+<p>By default, the non-uniform FFT runs on a pure-JAX backend using
+<a href="https://github.com/GragasLab/nufftax/tree/custom-kernel-spread"><code>nufftax</code></a>.
+Setting the environment variable <code>CRYOJAX_FINUFFT_BACKEND=jax-finufft</code> switches to
+<a href="https://github.com/flatironinstitute/jax-finufft"><code>jax-finufft</code></a>, which
+can be more computationally efficient and less memory-demanding, at the
+cost of being trickier to install and having more limited integration
+with multi-GPU JAX.</p>
+</div>
 
 
 
@@ -3398,12 +3072,12 @@ the potential is evaluated as the average value inside the voxel</p>
 <div class="doc doc-object doc-function">
 
 
-<h5 id="cryojax.simulator.FFTAtomRenderFn.__init__" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">voxel_size</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">frequency_grid</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;_ _ _ 3&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">sampling_mode</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s1">&#39;average&#39;</span><span class="p">,</span> <span class="s1">&#39;point&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;average&#39;</span><span class="p">,</span> <span class="n">eps</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-06</span><span class="p">,</span> <span class="n">opts</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span></code>
+<h5 id="cryojax.simulator.GaussianFourierRenderFn.__init__" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">voxel_size</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">jax_util</span><span class="o">.</span><span class="n">FloatLike</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">sampling_mode</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s1">&#39;average&#39;</span><span class="p">,</span> <span class="s1">&#39;point&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;average&#39;</span><span class="p">,</span> <span class="n">upsample_factor</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">eps</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-06</span><span class="p">,</span> <span class="n">options</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{})</span></code>
   
 
 
-<a href="#cryojax.simulator.FFTAtomRenderFn.__init__" class="headerlink" title="Permanent link">¤</a></h5>
+<a href="#cryojax.simulator.GaussianFourierRenderFn.__init__" class="headerlink" title="Permanent link">¤</a></h5>
 
 
     <div class="doc doc-contents ">
@@ -3414,34 +3088,20 @@ the potential is evaluated as the average value inside the voxel</p>
     The shape of the resulting voxel grid.</li>
 <li><code>voxel_size</code>:
     The voxel size of the resulting voxel grid.</li>
-<li>
-<p><code>frequency_grid</code>:
-    An optional frequency grid for rendering the
-    volume. If <code>None</code>, compute on the fly. The grid
-    should be in inverse angstroms and have the zero
-    frequency component in the center, i.e.</p>
-<div class="highlight"><pre><span></span><code><span class="n">frequency_grid</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">fftshift</span><span class="p">(</span>
-    <span class="n">make_frequency_grid</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">voxel_size</span><span class="p">,</span> <span class="n">outputs_rfft</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
-    <span class="n">axes</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
-<span class="p">)</span>
-</code></pre></div>
-</li>
-<li>
-<p><code>sampling_mode</code>:
+<li><code>sampling_mode</code>:
     If <code>'average'</code>, convolve with a box function to sample the
     projected volume at a pixel to be the average value of the
     underlying continuous function. If <code>'point'</code>, the volume at
-    a pixel will be point sampled.</p>
-</li>
+    a pixel will be point sampled.</li>
+<li><code>upsample_factor</code>:
+    How much to upsample the grid on which atoms are spread onto.</li>
 <li><code>eps</code>:
-    See <a href="https://github.com/flatironinstitute/jax-finufft"><code>jax-finufft</code></a>
+    The precision of the underlying non-uniform FFT implementation.
+    See <a href="https://finufft.readthedocs.io/en/latest/opts.html#options-parameters-cpu"><code>finufft</code></a>
     for documentation.</li>
-<li><code>opts</code>:
-    A <code>jax_finufft.options.Opts</code> or <code>jax_finufft.options.NestedOpts</code>
-    dataclass.
-    See <a href="https://github.com/flatironinstitute/jax-finufft"><code>jax-finufft</code></a>
-    for documentation. If passing these advanced options, do not change
-    <code>modeord=False</code> for both the forward and the backward pass.</li>
+<li><code>options</code>:
+    A dictionary of options for advanced usage, passed directly to
+    the underlying non-uniform FFT implementation.</li>
 </ul>
 
 
@@ -3452,12 +3112,12 @@ the potential is evaluated as the average value inside the voxel</p>
 <div class="doc doc-object doc-function">
 
 
-<h5 id="cryojax.simulator.FFTAtomRenderFn.__call__" class="doc doc-heading">
-  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__call__</span><span class="p">(</span><span class="n">volume_representation</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">IndependentAtomVolume</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">outputs_real_space</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">outputs_rfft</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">fftshifted</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Inexact</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{self.shape[0]}</span><span class="s1"> </span><span class="si">{self.shape[1]}</span><span class="s1"> </span><span class="si">{self.shape[2]}</span><span class="s1">&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{self.shape[0]}</span><span class="s1"> </span><span class="si">{self.shape[1]}</span><span class="s1"> </span><span class="si">{self.shape[2]}</span><span class="s1">//2+1&#39;</span><span class="p">]</span></code>
+<h5 id="cryojax.simulator.GaussianFourierRenderFn.__call__" class="doc doc-heading">
+  <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="fm">__call__</span><span class="p">(</span><span class="n">volume_representation</span><span class="p">:</span> <span class="n">cryojax</span><span class="o">.</span><span class="n">simulator</span><span class="o">.</span><span class="n">GaussianFourierVolume</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">outputs_real_space</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">outputs_rfft</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">fftshifted</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Inexact</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{self.shape[0]}</span><span class="s1"> </span><span class="si">{self.shape[1]}</span><span class="s1"> </span><span class="si">{self.shape[2]}</span><span class="s1">&#39;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Complex</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s1">&#39;</span><span class="si">{self.shape[0]}</span><span class="s1"> </span><span class="si">{self.shape[1]}</span><span class="s1"> </span><span class="si">{self.shape[2]}</span><span class="s1">//2+1&#39;</span><span class="p">]</span></code>
   
 
 
-<a href="#cryojax.simulator.FFTAtomRenderFn.__call__" class="headerlink" title="Permanent link">¤</a></h5>
+<a href="#cryojax.simulator.GaussianFourierRenderFn.__call__" class="headerlink" title="Permanent link">¤</a></h5>
 
 
     <div class="doc doc-contents ">
@@ -3465,7 +3125,7 @@ the potential is evaluated as the average value inside the voxel</p>
         <p><strong>Arguments:</strong></p>
 <ul>
 <li><code>volume_representation</code>:
-    The <code>GaussianMixtureVolume</code>.</li>
+    The <code>GaussianFourierVolume</code>.</li>
 <li><code>outputs_real_space</code>:
     If <code>True</code>, return a voxel grid in real-space.</li>
 <li><code>outputs_rfft</code>:
