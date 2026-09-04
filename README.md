@@ -37,8 +37,6 @@ uv pip install -e `.[dev,tests]`
 uv run pre-commit install
 ```
 
-The [`jax-finufft`](https://github.com/dfm/jax-finufft) package is an optional dependency used for non-uniform fast fourier transforms. This is used in select methods for computing image projections from atoms and voxels. If you would like to use these methods, we recommend first following the `jax_finufft` installation instructions and then installing `cryojax`.
-
 ## Quick example
 
 Image simulation in cryoJAX revolves around the `image_model` class. The following is a basic example for instantiating an `image_model` and simulating an image:

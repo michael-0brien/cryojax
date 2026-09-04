@@ -4,13 +4,14 @@ Implementation of operators on images in real-space.
 
 from abc import abstractmethod
 from collections.abc import Sequence
+from typing import ClassVar
 from typing_extensions import override
 
 import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float, Inexact
 
-from ..._internal import error_if_not_positive
+from ..._internal import error_if_not_positive, leaf_asarray
 from ...jax_util import FloatLike, NDArrayLike
 
 
@@ -28,13 +29,13 @@ class AbstractRealOperator(eqx.Module, strict=True):
         2) Overrwrite the `__call__` method.
     """
 
+    spatial_dims: eqx.AbstractClassVar[list[int]]
+
     @abstractmethod
     def __call__(  # pyright: ignore
         self,
-        coordinate_grid: (
-            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
-        ),
-    ) -> Inexact[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]:
+        coordinates: Float[Array, "..."],
+    ) -> Inexact[Array, "..."]:
         raise NotImplementedError
 
     def __add__(self, other) -> "AbstractRealOperator":
@@ -74,14 +75,11 @@ class _SumRealOperator(AbstractRealOperator, strict=True):
     operator1: AbstractRealOperator
     operator2: AbstractRealOperator
 
+    spatial_dims: ClassVar[list[int]] = [1, 2, 3]
+
     @override
-    def __call__(
-        self,
-        coordinate_grid: (
-            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
-        ),
-    ) -> Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"]:
-        return self.operator1(coordinate_grid) * self.operator2(coordinate_grid)
+    def __call__(self, coordinates: Float[Array, "..."]) -> Inexact[Array, "..."]:
+        return self.operator1(coordinates) + self.operator2(coordinates)
 
     def __repr__(self):
         return f"{repr(self.operator1)} + {repr(self.operator2)}"
@@ -93,14 +91,11 @@ class _DiffRealOperator(AbstractRealOperator, strict=True):
     operator1: AbstractRealOperator
     operator2: AbstractRealOperator
 
+    spatial_dims: ClassVar[list[int]] = [1, 2, 3]
+
     @override
-    def __call__(
-        self,
-        coordinate_grid: (
-            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
-        ),
-    ) -> Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"]:
-        return self.operator1(coordinate_grid) * self.operator2(coordinate_grid)
+    def __call__(self, coordinates: Float[Array, "..."]) -> Inexact[Array, "..."]:
+        return self.operator1(coordinates) - self.operator2(coordinates)
 
     def __repr__(self):
         return f"{repr(self.operator1)} - {repr(self.operator2)}"
@@ -112,14 +107,11 @@ class _ProductRealOperator(AbstractRealOperator, strict=True):
     operator1: AbstractRealOperator
     operator2: AbstractRealOperator
 
+    spatial_dims: ClassVar[list[int]] = [1, 2, 3]
+
     @override
-    def __call__(
-        self,
-        coordinate_grid: (
-            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
-        ),
-    ) -> Inexact[Array, "y_dim x_dim"] | Inexact[Array, "z_dim y_dim x_dim"]:
-        return self.operator1(coordinate_grid) * self.operator2(coordinate_grid)
+    def __call__(self, coordinates: Float[Array, "..."]) -> Inexact[Array, "..."]:
+        return self.operator1(coordinates) * self.operator2(coordinates)
 
     def __repr__(self):
         return f"{repr(self.operator1)} * {repr(self.operator2)}"
@@ -133,15 +125,17 @@ class RealGaussian(AbstractRealOperator, strict=True):
     where $r^2 = x^2 + y^2$.
     """
 
-    amplitude: Float[Array, ""]
-    variance: Float[Array, ""]
-    offset: Float[Array, " _"] | None
+    amplitude: Float[NDArrayLike, "..."]
+    variance: Float[NDArrayLike, "..."]
+    offset: Float[NDArrayLike, " _"] | None
+
+    spatial_dims: ClassVar[list[int]] = [1, 2, 3]
 
     def __init__(
         self,
         amplitude: FloatLike = 1.0,
         variance: FloatLike = 1.0,
-        offset: Float[NDArrayLike, " _"] | Sequence[float] | None = None,
+        offset: FloatLike | Float[NDArrayLike, "... _"] | Sequence[float] | None = None,
     ):
         """**Arguments:**
 
@@ -155,45 +149,61 @@ class RealGaussian(AbstractRealOperator, strict=True):
             An offset to the origin, equal to $r_0$
             in the above equation.
         """
-        self.amplitude = jnp.asarray(amplitude, dtype=float)
-        self.variance = jnp.asarray(variance, dtype=float)
+        self.amplitude = leaf_asarray(amplitude, dtype=float)
+        self.variance = leaf_asarray(variance, dtype=float)
         if offset is not None:
-            self.offset = jnp.asarray(offset, dtype=float)
+            offset = leaf_asarray(offset, dtype=float)
+            self.offset = offset[None] if offset.ndim == 0 else offset
         else:
             self.offset = None
 
     @override
-    def __call__(
-        self, coordinate_grid: Float[Array, "y_dim x_dim 2"]
-    ) -> Float[Array, "y_dim x_dim"]:
-        ndim = coordinate_grid.ndim - 1
-        offset = jnp.zeros((ndim,), dtype=float) if self.offset is None else self.offset
-        r_squared = jnp.sum((coordinate_grid - offset) ** 2, axis=-1)
+    def __call__(self, coordinates: Float[Array, "..."]) -> Float[Array, "..."]:
+        coordinates, ndim, flag = _standardize_coordinates(coordinates)
+        variance = jnp.asarray(self.variance)
+        offset = (
+            jnp.zeros((ndim,), dtype=float)
+            if self.offset is None
+            else jnp.asarray(self.offset)
+        )
+        r_squared = jnp.sum((coordinates - offset) ** 2, axis=-1)
         scaling = (
-            self.amplitude
-            / jnp.sqrt(2 * jnp.pi * error_if_not_positive(self.variance)) ** ndim
-        ) * jnp.exp(-0.5 * r_squared / self.variance)
-        return scaling
+            jnp.asarray(self.amplitude)
+            / jnp.sqrt(2 * jnp.pi * error_if_not_positive(variance)) ** ndim
+        ) * jnp.exp(-0.5 * r_squared / variance)
+        return _standardize_output(scaling, flag=flag)
 
 
 class RealConstant(AbstractRealOperator, strict=True):
     """An operator that is a constant."""
 
-    value: Float[Array, "..."]
+    value: Float[NDArrayLike, "..."]
+
+    spatial_dims: ClassVar[list[int]] = [1, 2, 3]
 
     def __init__(self, value: float | Float[NDArrayLike, "..."]):
         """**Arguments:**
 
         - `value`: The value of the constant
         """
-        self.value = jnp.asarray(value)
+        self.value = leaf_asarray(value, dtype=float)
 
     @override
-    def __call__(
-        self,
-        coordinate_grid: (
-            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
-        ),
-    ) -> Float[Array, ""]:
-        del coordinate_grid
-        return self.value
+    def __call__(self, coordinates: Float[Array, "..."]) -> Float[Array, ""]:
+        del coordinates
+        return jnp.asarray(self.value)
+
+
+def _standardize_coordinates(x: Array):
+    flag = False
+    if x.ndim == 0:
+        flag = True
+        x = x[None, None]
+    elif x.ndim == 1:
+        x = x[:, None]
+    ndim = x.shape[-1]
+    return x, ndim, flag
+
+
+def _standardize_output(out: Array, *, flag: bool):
+    return out[0] if flag else out

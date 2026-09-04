@@ -1,9 +1,11 @@
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
+from ..jax_util import NDArrayLike
+
 
 def convert_quaternion_to_euler_angles(
-    wxyz: Float[Array, "4"], convention: str = "zyz", extrinsic: bool = True
+    wxyz: Float[NDArrayLike, "4"], convention: str = "zyz", extrinsic: bool = True
 ) -> Float[Array, "3"]:
     """Convert a quaternion to a sequence of euler angles about an extrinsic
     coordinate system.
@@ -29,7 +31,7 @@ def convert_quaternion_to_euler_angles(
     axes = [xyz_axis_to_array_axis[axis] for axis in convention]
     angle_first, angle_third = (0, 2) if extrinsic else (2, 0)
     axes = axes if extrinsic else axes[::-1]
-    xyzw = jnp.roll(wxyz, shift=-1)
+    xyzw = jnp.roll(jnp.asarray(wxyz), shift=-1)
     i, j, k = axes
     eps = 1e-7
     k = 3 - i - j

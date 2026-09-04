@@ -1,30 +1,25 @@
 """The image configuration and utility manager."""
 
 import math
-import warnings
 from functools import cached_property
-from typing import Literal
+from typing import Literal, cast
 
 import equinox as eqx
-import equinox.internal as eqxi
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
-from .._internal import error_if_not_positive
+from .._internal import error_if_not_positive, leaf_asarray
 from ..constants import (
     interaction_constant_from_kilovolts,
     lorentz_factor_from_kilovolts,
     wavelength_from_kilovolts,
 )
-from ..jax_util import FloatLike
-from ..ndimage import make_coordinate_grid, make_frequency_grid
-
-
-_get_deprecation_msg = lambda self, prop, func: (
-    f"`{self.__class__.__name__}.{prop}` has been deprecated and will be "
-    "removed in cryoJAX 0.6.0. Instead, make "
-    f"the appropriate call to `{self.__class__.__name__}.{func}`."
+from ..jax_util import FloatLike, NDArrayLike
+from ..ndimage import (
+    make_coordinate_grid,
+    make_frequency_grid,
+    query_efficient_grid_size,
 )
 
 
@@ -132,8 +127,8 @@ class AbstractImageConfig(eqx.Module, strict=True):
     """Configuration and utilities for an electron microscopy image."""
 
     shape: eqx.AbstractVar[tuple[int, int]]
-    pixel_size: eqx.AbstractVar[Float[Array, ""]]
-    voltage_in_kilovolts: eqx.AbstractVar[Float[Array, ""]]
+    pixel_size: eqx.AbstractVar[Float[NDArrayLike, "..."]]
+    voltage_in_kilovolts: eqx.AbstractVar[Float[NDArrayLike, "..."]]
 
     padded_shape: eqx.AbstractVar[tuple[int, int]]
     precompute_mode: eqx.AbstractVar[
@@ -162,20 +157,22 @@ class AbstractImageConfig(eqx.Module, strict=True):
         """The incident electron wavelength corresponding to the beam
         energy `voltage_in_kilovolts`.
         """
-        return wavelength_from_kilovolts(error_if_not_positive(self.voltage_in_kilovolts))
+        return wavelength_from_kilovolts(
+            error_if_not_positive(jnp.asarray(self.voltage_in_kilovolts))
+        )
 
     @property
     def lorentz_factor(self) -> Float[Array, ""]:
         """The lorenz factor at the given `voltage_in_kilovolts`."""
         return lorentz_factor_from_kilovolts(
-            error_if_not_positive(self.voltage_in_kilovolts)
+            error_if_not_positive(jnp.asarray(self.voltage_in_kilovolts))
         )
 
     @property
     def interaction_constant(self) -> Float[Array, ""]:
         """The electron interaction constant at the given `voltage_in_kilovolts`."""
         return interaction_constant_from_kilovolts(
-            error_if_not_positive(self.voltage_in_kilovolts)
+            error_if_not_positive(jnp.asarray(self.voltage_in_kilovolts))
         )
 
     def get_coordinate_grid(self, *, padding: bool = False, physical: bool = True):
@@ -211,7 +208,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
             coordinate_grid = _get_grid_impl(self)
 
         if physical:
-            pixel_size = error_if_not_positive(self.pixel_size)
+            pixel_size = error_if_not_positive(jnp.asarray(self.pixel_size))
             coordinate_grid = _safe_multiply_by_constant(
                 coordinate_grid, pixel_size, is_fft_grid=False
             )
@@ -265,7 +262,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
             frequency_grid = _get_grid_impl(self)
 
         if physical:
-            pixel_size = error_if_not_positive(self.pixel_size)
+            pixel_size = error_if_not_positive(jnp.asarray(self.pixel_size))
             frequency_grid = _safe_multiply_by_constant(
                 frequency_grid, 1 / pixel_size, is_fft_grid=True
             )
@@ -370,160 +367,6 @@ class AbstractImageConfig(eqx.Module, strict=True):
         else:
             return self.precomputed_grids.get(real_space=False, full=True, padding=True)
 
-    @property
-    def coordinate_grid_in_pixels(
-        self,
-    ) -> Float[Array, "{self.y_dim} {self.x_dim} 2"]:
-        warnings.warn(
-            _get_deprecation_msg(
-                self, "coordinate_grid_in_pixels", "get_coordinate_grid"
-            ),
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        return self._coordinate_grid
-
-    @property
-    def coordinate_grid_in_angstroms(
-        self,
-    ) -> Float[Array, "{self.y_dim} {self.x_dim} 2"]:
-        warnings.warn(
-            _get_deprecation_msg(
-                self, "coordinate_grid_in_angstroms", "get_coordinate_grid"
-            ),
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        return self.get_coordinate_grid()
-
-    @property
-    def frequency_grid_in_pixels(
-        self,
-    ) -> Float[Array, "{self.y_dim} {self.x_dim//2+1} 2"]:
-        warnings.warn(
-            _get_deprecation_msg(self, "frequency_grid_in_pixels", "get_frequency_grid"),
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        return self._frequency_grid
-
-    @property
-    def frequency_grid_in_angstroms(
-        self,
-    ) -> Float[Array, "{self.y_dim} {self.x_dim//2+1} 2"]:
-        warnings.warn(
-            _get_deprecation_msg(
-                self, "frequency_grid_in_angstroms", "get_frequency_grid"
-            ),
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        return self.get_frequency_grid()
-
-    @property
-    def full_frequency_grid_in_pixels(
-        self,
-    ) -> Float[Array, "{self.y_dim} {self.x_dim} 2"]:
-        warnings.warn(
-            _get_deprecation_msg(
-                self, "full_frequency_grid_in_pixels", "get_frequency_grid"
-            ),
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        return self._full_frequency_grid
-
-    @property
-    def full_frequency_grid_in_angstroms(
-        self,
-    ) -> Float[Array, "{self.y_dim} {self.x_dim} 2"]:
-        warnings.warn(
-            _get_deprecation_msg(
-                self, "full_frequency_grid_in_angstroms", "get_frequency_grid"
-            ),
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        return self.get_frequency_grid(full=True)
-
-    @property
-    def padded_coordinate_grid_in_pixels(
-        self,
-    ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim} 2"]:
-        warnings.warn(
-            _get_deprecation_msg(
-                self, "padded_coordinate_grid_in_pixels", "get_coordinate_grid"
-            ),
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        return self._padded_coordinate_grid
-
-    @property
-    def padded_coordinate_grid_in_angstroms(
-        self,
-    ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim} 2"]:
-        warnings.warn(
-            _get_deprecation_msg(
-                self, "coordinate_grid_in_angstroms", "get_coordinate_grid"
-            ),
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        return self.get_coordinate_grid(padding=True)
-
-    @property
-    def padded_frequency_grid_in_pixels(
-        self,
-    ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim//2+1} 2"]:
-        warnings.warn(
-            _get_deprecation_msg(
-                self, "padded_frequency_grid_in_pixels", "get_frequency_grid"
-            ),
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        return self._padded_frequency_grid
-
-    @property
-    def padded_frequency_grid_in_angstroms(
-        self,
-    ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim//2+1} 2"]:
-        warnings.warn(
-            _get_deprecation_msg(
-                self, "padded_frequency_grid_in_angstroms", "get_frequency_grid"
-            ),
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        return self.get_frequency_grid(padding=True)
-
-    @property
-    def padded_full_frequency_grid_in_pixels(
-        self,
-    ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim} 2"]:
-        warnings.warn(
-            _get_deprecation_msg(
-                self, "padded_full_frequency_grid_in_pixels", "get_frequency_grid"
-            ),
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        return self._padded_full_frequency_grid
-
-    @property
-    def padded_full_frequency_grid_in_angstroms(
-        self,
-    ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim} 2"]:
-        warnings.warn(
-            _get_deprecation_msg(
-                self, "padded_full_frequency_grid_in_angstroms", "get_frequency_grid"
-            ),
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        return self.get_frequency_grid(full=True, padding=True)
-
 
 class BasicImageConfig(AbstractImageConfig, strict=True):
     """Configuration and utilities for a basic electron microscopy
@@ -531,8 +374,8 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
     """
 
     shape: tuple[int, int]
-    pixel_size: Float[Array, ""]
-    voltage_in_kilovolts: Float[Array, ""]
+    pixel_size: Float[NDArrayLike, "..."]
+    voltage_in_kilovolts: Float[NDArrayLike, "..."]
 
     padded_shape: tuple[int, int]
     precompute_mode: Literal["none", "rfft", "fft", "all", "compile_time_eval"] = (
@@ -540,18 +383,17 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
     )
     precomputed_grids: PrecomputedGrids | None
 
-    @eqxi.doc_remove_args("pad_options")
     def __init__(
         self,
         shape: tuple[int, int],
         pixel_size: FloatLike,
-        voltage_in_kilovolts: FloatLike,
+        voltage_in_kilovolts: FloatLike = 300.0,
         *,
         padded_shape: tuple[int, int] | None = None,
+        pad_scale: float = 1.0,
         precompute_mode: Literal[
             "none", "rfft", "fft", "all", "compile_time_eval"
         ] = "none",
-        pad_options: dict = {},
     ):
         """**Arguments:**
 
@@ -564,6 +406,12 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
         - `padded_shape`:
             The shape of the image after padding. By default, equal
             to `shape`.
+        - `pad_scale`:
+            A scale factor used to determine the `padded_shape`.
+            Used only if `padded_shape` is not directly provided.
+            Unless `pad_scale = 1.0`, it is only an approximation
+            of the resulting `padded_shape`. By default, a good
+            array size for FFT efficiency is chosen.
         - `precompute_mode`:
             How to pre-compute coordinate and frequency grids stored in
             the `image_config`. Options are
@@ -586,19 +434,11 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
                 `jax.ensure_compile_time_eval`.
         """
         # Set parameters
-        self.pixel_size = jnp.asarray(pixel_size, dtype=float)
-        self.voltage_in_kilovolts = jnp.asarray(voltage_in_kilovolts, dtype=float)
+        self.pixel_size = leaf_asarray(pixel_size, dtype=float)
+        self.voltage_in_kilovolts = leaf_asarray(voltage_in_kilovolts, dtype=float)
         # Set shape and padded shape
-        if "shape" in pad_options:
-            warnings.warn(
-                "`BasicImageConfig(..., pad_options=...)` is deprecated and will "
-                "be removed in cryoJAX 0.6.0. Use `padded_shape` instead.",
-                category=FutureWarning,
-                stacklevel=2,
-            )
-            padded_shape = pad_options["shape"]
         self.shape = shape
-        self.padded_shape = shape if padded_shape is None else padded_shape
+        self.padded_shape = _set_padded_shape(type(self), shape, padded_shape, pad_scale)
         # Finally, grid precompute
         if precompute_mode == "rfft":
             self.precomputed_grids = PrecomputedGrids(
@@ -622,9 +462,9 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
     including the electron dose."""
 
     shape: tuple[int, int]
-    pixel_size: Float[Array, ""]
-    voltage_in_kilovolts: Float[Array, ""]
-    electron_dose: Float[Array, ""]
+    pixel_size: Float[NDArrayLike, "..."]
+    voltage_in_kilovolts: Float[NDArrayLike, "..."]
+    electron_dose: Float[NDArrayLike, "..."]
 
     padded_shape: tuple[int, int]
     precompute_mode: Literal["none", "rfft", "fft", "all", "compile_time_eval"] = (
@@ -632,19 +472,18 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
     )
     precomputed_grids: PrecomputedGrids | None
 
-    @eqxi.doc_remove_args("pad_options")
     def __init__(
         self,
         shape: tuple[int, int],
         pixel_size: FloatLike,
-        voltage_in_kilovolts: FloatLike,
-        electron_dose: FloatLike,
+        voltage_in_kilovolts: FloatLike = 300.0,
+        electron_dose: FloatLike = 50.0,
         *,
         padded_shape: tuple[int, int] | None = None,
+        pad_scale: float = 1.0,
         precompute_mode: Literal[
             "none", "rfft", "fft", "all", "compile_time_eval"
         ] = "none",
-        pad_options: dict = {},
     ):
         """**Arguments:**
 
@@ -660,6 +499,12 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
         - `padded_shape`:
             The shape of the image after padding. By default, equal
             to `shape`.
+        - `pad_scale`:
+            A scale factor used to determine the `padded_shape`.
+            Used only if `padded_shape` is not directly provided.
+            Unless `pad_scale = 1.0`, it is only an approximation
+            of the resulting `padded_shape`. By default, a good
+            array size for FFT efficiency is chosen.
         - `precompute_mode`:
             How to pre-compute coordinate and frequency grids stored in
             the `image_config`. Options are
@@ -682,20 +527,12 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
                 `jax.ensure_compile_time_eval`.
         """
         # Set parameters
-        self.pixel_size = jnp.asarray(pixel_size, dtype=float)
-        self.voltage_in_kilovolts = jnp.asarray(voltage_in_kilovolts, dtype=float)
-        self.electron_dose = jnp.asarray(electron_dose, dtype=float)
+        self.pixel_size = leaf_asarray(pixel_size, dtype=float)
+        self.voltage_in_kilovolts = leaf_asarray(voltage_in_kilovolts, dtype=float)
+        self.electron_dose = leaf_asarray(electron_dose, dtype=float)
         # Set shape and padded shape
-        if "shape" in pad_options:
-            warnings.warn(
-                "`BasicImageConfig(..., pad_options=...)` is deprecated and will "
-                "be removed in cryoJAX 0.6.0. Use `padded_shape` instead.",
-                category=FutureWarning,
-                stacklevel=2,
-            )
-            padded_shape = pad_options["shape"]
         self.shape = shape
-        self.padded_shape = shape if padded_shape is None else padded_shape
+        self.padded_shape = _set_padded_shape(type(self), shape, padded_shape, pad_scale)
         # Finally, grid precompute
         if precompute_mode == "rfft":
             self.precomputed_grids = PrecomputedGrids(
@@ -716,26 +553,54 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
     @property
     def electrons_per_pixel(self) -> Float[Array, ""]:
         """The `electron_dose` in a given pixel area."""
-        return error_if_not_positive(self.electron_dose) * self.pixel_size**2
+        return (
+            error_if_not_positive(jnp.asarray(self.electron_dose))
+            * jnp.asarray(self.pixel_size) ** 2
+        )
 
 
 def _safe_multiply_by_constant(
     grid: Float[Array, "y_dim x_dim 2"], constant: Float[Array, ""], is_fft_grid: bool
 ) -> Float[Array, "y_dim x_dim 2"]:
-    """Multiplies a coordinate grid by a constant in a
-    safe way for gradient computation.
+    """Multiply a coordinate grid by a constant, keeping zero-valued
+    components independent of `constant` so that gradients through
+    `jnp.linalg.norm(grid, axis=-1)` remain finite at the origin.
 
-    If we naively wrote `grid * constant`, when we
-    take gradients with respect to pixel size there will be a
-    term `sqrt(grid * constant)` that needs to be differentiated.
-    This is undefined at locations where the grid is equal to zero.
+    For an FFT frequency grid (DC at corner): the x-component is zero in
+    column 0 and the y-component is zero in row 0; those entries are left
+    untouched.  For a real-space coordinate grid (center at N//2): the
+    x-component is zero in the center column and the y-component is zero
+    in the center row; those entries are left untouched.
     """
+    y_dim, x_dim = grid.shape[0], grid.shape[1]
+    row_idx = jnp.arange(y_dim)
+    col_idx = jnp.arange(x_dim)
     if is_fft_grid:
-        grid = grid.at[:, 1:, 0].multiply(constant)
-        grid = grid.at[1:, :, 1].multiply(constant)
-
+        scale_x = jnp.where(col_idx > 0, constant, 1.0)
+        scale_y = jnp.where(row_idx > 0, constant, 1.0)
     else:
-        s1, s2 = grid.shape[0], grid.shape[1]
-        grid = grid.at[:, s2 // 2, 0].multiply(constant)
-        grid = grid.at[s1 // 2, :, 1].multiply(constant)
-    return grid
+        scale_x = jnp.where(col_idx != x_dim // 2, constant, 1.0)
+        scale_y = jnp.where(row_idx != y_dim // 2, constant, 1.0)
+    return jnp.stack(
+        [grid[..., 0] * scale_x[None, :], grid[..., 1] * scale_y[:, None]],
+        axis=-1,
+    )
+
+
+def _set_padded_shape(
+    cls, shape: tuple[int, int], padded_shape: tuple[int, int] | None, pad_scale: float
+):
+    if padded_shape is not None:
+        return padded_shape
+    elif pad_scale == 1.0:
+        return shape
+    elif pad_scale > 1.0:
+        return cast(
+            tuple[int, int],
+            query_efficient_grid_size(shape, pad_scale=pad_scale, only_even=True),
+        )
+    else:
+        raise ValueError(
+            f"Invalid value for `{cls.__name__}(..., pad_scale=...)`. "
+            f"This must be greater than `1.0`, but got value `{pad_scale}`."
+        )

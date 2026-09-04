@@ -2,8 +2,8 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
-from ..._internal import error_if_not_fractional
-from ...jax_util import FloatLike
+from ..._internal import error_if_not_fractional, leaf_asarray
+from ...jax_util import FloatLike, NDArrayLike
 from ...ndimage import AbstractFourierOperator
 from .._image_config import AbstractImageConfig
 from .transfer_function import AbstractCTF
@@ -28,8 +28,8 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
 
     ctf: AbstractCTF
     envelope: AbstractFourierOperator | None
-    amplitude_contrast_ratio: Float[Array, ""]
-    phase_shift: Float[Array, ""]
+    amplitude_contrast_ratio: Float[NDArrayLike, "..."]
+    phase_shift: Float[NDArrayLike, "..."]
 
     def __init__(
         self,
@@ -48,8 +48,21 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
 
         self.ctf = ctf
         self.envelope = envelope
-        self.amplitude_contrast_ratio = jnp.asarray(amplitude_contrast_ratio, dtype=float)
-        self.phase_shift = jnp.asarray(phase_shift, dtype=float)
+        self.amplitude_contrast_ratio = leaf_asarray(
+            amplitude_contrast_ratio, dtype=float
+        )
+        self.phase_shift = leaf_asarray(phase_shift, dtype=float)
+
+    def __check_init__(self):
+        if self.envelope is not None:
+            if 2 not in self.envelope.spatial_dims:
+                raise ValueError(
+                    "`ContrastTransferTheory.envelope` of type "
+                    f"`{self.envelope.__class__.__name__}` must support "
+                    "`spatial_dim = 2`, but found that "
+                    f"`{self.envelope.__class__.__name__}.spatial_dims = "
+                    f"{self.envelope.spatial_dims}`."
+                )
 
     def propagate_object(
         self,
@@ -66,7 +79,7 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
         image_config: AbstractImageConfig,
         *,
         defocus_offset: FloatLike | None = None,
-        input_is_ewald_sphere: bool = False,
+        is_ewald_sphere: bool = False,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         """Apply the CTF directly to the phase shifts in the exit plane.
 
@@ -77,7 +90,7 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
             below it.
         - `image_config`:
             The configuration of the resulting image.
-        - `input_is_ewald_sphere`:
+        - `is_ewald_sphere`:
             If `False`, the `object_spectrum` is a projection
             approximation and is therefore the fourier transform of a real-valued
             array. If `True`, `object_spectrum` is extracted from
@@ -87,14 +100,17 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
             An optional defocus offset to apply to the CTF defocus at
             runtime.
         """
-        amplitude_contrast_ratio = error_if_not_fractional(self.amplitude_contrast_ratio)
+        amplitude_contrast_ratio = error_if_not_fractional(
+            jnp.asarray(self.amplitude_contrast_ratio)
+        )
+        phase_shift = jnp.asarray(self.phase_shift)
         frequency_grid = image_config.get_frequency_grid(padding=True, physical=True)
-        if not input_is_ewald_sphere:
+        if not is_ewald_sphere:
             # Compute the CTF, including additional phase shifts
             ctf_array = self.ctf(
                 frequency_grid,
                 wavelength_in_angstroms=image_config.wavelength_in_angstroms,
-                phase_shift=self.phase_shift,
+                phase_shift=phase_shift,
                 amplitude_contrast_ratio=amplitude_contrast_ratio,
                 outputs_exp=False,
                 defocus_offset=defocus_offset,
@@ -109,7 +125,7 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
                 frequency_grid,
                 wavelength_in_angstroms=image_config.wavelength_in_angstroms,
                 defocus_offset=defocus_offset,
-            ) - jnp.deg2rad(self.phase_shift)
+            ) - jnp.deg2rad(phase_shift)
             contrast_spectrum = _compute_contrast_from_ewald_sphere(
                 object_spectrum,
                 aberration_phase_shifts,

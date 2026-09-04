@@ -3,8 +3,6 @@ Masks to apply to images in real space.
 """
 
 import abc
-import functools
-import operator
 from typing import ClassVar
 from typing_extensions import override
 
@@ -13,7 +11,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from ...jax_util import FloatLike, NDArrayLike
-from ._base_transform import AbstractImageTransform
+from .base_transform import AbstractImageTransform
 
 
 class AbstractMask(AbstractImageTransform, strict=True):
@@ -26,8 +24,14 @@ class AbstractMask(AbstractImageTransform, strict=True):
         raise NotImplementedError
 
     def __call__(
-        self, image: Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]
-    ) -> Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]:
+        self,
+        image: (
+            Float[Array, "*batch y_dim x_dim"] | Float[Array, "*batch z_dim y_dim x_dim"]
+        ),
+    ) -> Float[Array, "*batch y_dim x_dim"] | Float[Array, "*batch z_dim y_dim x_dim"]:
+        """Apply the mask to an image or volume, which may carry leading batch
+        dimensions. The mask is broadcast against them.
+        """
         return image * self.get()
 
 
@@ -278,52 +282,6 @@ class Rectangular3DCosineMask(AbstractMask, strict=True):
 
     @override
     def get(self) -> Float[Array, "z_dim y_dim x_dim"]:
-        return self.array
-
-
-class SincCorrectionMask(AbstractMask, strict=True):
-    """Divide an image or volume by a 2D or 3D rectangular
-    squared sinc function computed on the unit box. This is used
-    for correcting scaling in [`cryojax.simulator.FourierSliceExtraction`][].
-
-    Linear interpolation in the Fourier domain can be thought of as
-    a convolution with a triangular kernel, whose Fourier
-    transform pair is the squared sinc. This mask
-    acts to deconvolve this function with a division in real-space.
-    """
-
-    array: Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]
-
-    def __init__(
-        self,
-        coordinate_grid_in_pixels: (
-            Float[Array, "y_dim x_dim 2"] | Float[Array, "z_dim y_dim x_dim 3"]
-        ),
-    ):
-        """**Arguments:**
-
-        - `coordinate_grid_in_pixels`:
-            The image or volume coordinates. This should be
-            generated with `make_coordinate_grid(shape)`, *not*
-            `make_coordinate_grid(shape, grid_spacing)`.
-        """
-        ndim = coordinate_grid_in_pixels.ndim - 1
-        box_dims = coordinate_grid_in_pixels.shape[0:ndim][::-1]
-        self.array = (
-            jax.lax.reciprocal(
-                functools.reduce(
-                    operator.mul,
-                    [
-                        jnp.sinc(coordinate_grid_in_pixels[..., i] / box_dims[i])
-                        for i in range(ndim)
-                    ],
-                )
-            )
-            ** 2
-        )
-
-    @override
-    def get(self) -> Float[Array, "y_dim x_dim"] | Float[Array, "z_dim y_dim x_dim"]:
         return self.array
 
 

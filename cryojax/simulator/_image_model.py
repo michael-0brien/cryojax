@@ -11,6 +11,7 @@ import jax.numpy as jnp
 import jax.random as jr
 from jaxtyping import Array, Bool, Complex, Float, PRNGKeyArray
 
+from .._internal import leaf_asarray
 from ..jax_util import NDArrayLike
 from ..ndimage import (
     AbstractFilter,
@@ -18,8 +19,7 @@ from ..ndimage import (
     AbstractMask,
     compute_edge_value,
     crop_to_shape,
-    irfftn,
-    rfftn,
+    standardize_fft,
 )
 from ._detector import AbstractDetector
 from ._image_config import AbstractImageConfig, DoseImageConfig
@@ -63,7 +63,7 @@ class AbstractImageModel(eqx.Module, strict=True):
 
     image_transform: eqx.AbstractVar[AbstractImageTransform | None]
 
-    signal_region: eqx.AbstractVar[Bool[Array, "_ _"] | None]
+    signal_region: eqx.AbstractVar[Bool[NDArrayLike, "_ _"] | None]
     normalizes_signal: eqx.AbstractVar[bool]
     signal_centering: eqx.AbstractVar[Literal["bg", "mean"]]
     translate_mode: eqx.AbstractVar[Literal["fft", "atom", "none"]]
@@ -135,62 +135,67 @@ class AbstractImageModel(eqx.Module, strict=True):
     ) -> Array:
         """Return an image postprocessed with filters, cropping, masking,
         and normalization in either real or fourier space.
+
+        A `filter` is given at `image_config.padded_shape` (as an `rfftn`
+        array) and is applied in fourier space before cropping, so that it
+        precedes normalization and masking.
         """
         image_config = self.image_config
-        mask_c, filter_c = self._compose_transform(mask, filter)
-        if (
-            mask_c is None
-            and image_config.padded_shape == image_config.shape
-            and not self.normalizes_signal
-        ):
-            # ... if there are no masks, we don't need to crop, and we are
-            # not normalizing, minimize moving back and forth between real
-            # and fourier space
-            if filter_c is not None:
-                fourier_image = filter_c(fourier_image)
+        shape, padded_shape = image_config.shape, image_config.padded_shape
+        config_name = image_config.__class__.__name__
+        composed_mask, composed_filter = self._compose_transform(mask, filter)
+        crops_image = padded_shape != shape
+        padded_rfft_shape = (padded_shape[0], padded_shape[1] // 2 + 1)
+        if filter is not None and filter.get().shape != padded_rfft_shape:
+            raise ValueError(
+                f"Found that the `filter` was shape {filter.get().shape}, but "
+                f"expected it to be shape {padded_rfft_shape}. You may have "
+                f"passed a filter according to the `{config_name}.shape`, when "
+                f"the `{config_name}.padded_shape` was expected."
+            )
+        # ... masking, bg-centering, and normalizing over a `signal_region` all
+        # read real-space pixels. Without them, every remaining step can be done
+        # in fourier space.
+        can_finish_in_fourier = composed_mask is None and (
+            not self.normalizes_signal
+            or (self.signal_centering == "mean" and self.signal_region is None)
+        )
+        # ... apply the filter in fourier space, before any crop
+        if composed_filter is not None:
+            fourier_image = composed_filter(fourier_image)
+        # ... fast path: with no crop the image is already in fourier space at
+        # `shape`, so avoid moving back and forth between real and fourier
+        # space. Any normalization that remains is a plain zero-mean,
+        # unit-standard-deviation rescaling, which `standardize_fft` reproduces
+        # exactly in fourier space.
+        if not crops_image and can_finish_in_fourier:
+            if self.normalizes_signal:
+                fourier_image = standardize_fft(fourier_image, real_shape=shape)
             return (
-                irfftn(fourier_image, s=image_config.shape)
+                jnp.fft.irfftn(fourier_image, s=shape)
                 if outputs_real_space
                 else fourier_image
             )
-        else:
-            # ... otherwise, apply filter, crop, and mask, again trying to
-            # minimize moving back and forth between real and fourier space
-            padded_rfft_shape = (
-                image_config.padded_shape[0],
-                image_config.padded_shape[1] // 2 + 1,
-            )
-            if filter_c is not None:
-                # ... apply the filter
-                if filter is not None:
-                    if not filter.get().shape == padded_rfft_shape:
-                        raise ValueError(
-                            "Found that the `filter` was shape "
-                            f"{filter.get().shape}, but expected it to be "
-                            f"shape {padded_rfft_shape}. You may have passed a "
-                            f"filter according to the "
-                            f"`{image_config.__class__.__name__}.shape`, "
-                            f"when the `{image_config.__class__.__name__}.padded_shape` "
-                            "was expected."
-                        )
-                fourier_image = filter_c(fourier_image)
-            padded_image = irfftn(fourier_image, s=image_config.padded_shape)
-            if image_config.padded_shape != image_config.shape:
-                image = crop_to_shape(padded_image, image_config.shape)
-            else:
-                image = padded_image
-            if self.normalizes_signal:
-                if self.signal_centering == "mean":
-                    image = self._mean_subtract_normalize(image)
-                elif self.signal_centering == "bg":
-                    image = self._bg_subtract_normalize(image, padded_image)
-            if mask_c is not None:
-                image = mask_c(image)
-            return image if outputs_real_space else rfftn(image)
+        # ... otherwise go to real space, both to crop and to make the padded
+        # image available for background estimation
+        padded_image = jnp.fft.irfftn(fourier_image, s=padded_shape)
+        image = crop_to_shape(padded_image, shape) if crops_image else padded_image
+        if self.normalizes_signal:
+            if self.signal_centering == "mean":
+                image = self._mean_subtract_normalize(image)
+            elif self.signal_centering == "bg":
+                # ... the filter is applied before the `irfftn` above, so the
+                # padded image carries it and its background correctly describes
+                # the filtered image
+                image = self._bg_subtract_normalize(image, padded_image)
+        if composed_mask is not None:
+            image = composed_mask(image)
+        return image if outputs_real_space else jnp.fft.rfftn(image)
 
     def _phase_shift_translate(self, fourier_image: Array) -> Array:
         phase_shifts = self.pose.compute_translation_operator(
-            self.image_config.get_frequency_grid(physical=True, padding=True)
+            self.image_config.padded_shape,
+            self.image_config.pixel_size,
         )
         fourier_image = self.pose.translate_image(
             fourier_image,
@@ -228,18 +233,24 @@ class AbstractImageModel(eqx.Module, strict=True):
                     return mask, filter * self.image_transform
 
     def _mean_subtract_normalize(self, image: Array) -> Array:
+        signal_region = (
+            None if self.signal_region is None else jnp.asarray(self.signal_region)
+        )
         mean, std = (
-            jnp.mean(image, where=self.signal_region),
-            jnp.std(image, where=self.signal_region),
+            jnp.mean(image, where=signal_region),
+            jnp.std(image, where=signal_region),
         )
         image = (image - mean) / std
 
         return image
 
-    def _bg_subtract_normalize(self, image: Array, padded_image: Array) -> Array:
+    def _bg_subtract_normalize(self, image: Array, background_image: Array) -> Array:
+        signal_region = (
+            None if self.signal_region is None else jnp.asarray(self.signal_region)
+        )
         bg_value, std = (
-            compute_edge_value(padded_image),
-            jnp.std(image, where=self.signal_region),
+            compute_edge_value(background_image),
+            jnp.std(image, where=signal_region),
         )
         image = (image - bg_value) / std
 
@@ -257,7 +268,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
 
     image_transform: AbstractImageTransform | None
     normalizes_signal: bool
-    signal_region: Bool[Array, "_ _"] | None
+    signal_region: Bool[NDArrayLike, "_ _"] | None
     signal_centering: Literal["bg", "mean"]
     translate_mode: Literal["fft", "atom", "none"]
 
@@ -334,7 +345,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
         if signal_region is None:
             self.signal_region = None
         else:
-            self.signal_region = jnp.asarray(signal_region, dtype=bool)
+            self.signal_region = leaf_asarray(signal_region, dtype=bool)
 
     @override
     def raw_simulate(
@@ -362,7 +373,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
         fourier_image = self.transfer_theory.propagate_object(  # noqa: E501
             fourier_image,
             self.image_config,
-            input_is_ewald_sphere=self.volume_integrator.outputs_ewald_sphere,
+            is_ewald_sphere=self.volume_integrator.outputs_ewald_sphere,
             defocus_offset=self.pose.offset_z_in_angstroms,
         )
         # Now for the in-plane translation if using phase shifts
@@ -370,7 +381,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
             fourier_image = self._phase_shift_translate(fourier_image)
 
         return (
-            irfftn(fourier_image, s=self.image_config.padded_shape)
+            jnp.fft.irfftn(fourier_image, s=self.image_config.padded_shape)
             if outputs_real_space
             else fourier_image
         )
@@ -386,7 +397,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
 
     image_transform: AbstractImageTransform | None
     normalizes_signal: bool
-    signal_region: Bool[Array, "_ _"] | None
+    signal_region: Bool[NDArrayLike, "_ _"] | None
     signal_centering: Literal["bg", "mean"]
     translate_mode: Literal["fft", "atom", "none"]
 
@@ -460,7 +471,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
         if signal_region is None:
             self.signal_region = None
         else:
-            self.signal_region = jnp.asarray(signal_region, dtype=bool)
+            self.signal_region = leaf_asarray(signal_region, dtype=bool)
 
     @override
     def raw_simulate(
@@ -489,7 +500,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
             fourier_image = self._phase_shift_translate(fourier_image)
 
         return (
-            irfftn(fourier_image, s=self.image_config.padded_shape)
+            jnp.fft.irfftn(fourier_image, s=self.image_config.padded_shape)
             if outputs_real_space
             else fourier_image
         )
@@ -515,7 +526,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
 
     image_transform: AbstractImageTransform | None
     normalizes_signal: bool
-    signal_region: Bool[Array, "_ _"] | None
+    signal_region: Bool[NDArrayLike, "_ _"] | None
     signal_centering: Literal["bg", "mean"]
     translate_mode: Literal["fft", "atom", "none"]
 
@@ -543,7 +554,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
         if signal_region is None:
             self.signal_region = None
         else:
-            self.signal_region = jnp.asarray(signal_region, dtype=bool)
+            self.signal_region = leaf_asarray(signal_region, dtype=bool)
 
     @override
     def raw_simulate(
@@ -576,7 +587,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
             contrast_spectrum = self._phase_shift_translate(contrast_spectrum)
 
         return (
-            irfftn(contrast_spectrum, s=self.image_config.padded_shape)
+            jnp.fft.irfftn(contrast_spectrum, s=self.image_config.padded_shape)
             if outputs_real_space
             else contrast_spectrum
         )
@@ -594,7 +605,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
 
     image_transform: AbstractImageTransform | None
     normalizes_signal: bool
-    signal_region: Bool[Array, "_ _"] | None
+    signal_region: Bool[NDArrayLike, "_ _"] | None
     signal_centering: Literal["bg", "mean"]
     translate_mode: Literal["fft", "atom", "none"]
 
@@ -622,7 +633,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
         if signal_region is None:
             self.signal_region = None
         else:
-            self.signal_region = jnp.asarray(signal_region, dtype=bool)
+            self.signal_region = leaf_asarray(signal_region, dtype=bool)
 
     @override
     def raw_simulate(
@@ -654,7 +665,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
             intensity_spectrum = self._phase_shift_translate(intensity_spectrum)
 
         return (
-            irfftn(intensity_spectrum, s=self.image_config.padded_shape)
+            jnp.fft.irfftn(intensity_spectrum, s=self.image_config.padded_shape)
             if outputs_real_space
             else intensity_spectrum
         )
@@ -673,7 +684,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
 
     image_transform: AbstractImageTransform | None
     normalizes_signal: bool
-    signal_region: Bool[Array, "_ _"] | None
+    signal_region: Bool[NDArrayLike, "_ _"] | None
     signal_centering: Literal["bg", "mean"]
     translate_mode: Literal["fft", "atom", "none"]
 
@@ -703,7 +714,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
         if signal_region is None:
             self.signal_region = None
         else:
-            self.signal_region = jnp.asarray(signal_region, dtype=bool)
+            self.signal_region = leaf_asarray(signal_region, dtype=bool)
 
     @override
     def raw_simulate(
@@ -762,7 +773,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
             )
 
             return (
-                irfftn(fourier_detector_readout, s=self.image_config.padded_shape)
+                jnp.fft.irfftn(fourier_detector_readout, s=self.image_config.padded_shape)
                 if outputs_real_space
                 else fourier_detector_readout
             )

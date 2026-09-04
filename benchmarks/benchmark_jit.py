@@ -94,9 +94,9 @@ def setup(num_images, path_to_pdb):
     volume_fourier_grid = cxs.FourierVoxelGridVolume.from_real_voxel_grid(
         render_fn(volume_gmm), pad_scale=2
     )
-    atom_volume = cxs.IndependentAtomVolume(
+    atom_volume = cxs.GaussianFourierVolume(
         positions=atom_positions,
-        scattering_factors=im.FourierGaussian(amplitude=1.0, b_factor=10.0),
+        kernel_fns=im.FourierGaussian(amplitude=1.0, b_factor=10.0),
     )
     return (particle_parameters, volume_gmm, atom_volume, volume_fourier_grid)
 
@@ -143,7 +143,7 @@ def run(n_iterations, num_images, path_to_pdb):
                 pose,
                 transfer_theory,
                 atom_volume,
-                cxs.FFTAtomProjection(eps=1e-16),
+                cxs.GaussianFourierProjection(eps=1e-16),
             )
             fft_image.block_until_ready()
         end_time = time()
@@ -160,7 +160,7 @@ def run(n_iterations, num_images, path_to_pdb):
             pose,
             transfer_theory,
             atom_volume,
-            cxs.FFTAtomProjection(eps=1e-16),
+            cxs.GaussianFourierProjection(eps=1e-16),
         )
         fft_image.block_until_ready()
         end_time = time()

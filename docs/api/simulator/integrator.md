@@ -25,7 +25,7 @@
 
 ---
 
-::: cryojax.simulator.RealVoxelProjection
+::: cryojax.simulator.EwaldSphereExtraction
         options:
             members:
                 - __init__
@@ -41,7 +41,7 @@
 
 ---
 
-::: cryojax.simulator.FFTAtomProjection
+::: cryojax.simulator.GaussianFourierProjection
         options:
             members:
                 - __init__

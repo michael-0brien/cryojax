@@ -5,9 +5,8 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float, Inexact, PRNGKeyArray
 
-from .._internal import error_if_not_fractional
-from ..jax_util import FloatLike
-from ..ndimage import fftn, ifftn, irfftn, rfftn
+from .._internal import error_if_not_fractional, leaf_asarray
+from ..jax_util import FloatLike, NDArrayLike
 from ._image_config import AbstractImageConfig
 from ._transfer_theory import ContrastTransferTheory, WaveTransferTheory
 from ._volume import AbstractVolumeIntegrator, AbstractVolumeRepresentation
@@ -60,7 +59,7 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
         defocus_offset: FloatLike | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         # ... compute the exit wave
-        fourier_wavefunction = fftn(
+        fourier_wavefunction = jnp.fft.fftn(
             self.compute_exit_wave(volume_representation, image_config, rng_key)
         )
         # ... propagate to the detector plane
@@ -69,9 +68,9 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
             image_config,
             defocus_offset=defocus_offset,
         )
-        wavefunction = ifftn(fourier_wavefunction)
+        wavefunction = jnp.fft.ifftn(fourier_wavefunction)
         # ... get the squared wavefunction and return to fourier space
-        intensity_spectrum = rfftn((wavefunction * jnp.conj(wavefunction)).real)
+        intensity_spectrum = jnp.fft.rfftn((wavefunction * jnp.conj(wavefunction)).real)
 
         return intensity_spectrum
 
@@ -85,7 +84,7 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         """Compute the contrast at the detector plane, given the squared wavefunction."""
         # ... compute the exit wave
-        fourier_wavefunction = fftn(
+        fourier_wavefunction = jnp.fft.fftn(
             self.compute_exit_wave(volume_representation, image_config, rng_key)
         )
         # ... propagate to the detector plane
@@ -94,12 +93,12 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
             image_config,
             defocus_offset=defocus_offset,
         )
-        wavefunction = ifftn(fourier_wavefunction)
+        wavefunction = jnp.fft.ifftn(fourier_wavefunction)
         # ... get the squared wavefunction
         squared_wavefunction = (wavefunction * jnp.conj(wavefunction)).real
         # ... compute the contrast directly from the squared wavefunction
         # as C = -1 + psi^2 / 1 + psi^2
-        contrast_spectrum = rfftn(
+        contrast_spectrum = jnp.fft.rfftn(
             (-1 + squared_wavefunction) / (1 + squared_wavefunction)
         )
 
@@ -155,7 +154,7 @@ class WeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
         contrast_spectrum = self.transfer_theory.propagate_object(  # noqa: E501
             object_spectrum,
             image_config,
-            input_is_ewald_sphere=self.volume_integrator.outputs_ewald_sphere,
+            is_ewald_sphere=self.volume_integrator.outputs_ewald_sphere,
             defocus_offset=defocus_offset,
         )
 
@@ -182,11 +181,12 @@ class WeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
         return intensity_spectrum
 
 
-class StrongPhaseScatteringTheory(AbstractWaveScatteringTheory, strict=True):
-    """Scattering theory for strong phase objects. This is analogous to
-    a Moliere high-energy approximation in high-energy physics.
+class RytovScatteringTheory(AbstractWaveScatteringTheory, strict=True):
+    """Scattering theory for a weakly scattering object with significant phase
+    shifts. This is based on what is called the Rytov approximation to the
+    underlying wave equation.
 
-    This is the simplest model for multiple scattering events.
+    This is the simplest model for multiple scattering through the specimen.
 
     !!! info
         Unlike in the weak-phase approximation, it is not possible to absorb a model
@@ -194,7 +194,7 @@ class StrongPhaseScatteringTheory(AbstractWaveScatteringTheory, strict=True):
         Instead, it is necessary to compute a complex scattering potential, where the
         imaginary part captures inelastic scattering.
 
-        In particular, given a projected electrostatic potential $\\u(x, y)$, the
+        In particular, given a projected electrostatic potential $u(x, y)$, the
         complex potential $\\phi(x, y)$ for amplitude contrast ratio $\\alpha$ is
 
         $$\\phi(x, y) = \\sqrt{1 - \\alpha^2} \\ u(x, y) + i \\alpha \\ u(x, y).$$
@@ -210,7 +210,7 @@ class StrongPhaseScatteringTheory(AbstractWaveScatteringTheory, strict=True):
 
     volume_integrator: AbstractVolumeIntegrator
     transfer_theory: WaveTransferTheory
-    amplitude_contrast_ratio: Float[Array, ""]
+    amplitude_contrast_ratio: Float[NDArrayLike, "..."]
 
     def __init__(
         self,
@@ -226,7 +226,9 @@ class StrongPhaseScatteringTheory(AbstractWaveScatteringTheory, strict=True):
         """
         self.volume_integrator = volume_integrator
         self.transfer_theory = transfer_theory
-        self.amplitude_contrast_ratio = jnp.asarray(amplitude_contrast_ratio, dtype=float)
+        self.amplitude_contrast_ratio = leaf_asarray(
+            amplitude_contrast_ratio, dtype=float
+        )
 
     @override
     def compute_exit_wave(
@@ -244,13 +246,13 @@ class StrongPhaseScatteringTheory(AbstractWaveScatteringTheory, strict=True):
         # rfftn
         is_proj = not self.volume_integrator.outputs_ewald_sphere
         do_ifft = lambda ft: (
-            irfftn(ft, s=image_config.padded_shape)
+            jnp.fft.irfftn(ft, s=image_config.padded_shape)
             if is_proj
-            else ifftn(ft, s=image_config.padded_shape)
+            else jnp.fft.ifftn(ft, s=image_config.padded_shape)
         )
         integrated_potential = _compute_complex_potential(
             do_ifft(fourier_in_plane_potential),
-            error_if_not_fractional(self.amplitude_contrast_ratio),
+            error_if_not_fractional(jnp.asarray(self.amplitude_contrast_ratio)),
         )
         object = image_config.interaction_constant * integrated_potential
         # Compute wavefunction, with amplitude and phase contrast
@@ -262,14 +264,4 @@ def _compute_complex_potential(
     amplitude_contrast_ratio: Float[Array, ""] | float,
 ) -> Complex[Array, "y_dim x_dim"]:
     ac = amplitude_contrast_ratio
-    if jnp.iscomplexobj(in_plane_potential):
-        raise NotImplementedError(
-            "You may have tried to use a `StrongPhaseScatteringTheory` "
-            "together with an Ewald sphere method for simulating images. "
-            "This is not implemented!"
-        )
-        # return jnp.sqrt(1.0 - ac**2) * integrated_potential.real + 1.0j * (
-        #     integrated_potential.imag + ac * integrated_potential.real
-        # )
-    else:
-        return (jnp.sqrt(1.0 - ac**2) + 1.0j * ac) * in_plane_potential
+    return (jnp.sqrt(1.0 - ac**2) + 1.0j * ac) * in_plane_potential

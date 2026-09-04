@@ -10,7 +10,3 @@ from ._pdb import (
     read_atoms_from_pdb as read_atoms_from_pdb,
     read_topology_from_pdb as read_topology_from_pdb,
 )
-from ._starfile import (
-    read_starfile as read_starfile,
-    write_starfile as write_starfile,
-)

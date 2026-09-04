@@ -51,8 +51,22 @@ This documentation describes the elements of transfer theory in `cryojax`. More 
 
 ## Transfer Theories
 
+??? abstract "`cryojax.simulator.AbstractTransferTheory`"
+    ::: cryojax.simulator.AbstractTransferTheory
+        options:
+            members:
+                - ctf
+
 ::: cryojax.simulator.ContrastTransferTheory
         options:
             members:
                 - __init__
                 - propagate_object
+
+---
+
+::: cryojax.simulator.WaveTransferTheory
+        options:
+            members:
+                - __init__
+                - propagate_exit_wave
