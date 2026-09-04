@@ -351,7 +351,7 @@ class EwaldSphereExtraction(
         # Scale by voxel size to convert from projection to integral
         ewald_sphere_surface *= image_config.pixel_size
         return (
-            jnp.fft.irfftn(ewald_sphere_surface, s=image_config.padded_shape)
+            jnp.fft.ifftn(ewald_sphere_surface)
             if outputs_real_space
             else ewald_sphere_surface
         )
