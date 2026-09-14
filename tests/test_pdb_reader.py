@@ -109,7 +109,6 @@ def test_read_pdb_at_structure(pdb_multiple_structures_path):
     atom_positions, atomic_numbers = read_atoms_from_pdb(
         pdb_multiple_structures_path,
         center=True,
-        loads_b_factors=False,
         selection_string="all",
         model_index=1,
     )

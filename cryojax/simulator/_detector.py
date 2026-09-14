@@ -11,7 +11,6 @@ import numpy as np
 from equinox import Module
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
-from ..ndimage import irfftn, rfftn
 from ._image_config import DoseImageConfig
 
 
@@ -42,7 +41,7 @@ class AbstractDetector(Module, strict=True):
         # Apply the integrated dose rate
         fourier_expected_counts = electrons_per_image * fourier_intensity
         if outputs_real_space:
-            return irfftn(fourier_expected_counts, s=image_config.padded_shape)
+            return jnp.fft.irfftn(fourier_expected_counts, s=image_config.padded_shape)
         else:
             return fourier_expected_counts
 
@@ -85,7 +84,7 @@ class GaussianDetector(AbstractDetector, strict=True):
         electron_counts = expected_electron_counts + jnp.sqrt(
             expected_electron_counts
         ) * jr.normal(key, expected_electron_counts.shape)
-        return electron_counts if outputs_real_space else rfftn(electron_counts)
+        return electron_counts if outputs_real_space else jnp.fft.rfftn(electron_counts)
 
 
 class PoissonDetector(AbstractDetector, strict=True):
@@ -107,4 +106,4 @@ class PoissonDetector(AbstractDetector, strict=True):
             fourier_intensity, image_config, outputs_real_space=True
         )
         electron_counts = jr.poisson(key, expected_electron_counts).astype(float)
-        return electron_counts if outputs_real_space else rfftn(electron_counts)
+        return electron_counts if outputs_real_space else jnp.fft.rfftn(electron_counts)

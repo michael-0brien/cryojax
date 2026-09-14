@@ -12,6 +12,12 @@
 
 ---
 
+::: cryojax.simulator.suggest_n_spread
+    options:
+      separate_signature: true
+
+---
+
 ::: cryojax.simulator.render_voxel_volume
     options:
       separate_signature: true

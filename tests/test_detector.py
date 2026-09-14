@@ -2,7 +2,6 @@ import cryojax.simulator as cs
 import jax
 import jax.numpy as jnp
 import numpy as np
-from cryojax.ndimage import irfftn, rfftn
 
 
 def test_constant_wavefunction_gives_constant_expected_events():
@@ -17,7 +16,7 @@ def test_constant_wavefunction_gives_constant_expected_events():
     electrons_per_pixel = image_config.electron_dose * image_config.pixel_size**2
     # Create squared wavefunction of just vacuum, i.e. 1 everywhere
     vacuum_squared_wavefunction = jnp.ones(image_config.shape, dtype=float)
-    fourier_vacuum_squared_wavefunction = rfftn(vacuum_squared_wavefunction)
+    fourier_vacuum_squared_wavefunction = jnp.fft.rfftn(vacuum_squared_wavefunction)
     # Create detector models
     poisson_detector = cs.PoissonDetector()
     # Compute expected events
@@ -46,7 +45,7 @@ def test_gaussian_limit():
     electrons_per_pixel = image_config.electron_dose * image_config.pixel_size**2
     # Create squared wavefunction of just vacuum, i.e. 1 everywhere
     vacuum_squared_wavefunction = jnp.ones(image_config.shape, dtype=float)
-    fourier_vacuum_squared_wavefunction = rfftn(vacuum_squared_wavefunction)
+    fourier_vacuum_squared_wavefunction = jnp.fft.rfftn(vacuum_squared_wavefunction)
     # Create detector models
     key = jax.random.key(1234)
     gaussian_detector = cs.GaussianDetector()
@@ -60,12 +59,12 @@ def test_gaussian_limit():
     )
     # Compare to see if the autocorrelation has converged
     np.testing.assert_allclose(
-        irfftn(
+        jnp.fft.irfftn(
             jnp.abs(gaussian_detector_readout_fft) ** 2
             / (n_pixels * electrons_per_pixel**2),
             s=image_config.padded_shape,
         ),
-        irfftn(
+        jnp.fft.irfftn(
             jnp.abs(poisson_detector_readout_fft) ** 2
             / (n_pixels * electrons_per_pixel**2),
             s=image_config.padded_shape,

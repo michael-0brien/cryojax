@@ -1,4 +1,3 @@
-import warnings as _warnings
 from typing import Any as _Any
 
 from ._coordinates import (
@@ -27,6 +26,11 @@ from ._fft import (
     irfftn as irfftn,
     rfftn as rfftn,
 )
+from ._fourier_slice import (
+    ewald_sphere_from_slice as ewald_sphere_from_slice,
+    prepare_sampling_fft as prepare_sampling_fft,
+    sample_fft_slice as sample_fft_slice,
+)
 from ._fourier_statistics import (
     compute_binned_powerspectrum as compute_binned_powerspectrum,
     compute_fourier_ring_correlation as compute_fourier_ring_correlation,
@@ -35,11 +39,13 @@ from ._fourier_statistics import (
 from ._fourier_utils import (
     convert_fftn_to_rfftn as convert_fftn_to_rfftn,
     enforce_rfftn_self_conjugates as enforce_rfftn_self_conjugates,
+    make_fftshift_phase as make_fftshift_phase,
+    make_rfftn_multiplicity as make_rfftn_multiplicity,
+    query_efficient_grid_size as query_efficient_grid_size,
 )
-from ._map_coordinates import (
-    compute_spline_coefficients as compute_spline_coefficients,
+from ._interpolation import (
     map_coordinates as map_coordinates,
-    map_coordinates_spline as map_coordinates_spline,
+    map_frequencies as map_frequencies,
 )
 from ._normalize import (
     background_subtract_image as background_subtract_image,
@@ -54,8 +60,6 @@ from ._operators import (
     AbstractRealOperator as AbstractRealOperator,
     CustomFourierOperator as CustomFourierOperator,
     FourierConstant as FourierConstant,
-    FourierDC as FourierDC,
-    FourierExp2D as FourierExp2D,
     FourierGaussian as FourierGaussian,
     FourierPhaseShifts as FourierPhaseShifts,
     FourierSinc as FourierSinc,
@@ -69,6 +73,11 @@ from ._radial_average import (
 )
 from ._rescale_pixel_size import (
     rescale_pixel_size as rescale_pixel_size,
+)
+from ._spreading import (
+    spread_gaussians_2d as spread_gaussians_2d,
+    spread_gaussians_3d as spread_gaussians_3d,
+    variance_to_nspread as variance_to_nspread,
 )
 from ._transforms import (
     AbstractFilter as AbstractFilter,
@@ -85,63 +94,43 @@ from ._transforms import (
     Rectangular3DCosineMask as Rectangular3DCosineMask,
     RotateFFT as RotateFFT,
     ScaleImage as ScaleImage,
-    SincCorrectionMask as SincCorrectionMask,
     SphericalCosineMask as SphericalCosineMask,
     SquareCosineMask as SquareCosineMask,
     WhiteningFilter as WhiteningFilter,
 )
 
 
+_RENAMED = {
+    "downsample_with_fourier_cropping": "fourier_crop_downsample",
+    "downsample_to_shape_with_fourier_cropping": "fourier_crop_to_shape",
+    "normalize_image": "standardize_image",
+}
+_REMOVED = {
+    "map_coordinates_spline": (
+        "Use `map_coordinates(..., order=3)`, which interpolates the array "
+        "directly rather than precomputed spline coefficients."
+    ),
+    "compute_spline_coefficients": (
+        "Prefiltering for cubic interpolation was removed. For fourier slice "
+        "extraction, use `prepare_sampling_fft(..., interp='cubic')`, which "
+        "deconvolves the cubic kernel's `sinc^4` transfer function instead of "
+        "solving for spline coefficients."
+    ),
+}
+_FLATTENED_SUBMODULES = {"operators", "transforms"}
+
+
 def __getattr__(name: str) -> _Any:
-    # Future deprecations
-    if name == "downsample_with_fourier_cropping":
-        _warnings.warn(
-            "'downsample_with_fourier_cropping' is deprecated"
-            "has been renamed to 'fourier_crop_downsample'. "
-            "The old name will be deprecated in cryoJAX 0.6.0.",
-            category=FutureWarning,
-            stacklevel=2,
+    if name in _RENAMED:
+        raise AttributeError(
+            f"'{name}' was removed in cryoJAX 0.6.0. Use '{_RENAMED[name]}' instead."
         )
-        return fourier_crop_downsample
-    if name == "downsample_to_shape_with_fourier_cropping":
-        _warnings.warn(
-            "'downsample_to_shape_with_fourier_cropping' is deprecated"
-            "has been renamed to 'fourier_crop_to_shape'. "
-            "The old name will be deprecated in cryoJAX 0.6.0.",
-            category=FutureWarning,
-            stacklevel=2,
+    if name in _REMOVED:
+        raise AttributeError(f"'{name}' was removed in cryoJAX 0.6.0. {_REMOVED[name]}")
+    if name in _FLATTENED_SUBMODULES:
+        raise AttributeError(
+            f"Submodule `cryojax.ndimage.{name}` was removed in cryoJAX 0.6.0. "
+            f"All symbols from `{name}` are now importable directly from "
+            "`cryojax.ndimage`."
         )
-        return fourier_crop_to_shape
-    if name == "normalize_image":
-        _warnings.warn(
-            "'normalize_image' is deprecated and "
-            "has been renamed to 'standardize_image'. "
-            "The old name will be deprecated in cryoJAX 0.6.0.",
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        return standardize_image
-    if name == "operators":
-        _warnings.warn(
-            "Submodule `cryojax.ndimage.operators` is deprecated and "
-            "has been moved to the `cryojax.ndimage` namespace. "
-            "`cryojax.ndimage.operators` will be removed in cryoJAX 0.6.0.",
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        from . import _operators as operators
-
-        return operators
-    if name == "transforms":
-        _warnings.warn(
-            "Submodule `cryojax.ndimage.transforms` is deprecated and "
-            "has been moved to the `cryojax.ndimage` namespace. "
-            "`cryojax.ndimage.transforms` will be removed in cryoJAX 0.6.0.",
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        from . import _transforms as transforms
-
-        return transforms
-
     raise AttributeError(f"cannot import name '{name}' from 'cryojax.ndimage'.")

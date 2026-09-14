@@ -38,7 +38,7 @@ There are many different volume representations of biological structures for cry
 
 ---
 
-::: cryojax.simulator.IndependentAtomVolume
+::: cryojax.simulator.GaussianFourierVolume
     options:
         members:
             - __init__
@@ -72,38 +72,15 @@ There are many different volume representations of biological structures for cry
                 - rotate_to_pose
                 - shape
 
----
-
-::: cryojax.simulator.FourierVoxelSplineVolume
-        options:
-            members:
-                - __init__
-                - from_real_voxel_grid
-                - to_representation
-                - rotate_to_pose
-                - shape
-
 
 #### Real-space
 
 !!! info "Real-space projections"
     The [`cryojax.simulator.RealVoxelGridVolume`][] does not have an associated
     method in cryoJAX for computing projections and therefore
-    cannot be used with with [`cryojax.simulator.make_image_model`][]. Instead,
-    use [`cryojax.simulator.RealVoxelCloudVolume`][].
+    cannot be used with with [`cryojax.simulator.make_image_model`][].
 
 ::: cryojax.simulator.RealVoxelGridVolume
-        options:
-            members:
-                - __init__
-                - from_real_voxel_grid
-                - to_representation
-                - rotate_to_pose
-                - shape
-
----
-
-::: cryojax.simulator.RealVoxelCloudVolume
         options:
             members:
                 - __init__
@@ -140,7 +117,7 @@ There are many different volume representations of biological structures for cry
 
 ---
 
-::: cryojax.simulator.FFTAtomRenderFn
+::: cryojax.simulator.GaussianFourierRenderFn
         options:
             members:
                 - __init__

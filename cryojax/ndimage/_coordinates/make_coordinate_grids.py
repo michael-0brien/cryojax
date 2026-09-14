@@ -68,6 +68,7 @@ def make_frequency_grid(
     shape: tuple[int, ...],
     grid_spacing: float | Float[np.ndarray, ""] | Float[Array, ""] = 1.0,
     outputs_rfftfreqs: bool = True,
+    fftshifted: bool = False,
 ) -> Float[Array, "*shape ndim"]:
     """Create a fourier-space cartesian coordinate system on a grid.
     The zero-frequency component is in the corner.
@@ -93,6 +94,7 @@ def make_frequency_grid(
         grid_spacing=grid_spacing,
         outputs_real_space=False,
         outputs_rfftfreqs=outputs_rfftfreqs,
+        fftshifted=fftshifted,
     )
     return frequency_grid
 
@@ -101,6 +103,7 @@ def make_radial_frequency_grid(
     shape: tuple[int, ...],
     grid_spacing: float | Float[np.ndarray, ""] | Float[Array, ""] = 1.0,
     outputs_rfftfreqs: bool = True,
+    fftshifted: bool = False,
 ) -> Float[Array, " *shape"]:
     """Create a fourier-space radial coordinate system on a grid.
     The zero-frequency component is in the corner.
@@ -127,7 +130,10 @@ def make_radial_frequency_grid(
     """
     # Make a cartesian grid
     frequency_grid = make_frequency_grid(
-        shape=shape, grid_spacing=grid_spacing, outputs_rfftfreqs=outputs_rfftfreqs
+        shape=shape,
+        grid_spacing=grid_spacing,
+        outputs_rfftfreqs=outputs_rfftfreqs,
+        fftshifted=fftshifted,
     )
 
     # Now compute the magnitude of the frequency vector
@@ -139,29 +145,12 @@ def make_radial_frequency_grid(
 def make_frequency_slice(
     shape: tuple[int, int],
     grid_spacing: float | Float[np.ndarray, ""] | Float[Array, ""] = 1.0,
-    outputs_rfftfreqs: bool = False,
+    outputs_rfftfreqs: bool = True,
+    fftshifted: bool = True,
 ) -> Float[Array, "1 {shape[0]} {shape[1]} 3"]:
-    """Create a fourier-space cartesian coordinate system on a grid, where
-    zero-frequency component is in the *center* of the grid.
-
-    !!! warning
-        In the function `make_frequency_grid`, the convention is that
-        the grid is returned with the zero frequency component is in the
-        corner. In this function, as mentioned above, frequency slices are
-        returned with the zero frequency component in the center. To convert
-        between the two conventions, run
-
-        ```python
-        import jax.numpy as jnp
-        from cryojax.coordinates import make_frequency_slice
-
-        frequency_slice_with_zero_in_center = make_frequency_slice((100, 100)) # Shape (1, 100, 100, 3)
-        frequency_slice_with_zero_in_corner = jnp.fft.ifftshift(frequency_slice_with_zero_in_center, axes=(1, 2))
-        ```
-
-        The reason for the difference is so that this function can be used to
-        directly pass a `frequency_slice` to the `cryojax.simulator.FourierVoxelGridPotential`,
-        which requires that the zero is in the center of the grid.
+    """Create central slice frequency coordinates. By default,
+    returns in the convention required for usage with
+    [`cryojax.ndimage.sample_fft_slice`][].
 
     **Arguments:**
 
@@ -180,12 +169,8 @@ def make_frequency_slice(
     zero-frequency component is in the *center* of the grid.
     """  # noqa: E501
     frequency_slice = make_frequency_grid(
-        shape, grid_spacing, outputs_rfftfreqs=outputs_rfftfreqs
+        shape, grid_spacing, outputs_rfftfreqs=outputs_rfftfreqs, fftshifted=fftshifted
     )
-    if outputs_rfftfreqs:
-        frequency_slice = jnp.fft.fftshift(frequency_slice, axes=(0,))
-    else:
-        frequency_slice = jnp.fft.fftshift(frequency_slice, axes=(0, 1))
     frequency_slice = jnp.expand_dims(
         jnp.pad(
             frequency_slice,
@@ -201,6 +186,7 @@ def make_frequency_slice(
 def make_1d_coordinate_grid(
     size: int,
     grid_spacing: float | Float[np.ndarray, ""] | Float[Array, ""] = 1.0,
+    fftshifted: bool = False,
 ) -> Float[Array, "*shape ndim"]:
     """
     Create a 1D real-space cartesian coordinate array.
@@ -218,7 +204,7 @@ def make_1d_coordinate_grid(
     A 1D cartesian coordinate array in real space.
     """
     coordinate_array = _make_coordinates_or_frequencies_1d(
-        size, grid_spacing=grid_spacing, outputs_real_space=True
+        size, grid_spacing=grid_spacing, outputs_real_space=True, fftshifted=fftshifted
     )
     return coordinate_array
 
@@ -227,6 +213,7 @@ def make_1d_frequency_grid(
     size: int,
     grid_spacing: float | Float[np.ndarray, ""] | Float[Array, ""] = 1.0,
     outputs_rfftfreqs: bool = True,
+    fftshifted: bool = False,
 ) -> Float[Array, "*shape ndim"]:
     """Create a 1D fourier-space cartesian coordinate array.
     If `outputs_rfftfreqs = False`, the zero-frequency component is in the beginning.
@@ -252,6 +239,7 @@ def make_1d_frequency_grid(
         grid_spacing=grid_spacing,
         outputs_real_space=False,
         outputs_rfftfreqs=outputs_rfftfreqs,
+        fftshifted=fftshifted,
     )
     return frequency_array
 
@@ -261,13 +249,14 @@ def _make_coordinates_or_frequencies(
     grid_spacing: float | Float[np.ndarray, ""] | Float[Array, ""] = 1.0,
     outputs_real_space: bool = False,
     outputs_rfftfreqs: bool = True,
+    fftshifted: bool = False,
 ) -> Float[Array, "*shape ndim"]:
     ndim = len(shape)
     coords1D = []
     for idx in range(ndim):
         if outputs_real_space:
             c1D = _make_coordinates_or_frequencies_1d(
-                shape[idx], grid_spacing, outputs_real_space
+                shape[idx], grid_spacing, outputs_real_space, fftshifted=fftshifted
             )
         else:
             if not outputs_rfftfreqs:
@@ -275,7 +264,11 @@ def _make_coordinates_or_frequencies(
             else:
                 rfftfreq = False if idx < ndim - 1 else True
             c1D = _make_coordinates_or_frequencies_1d(
-                shape[idx], grid_spacing, outputs_real_space, rfftfreq
+                shape[idx],
+                grid_spacing,
+                outputs_real_space,
+                rfftfreq,
+                fftshifted=fftshifted,
             )
         coords1D.append(c1D)
     if ndim == 2:
@@ -303,15 +296,22 @@ def _make_coordinates_or_frequencies_1d(
     grid_spacing: float | Float[np.ndarray, ""] | Float[Array, ""],
     outputs_real_space: bool = False,
     outputs_rfftfreqs: bool | None = None,
+    fftshifted: bool = False,
 ) -> Float[Array, " size"]:
     """One-dimensional coordinates in real or fourier space"""
     if outputs_real_space:
-        make_1d = lambda size, dx: jnp.fft.fftshift(jnp.fft.fftfreq(size, 1 / dx)) * size
+        make_1d = lambda size, dx: jnp.fft.fftshift(jnp.fft.fftfreq(size, 1 / dx) * size)
     else:
         if outputs_rfftfreqs is None:
             raise ValueError("Internal error in `cryojax.coordinates`.")
         else:
-            fn = jnp.fft.rfftfreq if outputs_rfftfreqs else jnp.fft.fftfreq
+            if outputs_rfftfreqs:
+                fn = jnp.fft.rfftfreq
+            else:
+                if fftshifted:
+                    fn = lambda *x: jnp.fft.fftshift(jnp.fft.fftfreq(*x))
+                else:
+                    fn = jnp.fft.fftfreq
             make_1d = lambda size, dx: fn(size, dx)
 
     return make_1d(size, grid_spacing)

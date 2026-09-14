@@ -1,7 +1,9 @@
 import cryojax.simulator as cxs
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
+from cryojax.ndimage import FourierPhaseShifts, make_frequency_grid
 from cryojax.rotations import SO3
 
 
@@ -13,6 +15,56 @@ def test_default_pose_arguments():
     np.testing.assert_allclose(
         euler.rotation.as_matrix(), axis_angle.rotation.as_matrix()
     )
+
+
+@pytest.mark.parametrize("shape", [(50, 3), (4, 5, 6, 3)])
+def test_rotate_coordinates(shape):
+    # `rotate_coordinates` applies the rotation matrix and must handle both a
+    # coordinate list `(N, 3)` and a coordinate grid `(N1, N2, N3, 3)` with a
+    # single (unbatched) pose, without explicit vmap.
+    pose = cxs.EulerAnglePose(phi_angle=30.0, theta_angle=20.0, psi_angle=10.0)
+    matrix = np.asarray(pose.rotation.as_matrix())
+    coordinates = np.random.RandomState(0).standard_normal(shape)
+
+    rotated = pose.rotate_coordinates(jnp.asarray(coordinates))
+    assert rotated.shape == shape
+    # ... each coordinate v is mapped to R @ v, i.e. coordinates @ R.T
+    expected = coordinates @ matrix.T
+    np.testing.assert_allclose(np.asarray(rotated), expected, atol=1e-5)
+
+    # ... `inverse=True` applies the transpose (inverse) rotation
+    rotated_inverse = pose.rotate_coordinates(jnp.asarray(coordinates), inverse=True)
+    np.testing.assert_allclose(
+        np.asarray(rotated_inverse), coordinates @ matrix, atol=1e-5
+    )
+
+
+def test_rotate_coordinates_matches_vmap_over_grid():
+    # The simplified (vmap-free) implementation must agree with nested vmaps.
+    pose = cxs.QuaternionPose(wxyz=np.array([0.5, 0.5, -0.5, 0.5]))
+    grid = np.random.RandomState(1).standard_normal((3, 4, 5, 3))
+    rotation = pose.rotation
+    reference = jax.vmap(jax.vmap(jax.vmap(rotation.apply)))(jnp.asarray(grid))
+    result = pose.rotate_coordinates(jnp.asarray(grid))
+    np.testing.assert_allclose(np.asarray(result), np.asarray(reference), atol=1e-5)
+
+
+@pytest.mark.parametrize(
+    "tx, ty, shape, pixel_size",
+    [
+        (1.5, -2.3, (32, 32), 1.0),
+        (0.0, 4.1, (33, 32), 0.5),
+        (-3.0, 0.0, (32, 33), 2.0),
+    ],
+)
+def test_translation_operator_separable(tx, ty, shape, pixel_size):
+    pose = cxs.EulerAnglePose(tx, ty)
+    # New separable implementation
+    result = pose.compute_translation_operator(shape, jnp.asarray(pixel_size))
+    # Reference: evaluate FourierPhaseShifts on the full 2D rfft frequency grid
+    frequency_grid = make_frequency_grid(shape, pixel_size)
+    expected = FourierPhaseShifts(jnp.asarray([tx, ty]))(frequency_grid)
+    np.testing.assert_allclose(np.asarray(result), np.asarray(expected), atol=1e-6)
 
 
 def test_translation_agreement():

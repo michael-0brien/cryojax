@@ -8,6 +8,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Bool, Complex, Float, Inexact
 
 from ..jax_util import FloatLike, NDArrayLike
+from ._fourier_utils import make_rfftn_multiplicity
 
 
 def rescale_image(
@@ -82,7 +83,7 @@ def rescale_fft(
     std: FloatLike = 1.0,
     *,
     input_is_rfft: bool = True,
-    shape_in_real_space: tuple[int, int] | None = None,
+    real_shape: tuple[int, int] | None = None,
 ) -> Complex[Array, "y_dim x_dim"]:
     """Rescale so that the image is mean `mean`
     and standard deviation `std` in real-space.
@@ -96,6 +97,10 @@ def rescale_fft(
         The real-space image is rescaled to this standard deviation.
     - `mean`:
         The real-space image is rescaled to this mean.
+    - `real_shape`:
+        The real-space shape of `fourier_image` when `input_is_rfft` is
+        `True`. If `None`, the last (real-transformed) axis is assumed to
+        be even.
 
 
     **Returns:**
@@ -105,26 +110,28 @@ def rescale_fft(
     """
     fourier_image = jnp.asarray(fourier_image)
     n1, n2 = fourier_image.shape
-    n_pixels = (
-        (
-            n1 * (2 * n2 - 1)
-            if shape_in_real_space is None
-            else math.prod(shape_in_real_space)
+    # Recover the real-space shape. If it is not given, assume an even width
+    # (the ambiguous case where the last rfft column *is* a self-conjugate
+    # Nyquist mode).
+    real_shape = real_shape if real_shape is not None else (n1, 2 * (n2 - 1))
+    n_pixels = math.prod(real_shape) if input_is_rfft else n1 * n2
+    # Mask the zero-frequency mode with an iota-derived `where` rather than an
+    # `at[...].set(...)`, which scatters and can break fusion
+    is_zero_mode = (jnp.arange(n1)[:, None] == 0) & (jnp.arange(n2)[None, :] == 0)
+    fourier_image_zero_mean = jnp.where(is_zero_mode, 0.0, fourier_image)
+    if input_is_rfft:
+        # The full-grid L2 norm weights each rfft mode by its Hermitian
+        # multiplicity (interior columns count twice; the zero and even-width
+        # Nyquist columns count once).
+        multiplicity = make_rfftn_multiplicity(real_shape)
+        image_std = jnp.sqrt(
+            jnp.sum(multiplicity * jnp.abs(fourier_image_zero_mean) ** 2)
         )
-        if input_is_rfft
-        else n1 * n2
-    )
-    fourier_image_zero_mean = fourier_image.at[0, 0].set(0.0)
-    image_std = (
-        jnp.sqrt(
-            jnp.sum(jnp.abs(fourier_image_zero_mean[:, 0]) ** 2)
-            + 2 * jnp.sum(jnp.abs(fourier_image_zero_mean[:, 1:]) ** 2)
-        )
-        if input_is_rfft
-        else jnp.linalg.norm(fourier_image_zero_mean)
-    ) / n_pixels
+    else:
+        image_std = jnp.linalg.norm(fourier_image_zero_mean)
+    image_std = image_std / n_pixels
     normalized_image = fourier_image_zero_mean / image_std
-    rescaled_image = (normalized_image * std).at[0, 0].set(mean * n_pixels)
+    rescaled_image = jnp.where(is_zero_mode, mean * n_pixels, normalized_image * std)
 
     return rescaled_image
 
@@ -133,7 +140,7 @@ def standardize_fft(
     fourier_image: Complex[NDArrayLike, "y_dim x_dim"],
     *,
     input_is_rfft: bool = True,
-    shape_in_real_space: tuple[int, int] | None = None,
+    real_shape: tuple[int, int] | None = None,
 ) -> Complex[Array, "y_dim x_dim"]:
     """Standardize so that the image is mean 0
     and standard deviation 1 in real-space.
@@ -143,6 +150,10 @@ def standardize_fft(
     - `fourier_image`:
         The image in the Fourier domain.
         Ensure the zero frequency component is in the corner.
+    - `real_shape`:
+        The real-space shape of `fourier_image` when `input_is_rfft` is
+        `True`. If `None`, the last (real-transformed) axis is assumed to
+        be even.
 
 
     **Returns:**
@@ -154,7 +165,7 @@ def standardize_fft(
         mean=0.0,
         std=1.0,
         input_is_rfft=input_is_rfft,
-        shape_in_real_space=shape_in_real_space,
+        real_shape=real_shape,
     )
 
 

@@ -1,12 +1,15 @@
 from collections.abc import Callable, Iterable
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import equinox as eqx
 import jax
-import lineax as lx
 from jaxtyping import Array, PyTree
 
 from ._filter_specs import make_filter_spec
+
+
+if TYPE_CHECKING:
+    import lineax as lx
 
 
 Args = TypeVar("Args")
@@ -18,7 +21,7 @@ def make_linear_operator(
     where_vector: Callable[[Args], Any],
     *,
     tags: object | Iterable[object] = (),
-) -> tuple[lx.FunctionLinearOperator, Args]:
+) -> tuple["lx.FunctionLinearOperator", Args]:
     """Instantiate a [`lineax.FunctionLinearOperator`](https://docs.kidger.site/lineax/api/operators/#lineax.FunctionLinearOperator)
     from a function that takes an arbitrary pytree as input.
 
@@ -27,6 +30,9 @@ def make_linear_operator(
     abstraction. It is easy to get backprojection operators using `lineax`, which
     calls [`jax.linear_transpose`](https://docs.jax.dev/en/latest/_autosummary/jax.linear_transpose.html)
     under the hood.
+
+    !!! note
+        Install `lineax` to use this function, e.g. with `pip install lineax`.
 
     !!! example "Backprojection with `lineax`"
 
@@ -38,7 +44,7 @@ def make_linear_operator(
         # Instantiate a linear operator
         volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(...)
         image_model = cxs.make_image_model(volume, ...)
-        where_vector = lambda x: x.volume.fourier_voxel_grid
+        where_vector = lambda x: x.volume.values
         operator, vector = jxu.make_linear_operator(
             fn=lambda x: x.simulate(),
             args=image_model,
@@ -76,6 +82,13 @@ def make_linear_operator(
     a pytree with the same structure as `pytree`, partitioned to only include the
     arguments at `where_vector`.
     """  # noqa: E501
+    try:
+        import lineax as lx
+    except ModuleNotFoundError as err:
+        raise ModuleNotFoundError(
+            "`cryojax.jax_util.make_linear_operator` requires `lineax`. "
+            "Install it with `pip install lineax`."
+        ) from err
     # Extract arguments for the volume at `where_vector`
     filter_spec = make_filter_spec(args, where_vector)
     vector_args, other_args = eqx.partition(args, filter_spec)

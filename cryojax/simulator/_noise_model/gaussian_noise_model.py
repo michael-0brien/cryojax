@@ -10,14 +10,14 @@ import jax.numpy as jnp
 import jax.random as jr
 from jaxtyping import Array, Complex, Float, PRNGKeyArray
 
-from ..._internal import error_if_not_positive
-from ...jax_util import FloatLike
+from ..._internal import error_if_not_positive, leaf_asarray
+from ...jax_util import FloatLike, NDArrayLike
 from ...ndimage import (
     AbstractFilter,
     AbstractFourierOperator,
     AbstractMask,
     FourierConstant,
-    rfftn,
+    make_rfftn_multiplicity,
 )
 from .._image_model import AbstractImageModel
 from .base_noise_model import AbstractEmpiricalNoiseModel, AbstractLikelihoodNoiseModel
@@ -45,8 +45,8 @@ class AbstractGaussianNoiseModel(
     """
 
     image_model: eqx.AbstractVar[AbstractImageModel]
-    signal_scale_factor: eqx.AbstractVar[Float[Array, ""]]
-    signal_offset: eqx.AbstractVar[Float[Array, ""]]
+    signal_scale_factor: eqx.AbstractVar[Float[NDArrayLike, "..."]]
+    signal_offset: eqx.AbstractVar[Float[NDArrayLike, "..."]]
 
     @override
     def sample(
@@ -109,13 +109,12 @@ class AbstractGaussianNoiseModel(
         simulated_image = self.image_model.simulate(
             outputs_real_space=True, mask=None, filter=filter
         )
-        simulated_image = (
-            error_if_not_positive(self.signal_scale_factor) * simulated_image
-            + self.signal_offset
-        )
+        simulated_image = error_if_not_positive(
+            jnp.asarray(self.signal_scale_factor)
+        ) * simulated_image + jnp.asarray(self.signal_offset)
         if mask is not None:
             simulated_image = mask(simulated_image)
-        return simulated_image if outputs_real_space else rfftn(simulated_image)
+        return simulated_image if outputs_real_space else jnp.fft.rfftn(simulated_image)
 
     @abstractmethod
     def compute_noise(
@@ -141,9 +140,9 @@ class GaussianWhiteNoiseModel(AbstractGaussianNoiseModel, strict=True):
     """
 
     image_model: AbstractImageModel
-    variance: Float[Array, ""]
-    signal_scale_factor: Float[Array, ""]
-    signal_offset: Float[Array, ""]
+    variance: Float[NDArrayLike, "..."]
+    signal_scale_factor: Float[NDArrayLike, "..."]
+    signal_offset: Float[NDArrayLike, "..."]
 
     def __init__(
         self,
@@ -165,9 +164,9 @@ class GaussianWhiteNoiseModel(AbstractGaussianNoiseModel, strict=True):
             An offset for the underlying signal simulated from `image_model`.
         """  # noqa: E501
         self.image_model = image_model
-        self.variance = jnp.asarray(variance, dtype=float)
-        self.signal_scale_factor = jnp.asarray(signal_scale_factor, dtype=float)
-        self.signal_offset = jnp.asarray(signal_offset, dtype=float)
+        self.variance = leaf_asarray(variance, dtype=float)
+        self.signal_scale_factor = leaf_asarray(signal_scale_factor, dtype=float)
+        self.signal_offset = leaf_asarray(signal_offset, dtype=float)
 
     @override
     def compute_noise(
@@ -196,7 +195,7 @@ class GaussianWhiteNoiseModel(AbstractGaussianNoiseModel, strict=True):
         )
         # Compute the zero mean variance and scale up to be independent of the number of
         # pixels
-        std = jnp.sqrt(n_pixels * error_if_not_positive(self.variance))
+        std = jnp.sqrt(n_pixels * error_if_not_positive(jnp.asarray(self.variance)))
         model = eqx.tree_at(
             lambda x: (x.image_transform, x.normalizes_signal),
             self.image_model,
@@ -243,7 +242,7 @@ class GaussianWhiteNoiseModel(AbstractGaussianNoiseModel, strict=True):
         - `filter`:
             A filter to apply to the final image.
         """
-        variance = self.variance
+        variance = jnp.asarray(self.variance)
         # Create simulated data
         simulated = self.compute_signal(outputs_real_space=True, mask=mask, filter=filter)
         # Compute residuals
@@ -270,8 +269,8 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
 
     image_model: AbstractImageModel
     variance_fn: AbstractFourierOperator
-    signal_scale_factor: Float[Array, ""]
-    signal_offset: Float[Array, ""]
+    signal_scale_factor: Float[NDArrayLike, "..."]
+    signal_offset: Float[NDArrayLike, "..."]
 
     def __init__(
         self,
@@ -294,8 +293,8 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
         """  # noqa: E501
         self.image_model = image_model
         self.variance_fn = variance_fn or FourierConstant(1.0)
-        self.signal_scale_factor = jnp.asarray(signal_scale_factor, dtype=float)
-        self.signal_offset = jnp.asarray(signal_offset, dtype=float)
+        self.signal_scale_factor = leaf_asarray(signal_scale_factor, dtype=float)
+        self.signal_offset = leaf_asarray(signal_offset, dtype=float)
 
     def compute_noise(
         self,
@@ -390,15 +389,12 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
         log_likelihood_per_mode = (
             squared_standard_normal_per_mode + jnp.log(2 * jnp.pi * variance) / 2
         )
-        # Compute log-likelihood, throwing away the zero mode. Need to take care
-        # to compute the loss function in fourier space for a real-valued function.
-        log_likelihood = (
-            -1.0
-            * (
-                jnp.sum(log_likelihood_per_mode[1:, 0])
-                + 2 * jnp.sum(log_likelihood_per_mode[:, 1:])
-            )
-            / n_pixels
-        )
+        # Sum over fourier modes, throwing away the zero (mean) mode. Since the
+        # observed data is real-valued, each rfft mode is weighted by its
+        # Hermitian multiplicity (interior columns count twice; the zero and
+        # even-width Nyquist columns count once).
+        multiplicity = make_rfftn_multiplicity(self.image_model.image_config.shape)
+        log_likelihood_per_mode = log_likelihood_per_mode.at[0, 0].set(0.0)
+        log_likelihood = -jnp.sum(multiplicity * log_likelihood_per_mode) / n_pixels
 
         return log_likelihood

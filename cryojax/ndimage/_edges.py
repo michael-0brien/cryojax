@@ -15,10 +15,9 @@ def crop_to_shape(
     image_or_volume: (
         Inexact[NDArrayLike, "y_dim x_dim"] | Inexact[NDArrayLike, "z_dim y_dim x_dim"]
     ),
-    shape: tuple[int, int] | tuple[int, int, int],
+    shape: tuple[int, ...],
     center: (
-        tuple[int, int]
-        | tuple[int, int, int]
+        tuple[int, ...]
         | tuple[Int[NDArrayLike, ""], Int[NDArrayLike, ""]]
         | tuple[Int[NDArrayLike, ""], Int[NDArrayLike, ""], Int[NDArrayLike, ""]]
         | None
@@ -98,7 +97,7 @@ def pad_to_shape(
     image_or_volume: (
         Inexact[NDArrayLike, "y_dim x_dim"] | Inexact[NDArrayLike, "z_dim y_dim x_dim"]
     ),
-    shape: tuple[int, int] | tuple[int, int, int],
+    shape: tuple[int, ...],
     **kwargs: Any,
 ) -> (
     Inexact[Array, " {shape[0]} {shape[1]}"]
@@ -135,7 +134,7 @@ def pad_to_shape(
 
 
 def resize_with_crop_or_pad(
-    image: Inexact[NDArrayLike, "y_dim x_dim"], shape: tuple[int, int], **kwargs
+    image: Inexact[NDArrayLike, "y_dim x_dim"], shape: tuple[int, ...], **kwargs
 ) -> Inexact[Array, " {shape[0]} {shape[1]}"]:
     """Resize an image to a new shape using padding and cropping."""
     if image.ndim != 2 or len(shape) != 2:

@@ -4,8 +4,8 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
-from ..._internal import error_if_negative
-from ...jax_util import FloatLike
+from ..._internal import error_if_negative, leaf_asarray
+from ...jax_util import FloatLike, NDArrayLike
 from .common_functions import (
     compute_phase_shift_from_amplitude_contrast_ratio,
     compute_phase_shifts_with_spherical_aberration,
@@ -99,10 +99,10 @@ class AstigmaticCTF(AbstractCTF, strict=True):
         ```
     """
 
-    defocus_in_angstroms: Float[Array, ""]
-    astigmatism_in_angstroms: Float[Array, ""]
-    astigmatism_angle: Float[Array, ""]
-    spherical_aberration_in_mm: Float[Array, ""]
+    defocus_in_angstroms: Float[NDArrayLike, "..."]
+    astigmatism_in_angstroms: Float[NDArrayLike, "..."]
+    astigmatism_angle: Float[NDArrayLike, "..."]
+    spherical_aberration_in_mm: Float[NDArrayLike, "..."]
 
     def __init__(
         self,
@@ -118,10 +118,12 @@ class AstigmaticCTF(AbstractCTF, strict=True):
         - `astigmatism_angle`: The defocus angle.
         - `spherical_aberration_in_mm`: The spherical aberration coefficient in mm.
         """
-        self.defocus_in_angstroms = jnp.asarray(defocus_in_angstroms, dtype=float)
-        self.astigmatism_in_angstroms = jnp.asarray(astigmatism_in_angstroms, dtype=float)
-        self.astigmatism_angle = jnp.asarray(astigmatism_angle, dtype=float)
-        self.spherical_aberration_in_mm = jnp.asarray(
+        self.defocus_in_angstroms = leaf_asarray(defocus_in_angstroms, dtype=float)
+        self.astigmatism_in_angstroms = leaf_asarray(
+            astigmatism_in_angstroms, dtype=float
+        )
+        self.astigmatism_angle = leaf_asarray(astigmatism_angle, dtype=float)
+        self.spherical_aberration_in_mm = leaf_asarray(
             spherical_aberration_in_mm, dtype=float
         )
 
@@ -148,20 +150,22 @@ class AstigmaticCTF(AbstractCTF, strict=True):
         - `defocus_offset`:
             An optional defocus offset to apply to the `defocus_in_angstroms` at runtime.
         """
-        astigmatism_angle = jnp.deg2rad(self.astigmatism_angle)
+        defocus_in_angstroms = jnp.asarray(self.defocus_in_angstroms)
+        astigmatism_in_angstroms = jnp.asarray(self.astigmatism_in_angstroms)
+        astigmatism_angle = jnp.deg2rad(jnp.asarray(self.astigmatism_angle))
         # Convert spherical abberation coefficient to angstroms
         spherical_aberration_in_angstroms = (
-            error_if_negative(self.spherical_aberration_in_mm) * 1e7
+            error_if_negative(jnp.asarray(self.spherical_aberration_in_mm)) * 1e7
         )
         # Compute phase shifts for CTF
         phase_shifts = compute_phase_shifts_with_spherical_aberration(
             frequency_grid_in_angstroms,
             (
-                self.defocus_in_angstroms
+                defocus_in_angstroms
                 if defocus_offset is None
-                else self.defocus_in_angstroms + jnp.asarray(defocus_offset, dtype=float)
+                else defocus_in_angstroms + jnp.asarray(defocus_offset, dtype=float)
             ),
-            self.astigmatism_in_angstroms,
+            astigmatism_in_angstroms,
             astigmatism_angle,
             jnp.asarray(wavelength_in_angstroms, dtype=float),
             spherical_aberration_in_angstroms,

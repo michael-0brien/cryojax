@@ -179,13 +179,6 @@ This documentation is a collection of functions used to work with coordinate sys
                 - get
                 - __call__
 
-::: cryojax.ndimage.SincCorrectionMask
-        options:
-            members:
-                - __init__
-                - get
-                - __call__
-
 
 **Other real-space operations**
 
@@ -246,23 +239,6 @@ This documentation is a collection of functions used to work with coordinate sys
 
 ---
 
-::: cryojax.ndimage.FourierExp2D
-        options:
-            members:
-                - __init__
-                - __call__
-
----
-
-::: cryojax.ndimage.FourierDC
-        options:
-            members:
-                - __init__
-                - __call__
-
-
----
-
 ::: cryojax.ndimage.CustomFourierOperator
         options:
             members:
@@ -295,12 +271,30 @@ This documentation is a collection of functions used to work with coordinate sys
 ---
 
 
-## Utility functions
+## Downsampling
+
+::: cryojax.ndimage.block_reduce_downsample
+
+::: cryojax.ndimage.fourier_crop_downsample
 
 ### Interpolation
 
 ::: cryojax.ndimage.map_coordinates
 
-::: cryojax.ndimage.map_coordinates_spline
+::: cryojax.ndimage.map_frequencies
 
-::: cryojax.ndimage.compute_spline_coefficients
+### Spreading
+
+::: cryojax.ndimage.spread_gaussians_2d
+
+::: cryojax.ndimage.spread_gaussians_3d
+
+::: cryojax.ndimage.variance_to_nspread
+
+### Fourier projection-slice extraction
+
+::: cryojax.ndimage.prepare_sampling_fft
+
+::: cryojax.ndimage.sample_fft_slice
+
+::: cryojax.ndimage.ewald_sphere_from_slice

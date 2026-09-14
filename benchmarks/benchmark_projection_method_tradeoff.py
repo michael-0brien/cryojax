@@ -41,9 +41,8 @@ def setup_volumes_and_configs(n_iterations, n_atoms, box_size, pixel_size=2.0):
     )
 
     # Fourier slice volume (pre-computed grid)
-    real_voxel_grid = volume_gmm.to_real_voxel_grid(
-        shape=(box_size, box_size, box_size), voxel_size=pixel_size
-    )
+    render_fn = cxs.GaussianMixtureRenderFn((box_size, box_size, box_size), pixel_size)
+    real_voxel_grid = render_fn(volume_gmm)
 
     times = []
     for _ in range(n_iterations + 1):
@@ -60,9 +59,9 @@ def setup_volumes_and_configs(n_iterations, n_atoms, box_size, pixel_size=2.0):
     )
 
     # Atom volume for direct projection
-    atom_volume = cxs.IndependentAtomVolume(
+    atom_volume = cxs.GaussianFourierVolume(
         positions=atom_positions,
-        scattering_factors=im.FourierGaussian(amplitude=1.0, b_factor=10.0),
+        kernel_fns=im.FourierGaussian(amplitude=1.0, b_factor=10.0),
     )
 
     # Image config
@@ -176,7 +175,7 @@ def benchmark_projection_methods(
 
                 # Benchmark Atom Projection (FFT)
                 times = []
-                integrator = cxs.FFTAtomProjection(eps=1e-16)
+                integrator = cxs.GaussianFourierProjection(eps=1e-16)
                 for _ in range(n_iterations + 1):
                     start_time = time()
                     images = simulate_image_batch(
