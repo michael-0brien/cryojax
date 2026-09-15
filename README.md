@@ -21,7 +21,7 @@ uv venv --python=3.11 ~/path/to/venv/
 source ~/path/to/venv/bin/activate
 ```
 
-Note that `python>=3.10` is required. After creating and activating the new environment, [install JAX](https://github.com/google/jax#installation) with either CPU or GPU support. Then, install `cryojax`. For the latest stable release, install using `pip`.
+Note that `python>=3.11` is required. After creating and activating the new environment, [install JAX](https://github.com/google/jax#installation) with either CPU or GPU support. Then, install `cryojax`. For the latest stable release, install using `pip`.
 
 ```bash
 uv pip install cryojax
