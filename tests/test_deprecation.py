@@ -71,6 +71,7 @@ def test_deprecated():
         "normalize_image",
         "operators",
         "transforms",
+        "cartesian_to_polar",
     ]
     for name in REMOVED_FROM_NDIMAGE:
         with pytest.raises(AttributeError):
