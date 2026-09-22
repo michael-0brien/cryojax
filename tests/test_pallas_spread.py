@@ -410,3 +410,292 @@ def test_pallas_requires_gpu_error_message_not_triggered_on_gpu(points_2d):
     spread_gaussians_2d(
         x, y, amplitude, variance, shape, pixel_size=pixel_size, enable_pallas=True
     )
+
+
+# ── Forward-mode: explicit JVP rules on the pallas wrappers ─────────────────
+#
+# JAX cannot differentiate the kernels themselves: the scatter aliases a zeros
+# input into its output (refused by `_pallas_call_jvp_rule`), and the generic
+# rule crashes on any kernel whose block index maps read `program_id`. Both
+# wrappers therefore carry a `jax.custom_jvp` with a hand-written tangent, and
+# the pure-JAX backend -- fully differentiable -- is the reference.
+
+
+def _index_points_2d(key, m, ny, nx):
+    i = jax.random.uniform(key, (m,), minval=-2.0, maxval=nx + 2.0)
+    j = jax.random.uniform(jax.random.fold_in(key, 1), (m,), minval=-2.0, maxval=ny + 2.0)
+    amplitude = jax.random.normal(jax.random.fold_in(key, 2), (m,)) * 2 + 3
+    variance = jnp.abs(jax.random.normal(jax.random.fold_in(key, 3), (m,))) * 0.3 + 0.4
+    return i, j, amplitude, variance
+
+
+def _random_tangents(key, primals):
+    return tuple(
+        jax.random.normal(jax.random.fold_in(key, k), jnp.shape(p))
+        for k, p in enumerate(primals)
+    )
+
+
+@requires_gpu
+@pytest.mark.parametrize("use_erf", [False, True])
+@pytest.mark.parametrize("scalar_variance", [False, True])
+def test_pallas_fwd_2d_jvp_matches_pure_jax(use_erf, scalar_variance):
+    from cryojax.ndimage._spreading.pallas_spread import pallas_spread_fwd_2d
+    from cryojax.ndimage._spreading.spread import spread_2d_impl
+
+    ny, nx, n_spread = 48, 40, 7
+    i, j, amplitude, variance = _index_points_2d(jax.random.PRNGKey(3), 150, ny, nx)
+    if scalar_variance:
+        variance = variance[0]
+    pixel_size = jnp.asarray(1.3)
+    primals = (i, j, amplitude, variance, pixel_size)
+    tangents = _random_tangents(jax.random.PRNGKey(4), primals)
+
+    ref = lambda i, j, a, v, p: spread_2d_impl(
+        i, j, a, v, ny, nx, pixel_size=p, n_spread=n_spread, use_erf=use_erf
+    )
+    pallas = lambda i, j, a, v, p: pallas_spread_fwd_2d(
+        i, j, a, v, p, ny, nx, n_spread, use_erf
+    )
+    out_ref, tan_ref = jax.jvp(ref, primals, tangents)
+    out_pallas, tan_pallas = jax.jvp(pallas, primals, tangents)
+    assert jnp.allclose(out_pallas, out_ref, atol=1e-4, rtol=1e-4)
+    assert not jnp.any(jnp.isnan(tan_pallas))
+    assert jnp.allclose(tan_pallas, tan_ref, atol=1e-4, rtol=1e-4)
+
+
+@requires_gpu
+@pytest.mark.parametrize("use_erf", [False, True])
+@pytest.mark.parametrize("scalar_variance", [False, True])
+def test_pallas_2d_hvp_matches_pure_jax(points_2d, use_erf, scalar_variance):
+    """Forward-over-reverse through the public API: what a Hessian-vector product
+    in an optimizer actually asks for."""
+    x, y, amplitude, variance, pixel_size, shape = points_2d
+    if scalar_variance:
+        variance = variance[0]
+    n_spread = 7
+    target = jax.random.normal(jax.random.PRNGKey(5), shape)
+
+    def make_loss(key):
+        def loss(x, y, amp, var, pix):
+            image = _JIT_SPREAD_2D[key](x, y, amp, var, pix, shape, n_spread, use_erf)
+            return jnp.sum((image - target) ** 2)
+
+        return loss
+
+    primals = (x, y, amplitude, variance, pixel_size)
+    tangents = _random_tangents(jax.random.PRNGKey(6), primals)
+    grad_ref, hvp_ref = jax.jvp(
+        jax.grad(make_loss("pure_jax"), argnums=(0, 1, 2, 3, 4)), primals, tangents
+    )
+    grad_pallas, hvp_pallas = jax.jvp(
+        jax.grad(make_loss("full"), argnums=(0, 1, 2, 3, 4)), primals, tangents
+    )
+    for ref, pallas in zip(grad_ref, grad_pallas):
+        assert jnp.allclose(pallas, ref, atol=1e-4, rtol=1e-4)
+    for ref, pallas in zip(hvp_ref, hvp_pallas):
+        assert not jnp.any(jnp.isnan(pallas))
+        assert jnp.allclose(pallas, ref, atol=1e-3, rtol=1e-3)
+
+
+@requires_gpu
+@pytest.mark.parametrize("use_erf", [False, True])
+@pytest.mark.parametrize("scalar_variance", [False, True])
+def test_pallas_bwd_2d_jvp_matches_pure_jax(use_erf, scalar_variance):
+    """Tangents on both the residuals and the cotangent, so the linear-in-`g` half
+    and the second-derivative half of the rule are exercised together."""
+    from cryojax.ndimage._spreading.pallas_spread import pallas_interp_bwd_2d
+    from cryojax.ndimage._spreading.spread import spread_2d_bwd
+
+    ny, nx, n_spread = 48, 40, 7
+    i, j, amplitude, variance = _index_points_2d(jax.random.PRNGKey(8), 150, ny, nx)
+    if scalar_variance:
+        variance = variance[0]
+    pixel_size = jnp.asarray(1.3)
+    res = (i, j, amplitude, variance, pixel_size)
+    g = jax.random.normal(jax.random.PRNGKey(9), (ny, nx))
+    tangents = (_random_tangents(jax.random.PRNGKey(10), res), jnp.ones_like(g) * 0.3)
+
+    ref = lambda res, g: spread_2d_bwd(ny, nx, n_spread, use_erf, res, g)
+    pallas = lambda res, g: pallas_interp_bwd_2d(ny, nx, n_spread, use_erf, res, g)
+    out_ref, tan_ref = jax.jvp(ref, (res, g), tangents)
+    out_pallas, tan_pallas = jax.jvp(pallas, (res, g), tangents)
+    for r, p in zip(out_ref, out_pallas):
+        assert jnp.allclose(p, r, atol=1e-4, rtol=1e-4)
+    for r, p in zip(tan_ref, tan_pallas):
+        assert not jnp.any(jnp.isnan(p))
+        assert jnp.allclose(p, r, atol=1e-4, rtol=1e-4)
+
+
+@requires_gpu
+@pytest.mark.parametrize("use_erf", [False, True])
+def test_pallas_2d_jvp_specialized_on_symbolic_zeros(use_erf):
+    """The two live patterns an optimizer's shared-parameter HVP produces: a scatter
+    tangent only in `pixel_size`, and a gather tangent only in the cotangent `g`."""
+    from cryojax.ndimage._spreading.pallas_spread import (
+        pallas_interp_bwd_2d,
+        pallas_spread_fwd_2d,
+    )
+    from cryojax.ndimage._spreading.spread import spread_2d_bwd, spread_2d_impl
+
+    ny, nx, n_spread = 48, 40, 7
+    i, j, amplitude, variance = _index_points_2d(jax.random.PRNGKey(11), 150, ny, nx)
+    pixel_size = jnp.asarray(1.3)
+    tpix = jnp.asarray(0.7)
+
+    ref = lambda p: spread_2d_impl(
+        i,
+        j,
+        amplitude,
+        variance,
+        ny,
+        nx,
+        pixel_size=p,
+        n_spread=n_spread,
+        use_erf=use_erf,
+    )
+    pallas = lambda p: pallas_spread_fwd_2d(
+        i, j, amplitude, variance, p, ny, nx, n_spread, use_erf
+    )
+    _, tan_ref = jax.jvp(ref, (pixel_size,), (tpix,))
+    _, tan_pallas = jax.jvp(pallas, (pixel_size,), (tpix,))
+    assert jnp.allclose(tan_pallas, tan_ref, atol=1e-4, rtol=1e-4)
+
+    res = (i, j, amplitude, variance, pixel_size)
+    g = jax.random.normal(jax.random.PRNGKey(12), (ny, nx))
+    tg = jax.random.normal(jax.random.PRNGKey(13), (ny, nx))
+    ref_g = lambda g: spread_2d_bwd(ny, nx, n_spread, use_erf, res, g)
+    pallas_g = lambda g: pallas_interp_bwd_2d(ny, nx, n_spread, use_erf, res, g)
+    _, tan_ref = jax.jvp(ref_g, (g,), (tg,))
+    _, tan_pallas = jax.jvp(pallas_g, (g,), (tg,))
+    for r, p in zip(tan_ref, tan_pallas):
+        assert jnp.allclose(p, r, atol=1e-4, rtol=1e-4)
+
+
+@requires_gpu
+@pytest.mark.parametrize("use_erf", [False, True])
+def test_pallas_2d_hvp_float32(points_2d, use_erf):
+    """Production runs the kernels in float32; the file's history has a dtype-lowering
+    bug, so the rules get their own float32 run."""
+    x, y, amplitude, variance, pixel_size, shape = points_2d
+    f32 = lambda a: jnp.asarray(a, dtype=jnp.float32)
+    primals = tuple(map(f32, (x, y, amplitude, variance, pixel_size)))
+    n_spread = 7
+    target = f32(jax.random.normal(jax.random.PRNGKey(14), shape))
+
+    def make_loss(key):
+        def loss(x, y, amp, var, pix):
+            image = _JIT_SPREAD_2D[key](x, y, amp, var, pix, shape, n_spread, use_erf)
+            return jnp.sum((image - target) ** 2)
+
+        return loss
+
+    tangents = tuple(map(f32, _random_tangents(jax.random.PRNGKey(15), primals)))
+    _, hvp_ref = jax.jvp(
+        jax.grad(make_loss("pure_jax"), argnums=(0, 1, 2, 3, 4)), primals, tangents
+    )
+    _, hvp_pallas = jax.jvp(
+        jax.grad(make_loss("full"), argnums=(0, 1, 2, 3, 4)), primals, tangents
+    )
+    for ref, pallas in zip(hvp_ref, hvp_pallas):
+        assert pallas.dtype == jnp.float32
+        assert not jnp.any(jnp.isnan(pallas))
+        assert jnp.allclose(pallas, ref, atol=1e-2, rtol=1e-2)
+
+
+def _index_points_3d(key, m, nz, ny, nx):
+    i = jax.random.uniform(key, (m,), minval=-2.0, maxval=nx + 2.0)
+    j = jax.random.uniform(jax.random.fold_in(key, 1), (m,), minval=-2.0, maxval=ny + 2.0)
+    k = jax.random.uniform(jax.random.fold_in(key, 2), (m,), minval=-2.0, maxval=nz + 2.0)
+    amplitude = jax.random.normal(jax.random.fold_in(key, 3), (m,)) * 2 + 3
+    variance = jnp.abs(jax.random.normal(jax.random.fold_in(key, 4), (m,))) * 0.3 + 0.4
+    return i, j, k, amplitude, variance
+
+
+@requires_gpu
+@pytest.mark.parametrize("use_erf", [False, True])
+@pytest.mark.parametrize("scalar_variance", [False, True])
+def test_pallas_fwd_3d_jvp_matches_pure_jax(use_erf, scalar_variance):
+    from cryojax.ndimage._spreading.pallas_spread import pallas_spread_fwd_3d
+    from cryojax.ndimage._spreading.spread import spread_3d_impl
+
+    nz, ny, nx, n_spread = 20, 24, 28, 5
+    i, j, k, amplitude, variance = _index_points_3d(
+        jax.random.PRNGKey(16), 150, nz, ny, nx
+    )
+    if scalar_variance:
+        variance = variance[0]
+    voxel_size = jnp.asarray(1.1)
+    primals = (i, j, k, amplitude, variance, voxel_size)
+    tangents = _random_tangents(jax.random.PRNGKey(17), primals)
+
+    ref = lambda i, j, k, a, v, p: spread_3d_impl(
+        i, j, k, a, v, nz, ny, nx, voxel_size=p, n_spread=n_spread, use_erf=use_erf
+    )
+    pallas = lambda i, j, k, a, v, p: pallas_spread_fwd_3d(
+        i, j, k, a, v, p, nz, ny, nx, n_spread, use_erf
+    )
+    out_ref, tan_ref = jax.jvp(ref, primals, tangents)
+    out_pallas, tan_pallas = jax.jvp(pallas, primals, tangents)
+    assert jnp.allclose(out_pallas, out_ref, atol=1e-4, rtol=1e-4)
+    assert not jnp.any(jnp.isnan(tan_pallas))
+    assert jnp.allclose(tan_pallas, tan_ref, atol=1e-4, rtol=1e-4)
+
+
+@requires_gpu
+@pytest.mark.parametrize("use_erf", [False, True])
+@pytest.mark.parametrize("scalar_variance", [False, True])
+def test_pallas_bwd_3d_jvp_matches_pure_jax(use_erf, scalar_variance):
+    from cryojax.ndimage._spreading.pallas_spread import pallas_interp_bwd_3d
+    from cryojax.ndimage._spreading.spread import spread_3d_bwd
+
+    nz, ny, nx, n_spread = 20, 24, 28, 5
+    i, j, k, amplitude, variance = _index_points_3d(
+        jax.random.PRNGKey(18), 150, nz, ny, nx
+    )
+    if scalar_variance:
+        variance = variance[0]
+    voxel_size = jnp.asarray(1.1)
+    res = (i, j, k, amplitude, variance, voxel_size)
+    g = jax.random.normal(jax.random.PRNGKey(19), (nz, ny, nx))
+    tangents = (_random_tangents(jax.random.PRNGKey(20), res), jnp.ones_like(g) * 0.3)
+
+    ref = lambda res, g: spread_3d_bwd(nz, ny, nx, n_spread, use_erf, res, g)
+    pallas = lambda res, g: pallas_interp_bwd_3d(nz, ny, nx, n_spread, use_erf, res, g)
+    out_ref, tan_ref = jax.jvp(ref, (res, g), tangents)
+    out_pallas, tan_pallas = jax.jvp(pallas, (res, g), tangents)
+    for r, p in zip(out_ref, out_pallas):
+        assert jnp.allclose(p, r, atol=1e-4, rtol=1e-4)
+    for r, p in zip(tan_ref, tan_pallas):
+        assert not jnp.any(jnp.isnan(p))
+        assert jnp.allclose(p, r, atol=1e-4, rtol=1e-4)
+
+
+@requires_gpu
+@pytest.mark.parametrize("use_erf", [False, True])
+def test_pallas_3d_hvp_matches_pure_jax(points_3d, use_erf):
+    x, y, z, amplitude, variance, voxel_size, shape = points_3d
+    n_spread = 5
+    target = jax.random.normal(jax.random.PRNGKey(21), shape)
+
+    def make_loss(key):
+        def loss(x, y, z, amp, var, pix):
+            volume = _JIT_SPREAD_3D[key](x, y, z, amp, var, pix, shape, n_spread, use_erf)
+            return jnp.sum((volume - target) ** 2)
+
+        return loss
+
+    primals = (x, y, z, amplitude, variance, voxel_size)
+    tangents = _random_tangents(jax.random.PRNGKey(22), primals)
+    argnums = (0, 1, 2, 3, 4, 5)
+    grad_ref, hvp_ref = jax.jvp(
+        jax.grad(make_loss("pure_jax"), argnums=argnums), primals, tangents
+    )
+    grad_pallas, hvp_pallas = jax.jvp(
+        jax.grad(make_loss("full"), argnums=argnums), primals, tangents
+    )
+    for ref, pallas in zip(grad_ref, grad_pallas):
+        assert jnp.allclose(pallas, ref, atol=1e-4, rtol=1e-4)
+    for ref, pallas in zip(hvp_ref, hvp_pallas):
+        assert not jnp.any(jnp.isnan(pallas))
+        assert jnp.allclose(pallas, ref, atol=1e-3, rtol=1e-3)
