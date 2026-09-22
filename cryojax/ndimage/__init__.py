@@ -1,7 +1,6 @@
 from typing import Any as _Any
 
 from ._coordinates import (
-    cartesian_to_polar as cartesian_to_polar,
     make_1d_coordinate_grid as make_1d_coordinate_grid,
     make_1d_frequency_grid as make_1d_frequency_grid,
     make_coordinate_grid as make_coordinate_grid,
@@ -107,14 +106,20 @@ _RENAMED = {
 }
 _REMOVED = {
     "map_coordinates_spline": (
+        "0.6.0",
         "Use `map_coordinates(..., order=3)`, which interpolates the array "
-        "directly rather than precomputed spline coefficients."
+        "directly rather than precomputed spline coefficients.",
     ),
     "compute_spline_coefficients": (
+        "0.6.0",
         "Prefiltering for cubic interpolation was removed. For fourier slice "
         "extraction, use `prepare_sampling_fft(..., interp='cubic')`, which "
         "deconvolves the cubic kernel's `sinc^4` transfer function instead of "
-        "solving for spline coefficients."
+        "solving for spline coefficients.",
+    ),
+    "cartesian_to_polar": (
+        "0.6.1",
+        "Compute polar coordinates directly from the grid.",
     ),
 }
 _FLATTENED_SUBMODULES = {"operators", "transforms"}
@@ -126,7 +131,8 @@ def __getattr__(name: str) -> _Any:
             f"'{name}' was removed in cryoJAX 0.6.0. Use '{_RENAMED[name]}' instead."
         )
     if name in _REMOVED:
-        raise AttributeError(f"'{name}' was removed in cryoJAX 0.6.0. {_REMOVED[name]}")
+        version, message = _REMOVED[name]
+        raise AttributeError(f"'{name}' was removed in cryoJAX {version}. {message}")
     if name in _FLATTENED_SUBMODULES:
         raise AttributeError(
             f"Submodule `cryojax.ndimage.{name}` was removed in cryoJAX 0.6.0. "

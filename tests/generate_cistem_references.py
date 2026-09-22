@@ -22,7 +22,7 @@ import cryojax.simulator as cxs
 import numpy as np
 from cryojax.constants import PengScatteringFactorParameters
 from cryojax.io import read_atoms_from_pdb, write_volume_to_mrc
-from cryojax.ndimage import cartesian_to_polar, make_frequency_grid
+from cryojax.ndimage import make_frequency_grid
 from cryojax.ndimage._interpolation import deconvolve_interpolation_kernel
 
 
@@ -80,7 +80,8 @@ def generate_ctf_reference():
     reference = []
     for defocus1, defocus2, astig_angle, kV, cs, ac, pixel_size in CTF_PARAMETERS:
         frequency_grid = make_frequency_grid((CTF_GRID_SIZE, CTF_GRID_SIZE), pixel_size)
-        k_sqr, theta = cartesian_to_polar(frequency_grid, square=True)
+        k_sqr = np.sum(np.asarray(frequency_grid) ** 2, axis=-1)
+        theta = np.arctan2(frequency_grid[..., 0], frequency_grid[..., 1])
         cistem_ctf = CistemCTF(
             kV=kV,
             cs=cs,
