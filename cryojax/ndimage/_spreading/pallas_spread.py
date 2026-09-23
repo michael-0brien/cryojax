@@ -52,6 +52,7 @@ import jax
 import jax.experimental.pallas as pl
 import jax.experimental.pallas.triton as pltriton
 import jax.numpy as jnp
+from jax.custom_batching import custom_vmap
 from jax.custom_derivatives import SymbolicZero
 from jaxtyping import Array
 
@@ -595,15 +596,21 @@ def resolve_enable_pallas(
 # generic rule cannot trace a kernel whose block index maps read `program_id`. Each
 # wrapper therefore carries a `jax.custom_jvp` whose tangent is a kernel of its own.
 #
-# Two things keep the rules cheap. They are FUSED: one launch writes the primal and
-# the tangent, evaluating each separable weight (and its derivatives) once per
-# neighbour instead of once per output. And they are SPECIALIZED on which tangents
-# are symbolically zero (`symbolic_zeros=True`): a Hessian-vector product in an
-# optimizer's shared-parameter direction is zero on almost every input, and a term
-# multiplied by a zero loaded from memory still costs its weight evaluation, so the
-# dead terms are dropped at trace time. The live pattern is a static key of the
-# cached kernel factory. An operand whose tangent is dead is never read in the kernel,
-# so the primal is passed in its slot rather than allocating a zeros array.
+# A rule returns the primal kernel and a TANGENT-ONLY kernel as two separate calls,
+# never one fused kernel producing both. That is what makes the rules linearizable:
+# `jax.linearize` keeps the primal (known) and records the tangent kernel as the
+# linear map, so an optimizer that already holds the gradient at a point can apply
+# the tangent map there -- Hessian-vector products -- without recomputing the primal
+# scatter or gather.
+#
+# The tangent kernels take any number of DIRECTIONS at one primal point: a `jax.vmap`
+# over tangents (a batch of Hessian-vector products, `jax.jacfwd`) is routed by
+# `custom_vmap` to one launch that evaluates the weights and their derivatives once
+# per neighbour and accumulates every direction, instead of one program per direction.
+# They are also SPECIALIZED on which tangents are symbolic zeros
+# (`symbolic_zeros=True`): a term multiplied by a zero loaded from memory still costs
+# its weight evaluation, so zero terms are dropped at trace time, the nonzero pattern
+# being a static key of the cached kernel factory.
 
 
 def _is_zero(tangent) -> bool:
@@ -634,29 +641,33 @@ def _tprod3(a, b, c, ta, tb, tc):
     return _add(_mul(ta, b * c), _mul(tb, a * c), _mul(tc, a * b))
 
 
-def _jvp_live(fn, args, tangents):
+def _jvp_over_nonzero(fn, args, tangents):
     """`jax.jvp(fn, args, tangents)` over only the arguments whose tangent is not
-    `None`; the rest are closed over as constants, so no dead term is traced."""
-    live = [k for k, t in enumerate(tangents) if t is not None]
+    `None`; the rest are closed over as constants, so no zero term is traced."""
+    nonzero = [k for k, t in enumerate(tangents) if t is not None]
 
-    def fn_live(*live_vals):
+    def fn_nonzero(*nonzero_vals):
         full = list(args)
-        for k, v in zip(live, live_vals):
+        for k, v in zip(nonzero, nonzero_vals):
             full[k] = v
         return fn(*full)
 
     return jax.jvp(
-        fn_live, tuple(args[k] for k in live), tuple(tangents[k] for k in live)
+        fn_nonzero, tuple(args[k] for k in nonzero), tuple(tangents[k] for k in nonzero)
     )
 
 
-def _like_operand(tangent, operand, dtype):
-    """A live tangent laid out like the kernel operand it pairs with: flattened if the
-    operand is, broadcast if the operand is (a scalar broadcast per point)."""
-    tangent = jnp.asarray(tangent, dtype=dtype)
-    if tangent.ndim > operand.ndim:
-        tangent = tangent.reshape(-1)
-    return jnp.broadcast_to(tangent, operand.shape)
+def _like_operands(tangents, operand, dtype):
+    """A stack of directions laid out like the kernel operand it pairs with: `tangents`
+    has a leading direction axis and the result is `(n_directions, *operand.shape)`,
+    flattened if the operand is, broadcast if the operand is."""
+    tangents = jnp.asarray(tangents, dtype=dtype)
+    n_directions = tangents.shape[0]
+    if tangents.ndim - 1 > operand.ndim:
+        tangents = tangents.reshape(n_directions, -1)
+    lead = (1,) * (operand.ndim - (tangents.ndim - 1))
+    tangents = tangents.reshape(n_directions, *lead, *tangents.shape[1:])
+    return jnp.broadcast_to(tangents, (n_directions, *operand.shape))
 
 
 def _weight_tangent(dw_dz, dw_dvar, dw_dpix, tcoord, tvar, tpix):
@@ -669,70 +680,164 @@ def _weight_tangent(dw_dz, dw_dvar, dw_dpix, tcoord, tvar, tpix):
     )
 
 
+#: Directions one tangent launch handles; a larger batch of directions is chunked across
+#: launches, never refused. The direction loop is unrolled inside the neighbour loop --
+#: each direction adds a per-point tangent block and, in the gather, its own accumulators
+#: of `block_size` lanes -- so this is a register budget, not a capability. Measured on
+#: an RTX PRO 5000 (float64, 100k points, 192^2, n_spread 7): the cost per added
+#: direction is flat from 2 to 12 directions and rises ~1.8x at 16, so 12 sits below
+#: the knee with float32 having more headroom.
+_MAX_JVP_DIRECTIONS = 12
+
+
+def _read_directions(refs, nonzero, names, n_directions):
+    """Per-direction dicts `{name: value | None}` of the nonzero tangents, read once
+    from their refs: a per-point ref is `(n_directions, block)`, a scalar ref
+    `(n_directions,)`."""
+    nonzero_names = [name for name, is_nonzero in zip(names, nonzero) if is_nonzero]
+    directions = [dict.fromkeys(names) for _ in range(n_directions)]
+    for name, ref in zip(nonzero_names, refs):
+        for d in range(n_directions):
+            directions[d][name] = ref[d]
+    return directions
+
+
+def _direction_specs(
+    nonzero, names, block_size, n_directions, scalar_names, image_names, n_pixels
+):
+    """One `BlockSpec` per nonzero tangent, matching `_read_directions`' layout."""
+    specs = []
+    for name, is_nonzero in zip(names, nonzero):
+        if not is_nonzero:
+            continue
+        if name in scalar_names:
+            specs.append(pl.BlockSpec((n_directions,), lambda p: (0,)))
+        elif name in image_names:
+            specs.append(pl.BlockSpec((n_directions * n_pixels,), lambda p: (0,)))
+        else:
+            specs.append(pl.BlockSpec((n_directions, block_size), lambda p: (0, p)))
+    return specs
+
+
+def _tangent_operands(nonzero_tangents, nonzero_operands, nonzero_names, dtype):
+    """Kernel operands for a stack of directions: scalars `(n_directions,)`, images
+    flattened, everything else `(n_directions, *operand.shape)`."""
+    n_directions = nonzero_tangents[0].shape[0]
+    operands = []
+    for t, operand, name in zip(nonzero_tangents, nonzero_operands, nonzero_names):
+        if name == "pix":
+            operands.append(jnp.asarray(t, dtype=dtype).reshape(n_directions))
+        elif name == "g":
+            operands.append(_like_operands(t, operand, dtype).reshape(-1))
+        else:
+            operands.append(_like_operands(t, operand, dtype))
+    return tuple(operands)
+
+
+def _chunk_directions(impl, n_directions, tangents):
+    """Run `impl` on chunks of at most `_MAX_JVP_DIRECTIONS` directions and
+    concatenate the tangents along the direction axis."""
+    outs = [
+        impl(tuple(x[start : start + _MAX_JVP_DIRECTIONS] for x in tangents))
+        for start in range(0, n_directions, _MAX_JVP_DIRECTIONS)
+    ]
+    if len(outs) == 1:
+        return outs[0]
+    return jax.tree.map(lambda *ts: jnp.concatenate(ts, axis=0), *outs)
+
+
+def _batchable(single, n_primals, impl):
+    """`single` (one direction) as a `custom_vmap` function whose batching rule sends a
+    `jax.vmap` over tangents at ONE primal point to `impl` (all directions in one
+    kernel, chunked by `_MAX_JVP_DIRECTIONS`). A `vmap` that also batches the primals --
+    different point sets -- has nothing to share and takes Pallas's generic batching."""
+    fn = custom_vmap(single)
+
+    @fn.def_vmap
+    def _rule(axis_size, in_batched, *args):
+        primals, tangents = args[:n_primals], args[n_primals:]
+        batched = lambda out: (out, jax.tree.map(lambda _: True, out))
+        if any(in_batched[:n_primals]):
+            in_axes = tuple(0 if b else None for b in in_batched)
+            return batched(jax.vmap(single, in_axes=in_axes)(*args))
+        tangents = tuple(
+            t if b else jnp.broadcast_to(t, (axis_size, *jnp.shape(t)))
+            for t, b in zip(tangents, in_batched[n_primals:])
+        )
+        return batched(
+            _chunk_directions(lambda ts: impl(primals, ts), axis_size, tangents)
+        )
+
+    return fn
+
+
+# ── 2D ──────────────────────────────────────────────────────────────────────
+
+
 @cache
-def _make_spread_jvp_kernel_2d(
+def _make_spread_tangent_kernel_2d(
     ny: int,
     nx: int,
     n_spread: int,
     use_erf: bool,
     block_size: int,
     m_total: int,
-    live: tuple[bool, bool, bool, bool, bool],
+    nonzero: tuple[bool, bool, bool, bool, bool],
+    n_directions: int,
 ):
-    """`_make_spread_kernel_2d` and its tangent in one pass:
-    `d(a wx wy) = da wx wy + a (twx wy + wx twy)`."""
-    live_i, live_j, live_amp, live_var, live_pix = live
-    live_x = live_i or live_var or live_pix
-    live_y = live_j or live_var or live_pix
+    """The tangent of `_make_spread_kernel_2d` in `n_directions` directions:
+    `d(a wx wy) = da wx wy + a (twx wy + wx twy)`, weights evaluated once per
+    neighbour, one atomic add per direction."""
+    nonzero_i, nonzero_j, nonzero_amp, nonzero_var, nonzero_pix = nonzero
+    nonzero_x = nonzero_i or nonzero_var or nonzero_pix
+    nonzero_y = nonzero_j or nonzero_var or nonzero_pix
+    n_nonzero, n_pixels = sum(nonzero), ny * nx
+    names = ("i", "j", "amp", "var", "pix")
 
-    def kernel(
-        i_ref,
-        j_ref,
-        amp_ref,
-        var_ref,
-        pixel_size_ref,
-        ti_ref,
-        tj_ref,
-        tamp_ref,
-        tvar_ref,
-        tpixel_size_ref,
-        zeros_ref,
-        tzeros_ref,
-        out_ref,
-        tout_ref,
-    ):
-        del zeros_ref, tzeros_ref  # aliased into the outputs; only force zero-init
+    def kernel(i_ref, j_ref, amp_ref, var_ref, pixel_size_ref, *refs):
+        tangent_refs, tout_ref = refs[:n_nonzero], refs[-1]
+        # refs[n_nonzero] is the zeros buffer aliased into the output
         i, j, amp, variance = i_ref[...], j_ref[...], amp_ref[...], var_ref[...]
         pixel_size = pixel_size_ref[0]
-        ti = ti_ref[...] if live_i else None
-        tj = tj_ref[...] if live_j else None
-        tamp = tamp_ref[...] if live_amp else None
-        tvar = tvar_ref[...] if live_var else None
-        tpix = tpixel_size_ref[0] if live_pix else None
+        T = _read_directions(tangent_refs, nonzero, names, n_directions)
         valid = _valid_lane_mask(block_size, m_total)
 
         i0x = jnp.ceil(i - n_spread / 2.0).astype(jnp.int32)
         i0y = jnp.ceil(j - n_spread / 2.0).astype(jnp.int32)
 
-        def weight(z, tcoord, is_live):
-            if not is_live:
+        def weight(z, coord_name, nonzero_axis):
+            if not nonzero_axis:
                 return _kernel_weight(z, variance, pixel_size, use_erf=use_erf), None
             w, dw_dz, dw_dvar, dw_dpix = _kernel_weight_and_grads(
                 z, variance, pixel_size, use_erf=use_erf
             )
-            return w, _weight_tangent(dw_dz, dw_dvar, dw_dpix, tcoord, tvar, tpix)
+            return w, [
+                _weight_tangent(
+                    dw_dz, dw_dvar, dw_dpix, t[coord_name], t["var"], t["pix"]
+                )
+                for t in T
+            ]
+
+        def at(tangents, d):
+            return None if tangents is None else tangents[d]
 
         def outer_body(oy, carry):
             idx_y = (i0y + oy) % ny
-            wy, twy = weight((i0y + oy).astype(i.dtype) - j, tj, live_y)
+            wy, twy = weight((i0y + oy).astype(i.dtype) - j, "j", nonzero_y)
 
             def inner_body(ox, carry2):
                 idx_x = (i0x + ox) % nx
-                wx, twx = weight((i0x + ox).astype(i.dtype) - i, ti, live_x)
+                wx, twx = weight((i0x + ox).astype(i.dtype) - i, "i", nonzero_x)
                 flat = idx_y * nx + idx_x
-                pltriton.atomic_add(out_ref, (flat,), amp * wx * wy, mask=valid)
-                tval = _add(_mul(tamp, wx * wy), _mul(twx, amp * wy), _mul(twy, amp * wx))
-                pltriton.atomic_add(tout_ref, (flat,), tval, mask=valid)
+                for d in range(n_directions):
+                    tval = _add(
+                        _mul(T[d]["amp"], wx * wy),
+                        _mul(at(twx, d), amp * wy),
+                        _mul(at(twy, d), amp * wx),
+                    )
+                    pltriton.atomic_add(
+                        tout_ref, (flat + d * n_pixels,), tval, mask=valid
+                    )
                 return carry2
 
             jax.lax.fori_loop(0, n_spread, inner_body, 0)
@@ -744,60 +849,48 @@ def _make_spread_jvp_kernel_2d(
 
 
 @cache
-def _make_spread_vjp_jvp_kernel_2d(
+def _make_spread_vjp_tangent_kernel_2d(
     ny: int,
     nx: int,
     n_spread: int,
     use_erf: bool,
     block_size: int,
     m_total: int,
-    live: tuple[bool, bool, bool, bool, bool, bool],
+    nonzero: tuple[bool, bool, bool, bool, bool, bool],
+    n_directions: int,
 ):
-    """`_make_spread_vjp_kernel_2d` and its tangent in one pass.
+    """The tangent of `_make_spread_vjp_kernel_2d` in `n_directions` directions, by
+    the product rule.
 
     The gather is linear in `g`, so `g`'s tangent is the gather of `tg` with the
     primal factors. Each residual tangent needs the total differential of every
     per-pixel factor -- second derivatives of the weight -- which `jax.jvp` of
     `_kernel_weight_and_grads` supplies inside the kernel body, forward mode over
-    elementwise math, over only the live inputs."""
-    live_i, live_j, live_amp, live_var, live_pix, live_g = live
-    live_x = live_i or live_var or live_pix
-    live_y = live_j or live_var or live_pix
+    elementwise math, over only the nonzero inputs. The weights and their derivatives
+    are evaluated once per neighbour and contracted with every direction; the primal
+    gather itself is not accumulated."""
+    nonzero_i, nonzero_j, nonzero_amp, nonzero_var, nonzero_pix, nonzero_g = nonzero
+    nonzero_x = nonzero_i or nonzero_var or nonzero_pix
+    nonzero_y = nonzero_j or nonzero_var or nonzero_pix
+    n_nonzero, n_pixels = sum(nonzero), ny * nx
+    names = ("i", "j", "amp", "var", "pix", "g")
 
-    def weight_and_grad(z, variance, pixel_size):
+    def weight_and_grads(z, variance, pixel_size):
         return _kernel_weight_and_grads(z, variance, pixel_size, use_erf=use_erf)
 
-    def kernel(
-        i_ref,
-        j_ref,
-        amp_ref,
-        var_ref,
-        pixel_size_ref,
-        g_ref,
-        ti_ref,
-        tj_ref,
-        tamp_ref,
-        tvar_ref,
-        tpixel_size_ref,
-        tg_ref,
-        di_ref,
-        dj_ref,
-        damp_ref,
-        dvar_ref,
-        dpix_ref,
-        odi_ref,
-        odj_ref,
-        odamp_ref,
-        odvar_ref,
-        odpix_ref,
-    ):
+    def kernel(i_ref, j_ref, amp_ref, var_ref, pixel_size_ref, g_ref, *refs):
+        tangent_refs, out_refs = refs[:n_nonzero], refs[n_nonzero:]
+        odi_ref, odj_ref, odamp_ref, odvar_ref, odpix_ref = out_refs
         i, j, amp, variance = i_ref[...], j_ref[...], amp_ref[...], var_ref[...]
         pixel_size = pixel_size_ref[0]
-        ti = ti_ref[...] if live_i else None
-        tj = tj_ref[...] if live_j else None
-        tamp = tamp_ref[...] if live_amp else None
-        tvar = tvar_ref[...] if live_var else None
-        tpix = tpixel_size_ref[0] if live_pix else None
+        nonzero_names = [n for n, nz_ in zip(names, nonzero) if nz_]
+        T = _read_directions(
+            [r for r, name in zip(tangent_refs, nonzero_names) if name != "g"],
+            nonzero[:5],
+            names[:5],
+            n_directions,
+        )
+        tg_ref = tangent_refs[-1] if nonzero_g else None
         valid = _valid_lane_mask(block_size, m_total)
 
         i0x = jnp.ceil(i - n_spread / 2.0).astype(jnp.int32)
@@ -805,208 +898,281 @@ def _make_spread_vjp_jvp_kernel_2d(
 
         zero = jnp.zeros((block_size,), dtype=i.dtype)
 
-        def weights(z, tcoord, is_live):
-            """`(w, dw/dz, dw/dvar, dw/dpix)` and their tangents (`None`s if dead)."""
-            if not is_live:
-                return weight_and_grad(z, variance, pixel_size), (None,) * 4
-            tz = None if tcoord is None else -tcoord
-            return _jvp_live(weight_and_grad, (z, variance, pixel_size), (tz, tvar, tpix))
+        def weights(z, coord_name, nonzero_axis):
+            """Primal `(w, dw/dz, dw/dvar, dw/dpix)` and, per direction, their tangents
+            (`None`s when this axis has no nonzero tangent)."""
+            primal = weight_and_grads(z, variance, pixel_size)
+            if not nonzero_axis:
+                return primal, [(None,) * 4] * n_directions
+            tangents = []
+            for t in T:
+                tz = None if t[coord_name] is None else -t[coord_name]
+                tangents.append(
+                    _jvp_over_nonzero(
+                        weight_and_grads,
+                        (z, variance, pixel_size),
+                        (tz, t["var"], t["pix"]),
+                    )[1]
+                )
+            return primal, tangents
 
         def outer_body(oy, carry):
-            damp, di, dj, dvar, dpix, odamp, odi, odj, odvar, odpix = carry
             idx_y = (i0y + oy) % ny
-            (wy, dwy, vwy, hwy), (Twy, Tdwy, Tvwy, Thwy) = weights(
-                (i0y + oy).astype(i.dtype) - j, tj, live_y
+            (wy, dwy, vwy, hwy), Ty = weights(
+                (i0y + oy).astype(i.dtype) - j, "j", nonzero_y
             )
 
-            def inner_body(ox, carry2):
-                damp, di, dj, dvar, dpix, odamp, odi, odj, odvar, odpix = carry2
+            def inner_body(ox, acc):
                 idx_x = (i0x + ox) % nx
-                (wx, dwx, vwx, hwx), (Twx, Tdwx, Tvwx, Thwx) = weights(
-                    (i0x + ox).astype(i.dtype) - i, ti, live_x
+                (wx, dwx, vwx, hwx), Tx = weights(
+                    (i0x + ox).astype(i.dtype) - i, "i", nonzero_x
                 )
                 flat = idx_y * nx + idx_x
                 g_val = pltriton.load(g_ref.at[flat], mask=valid, other=0.0)
 
-                # The gather's per-pixel factors...
                 f_amp = wy * wx
                 f_i = -dwx * wy
                 f_j = -dwy * wx
                 f_var = wy * vwx + wx * vwy
                 f_pix = wy * hwx + wx * hwy
-                damp = damp + g_val * f_amp
-                di = di + amp * g_val * f_i
-                dj = dj + amp * g_val * f_j
-                dvar = dvar + amp * g_val * f_var
-                dpix = dpix + amp * g_val * f_pix
 
-                # ...and their tangents, by the product rule.
-                Tf_amp = _tprod2(wy, wx, Twy, Twx)
-                Tf_i = _neg(_tprod2(dwx, wy, Tdwx, Twy))
-                Tf_j = _neg(_tprod2(dwy, wx, Tdwy, Twx))
-                Tf_var = _add(_tprod2(wy, vwx, Twy, Tvwx), _tprod2(wx, vwy, Twx, Tvwy))
-                Tf_pix = _add(_tprod2(wy, hwx, Twy, Thwx), _tprod2(wx, hwy, Twx, Thwy))
-
-                tg_val = (
-                    pltriton.load(tg_ref.at[flat], mask=valid, other=0.0)
-                    if live_g
-                    else None
-                )
-
-                def tangent(f, Tf):
-                    return _add(
-                        _mul(tg_val, amp * f),
-                        _mul(g_val, _add(_mul(tamp, f), _mul(amp, Tf))),
+                new_acc = []
+                for d in range(n_directions):
+                    (Twx, Tdwx, Tvwx, Thwx), (Twy, Tdwy, Tvwy, Thwy) = Tx[d], Ty[d]
+                    Tf_amp = _tprod2(wy, wx, Twy, Twx)
+                    Tf_i = _neg(_tprod2(dwx, wy, Tdwx, Twy))
+                    Tf_j = _neg(_tprod2(dwy, wx, Tdwy, Twx))
+                    Tf_var = _add(
+                        _tprod2(wy, vwx, Twy, Tvwx), _tprod2(wx, vwy, Twx, Tvwy)
                     )
+                    Tf_pix = _add(
+                        _tprod2(wy, hwx, Twy, Thwx), _tprod2(wx, hwy, Twx, Thwy)
+                    )
+                    tg_val = (
+                        pltriton.load(
+                            tg_ref.at[flat + d * n_pixels], mask=valid, other=0.0
+                        )
+                        if nonzero_g
+                        else None
+                    )
+                    tamp = T[d]["amp"]
 
-                odamp = _add(odamp, _mul(tg_val, f_amp), _mul(g_val, Tf_amp))
-                odi = _add(odi, tangent(f_i, Tf_i))
-                odj = _add(odj, tangent(f_j, Tf_j))
-                odvar = _add(odvar, tangent(f_var, Tf_var))
-                odpix = _add(odpix, tangent(f_pix, Tf_pix))
-                return damp, di, dj, dvar, dpix, odamp, odi, odj, odvar, odpix
+                    def tangent(f, Tf):
+                        return _add(
+                            _mul(tg_val, amp * f),
+                            _mul(g_val, _add(_mul(tamp, f), _mul(amp, Tf))),
+                        )
 
-            return jax.lax.fori_loop(
-                0,
-                n_spread,
-                inner_body,
-                (damp, di, dj, dvar, dpix, odamp, odi, odj, odvar, odpix),
-            )
+                    odamp, odi, odj, odvar, odpix = acc[5 * d : 5 * d + 5]
+                    new_acc += [
+                        _add(odamp, _mul(tg_val, f_amp), _mul(g_val, Tf_amp)),
+                        _add(odi, tangent(f_i, Tf_i)),
+                        _add(odj, tangent(f_j, Tf_j)),
+                        _add(odvar, tangent(f_var, Tf_var)),
+                        _add(odpix, tangent(f_pix, Tf_pix)),
+                    ]
+                return tuple(new_acc)
 
-        damp, di, dj, dvar, dpix, odamp, odi, odj, odvar, odpix = jax.lax.fori_loop(
-            0, n_spread, outer_body, (zero,) * 10
-        )
+            return jax.lax.fori_loop(0, n_spread, inner_body, carry)
 
-        pltriton.store(di_ref, di, mask=valid)
-        pltriton.store(dj_ref, dj, mask=valid)
-        pltriton.store(damp_ref, damp, mask=valid)
-        pltriton.store(dvar_ref, dvar, mask=valid)
-        pltriton.store(dpix_ref, dpix, mask=valid)
-        pltriton.store(odi_ref, odi, mask=valid)
-        pltriton.store(odj_ref, odj, mask=valid)
-        pltriton.store(odamp_ref, odamp, mask=valid)
-        pltriton.store(odvar_ref, odvar, mask=valid)
-        pltriton.store(odpix_ref, odpix, mask=valid)
+        acc = jax.lax.fori_loop(0, n_spread, outer_body, (zero,) * (5 * n_directions))
+        for d in range(n_directions):
+            odamp, odi, odj, odvar, odpix = acc[5 * d : 5 * d + 5]
+            for ref, value in (
+                (odi_ref, odi),
+                (odj_ref, odj),
+                (odamp_ref, odamp),
+                (odvar_ref, odvar),
+                (odpix_ref, odpix),
+            ):
+                pltriton.store(ref.at[d], value, mask=valid)
 
     return kernel
 
 
-def pallas_spread_jvp_2d(
-    i, j, amplitude, variance, pixel_size, tangents, ny, nx, n_spread, use_erf
+def _spread_tangent_2d_impl(
+    primals, nonzero_tangents, nonzero, ny, nx, n_spread, use_erf
 ):
-    """`(out, tangent_out)`; `tangents` aligned with the five primals, symbolic zeros
-    allowed and dropped at trace time."""
-    live = tuple(not _is_zero(t) for t in tangents)
+    """The scatter's tangent in every direction of `nonzero_tangents`, each of which
+    carries a leading direction axis (aligned with the `True`s of `nonzero`):
+    `(n_directions, ny, nx)`."""
+    i, j, amplitude, variance, pixel_size = primals
+    n_directions = nonzero_tangents[0].shape[0]
     m_total, dtype = i.shape[0], i.dtype
-    j, amplitude = j.astype(dtype), amplitude.astype(dtype)
-    variance_b = jnp.broadcast_to(variance, (m_total,)).astype(dtype)
-    pixel_size_b = jnp.reshape(pixel_size, (1,)).astype(dtype)
-    primals_b = (i, j, amplitude, variance_b, pixel_size_b)
-    # A dead tangent's slot holds its primal: same shape, never read.
-    tangents_b = tuple(
-        (_like_operand(t, p, dtype) if is_live else p)
-        for t, p, is_live in zip(tangents, primals_b, live)
+    primals_b = (
+        i,
+        j.astype(dtype),
+        amplitude.astype(dtype),
+        jnp.broadcast_to(variance, (m_total,)).astype(dtype),
+        jnp.reshape(pixel_size, (1,)).astype(dtype),
+    )
+    names = ("i", "j", "amp", "var", "pix")
+    tangents_b = _tangent_operands(
+        nonzero_tangents,
+        [p for p, nz_ in zip(primals_b, nonzero) if nz_],
+        [n for n, nz_ in zip(names, nonzero) if nz_],
+        dtype,
     )
     block_size = _choose_block_size(n_spread, ndim=2)
     grid = (pl.cdiv(m_total, block_size),)
-    kernel = _make_spread_jvp_kernel_2d(
-        ny, nx, n_spread, use_erf, block_size, m_total, live
+    kernel = _make_spread_tangent_kernel_2d(
+        ny, nx, n_spread, use_erf, block_size, m_total, nonzero, n_directions
     )
-    zeros = jnp.zeros((ny * nx,), dtype=dtype)
+    n_pixels = ny * nx
     per_point = pl.BlockSpec((block_size,), lambda p: (p,))
     scalar = pl.BlockSpec((1,), lambda p: (0,))
-    image = pl.BlockSpec((ny * nx,), lambda p: (0,))
-    out, tout = pl.pallas_call(
+    timage = pl.BlockSpec((n_directions * n_pixels,), lambda p: (0,))
+    tangent_specs = _direction_specs(
+        nonzero, names, block_size, n_directions, ("pix",), (), n_pixels
+    )
+    tout = pl.pallas_call(
         kernel,
         grid=grid,
-        in_specs=[per_point] * 4 + [scalar] + [per_point] * 4 + [scalar, image, image],
-        out_specs=[image, image],
-        out_shape=[jax.ShapeDtypeStruct((ny * nx,), dtype)] * 2,
-        input_output_aliases={10: 0, 11: 1},
+        in_specs=[per_point] * 4 + [scalar] + tangent_specs + [timage],
+        out_specs=timage,
+        out_shape=jax.ShapeDtypeStruct((n_directions * n_pixels,), dtype),
+        input_output_aliases={5 + len(tangents_b): 0},
         compiler_params=_CompilerParams(),
-    )(*primals_b, *tangents_b, zeros, zeros)
-    return out.reshape(ny, nx), tout.reshape(ny, nx)
+    )(*primals_b, *tangents_b, jnp.zeros((n_directions * n_pixels,), dtype=dtype))
+    return tout.reshape(n_directions, ny, nx)
+
+
+@cache
+def _spread_tangent_2d_batchable(ny, nx, n_spread, use_erf, nonzero):
+    def impl(primals, tangents):
+        return _spread_tangent_2d_impl(
+            primals, tangents, nonzero, ny, nx, n_spread, use_erf
+        )
+
+    def single(*args):
+        primals, tangents = args[:5], args[5:]
+        return impl(primals, tuple(t[None] for t in tangents))[0]
+
+    return _batchable(single, 5, impl)
+
+
+def pallas_spread_tangent_2d(
+    i, j, amplitude, variance, pixel_size, tangents, ny, nx, n_spread, use_erf
+):
+    """The tangent of the 2D scatter; `tangents` aligned with the five primals, symbolic
+    zeros allowed and dropped at trace time. Under `jax.vmap` over the tangents, every
+    direction runs in one launch."""
+    nonzero = tuple(not _is_zero(t) for t in tangents)
+    fn = _spread_tangent_2d_batchable(ny, nx, n_spread, use_erf, nonzero)
+    return fn(
+        i, j, amplitude, variance, pixel_size, *(t for t in tangents if not _is_zero(t))
+    )
 
 
 def _spread_2d_jvp_rule(ny, nx, n_spread, use_erf, primals, tangents):
+    # Two calls, never one: the primal stays known under `jax.linearize`.
+    out = pallas_spread_2d(*primals, ny, nx, n_spread, use_erf)
     if all(_is_zero(t) for t in tangents):
-        out = pallas_spread_2d(*primals, ny, nx, n_spread, use_erf)
         return out, jnp.zeros_like(out)
-    return pallas_spread_jvp_2d(*primals, tangents, ny, nx, n_spread, use_erf)
+    return out, pallas_spread_tangent_2d(*primals, tangents, ny, nx, n_spread, use_erf)
 
 
 pallas_spread_2d.defjvp(_spread_2d_jvp_rule, symbolic_zeros=True)
 
 
-def pallas_spread_vjp_jvp_2d(ny, nx, n_spread, use_erf, res, g, tres, tg):
-    """`(out, tangent_out)`, each the gather's five outputs; `tres`/`tg` may hold
-    symbolic zeros, dropped at trace time."""
-    live = tuple(not _is_zero(t) for t in (*tres, tg))
+def _spread_vjp_tangent_2d_impl(
+    res, g, nonzero_tangents, nonzero, ny, nx, n_spread, use_erf
+):
+    """The gather's tangent -- its five outputs' -- in every direction of
+    `nonzero_tangents` (leading direction axis, aligned with the `True`s of
+    `nonzero`)."""
     i, j, amplitude, variance, pixel_size = res
+    n_directions = nonzero_tangents[0].shape[0]
     m_total, dtype = i.shape[0], i.dtype
-    variance_b = jnp.broadcast_to(variance, (m_total,)).astype(dtype)
+    n_pixels = ny * nx
     primals_b = (
         i,
         j.astype(dtype),
         amplitude.astype(dtype),
-        variance_b,
+        jnp.broadcast_to(variance, (m_total,)).astype(dtype),
         jnp.reshape(pixel_size, (1,)).astype(dtype),
         g.astype(dtype).reshape(-1),
     )
-    tangents_b = tuple(
-        (_like_operand(t, p, dtype) if is_live else p)
-        for t, p, is_live in zip((*tres, tg), primals_b, live)
+    names = ("i", "j", "amp", "var", "pix", "g")
+    tangents_b = _tangent_operands(
+        nonzero_tangents,
+        [p for p, nz_ in zip(primals_b, nonzero) if nz_],
+        [n for n, nz_ in zip(names, nonzero) if nz_],
+        dtype,
     )
     block_size = _choose_block_size(n_spread, ndim=2)
     grid = (pl.cdiv(m_total, block_size),)
-    kernel = _make_spread_vjp_jvp_kernel_2d(
-        ny, nx, n_spread, use_erf, block_size, m_total, live
+    kernel = _make_spread_vjp_tangent_kernel_2d(
+        ny, nx, n_spread, use_erf, block_size, m_total, nonzero, n_directions
     )
     per_point = pl.BlockSpec((block_size,), lambda p: (p,))
     scalar = pl.BlockSpec((1,), lambda p: (0,))
-    image = pl.BlockSpec((ny * nx,), lambda p: (0,))
-    outs = pl.pallas_call(
+    image = pl.BlockSpec((n_pixels,), lambda p: (0,))
+    per_direction = pl.BlockSpec((n_directions, block_size), lambda p: (0, p))
+    tangent_specs = _direction_specs(
+        nonzero, names, block_size, n_directions, ("pix",), ("g",), n_pixels
+    )
+    odi, odj, odamplitude, odvariance_pp, odpixel_size_pp = pl.pallas_call(
         kernel,
         grid=grid,
-        in_specs=([per_point] * 4 + [scalar, image]) * 2,
-        out_specs=[per_point] * 10,
-        out_shape=[jax.ShapeDtypeStruct((m_total,), dtype)] * 10,
+        in_specs=[per_point] * 4 + [scalar, image] + tangent_specs,
+        out_specs=[per_direction] * 5,
+        out_shape=[jax.ShapeDtypeStruct((n_directions, m_total), dtype)] * 5,
         compiler_params=_CompilerParams(),
     )(*primals_b, *tangents_b)
-    di, dj, damplitude, dvariance_pp, dpixel_size_pp = outs[:5]
-    odi, odj, odamplitude, odvariance_pp, odpixel_size_pp = outs[5:]
-    scalar_variance = jnp.ndim(variance) == 0
-    out = (
-        di,
-        dj,
-        damplitude,
-        jnp.sum(dvariance_pp) if scalar_variance else dvariance_pp,
-        jnp.sum(dpixel_size_pp),
-    )
-    tangent_out = (
+    return (
         odi,
         odj,
         odamplitude,
-        jnp.sum(odvariance_pp) if scalar_variance else odvariance_pp,
-        jnp.sum(odpixel_size_pp),
+        jnp.sum(odvariance_pp, axis=-1) if jnp.ndim(variance) == 0 else odvariance_pp,
+        jnp.sum(odpixel_size_pp, axis=-1),
     )
-    return out, tangent_out
+
+
+@cache
+def _spread_vjp_tangent_2d_batchable(ny, nx, n_spread, use_erf, nonzero):
+    def impl(primals, tangents):
+        res, g = primals[:5], primals[5]
+        return _spread_vjp_tangent_2d_impl(
+            res, g, tangents, nonzero, ny, nx, n_spread, use_erf
+        )
+
+    def single(*args):
+        primals, tangents = args[:6], args[6:]
+        return jax.tree.map(
+            lambda t: t[0], impl(primals, tuple(t[None] for t in tangents))
+        )
+
+    return _batchable(single, 6, impl)
+
+
+def pallas_spread_vjp_tangent_2d(ny, nx, n_spread, use_erf, res, g, tres, tg):
+    """The tangent of the 2D gather's five outputs; `tres`/`tg` may hold symbolic zeros,
+    dropped at trace time. Under `jax.vmap` over the tangents, every direction runs in
+    one launch."""
+    tangents = (*tres, tg)
+    nonzero = tuple(not _is_zero(t) for t in tangents)
+    fn = _spread_vjp_tangent_2d_batchable(ny, nx, n_spread, use_erf, nonzero)
+    return fn(*res, g, *(t for t in tangents if not _is_zero(t)))
 
 
 def _spread_vjp_2d_jvp_rule(ny, nx, n_spread, use_erf, primals, tangents):
     res, g = primals
     tres, tg = tangents
+    out = pallas_spread_vjp_2d(ny, nx, n_spread, use_erf, res, g)
     if _is_zero(tg) and all(_is_zero(t) for t in tres):
-        out = pallas_spread_vjp_2d(ny, nx, n_spread, use_erf, res, g)
         return out, jax.tree.map(jnp.zeros_like, out)
-    return pallas_spread_vjp_jvp_2d(ny, nx, n_spread, use_erf, res, g, tres, tg)
+    return out, pallas_spread_vjp_tangent_2d(ny, nx, n_spread, use_erf, res, g, tres, tg)
 
 
 pallas_spread_vjp_2d.defjvp(_spread_vjp_2d_jvp_rule, symbolic_zeros=True)
 
 
+# ── 3D ──────────────────────────────────────────────────────────────────────
+
+
 @cache
-def _make_spread_jvp_kernel_3d(
+def _make_spread_tangent_kernel_3d(
     nz: int,
     ny: int,
     nx: int,
@@ -1014,74 +1180,68 @@ def _make_spread_jvp_kernel_3d(
     use_erf: bool,
     block_size: int,
     m_total: int,
-    live: tuple[bool, bool, bool, bool, bool, bool],
+    nonzero: tuple[bool, bool, bool, bool, bool, bool],
+    n_directions: int,
 ):
-    """`_make_spread_kernel_3d` and its tangent in one pass."""
-    live_i, live_j, live_k, live_amp, live_var, live_pix = live
-    live_x = live_i or live_var or live_pix
-    live_y = live_j or live_var or live_pix
-    live_z = live_k or live_var or live_pix
+    """3D twin of `_make_spread_tangent_kernel_2d`."""
+    nonzero_i, nonzero_j, nonzero_k, nonzero_amp, nonzero_var, nonzero_pix = nonzero
+    nonzero_x = nonzero_i or nonzero_var or nonzero_pix
+    nonzero_y = nonzero_j or nonzero_var or nonzero_pix
+    nonzero_z = nonzero_k or nonzero_var or nonzero_pix
+    n_nonzero, n_voxels = sum(nonzero), nz * ny * nx
+    names = ("i", "j", "k", "amp", "var", "pix")
 
-    def kernel(
-        i_ref,
-        j_ref,
-        k_ref,
-        amp_ref,
-        var_ref,
-        voxel_size_ref,
-        ti_ref,
-        tj_ref,
-        tk_ref,
-        tamp_ref,
-        tvar_ref,
-        tvoxel_size_ref,
-        zeros_ref,
-        tzeros_ref,
-        out_ref,
-        tout_ref,
-    ):
-        del zeros_ref, tzeros_ref  # aliased into the outputs; only force zero-init
+    def kernel(i_ref, j_ref, k_ref, amp_ref, var_ref, voxel_size_ref, *refs):
+        tangent_refs, tout_ref = refs[:n_nonzero], refs[-1]
         i, j, k = i_ref[...], j_ref[...], k_ref[...]
         amp, variance = amp_ref[...], var_ref[...]
         voxel_size = voxel_size_ref[0]
-        ti = ti_ref[...] if live_i else None
-        tj = tj_ref[...] if live_j else None
-        tk = tk_ref[...] if live_k else None
-        tamp = tamp_ref[...] if live_amp else None
-        tvar = tvar_ref[...] if live_var else None
-        tpix = tvoxel_size_ref[0] if live_pix else None
+        T = _read_directions(tangent_refs, nonzero, names, n_directions)
         valid = _valid_lane_mask(block_size, m_total)
 
         i0x = jnp.ceil(i - n_spread / 2.0).astype(jnp.int32)
         i0y = jnp.ceil(j - n_spread / 2.0).astype(jnp.int32)
         i0z = jnp.ceil(k - n_spread / 2.0).astype(jnp.int32)
 
-        def weight(z, tcoord, is_live):
-            if not is_live:
+        def weight(z, coord_name, nonzero_axis):
+            if not nonzero_axis:
                 return _kernel_weight(z, variance, voxel_size, use_erf=use_erf), None
             w, dw_dz, dw_dvar, dw_dpix = _kernel_weight_and_grads(
                 z, variance, voxel_size, use_erf=use_erf
             )
-            return w, _weight_tangent(dw_dz, dw_dvar, dw_dpix, tcoord, tvar, tpix)
+            return w, [
+                _weight_tangent(
+                    dw_dz, dw_dvar, dw_dpix, t[coord_name], t["var"], t["pix"]
+                )
+                for t in T
+            ]
+
+        def at(tangents, d):
+            return None if tangents is None else tangents[d]
 
         def oz_body(oz, carry):
             idx_z = (i0z + oz) % nz
-            wz, twz = weight((i0z + oz).astype(i.dtype) - k, tk, live_z)
+            wz, twz = weight((i0z + oz).astype(i.dtype) - k, "k", nonzero_z)
 
             def oy_body(oy, carry2):
                 idx_y = (i0y + oy) % ny
-                wy, twy = weight((i0y + oy).astype(i.dtype) - j, tj, live_y)
+                wy, twy = weight((i0y + oy).astype(i.dtype) - j, "j", nonzero_y)
 
                 def ox_body(ox, carry3):
                     idx_x = (i0x + ox) % nx
-                    wx, twx = weight((i0x + ox).astype(i.dtype) - i, ti, live_x)
+                    wx, twx = weight((i0x + ox).astype(i.dtype) - i, "i", nonzero_x)
                     flat = idx_z * (nx * ny) + idx_y * nx + idx_x
-                    pltriton.atomic_add(out_ref, (flat,), amp * wz * wy * wx, mask=valid)
-                    tval = _add(
-                        _mul(tamp, wz * wy * wx),
-                        _mul(amp, _tprod3(wz, wy, wx, twz, twy, twx)),
-                    )
-                    pltriton.atomic_add(tout_ref, (flat,), tval, mask=valid)
+                    for d in range(n_directions):
+                        tval = _add(
+                            _mul(T[d]["amp"], wz * wy * wx),
+                            _mul(
+                                amp,
+                                _tprod3(wz, wy, wx, at(twz, d), at(twy, d), at(twx, d)),
+                            ),
+                        )
+                        pltriton.atomic_add(
+                            tout_ref, (flat + d * n_voxels,), tval, mask=valid
+                        )
                     return carry3
 
                 jax.lax.fori_loop(0, n_spread, ox_body, 0)
@@ -1096,7 +1256,7 @@ def _make_spread_jvp_kernel_3d(
 
 
 @cache
-def _make_spread_vjp_jvp_kernel_3d(
+def _make_spread_vjp_tangent_kernel_3d(
     nz: int,
     ny: int,
     nx: int,
@@ -1104,54 +1264,36 @@ def _make_spread_vjp_jvp_kernel_3d(
     use_erf: bool,
     block_size: int,
     m_total: int,
-    live: tuple[bool, bool, bool, bool, bool, bool, bool],
+    nonzero: tuple[bool, bool, bool, bool, bool, bool, bool],
+    n_directions: int,
 ):
-    """`_make_spread_vjp_kernel_3d` and its tangent in one pass; see the 2D twin."""
-    live_i, live_j, live_k, live_amp, live_var, live_pix, live_g = live
-    live_x = live_i or live_var or live_pix
-    live_y = live_j or live_var or live_pix
-    live_z = live_k or live_var or live_pix
+    """3D twin of `_make_spread_vjp_tangent_kernel_2d`."""
+    nonzero_i, nonzero_j, nonzero_k, nonzero_amp, nonzero_var, nonzero_pix, nonzero_g = (
+        nonzero
+    )
+    nonzero_x = nonzero_i or nonzero_var or nonzero_pix
+    nonzero_y = nonzero_j or nonzero_var or nonzero_pix
+    nonzero_z = nonzero_k or nonzero_var or nonzero_pix
+    n_nonzero, n_voxels = sum(nonzero), nz * ny * nx
+    names = ("i", "j", "k", "amp", "var", "pix", "g")
 
-    def weight_and_grad(z, variance, voxel_size):
+    def weight_and_grads(z, variance, voxel_size):
         return _kernel_weight_and_grads(z, variance, voxel_size, use_erf=use_erf)
 
-    def kernel(
-        i_ref,
-        j_ref,
-        k_ref,
-        amp_ref,
-        var_ref,
-        voxel_size_ref,
-        g_ref,
-        ti_ref,
-        tj_ref,
-        tk_ref,
-        tamp_ref,
-        tvar_ref,
-        tvoxel_size_ref,
-        tg_ref,
-        di_ref,
-        dj_ref,
-        dk_ref,
-        damp_ref,
-        dvar_ref,
-        dpix_ref,
-        odi_ref,
-        odj_ref,
-        odk_ref,
-        odamp_ref,
-        odvar_ref,
-        odpix_ref,
-    ):
+    def kernel(i_ref, j_ref, k_ref, amp_ref, var_ref, voxel_size_ref, g_ref, *refs):
+        tangent_refs, out_refs = refs[:n_nonzero], refs[n_nonzero:]
+        odi_ref, odj_ref, odk_ref, odamp_ref, odvar_ref, odpix_ref = out_refs
         i, j, k = i_ref[...], j_ref[...], k_ref[...]
         amp, variance = amp_ref[...], var_ref[...]
         voxel_size = voxel_size_ref[0]
-        ti = ti_ref[...] if live_i else None
-        tj = tj_ref[...] if live_j else None
-        tk = tk_ref[...] if live_k else None
-        tamp = tamp_ref[...] if live_amp else None
-        tvar = tvar_ref[...] if live_var else None
-        tpix = tvoxel_size_ref[0] if live_pix else None
+        nonzero_names = [n for n, nz_ in zip(names, nonzero) if nz_]
+        T = _read_directions(
+            [r for r, name in zip(tangent_refs, nonzero_names) if name != "g"],
+            nonzero[:6],
+            names[:6],
+            n_directions,
+        )
+        tg_ref = tangent_refs[-1] if nonzero_g else None
         valid = _valid_lane_mask(block_size, m_total)
 
         i0x = jnp.ceil(i - n_spread / 2.0).astype(jnp.int32)
@@ -1160,31 +1302,38 @@ def _make_spread_vjp_jvp_kernel_3d(
 
         zero = jnp.zeros((block_size,), dtype=i.dtype)
 
-        def weights(z, tcoord, is_live):
-            if not is_live:
-                return weight_and_grad(z, variance, voxel_size), (None,) * 4
-            tz = None if tcoord is None else -tcoord
-            return _jvp_live(weight_and_grad, (z, variance, voxel_size), (tz, tvar, tpix))
+        def weights(z, coord_name, nonzero_axis):
+            primal = weight_and_grads(z, variance, voxel_size)
+            if not nonzero_axis:
+                return primal, [(None,) * 4] * n_directions
+            tangents = []
+            for t in T:
+                tz = None if t[coord_name] is None else -t[coord_name]
+                tangents.append(
+                    _jvp_over_nonzero(
+                        weight_and_grads,
+                        (z, variance, voxel_size),
+                        (tz, t["var"], t["pix"]),
+                    )[1]
+                )
+            return primal, tangents
 
         def oz_body(oz, carry):
             idx_z = (i0z + oz) % nz
-            (wz, dwz, vwz, hwz), (Twz, Tdwz, Tvwz, Thwz) = weights(
-                (i0z + oz).astype(i.dtype) - k, tk, live_z
+            (wz, dwz, vwz, hwz), Tz = weights(
+                (i0z + oz).astype(i.dtype) - k, "k", nonzero_z
             )
 
             def oy_body(oy, carry2):
                 idx_y = (i0y + oy) % ny
-                (wy, dwy, vwy, hwy), (Twy, Tdwy, Tvwy, Thwy) = weights(
-                    (i0y + oy).astype(i.dtype) - j, tj, live_y
+                (wy, dwy, vwy, hwy), Ty = weights(
+                    (i0y + oy).astype(i.dtype) - j, "j", nonzero_y
                 )
 
-                def ox_body(ox, carry3):
-                    damp, di, dj, dk, dvar, dpix, odamp, odi, odj, odk, odvar, odpix = (
-                        carry3
-                    )
+                def ox_body(ox, acc):
                     idx_x = (i0x + ox) % nx
-                    (wx, dwx, vwx, hwx), (Twx, Tdwx, Tvwx, Thwx) = weights(
-                        (i0x + ox).astype(i.dtype) - i, ti, live_x
+                    (wx, dwx, vwx, hwx), Tx = weights(
+                        (i0x + ox).astype(i.dtype) - i, "i", nonzero_x
                     )
                     flat = idx_z * (nx * ny) + idx_y * nx + idx_x
                     g_val = pltriton.load(g_ref.at[flat], mask=valid, other=0.0)
@@ -1194,91 +1343,78 @@ def _make_spread_vjp_jvp_kernel_3d(
                     f_i, f_j, f_k = -dwx * wzy, -dwy * wzx, -dwz * wyx
                     f_var = wzy * vwx + wzx * vwy + wyx * vwz
                     f_pix = wzy * hwx + wzx * hwy + wyx * hwz
-                    damp = damp + g_val * f_amp
-                    di = di + amp * g_val * f_i
-                    dj = dj + amp * g_val * f_j
-                    dk = dk + amp * g_val * f_k
-                    dvar = dvar + amp * g_val * f_var
-                    dpix = dpix + amp * g_val * f_pix
 
-                    Tf_amp = _tprod3(wz, wy, wx, Twz, Twy, Twx)
-                    Tf_i = _neg(_tprod3(dwx, wz, wy, Tdwx, Twz, Twy))
-                    Tf_j = _neg(_tprod3(dwy, wz, wx, Tdwy, Twz, Twx))
-                    Tf_k = _neg(_tprod3(dwz, wy, wx, Tdwz, Twy, Twx))
-                    Tf_var = _add(
-                        _tprod3(wz, wy, vwx, Twz, Twy, Tvwx),
-                        _tprod3(wz, wx, vwy, Twz, Twx, Tvwy),
-                        _tprod3(wy, wx, vwz, Twy, Twx, Tvwz),
-                    )
-                    Tf_pix = _add(
-                        _tprod3(wz, wy, hwx, Twz, Twy, Thwx),
-                        _tprod3(wz, wx, hwy, Twz, Twx, Thwy),
-                        _tprod3(wy, wx, hwz, Twy, Twx, Thwz),
-                    )
-
-                    tg_val = (
-                        pltriton.load(tg_ref.at[flat], mask=valid, other=0.0)
-                        if live_g
-                        else None
-                    )
-
-                    def tangent(f, Tf):
-                        return _add(
-                            _mul(tg_val, amp * f),
-                            _mul(g_val, _add(_mul(tamp, f), _mul(amp, Tf))),
+                    new_acc = []
+                    for d in range(n_directions):
+                        (Twx, Tdwx, Tvwx, Thwx) = Tx[d]
+                        (Twy, Tdwy, Tvwy, Thwy) = Ty[d]
+                        (Twz, Tdwz, Tvwz, Thwz) = Tz[d]
+                        Tf_amp = _tprod3(wz, wy, wx, Twz, Twy, Twx)
+                        Tf_i = _neg(_tprod3(dwx, wz, wy, Tdwx, Twz, Twy))
+                        Tf_j = _neg(_tprod3(dwy, wz, wx, Tdwy, Twz, Twx))
+                        Tf_k = _neg(_tprod3(dwz, wy, wx, Tdwz, Twy, Twx))
+                        Tf_var = _add(
+                            _tprod3(wz, wy, vwx, Twz, Twy, Tvwx),
+                            _tprod3(wz, wx, vwy, Twz, Twx, Tvwy),
+                            _tprod3(wy, wx, vwz, Twy, Twx, Tvwz),
                         )
+                        Tf_pix = _add(
+                            _tprod3(wz, wy, hwx, Twz, Twy, Thwx),
+                            _tprod3(wz, wx, hwy, Twz, Twx, Thwy),
+                            _tprod3(wy, wx, hwz, Twy, Twx, Thwz),
+                        )
+                        tg_val = (
+                            pltriton.load(
+                                tg_ref.at[flat + d * n_voxels], mask=valid, other=0.0
+                            )
+                            if nonzero_g
+                            else None
+                        )
+                        tamp = T[d]["amp"]
 
-                    odamp = _add(odamp, _mul(tg_val, f_amp), _mul(g_val, Tf_amp))
-                    odi = _add(odi, tangent(f_i, Tf_i))
-                    odj = _add(odj, tangent(f_j, Tf_j))
-                    odk = _add(odk, tangent(f_k, Tf_k))
-                    odvar = _add(odvar, tangent(f_var, Tf_var))
-                    odpix = _add(odpix, tangent(f_pix, Tf_pix))
-                    return (
-                        damp,
-                        di,
-                        dj,
-                        dk,
-                        dvar,
-                        dpix,
-                        odamp,
-                        odi,
-                        odj,
-                        odk,
-                        odvar,
-                        odpix,
-                    )
+                        def tangent(f, Tf):
+                            return _add(
+                                _mul(tg_val, amp * f),
+                                _mul(g_val, _add(_mul(tamp, f), _mul(amp, Tf))),
+                            )
+
+                        odamp, odi, odj, odk, odvar, odpix = acc[6 * d : 6 * d + 6]
+                        new_acc += [
+                            _add(odamp, _mul(tg_val, f_amp), _mul(g_val, Tf_amp)),
+                            _add(odi, tangent(f_i, Tf_i)),
+                            _add(odj, tangent(f_j, Tf_j)),
+                            _add(odk, tangent(f_k, Tf_k)),
+                            _add(odvar, tangent(f_var, Tf_var)),
+                            _add(odpix, tangent(f_pix, Tf_pix)),
+                        ]
+                    return tuple(new_acc)
 
                 return jax.lax.fori_loop(0, n_spread, ox_body, carry2)
 
             return jax.lax.fori_loop(0, n_spread, oy_body, carry)
 
-        outs = jax.lax.fori_loop(0, n_spread, oz_body, (zero,) * 12)
-        damp, di, dj, dk, dvar, dpix, odamp, odi, odj, odk, odvar, odpix = outs
-
-        for ref, value in (
-            (di_ref, di),
-            (dj_ref, dj),
-            (dk_ref, dk),
-            (damp_ref, damp),
-            (dvar_ref, dvar),
-            (dpix_ref, dpix),
-            (odi_ref, odi),
-            (odj_ref, odj),
-            (odk_ref, odk),
-            (odamp_ref, odamp),
-            (odvar_ref, odvar),
-            (odpix_ref, odpix),
-        ):
-            pltriton.store(ref, value, mask=valid)
+        acc = jax.lax.fori_loop(0, n_spread, oz_body, (zero,) * (6 * n_directions))
+        for d in range(n_directions):
+            odamp, odi, odj, odk, odvar, odpix = acc[6 * d : 6 * d + 6]
+            for ref, value in (
+                (odi_ref, odi),
+                (odj_ref, odj),
+                (odk_ref, odk),
+                (odamp_ref, odamp),
+                (odvar_ref, odvar),
+                (odpix_ref, odpix),
+            ):
+                pltriton.store(ref.at[d], value, mask=valid)
 
     return kernel
 
 
-def pallas_spread_jvp_3d(
-    i, j, k, amplitude, variance, voxel_size, tangents, nz, ny, nx, n_spread, use_erf
+def _spread_tangent_3d_impl(
+    primals, nonzero_tangents, nonzero, nz, ny, nx, n_spread, use_erf
 ):
-    live = tuple(not _is_zero(t) for t in tangents)
+    """3D twin of `_spread_tangent_2d_impl`: `(n_directions, nz, ny, nx)`."""
+    i, j, k, amplitude, variance, voxel_size = primals
+    n_directions = nonzero_tangents[0].shape[0]
     m_total, dtype = i.shape[0], i.dtype
     primals_b = (
         i,
@@ -1288,46 +1424,88 @@ def pallas_spread_jvp_3d(
         jnp.broadcast_to(variance, (m_total,)).astype(dtype),
         jnp.reshape(voxel_size, (1,)).astype(dtype),
     )
-    tangents_b = tuple(
-        (_like_operand(t, p, dtype) if is_live else p)
-        for t, p, is_live in zip(tangents, primals_b, live)
+    names = ("i", "j", "k", "amp", "var", "pix")
+    tangents_b = _tangent_operands(
+        nonzero_tangents,
+        [p for p, nz_ in zip(primals_b, nonzero) if nz_],
+        [n for n, nz_ in zip(names, nonzero) if nz_],
+        dtype,
     )
     block_size = _choose_block_size(n_spread, ndim=3)
     grid = (pl.cdiv(m_total, block_size),)
-    kernel = _make_spread_jvp_kernel_3d(
-        nz, ny, nx, n_spread, use_erf, block_size, m_total, live
+    kernel = _make_spread_tangent_kernel_3d(
+        nz, ny, nx, n_spread, use_erf, block_size, m_total, nonzero, n_directions
     )
     n_voxels = nz * ny * nx
-    zeros = jnp.zeros((n_voxels,), dtype=dtype)
     per_point = pl.BlockSpec((block_size,), lambda p: (p,))
     scalar = pl.BlockSpec((1,), lambda p: (0,))
-    volume = pl.BlockSpec((n_voxels,), lambda p: (0,))
-    out, tout = pl.pallas_call(
+    tvolume = pl.BlockSpec((n_directions * n_voxels,), lambda p: (0,))
+    tangent_specs = _direction_specs(
+        nonzero, names, block_size, n_directions, ("pix",), (), n_voxels
+    )
+    tout = pl.pallas_call(
         kernel,
         grid=grid,
-        in_specs=([per_point] * 5 + [scalar]) * 2 + [volume, volume],
-        out_specs=[volume, volume],
-        out_shape=[jax.ShapeDtypeStruct((n_voxels,), dtype)] * 2,
-        input_output_aliases={12: 0, 13: 1},
+        in_specs=[per_point] * 5 + [scalar] + tangent_specs + [tvolume],
+        out_specs=tvolume,
+        out_shape=jax.ShapeDtypeStruct((n_directions * n_voxels,), dtype),
+        input_output_aliases={6 + len(tangents_b): 0},
         compiler_params=_CompilerParams(),
-    )(*primals_b, *tangents_b, zeros, zeros)
-    return out.reshape(nz, ny, nx), tout.reshape(nz, ny, nx)
+    )(*primals_b, *tangents_b, jnp.zeros((n_directions * n_voxels,), dtype=dtype))
+    return tout.reshape(n_directions, nz, ny, nx)
+
+
+@cache
+def _spread_tangent_3d_batchable(nz, ny, nx, n_spread, use_erf, nonzero):
+    def impl(primals, tangents):
+        return _spread_tangent_3d_impl(
+            primals, tangents, nonzero, nz, ny, nx, n_spread, use_erf
+        )
+
+    def single(*args):
+        primals, tangents = args[:6], args[6:]
+        return impl(primals, tuple(t[None] for t in tangents))[0]
+
+    return _batchable(single, 6, impl)
+
+
+def pallas_spread_tangent_3d(
+    i, j, k, amplitude, variance, voxel_size, tangents, nz, ny, nx, n_spread, use_erf
+):
+    """3D twin of `pallas_spread_tangent_2d`."""
+    nonzero = tuple(not _is_zero(t) for t in tangents)
+    fn = _spread_tangent_3d_batchable(nz, ny, nx, n_spread, use_erf, nonzero)
+    return fn(
+        i,
+        j,
+        k,
+        amplitude,
+        variance,
+        voxel_size,
+        *(t for t in tangents if not _is_zero(t)),
+    )
 
 
 def _spread_3d_jvp_rule(nz, ny, nx, n_spread, use_erf, primals, tangents):
+    out = pallas_spread_3d(*primals, nz, ny, nx, n_spread, use_erf)
     if all(_is_zero(t) for t in tangents):
-        out = pallas_spread_3d(*primals, nz, ny, nx, n_spread, use_erf)
         return out, jnp.zeros_like(out)
-    return pallas_spread_jvp_3d(*primals, tangents, nz, ny, nx, n_spread, use_erf)
+    return out, pallas_spread_tangent_3d(
+        *primals, tangents, nz, ny, nx, n_spread, use_erf
+    )
 
 
 pallas_spread_3d.defjvp(_spread_3d_jvp_rule, symbolic_zeros=True)
 
 
-def pallas_spread_vjp_jvp_3d(nz, ny, nx, n_spread, use_erf, res, g, tres, tg):
-    live = tuple(not _is_zero(t) for t in (*tres, tg))
+def _spread_vjp_tangent_3d_impl(
+    res, g, nonzero_tangents, nonzero, nz, ny, nx, n_spread, use_erf
+):
+    """3D twin of `_spread_vjp_tangent_2d_impl`."""
     i, j, k, amplitude, variance, voxel_size = res
+    n_directions = nonzero_tangents[0].shape[0]
     m_total, dtype = i.shape[0], i.dtype
+    n_voxels = nz * ny * nx
     primals_b = (
         i,
         j.astype(dtype),
@@ -1337,48 +1515,77 @@ def pallas_spread_vjp_jvp_3d(nz, ny, nx, n_spread, use_erf, res, g, tres, tg):
         jnp.reshape(voxel_size, (1,)).astype(dtype),
         g.astype(dtype).reshape(-1),
     )
-    tangents_b = tuple(
-        (_like_operand(t, p, dtype) if is_live else p)
-        for t, p, is_live in zip((*tres, tg), primals_b, live)
+    names = ("i", "j", "k", "amp", "var", "pix", "g")
+    tangents_b = _tangent_operands(
+        nonzero_tangents,
+        [p for p, nz_ in zip(primals_b, nonzero) if nz_],
+        [n for n, nz_ in zip(names, nonzero) if nz_],
+        dtype,
     )
     block_size = _choose_block_size(n_spread, ndim=3)
     grid = (pl.cdiv(m_total, block_size),)
-    kernel = _make_spread_vjp_jvp_kernel_3d(
-        nz, ny, nx, n_spread, use_erf, block_size, m_total, live
+    kernel = _make_spread_vjp_tangent_kernel_3d(
+        nz, ny, nx, n_spread, use_erf, block_size, m_total, nonzero, n_directions
     )
     per_point = pl.BlockSpec((block_size,), lambda p: (p,))
     scalar = pl.BlockSpec((1,), lambda p: (0,))
-    volume = pl.BlockSpec((nz * ny * nx,), lambda p: (0,))
-    outs = pl.pallas_call(
+    volume = pl.BlockSpec((n_voxels,), lambda p: (0,))
+    per_direction = pl.BlockSpec((n_directions, block_size), lambda p: (0, p))
+    tangent_specs = _direction_specs(
+        nonzero, names, block_size, n_directions, ("pix",), ("g",), n_voxels
+    )
+    odi, odj, odk, odamplitude, odvariance_pp, odvoxel_size_pp = pl.pallas_call(
         kernel,
         grid=grid,
-        in_specs=([per_point] * 5 + [scalar, volume]) * 2,
-        out_specs=[per_point] * 12,
-        out_shape=[jax.ShapeDtypeStruct((m_total,), dtype)] * 12,
+        in_specs=[per_point] * 5 + [scalar, volume] + tangent_specs,
+        out_specs=[per_direction] * 6,
+        out_shape=[jax.ShapeDtypeStruct((n_directions, m_total), dtype)] * 6,
         compiler_params=_CompilerParams(),
     )(*primals_b, *tangents_b)
-    scalar_variance = jnp.ndim(variance) == 0
+    return (
+        odi,
+        odj,
+        odk,
+        odamplitude,
+        jnp.sum(odvariance_pp, axis=-1) if jnp.ndim(variance) == 0 else odvariance_pp,
+        jnp.sum(odvoxel_size_pp, axis=-1),
+    )
 
-    def assemble(di, dj, dk, damplitude, dvariance_pp, dvoxel_size_pp):
-        return (
-            di,
-            dj,
-            dk,
-            damplitude,
-            jnp.sum(dvariance_pp) if scalar_variance else dvariance_pp,
-            jnp.sum(dvoxel_size_pp),
+
+@cache
+def _spread_vjp_tangent_3d_batchable(nz, ny, nx, n_spread, use_erf, nonzero):
+    def impl(primals, tangents):
+        res, g = primals[:6], primals[6]
+        return _spread_vjp_tangent_3d_impl(
+            res, g, tangents, nonzero, nz, ny, nx, n_spread, use_erf
         )
 
-    return assemble(*outs[:6]), assemble(*outs[6:])
+    def single(*args):
+        primals, tangents = args[:7], args[7:]
+        return jax.tree.map(
+            lambda t: t[0], impl(primals, tuple(t[None] for t in tangents))
+        )
+
+    return _batchable(single, 7, impl)
+
+
+def pallas_spread_vjp_tangent_3d(nz, ny, nx, n_spread, use_erf, res, g, tres, tg):
+    """3D twin of `pallas_spread_vjp_tangent_2d`."""
+    tangents = (*tres, tg)
+    nonzero = tuple(not _is_zero(t) for t in tangents)
+    fn = _spread_vjp_tangent_3d_batchable(nz, ny, nx, n_spread, use_erf, nonzero)
+    return fn(*res, g, *(t for t in tangents if not _is_zero(t)))
 
 
 def _spread_vjp_3d_jvp_rule(nz, ny, nx, n_spread, use_erf, primals, tangents):
     res, g = primals
     tres, tg = tangents
+    out = pallas_spread_vjp_3d(nz, ny, nx, n_spread, use_erf, res, g)
     if _is_zero(tg) and all(_is_zero(t) for t in tres):
-        out = pallas_spread_vjp_3d(nz, ny, nx, n_spread, use_erf, res, g)
         return out, jax.tree.map(jnp.zeros_like, out)
-    return pallas_spread_vjp_jvp_3d(nz, ny, nx, n_spread, use_erf, res, g, tres, tg)
+    return out, pallas_spread_vjp_tangent_3d(
+        nz, ny, nx, n_spread, use_erf, res, g, tres, tg
+    )
 
 
 pallas_spread_vjp_3d.defjvp(_spread_vjp_3d_jvp_rule, symbolic_zeros=True)
