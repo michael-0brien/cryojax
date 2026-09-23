@@ -32,7 +32,7 @@ import jax.numpy as jnp
 import pytest
 from cryojax.ndimage import spread_gaussians_2d, spread_gaussians_3d
 from cryojax.ndimage._spreading.pallas_spread import (
-    pallas_interp_bwd_2d,
+    pallas_spread_vjp_2d,
     resolve_enable_pallas,
 )
 
@@ -205,7 +205,7 @@ def test_resolve_enable_pallas_invalid_type():
 
 # ── Backward (gather): safe to check numerically under `interpret=True` ─────
 #
-# `pallas_interp_bwd_{2,3}d` don't expose an `interpret` argument (the real
+# `pallas_spread_vjp_{2,3}d` don't expose an `interpret` argument (the real
 # module always compiles for real), so these tests call `pl.pallas_call`
 # with `interpret=True` directly via a small local monkeypatch of
 # `pl.pallas_call`'s default, rather than threading an `interpret` kwarg
@@ -251,7 +251,7 @@ def test_pallas_bwd_2d_matches_pure_jax_interpret(
     i = x / pixel_size + nx // 2
     j = y / pixel_size + ny // 2
     res = (i, j, amplitude, variance, pixel_size)
-    di, dj, damplitude, dvariance, dpixel_size = pallas_interp_bwd_2d(
+    di, dj, damplitude, dvariance, dpixel_size = pallas_spread_vjp_2d(
         ny, nx, n_spread, use_erf, res, g
     )
     # `grads_ref` is w.r.t. physical `x`/`y`; `di`/`dj` are w.r.t. grid-index
@@ -440,7 +440,7 @@ def _random_tangents(key, primals):
 @pytest.mark.parametrize("use_erf", [False, True])
 @pytest.mark.parametrize("scalar_variance", [False, True])
 def test_pallas_fwd_2d_jvp_matches_pure_jax(use_erf, scalar_variance):
-    from cryojax.ndimage._spreading.pallas_spread import pallas_spread_fwd_2d
+    from cryojax.ndimage._spreading.pallas_spread import pallas_spread_2d
     from cryojax.ndimage._spreading.spread import spread_2d_impl
 
     ny, nx, n_spread = 48, 40, 7
@@ -454,7 +454,7 @@ def test_pallas_fwd_2d_jvp_matches_pure_jax(use_erf, scalar_variance):
     ref = lambda i, j, a, v, p: spread_2d_impl(
         i, j, a, v, ny, nx, pixel_size=p, n_spread=n_spread, use_erf=use_erf
     )
-    pallas = lambda i, j, a, v, p: pallas_spread_fwd_2d(
+    pallas = lambda i, j, a, v, p: pallas_spread_2d(
         i, j, a, v, p, ny, nx, n_spread, use_erf
     )
     out_ref, tan_ref = jax.jvp(ref, primals, tangents)
@@ -504,7 +504,7 @@ def test_pallas_2d_hvp_matches_pure_jax(points_2d, use_erf, scalar_variance):
 def test_pallas_bwd_2d_jvp_matches_pure_jax(use_erf, scalar_variance):
     """Tangents on both the residuals and the cotangent, so the linear-in-`g` half
     and the second-derivative half of the rule are exercised together."""
-    from cryojax.ndimage._spreading.pallas_spread import pallas_interp_bwd_2d
+    from cryojax.ndimage._spreading.pallas_spread import pallas_spread_vjp_2d
     from cryojax.ndimage._spreading.spread import spread_2d_bwd
 
     ny, nx, n_spread = 48, 40, 7
@@ -517,7 +517,7 @@ def test_pallas_bwd_2d_jvp_matches_pure_jax(use_erf, scalar_variance):
     tangents = (_random_tangents(jax.random.PRNGKey(10), res), jnp.ones_like(g) * 0.3)
 
     ref = lambda res, g: spread_2d_bwd(ny, nx, n_spread, use_erf, res, g)
-    pallas = lambda res, g: pallas_interp_bwd_2d(ny, nx, n_spread, use_erf, res, g)
+    pallas = lambda res, g: pallas_spread_vjp_2d(ny, nx, n_spread, use_erf, res, g)
     out_ref, tan_ref = jax.jvp(ref, (res, g), tangents)
     out_pallas, tan_pallas = jax.jvp(pallas, (res, g), tangents)
     for r, p in zip(out_ref, out_pallas):
@@ -533,8 +533,8 @@ def test_pallas_2d_jvp_specialized_on_symbolic_zeros(use_erf):
     """The two live patterns an optimizer's shared-parameter HVP produces: a scatter
     tangent only in `pixel_size`, and a gather tangent only in the cotangent `g`."""
     from cryojax.ndimage._spreading.pallas_spread import (
-        pallas_interp_bwd_2d,
-        pallas_spread_fwd_2d,
+        pallas_spread_2d,
+        pallas_spread_vjp_2d,
     )
     from cryojax.ndimage._spreading.spread import spread_2d_bwd, spread_2d_impl
 
@@ -554,7 +554,7 @@ def test_pallas_2d_jvp_specialized_on_symbolic_zeros(use_erf):
         n_spread=n_spread,
         use_erf=use_erf,
     )
-    pallas = lambda p: pallas_spread_fwd_2d(
+    pallas = lambda p: pallas_spread_2d(
         i, j, amplitude, variance, p, ny, nx, n_spread, use_erf
     )
     _, tan_ref = jax.jvp(ref, (pixel_size,), (tpix,))
@@ -565,7 +565,7 @@ def test_pallas_2d_jvp_specialized_on_symbolic_zeros(use_erf):
     g = jax.random.normal(jax.random.PRNGKey(12), (ny, nx))
     tg = jax.random.normal(jax.random.PRNGKey(13), (ny, nx))
     ref_g = lambda g: spread_2d_bwd(ny, nx, n_spread, use_erf, res, g)
-    pallas_g = lambda g: pallas_interp_bwd_2d(ny, nx, n_spread, use_erf, res, g)
+    pallas_g = lambda g: pallas_spread_vjp_2d(ny, nx, n_spread, use_erf, res, g)
     _, tan_ref = jax.jvp(ref_g, (g,), (tg,))
     _, tan_pallas = jax.jvp(pallas_g, (g,), (tg,))
     for r, p in zip(tan_ref, tan_pallas):
@@ -616,7 +616,7 @@ def _index_points_3d(key, m, nz, ny, nx):
 @pytest.mark.parametrize("use_erf", [False, True])
 @pytest.mark.parametrize("scalar_variance", [False, True])
 def test_pallas_fwd_3d_jvp_matches_pure_jax(use_erf, scalar_variance):
-    from cryojax.ndimage._spreading.pallas_spread import pallas_spread_fwd_3d
+    from cryojax.ndimage._spreading.pallas_spread import pallas_spread_3d
     from cryojax.ndimage._spreading.spread import spread_3d_impl
 
     nz, ny, nx, n_spread = 20, 24, 28, 5
@@ -632,7 +632,7 @@ def test_pallas_fwd_3d_jvp_matches_pure_jax(use_erf, scalar_variance):
     ref = lambda i, j, k, a, v, p: spread_3d_impl(
         i, j, k, a, v, nz, ny, nx, voxel_size=p, n_spread=n_spread, use_erf=use_erf
     )
-    pallas = lambda i, j, k, a, v, p: pallas_spread_fwd_3d(
+    pallas = lambda i, j, k, a, v, p: pallas_spread_3d(
         i, j, k, a, v, p, nz, ny, nx, n_spread, use_erf
     )
     out_ref, tan_ref = jax.jvp(ref, primals, tangents)
@@ -646,7 +646,7 @@ def test_pallas_fwd_3d_jvp_matches_pure_jax(use_erf, scalar_variance):
 @pytest.mark.parametrize("use_erf", [False, True])
 @pytest.mark.parametrize("scalar_variance", [False, True])
 def test_pallas_bwd_3d_jvp_matches_pure_jax(use_erf, scalar_variance):
-    from cryojax.ndimage._spreading.pallas_spread import pallas_interp_bwd_3d
+    from cryojax.ndimage._spreading.pallas_spread import pallas_spread_vjp_3d
     from cryojax.ndimage._spreading.spread import spread_3d_bwd
 
     nz, ny, nx, n_spread = 20, 24, 28, 5
@@ -661,7 +661,7 @@ def test_pallas_bwd_3d_jvp_matches_pure_jax(use_erf, scalar_variance):
     tangents = (_random_tangents(jax.random.PRNGKey(20), res), jnp.ones_like(g) * 0.3)
 
     ref = lambda res, g: spread_3d_bwd(nz, ny, nx, n_spread, use_erf, res, g)
-    pallas = lambda res, g: pallas_interp_bwd_3d(nz, ny, nx, n_spread, use_erf, res, g)
+    pallas = lambda res, g: pallas_spread_vjp_3d(nz, ny, nx, n_spread, use_erf, res, g)
     out_ref, tan_ref = jax.jvp(ref, (res, g), tangents)
     out_pallas, tan_pallas = jax.jvp(pallas, (res, g), tangents)
     for r, p in zip(out_ref, out_pallas):

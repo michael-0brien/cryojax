@@ -7,8 +7,8 @@ via `segment_sum`), this backend never holds more than `O(block_size *
 n_spread^d)` at once per kernel program, for a total footprint of `O(M)`
 across the whole call.
 
-Forward (`pallas_spread_fwd_{2,3}d`) scatters, so it needs atomics (only
-available on the Triton backend). Backward (`pallas_interp_bwd_{2,3}d`) is
+The primal (`pallas_spread_{2,3}d`) scatters, so it needs atomics (only
+available on the Triton backend). Its VJP (`pallas_spread_vjp_{2,3}d`) is
 a pure gather (the adjoint of spreading is interpolation, exactly as in
 `spread.py`), so no atomics are needed there at all: each point reads its
 own fixed-size neighborhood of the output cotangent independently. The one
@@ -120,7 +120,7 @@ def _kernel_weight(
     return jnp.exp(-0.5 * r**2 / variance) / jnp.sqrt(2 * jnp.pi * variance)
 
 
-def _kernel_weight_and_grad(
+def _kernel_weight_and_grads(
     z: Array, variance: Array, pixel_size: Array, *, use_erf: bool
 ) -> tuple[Array, Array, Array, Array]:
     """Kernel-safe counterpart of `spread._kernel_weight_and_grads`. Returns
@@ -164,7 +164,7 @@ def _valid_lane_mask(block_size: int, m_total: int) -> Array:
 
 
 # ============================================================================
-# Forward: atomic-add scatter ("nupts-driven")
+# Primal: atomic-add scatter ("nupts-driven")
 # ============================================================================
 #
 # TODO(pallas-output-driven): FINUFFT's own `gpu_method=0` ("auto") default
@@ -176,7 +176,7 @@ def _valid_lane_mask(block_size: int, m_total: int) -> Array:
 
 
 @cache
-def _make_fwd_kernel_2d(
+def _make_spread_kernel_2d(
     ny: int, nx: int, n_spread: int, use_erf: bool, block_size: int, m_total: int
 ):
     def kernel(i_ref, j_ref, amp_ref, var_ref, pixel_size_ref, zeros_ref, out_ref):
@@ -211,7 +211,7 @@ def _make_fwd_kernel_2d(
 
 
 @cache
-def _make_fwd_kernel_3d(
+def _make_spread_kernel_3d(
     nz: int, ny: int, nx: int, n_spread: int, use_erf: bool, block_size: int, m_total: int
 ):
     def kernel(i_ref, j_ref, k_ref, amp_ref, var_ref, voxel_size_ref, zeros_ref, out_ref):
@@ -257,9 +257,7 @@ def _make_fwd_kernel_3d(
 
 
 @partial(jax.custom_jvp, nondiff_argnums=(5, 6, 7, 8))
-def pallas_spread_fwd_2d(
-    i, j, amplitude, variance, pixel_size, ny, nx, n_spread, use_erf
-):
+def pallas_spread_2d(i, j, amplitude, variance, pixel_size, ny, nx, n_spread, use_erf):
     m_total, dtype = i.shape[0], i.dtype
     j = j.astype(dtype)
     amplitude = amplitude.astype(dtype)
@@ -267,7 +265,7 @@ def pallas_spread_fwd_2d(
     pixel_size_b = jnp.reshape(pixel_size, (1,)).astype(dtype)
     block_size = _choose_block_size(n_spread, ndim=2)
     grid = (pl.cdiv(m_total, block_size),)
-    kernel = _make_fwd_kernel_2d(ny, nx, n_spread, use_erf, block_size, m_total)
+    kernel = _make_spread_kernel_2d(ny, nx, n_spread, use_erf, block_size, m_total)
     zeros = jnp.zeros((ny * nx,), dtype=dtype)
     out = pl.pallas_call(
         kernel,
@@ -289,7 +287,7 @@ def pallas_spread_fwd_2d(
 
 
 @partial(jax.custom_jvp, nondiff_argnums=(6, 7, 8, 9, 10))
-def pallas_spread_fwd_3d(
+def pallas_spread_3d(
     i, j, k, amplitude, variance, voxel_size, nz, ny, nx, n_spread, use_erf
 ):
     m_total, dtype = i.shape[0], i.dtype
@@ -300,7 +298,7 @@ def pallas_spread_fwd_3d(
     voxel_size_b = jnp.reshape(voxel_size, (1,)).astype(dtype)
     block_size = _choose_block_size(n_spread, ndim=3)
     grid = (pl.cdiv(m_total, block_size),)
-    kernel = _make_fwd_kernel_3d(nz, ny, nx, n_spread, use_erf, block_size, m_total)
+    kernel = _make_spread_kernel_3d(nz, ny, nx, n_spread, use_erf, block_size, m_total)
     zeros = jnp.zeros((nz * ny * nx,), dtype=dtype)
     out = pl.pallas_call(
         kernel,
@@ -323,13 +321,13 @@ def pallas_spread_fwd_3d(
 
 
 # ============================================================================
-# Backward: pure gather ("interpolation", the adjoint of spreading) -- no
+# VJP: pure gather ("interpolation", the adjoint of spreading) -- no
 # atomics needed; see module docstring.
 # ============================================================================
 
 
 @cache
-def _make_bwd_kernel_2d(
+def _make_spread_vjp_kernel_2d(
     ny: int, nx: int, n_spread: int, use_erf: bool, block_size: int, m_total: int
 ):
     def kernel(
@@ -358,7 +356,7 @@ def _make_bwd_kernel_2d(
             damp, di, dj, dvar, dpix = carry
             idx_y = (i0y + oy) % ny
             z_y = (i0y + oy).astype(i.dtype) - j
-            wy, dwy_dz, dwy_dvar, dwy_dpix = _kernel_weight_and_grad(
+            wy, dwy_dz, dwy_dvar, dwy_dpix = _kernel_weight_and_grads(
                 z_y, variance, pixel_size, use_erf=use_erf
             )
 
@@ -366,7 +364,7 @@ def _make_bwd_kernel_2d(
                 damp, di, dj, dvar, dpix = carry2
                 idx_x = (i0x + ox) % nx
                 z_x = (i0x + ox).astype(i.dtype) - i
-                wx, dwx_dz, dwx_dvar, dwx_dpix = _kernel_weight_and_grad(
+                wx, dwx_dz, dwx_dvar, dwx_dpix = _kernel_weight_and_grads(
                     z_x, variance, pixel_size, use_erf=use_erf
                 )
                 flat = idx_y * nx + idx_x
@@ -395,7 +393,7 @@ def _make_bwd_kernel_2d(
 
 
 @cache
-def _make_bwd_kernel_3d(
+def _make_spread_vjp_kernel_3d(
     nz: int, ny: int, nx: int, n_spread: int, use_erf: bool, block_size: int, m_total: int
 ):
     def kernel(
@@ -428,7 +426,7 @@ def _make_bwd_kernel_3d(
             damp, di, dj, dk, dvar, dpix = carry
             idx_z = (i0z + oz) % nz
             z_z = (i0z + oz).astype(i.dtype) - k
-            wz, dwz_dz, dwz_dvar, dwz_dpix = _kernel_weight_and_grad(
+            wz, dwz_dz, dwz_dvar, dwz_dpix = _kernel_weight_and_grads(
                 z_z, variance, voxel_size, use_erf=use_erf
             )
 
@@ -436,7 +434,7 @@ def _make_bwd_kernel_3d(
                 damp, di, dj, dk, dvar, dpix = carry2
                 idx_y = (i0y + oy) % ny
                 z_y = (i0y + oy).astype(i.dtype) - j
-                wy, dwy_dz, dwy_dvar, dwy_dpix = _kernel_weight_and_grad(
+                wy, dwy_dz, dwy_dvar, dwy_dpix = _kernel_weight_and_grads(
                     z_y, variance, voxel_size, use_erf=use_erf
                 )
 
@@ -444,7 +442,7 @@ def _make_bwd_kernel_3d(
                     damp, di, dj, dk, dvar, dpix = carry3
                     idx_x = (i0x + ox) % nx
                     z_x = (i0x + ox).astype(i.dtype) - i
-                    wx, dwx_dz, dwx_dvar, dwx_dpix = _kernel_weight_and_grad(
+                    wx, dwx_dz, dwx_dvar, dwx_dpix = _kernel_weight_and_grads(
                         z_x, variance, voxel_size, use_erf=use_erf
                     )
                     flat = idx_z * (nx * ny) + idx_y * nx + idx_x
@@ -484,7 +482,7 @@ def _make_bwd_kernel_3d(
 
 
 @partial(jax.custom_jvp, nondiff_argnums=(0, 1, 2, 3))
-def pallas_interp_bwd_2d(ny, nx, n_spread, use_erf, res, g):
+def pallas_spread_vjp_2d(ny, nx, n_spread, use_erf, res, g):
     i, j, amplitude, variance, pixel_size = res
     m_total, dtype = i.shape[0], i.dtype
     j = j.astype(dtype)
@@ -494,7 +492,7 @@ def pallas_interp_bwd_2d(ny, nx, n_spread, use_erf, res, g):
     g = g.astype(dtype)
     block_size = _choose_block_size(n_spread, ndim=2)
     grid = (pl.cdiv(m_total, block_size),)
-    kernel = _make_bwd_kernel_2d(ny, nx, n_spread, use_erf, block_size, m_total)
+    kernel = _make_spread_vjp_kernel_2d(ny, nx, n_spread, use_erf, block_size, m_total)
     out_shapes = [jax.ShapeDtypeStruct((m_total,), dtype)] * 5
     di, dj, damplitude, dvariance_pp, dpixel_size_pp = pl.pallas_call(
         kernel,
@@ -517,7 +515,7 @@ def pallas_interp_bwd_2d(ny, nx, n_spread, use_erf, res, g):
 
 
 @partial(jax.custom_jvp, nondiff_argnums=(0, 1, 2, 3, 4))
-def pallas_interp_bwd_3d(nz, ny, nx, n_spread, use_erf, res, g):
+def pallas_spread_vjp_3d(nz, ny, nx, n_spread, use_erf, res, g):
     i, j, k, amplitude, variance, voxel_size = res
     m_total, dtype = i.shape[0], i.dtype
     j = j.astype(dtype)
@@ -528,7 +526,9 @@ def pallas_interp_bwd_3d(nz, ny, nx, n_spread, use_erf, res, g):
     g = g.astype(dtype)
     block_size = _choose_block_size(n_spread, ndim=3)
     grid = (pl.cdiv(m_total, block_size),)
-    kernel = _make_bwd_kernel_3d(nz, ny, nx, n_spread, use_erf, block_size, m_total)
+    kernel = _make_spread_vjp_kernel_3d(
+        nz, ny, nx, n_spread, use_erf, block_size, m_total
+    )
     out_shapes = [jax.ShapeDtypeStruct((m_total,), dtype)] * 6
     di, dj, dk, damplitude, dvariance_pp, dvoxel_size_pp = pl.pallas_call(
         kernel,
@@ -620,6 +620,20 @@ def _mul(a, b):
     return None if a is None or b is None else a * b
 
 
+def _neg(x):
+    return None if x is None else -x
+
+
+def _tprod2(a, b, ta, tb):
+    """Tangent of `a b` by the product rule, `None` tangents dropped."""
+    return _add(_mul(ta, b), _mul(tb, a))
+
+
+def _tprod3(a, b, c, ta, tb, tc):
+    """Tangent of `a b c` by the product rule, `None` tangents dropped."""
+    return _add(_mul(ta, b * c), _mul(tb, a * c), _mul(tc, a * b))
+
+
 def _jvp_live(fn, args, tangents):
     """`jax.jvp(fn, args, tangents)` over only the arguments whose tangent is not
     `None`; the rest are closed over as constants, so no dead term is traced."""
@@ -656,7 +670,7 @@ def _weight_tangent(dw_dz, dw_dvar, dw_dpix, tcoord, tvar, tpix):
 
 
 @cache
-def _make_fwd_and_jvp_kernel_2d(
+def _make_spread_jvp_kernel_2d(
     ny: int,
     nx: int,
     n_spread: int,
@@ -665,7 +679,7 @@ def _make_fwd_and_jvp_kernel_2d(
     m_total: int,
     live: tuple[bool, bool, bool, bool, bool],
 ):
-    """`_make_fwd_kernel_2d` and its tangent in one pass:
+    """`_make_spread_kernel_2d` and its tangent in one pass:
     `d(a wx wy) = da wx wy + a (twx wy + wx twy)`."""
     live_i, live_j, live_amp, live_var, live_pix = live
     live_x = live_i or live_var or live_pix
@@ -703,7 +717,7 @@ def _make_fwd_and_jvp_kernel_2d(
         def weight(z, tcoord, is_live):
             if not is_live:
                 return _kernel_weight(z, variance, pixel_size, use_erf=use_erf), None
-            w, dw_dz, dw_dvar, dw_dpix = _kernel_weight_and_grad(
+            w, dw_dz, dw_dvar, dw_dpix = _kernel_weight_and_grads(
                 z, variance, pixel_size, use_erf=use_erf
             )
             return w, _weight_tangent(dw_dz, dw_dvar, dw_dpix, tcoord, tvar, tpix)
@@ -730,7 +744,7 @@ def _make_fwd_and_jvp_kernel_2d(
 
 
 @cache
-def _make_bwd_and_jvp_kernel_2d(
+def _make_spread_vjp_jvp_kernel_2d(
     ny: int,
     nx: int,
     n_spread: int,
@@ -739,19 +753,19 @@ def _make_bwd_and_jvp_kernel_2d(
     m_total: int,
     live: tuple[bool, bool, bool, bool, bool, bool],
 ):
-    """`_make_bwd_kernel_2d` and its tangent in one pass.
+    """`_make_spread_vjp_kernel_2d` and its tangent in one pass.
 
     The gather is linear in `g`, so `g`'s tangent is the gather of `tg` with the
     primal factors. Each residual tangent needs the total differential of every
     per-pixel factor -- second derivatives of the weight -- which `jax.jvp` of
-    `_kernel_weight_and_grad` supplies inside the kernel body, forward mode over
+    `_kernel_weight_and_grads` supplies inside the kernel body, forward mode over
     elementwise math, over only the live inputs."""
     live_i, live_j, live_amp, live_var, live_pix, live_g = live
     live_x = live_i or live_var or live_pix
     live_y = live_j or live_var or live_pix
 
     def weight_and_grad(z, variance, pixel_size):
-        return _kernel_weight_and_grad(z, variance, pixel_size, use_erf=use_erf)
+        return _kernel_weight_and_grads(z, variance, pixel_size, use_erf=use_erf)
 
     def kernel(
         i_ref,
@@ -827,15 +841,11 @@ def _make_bwd_and_jvp_kernel_2d(
                 dpix = dpix + amp * g_val * f_pix
 
                 # ...and their tangents, by the product rule.
-                Tf_amp = _add(_mul(Twy, wx), _mul(wy, Twx))
-                Tf_i = _add(_mul(Tdwx, -wy), _mul(-dwx, Twy))
-                Tf_j = _add(_mul(Tdwy, -wx), _mul(-dwy, Twx))
-                Tf_var = _add(
-                    _mul(Twy, vwx), _mul(wy, Tvwx), _mul(Twx, vwy), _mul(wx, Tvwy)
-                )
-                Tf_pix = _add(
-                    _mul(Twy, hwx), _mul(wy, Thwx), _mul(Twx, hwy), _mul(wx, Thwy)
-                )
+                Tf_amp = _tprod2(wy, wx, Twy, Twx)
+                Tf_i = _neg(_tprod2(dwx, wy, Tdwx, Twy))
+                Tf_j = _neg(_tprod2(dwy, wx, Tdwy, Twx))
+                Tf_var = _add(_tprod2(wy, vwx, Twy, Tvwx), _tprod2(wx, vwy, Twx, Tvwy))
+                Tf_pix = _add(_tprod2(wy, hwx, Twy, Thwx), _tprod2(wx, hwy, Twx, Thwy))
 
                 tg_val = (
                     pltriton.load(tg_ref.at[flat], mask=valid, other=0.0)
@@ -881,7 +891,7 @@ def _make_bwd_and_jvp_kernel_2d(
     return kernel
 
 
-def pallas_spread_fwd_and_jvp_2d(
+def pallas_spread_jvp_2d(
     i, j, amplitude, variance, pixel_size, tangents, ny, nx, n_spread, use_erf
 ):
     """`(out, tangent_out)`; `tangents` aligned with the five primals, symbolic zeros
@@ -899,7 +909,7 @@ def pallas_spread_fwd_and_jvp_2d(
     )
     block_size = _choose_block_size(n_spread, ndim=2)
     grid = (pl.cdiv(m_total, block_size),)
-    kernel = _make_fwd_and_jvp_kernel_2d(
+    kernel = _make_spread_jvp_kernel_2d(
         ny, nx, n_spread, use_erf, block_size, m_total, live
     )
     zeros = jnp.zeros((ny * nx,), dtype=dtype)
@@ -918,17 +928,17 @@ def pallas_spread_fwd_and_jvp_2d(
     return out.reshape(ny, nx), tout.reshape(ny, nx)
 
 
-def _pallas_spread_fwd_2d_jvp(ny, nx, n_spread, use_erf, primals, tangents):
+def _spread_2d_jvp_rule(ny, nx, n_spread, use_erf, primals, tangents):
     if all(_is_zero(t) for t in tangents):
-        out = pallas_spread_fwd_2d(*primals, ny, nx, n_spread, use_erf)
+        out = pallas_spread_2d(*primals, ny, nx, n_spread, use_erf)
         return out, jnp.zeros_like(out)
-    return pallas_spread_fwd_and_jvp_2d(*primals, tangents, ny, nx, n_spread, use_erf)
+    return pallas_spread_jvp_2d(*primals, tangents, ny, nx, n_spread, use_erf)
 
 
-pallas_spread_fwd_2d.defjvp(_pallas_spread_fwd_2d_jvp, symbolic_zeros=True)
+pallas_spread_2d.defjvp(_spread_2d_jvp_rule, symbolic_zeros=True)
 
 
-def pallas_interp_bwd_and_jvp_2d(ny, nx, n_spread, use_erf, res, g, tres, tg):
+def pallas_spread_vjp_jvp_2d(ny, nx, n_spread, use_erf, res, g, tres, tg):
     """`(out, tangent_out)`, each the gather's five outputs; `tres`/`tg` may hold
     symbolic zeros, dropped at trace time."""
     live = tuple(not _is_zero(t) for t in (*tres, tg))
@@ -949,7 +959,7 @@ def pallas_interp_bwd_and_jvp_2d(ny, nx, n_spread, use_erf, res, g, tres, tg):
     )
     block_size = _choose_block_size(n_spread, ndim=2)
     grid = (pl.cdiv(m_total, block_size),)
-    kernel = _make_bwd_and_jvp_kernel_2d(
+    kernel = _make_spread_vjp_jvp_kernel_2d(
         ny, nx, n_spread, use_erf, block_size, m_total, live
     )
     per_point = pl.BlockSpec((block_size,), lambda p: (p,))
@@ -983,29 +993,20 @@ def pallas_interp_bwd_and_jvp_2d(ny, nx, n_spread, use_erf, res, g, tres, tg):
     return out, tangent_out
 
 
-def _pallas_interp_bwd_2d_jvp(ny, nx, n_spread, use_erf, primals, tangents):
+def _spread_vjp_2d_jvp_rule(ny, nx, n_spread, use_erf, primals, tangents):
     res, g = primals
     tres, tg = tangents
     if _is_zero(tg) and all(_is_zero(t) for t in tres):
-        out = pallas_interp_bwd_2d(ny, nx, n_spread, use_erf, res, g)
+        out = pallas_spread_vjp_2d(ny, nx, n_spread, use_erf, res, g)
         return out, jax.tree.map(jnp.zeros_like, out)
-    return pallas_interp_bwd_and_jvp_2d(ny, nx, n_spread, use_erf, res, g, tres, tg)
+    return pallas_spread_vjp_jvp_2d(ny, nx, n_spread, use_erf, res, g, tres, tg)
 
 
-pallas_interp_bwd_2d.defjvp(_pallas_interp_bwd_2d_jvp, symbolic_zeros=True)
-
-
-def _tprod3(a, b, c, ta, tb, tc):
-    """Tangent of `a b c` by the product rule, `None` tangents dropped."""
-    return _add(_mul(ta, b * c), _mul(tb, a * c), _mul(tc, a * b))
-
-
-def _neg(x):
-    return None if x is None else -x
+pallas_spread_vjp_2d.defjvp(_spread_vjp_2d_jvp_rule, symbolic_zeros=True)
 
 
 @cache
-def _make_fwd_and_jvp_kernel_3d(
+def _make_spread_jvp_kernel_3d(
     nz: int,
     ny: int,
     nx: int,
@@ -1015,7 +1016,7 @@ def _make_fwd_and_jvp_kernel_3d(
     m_total: int,
     live: tuple[bool, bool, bool, bool, bool, bool],
 ):
-    """`_make_fwd_kernel_3d` and its tangent in one pass."""
+    """`_make_spread_kernel_3d` and its tangent in one pass."""
     live_i, live_j, live_k, live_amp, live_var, live_pix = live
     live_x = live_i or live_var or live_pix
     live_y = live_j or live_var or live_pix
@@ -1058,7 +1059,7 @@ def _make_fwd_and_jvp_kernel_3d(
         def weight(z, tcoord, is_live):
             if not is_live:
                 return _kernel_weight(z, variance, voxel_size, use_erf=use_erf), None
-            w, dw_dz, dw_dvar, dw_dpix = _kernel_weight_and_grad(
+            w, dw_dz, dw_dvar, dw_dpix = _kernel_weight_and_grads(
                 z, variance, voxel_size, use_erf=use_erf
             )
             return w, _weight_tangent(dw_dz, dw_dvar, dw_dpix, tcoord, tvar, tpix)
@@ -1095,7 +1096,7 @@ def _make_fwd_and_jvp_kernel_3d(
 
 
 @cache
-def _make_bwd_and_jvp_kernel_3d(
+def _make_spread_vjp_jvp_kernel_3d(
     nz: int,
     ny: int,
     nx: int,
@@ -1105,14 +1106,14 @@ def _make_bwd_and_jvp_kernel_3d(
     m_total: int,
     live: tuple[bool, bool, bool, bool, bool, bool, bool],
 ):
-    """`_make_bwd_kernel_3d` and its tangent in one pass; see the 2D twin."""
+    """`_make_spread_vjp_kernel_3d` and its tangent in one pass; see the 2D twin."""
     live_i, live_j, live_k, live_amp, live_var, live_pix, live_g = live
     live_x = live_i or live_var or live_pix
     live_y = live_j or live_var or live_pix
     live_z = live_k or live_var or live_pix
 
     def weight_and_grad(z, variance, voxel_size):
-        return _kernel_weight_and_grad(z, variance, voxel_size, use_erf=use_erf)
+        return _kernel_weight_and_grads(z, variance, voxel_size, use_erf=use_erf)
 
     def kernel(
         i_ref,
@@ -1274,7 +1275,7 @@ def _make_bwd_and_jvp_kernel_3d(
     return kernel
 
 
-def pallas_spread_fwd_and_jvp_3d(
+def pallas_spread_jvp_3d(
     i, j, k, amplitude, variance, voxel_size, tangents, nz, ny, nx, n_spread, use_erf
 ):
     live = tuple(not _is_zero(t) for t in tangents)
@@ -1293,7 +1294,7 @@ def pallas_spread_fwd_and_jvp_3d(
     )
     block_size = _choose_block_size(n_spread, ndim=3)
     grid = (pl.cdiv(m_total, block_size),)
-    kernel = _make_fwd_and_jvp_kernel_3d(
+    kernel = _make_spread_jvp_kernel_3d(
         nz, ny, nx, n_spread, use_erf, block_size, m_total, live
     )
     n_voxels = nz * ny * nx
@@ -1313,17 +1314,17 @@ def pallas_spread_fwd_and_jvp_3d(
     return out.reshape(nz, ny, nx), tout.reshape(nz, ny, nx)
 
 
-def _pallas_spread_fwd_3d_jvp(nz, ny, nx, n_spread, use_erf, primals, tangents):
+def _spread_3d_jvp_rule(nz, ny, nx, n_spread, use_erf, primals, tangents):
     if all(_is_zero(t) for t in tangents):
-        out = pallas_spread_fwd_3d(*primals, nz, ny, nx, n_spread, use_erf)
+        out = pallas_spread_3d(*primals, nz, ny, nx, n_spread, use_erf)
         return out, jnp.zeros_like(out)
-    return pallas_spread_fwd_and_jvp_3d(*primals, tangents, nz, ny, nx, n_spread, use_erf)
+    return pallas_spread_jvp_3d(*primals, tangents, nz, ny, nx, n_spread, use_erf)
 
 
-pallas_spread_fwd_3d.defjvp(_pallas_spread_fwd_3d_jvp, symbolic_zeros=True)
+pallas_spread_3d.defjvp(_spread_3d_jvp_rule, symbolic_zeros=True)
 
 
-def pallas_interp_bwd_and_jvp_3d(nz, ny, nx, n_spread, use_erf, res, g, tres, tg):
+def pallas_spread_vjp_jvp_3d(nz, ny, nx, n_spread, use_erf, res, g, tres, tg):
     live = tuple(not _is_zero(t) for t in (*tres, tg))
     i, j, k, amplitude, variance, voxel_size = res
     m_total, dtype = i.shape[0], i.dtype
@@ -1342,7 +1343,7 @@ def pallas_interp_bwd_and_jvp_3d(nz, ny, nx, n_spread, use_erf, res, g, tres, tg
     )
     block_size = _choose_block_size(n_spread, ndim=3)
     grid = (pl.cdiv(m_total, block_size),)
-    kernel = _make_bwd_and_jvp_kernel_3d(
+    kernel = _make_spread_vjp_jvp_kernel_3d(
         nz, ny, nx, n_spread, use_erf, block_size, m_total, live
     )
     per_point = pl.BlockSpec((block_size,), lambda p: (p,))
@@ -1371,13 +1372,13 @@ def pallas_interp_bwd_and_jvp_3d(nz, ny, nx, n_spread, use_erf, res, g, tres, tg
     return assemble(*outs[:6]), assemble(*outs[6:])
 
 
-def _pallas_interp_bwd_3d_jvp(nz, ny, nx, n_spread, use_erf, primals, tangents):
+def _spread_vjp_3d_jvp_rule(nz, ny, nx, n_spread, use_erf, primals, tangents):
     res, g = primals
     tres, tg = tangents
     if _is_zero(tg) and all(_is_zero(t) for t in tres):
-        out = pallas_interp_bwd_3d(nz, ny, nx, n_spread, use_erf, res, g)
+        out = pallas_spread_vjp_3d(nz, ny, nx, n_spread, use_erf, res, g)
         return out, jax.tree.map(jnp.zeros_like, out)
-    return pallas_interp_bwd_and_jvp_3d(nz, ny, nx, n_spread, use_erf, res, g, tres, tg)
+    return pallas_spread_vjp_jvp_3d(nz, ny, nx, n_spread, use_erf, res, g, tres, tg)
 
 
-pallas_interp_bwd_3d.defjvp(_pallas_interp_bwd_3d_jvp, symbolic_zeros=True)
+pallas_spread_vjp_3d.defjvp(_spread_vjp_3d_jvp_rule, symbolic_zeros=True)
