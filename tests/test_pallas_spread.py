@@ -530,7 +530,7 @@ def test_pallas_bwd_2d_jvp_matches_pure_jax(use_erf, scalar_variance):
 @requires_gpu
 @pytest.mark.parametrize("use_erf", [False, True])
 def test_pallas_2d_jvp_specialized_on_symbolic_zeros(use_erf):
-    """The two live patterns an optimizer's shared-parameter HVP produces: a scatter
+    """The two nonzero patterns an optimizer's shared-parameter HVP produces: a scatter
     tangent only in `pixel_size`, and a gather tangent only in the cotangent `g`."""
     from cryojax.ndimage._spreading.pallas_spread import (
         pallas_spread_2d,
@@ -699,3 +699,452 @@ def test_pallas_3d_hvp_matches_pure_jax(points_3d, use_erf):
     for ref, pallas in zip(hvp_ref, hvp_pallas):
         assert not jnp.any(jnp.isnan(pallas))
         assert jnp.allclose(pallas, ref, atol=1e-3, rtol=1e-3)
+
+
+# ── Several tangent directions at one primal point ───────────────────────────
+#
+# `jax.vmap` over tangents (a batch of Hessian-vector products, `jax.jacfwd`) asks for
+# the JVP in several directions at the same primal point. Pallas's generic batching
+# would run one program per direction, recomputing every weight and the primal each
+# time; the JVP wrappers instead route a tangent batch to a kernel that evaluates the
+# weights once and accumulates all directions. The pure-JAX backend, batched by JAX
+# itself, is the reference throughout.
+
+from jax._src import core as _jax_core  # noqa: E402  (jaxpr inspection only)
+
+
+def _pallas_calls(fn, *args):
+    """Every `pallas_call` in `fn`'s traced program, as
+    `(n_outputs, out_shape, n_grid_axes)`."""
+    found = []
+
+    def walk(v):
+        if isinstance(v, _jax_core.ClosedJaxpr):
+            visit(v.jaxpr)
+        elif isinstance(v, _jax_core.Jaxpr):
+            visit(v)
+        elif isinstance(v, (tuple, list)):
+            for w in v:
+                walk(w)
+        elif isinstance(v, dict):
+            for w in v.values():
+                walk(w)
+
+    def visit(jaxpr):
+        for eqn in jaxpr.eqns:
+            if eqn.primitive.name == "pallas_call":
+                grid = eqn.params["grid_mapping"].grid
+                found.append((len(eqn.outvars), eqn.outvars[-1].aval.shape, len(grid)))
+            for v in eqn.params.values():
+                walk(v)
+
+    visit(jax.make_jaxpr(fn)(*args).jaxpr)
+    return found
+
+
+# Layer 0: the JAX contracts the routing relies on, pinned on toy functions (CPU).
+
+
+def test_contract_custom_vmap_fires_inside_a_custom_jvp_rule():
+    from jax.custom_batching import custom_vmap
+
+    seen = []
+
+    @custom_vmap
+    def tangent_map(x, t):
+        return x**3, 3 * x**2 * t
+
+    @tangent_map.def_vmap
+    def _(axis_size, in_batched, x, t):
+        seen.append((axis_size, tuple(in_batched)))
+        return (x**3, 3 * x**2 * t), (False, True)
+
+    @jax.custom_jvp
+    def f(x):
+        return x**3
+
+    @f.defjvp
+    def _(primals, tangents):
+        (x,), (t,) = primals, tangents
+        return tangent_map(x, t)
+
+    x = jnp.arange(1.0, 4.0)
+    dirs = jnp.eye(3)[:2]
+    for wrap in (lambda g: g, jax.jit):
+        seen.clear()
+        out = wrap(lambda d: jax.vmap(lambda dd: jax.jvp(f, (x,), (dd,)))(d))(dirs)
+        assert seen == [(2, (False, True))]
+        assert out[0].shape == (2, 3)  # an unbatched primal is broadcast for the caller
+        assert jnp.allclose(out[1], 3 * x**2 * dirs)
+
+
+def test_contract_symbolic_zeros_reach_the_rule():
+    from jax.custom_derivatives import SymbolicZero
+
+    seen = []
+
+    @jax.custom_jvp
+    def f(x, y):
+        return x * y
+
+    def rule(primals, tangents):
+        seen.append(tuple(isinstance(t, SymbolicZero) for t in tangents))
+        x, y = primals
+        tx, ty = tangents
+        return x * y, (0.0 if isinstance(tx, SymbolicZero) else tx * y) + (
+            0.0 if isinstance(ty, SymbolicZero) else x * ty
+        )
+
+    f.defjvp(rule, symbolic_zeros=True)
+    jax.jvp(lambda x: f(x, jnp.asarray(2.0)), (jnp.asarray(3.0),), (jnp.asarray(1.0),))
+    assert seen == [(False, True)]
+
+
+# Layer 2/4: several directions, against the pure-JAX backend and the single-direction
+# kernel.
+
+
+def _direction_tangents(key, primals, n_directions):
+    return tuple(
+        jax.random.normal(jax.random.fold_in(key, k), (n_directions, *jnp.shape(p)))
+        for k, p in enumerate(primals)
+    )
+
+
+@requires_gpu
+@pytest.mark.parametrize("use_erf", [False, True])
+@pytest.mark.parametrize("scalar_variance", [False, True])
+@pytest.mark.parametrize("n_directions", [1, 2, 3, 11])
+def test_pallas_spread_jvp_2d_over_directions_matches_pure_jax(
+    use_erf, scalar_variance, n_directions
+):
+    from cryojax.ndimage._spreading.pallas_spread import pallas_spread_2d
+    from cryojax.ndimage._spreading.spread import spread_2d_impl
+
+    ny, nx, n_spread = 48, 40, 7
+    i, j, amplitude, variance = _index_points_2d(jax.random.PRNGKey(23), 150, ny, nx)
+    if scalar_variance:
+        variance = variance[0]
+    primals = (i, j, amplitude, variance, jnp.asarray(1.3))
+    dirs = _direction_tangents(jax.random.PRNGKey(24), primals, n_directions)
+
+    ref = lambda i, j, a, v, p: spread_2d_impl(
+        i, j, a, v, ny, nx, pixel_size=p, n_spread=n_spread, use_erf=use_erf
+    )
+    pallas = lambda i, j, a, v, p: pallas_spread_2d(
+        i, j, a, v, p, ny, nx, n_spread, use_erf
+    )
+    batched_jvp = lambda f: jax.vmap(lambda t: jax.jvp(f, primals, t))(dirs)
+    out_ref, tan_ref = batched_jvp(ref)
+    out_pallas, tan_pallas = batched_jvp(pallas)
+    assert jnp.allclose(out_pallas, out_ref, atol=1e-4, rtol=1e-4)
+    assert not jnp.any(jnp.isnan(tan_pallas))
+    assert jnp.allclose(tan_pallas, tan_ref, atol=1e-4, rtol=1e-4)
+    # ...and each direction equals the single-direction kernel. Not bit for bit: the
+    # scatter's atomic adds land in hardware order, so two launches on identical inputs
+    # differ at the ULP level (the gather, which owns its outputs, is exact -- see its
+    # test).
+    for d in range(n_directions):
+        single = jax.jvp(pallas, primals, tuple(t[d] for t in dirs))[1]
+        assert jnp.allclose(tan_pallas[d], single, atol=1e-9, rtol=1e-9)
+
+
+@requires_gpu
+@pytest.mark.parametrize("use_erf", [False, True])
+@pytest.mark.parametrize("scalar_variance", [False, True])
+@pytest.mark.parametrize("n_directions", [1, 3, 11])
+def test_pallas_spread_vjp_jvp_2d_over_directions_matches_pure_jax(
+    use_erf, scalar_variance, n_directions
+):
+    from cryojax.ndimage._spreading.pallas_spread import pallas_spread_vjp_2d
+    from cryojax.ndimage._spreading.spread import spread_2d_bwd
+
+    ny, nx, n_spread = 48, 40, 7
+    i, j, amplitude, variance = _index_points_2d(jax.random.PRNGKey(25), 150, ny, nx)
+    if scalar_variance:
+        variance = variance[0]
+    res = (i, j, amplitude, variance, jnp.asarray(1.3))
+    g = jax.random.normal(jax.random.PRNGKey(26), (ny, nx))
+    dirs = (
+        _direction_tangents(jax.random.PRNGKey(27), res, n_directions),
+        jax.random.normal(jax.random.PRNGKey(28), (n_directions, ny, nx)),
+    )
+    ref = lambda res, g: spread_2d_bwd(ny, nx, n_spread, use_erf, res, g)
+    pallas = lambda res, g: pallas_spread_vjp_2d(ny, nx, n_spread, use_erf, res, g)
+    batched_jvp = lambda f: jax.vmap(lambda t: jax.jvp(f, (res, g), t))(dirs)
+    out_ref, tan_ref = batched_jvp(ref)
+    out_pallas, tan_pallas = batched_jvp(pallas)
+    for r, p in zip(out_ref, out_pallas):
+        assert jnp.allclose(p, r, atol=1e-4, rtol=1e-4)
+    for r, p in zip(tan_ref, tan_pallas):
+        assert not jnp.any(jnp.isnan(p))
+        assert jnp.allclose(p, r, atol=1e-4, rtol=1e-4)
+    # Per-point outputs bit for bit (the gather owns its outputs; no atomics). The two
+    # scalar outputs are `jnp.sum` reductions outside the kernel, over `(n, m)` here and
+    # `(m,)` there, and XLA's GPU reductions are not bitwise reproducible across shapes.
+    for d in range(n_directions):
+        single = jax.jvp(pallas, (res, g), jax.tree.map(lambda t: t[d], dirs))[1]
+        for s, p in zip(single, tan_pallas):
+            if jnp.ndim(s) == 0:
+                assert jnp.allclose(p[d], s, rtol=1e-12, atol=0.0)
+            else:
+                assert jnp.array_equal(p[d], s)
+
+
+@requires_gpu
+@pytest.mark.parametrize("use_erf", [False, True])
+def test_pallas_2d_directions_specialized_on_the_nonzero_pattern(use_erf):
+    """Directions that move only the cotangent (an `ac`/`bf`-like border) and only
+    `pixel_size` (a `ps`-like border)."""
+    from cryojax.ndimage._spreading.pallas_spread import pallas_spread_vjp_2d
+    from cryojax.ndimage._spreading.spread import spread_2d_bwd
+
+    ny, nx, n_spread = 48, 40, 7
+    i, j, amplitude, variance = _index_points_2d(jax.random.PRNGKey(29), 150, ny, nx)
+    res = (i, j, amplitude, variance, jnp.asarray(1.3))
+    g = jax.random.normal(jax.random.PRNGKey(30), (ny, nx))
+    tg = jax.random.normal(jax.random.PRNGKey(31), (3, ny, nx))
+    tpix = jnp.asarray([1.0, 0.5, -0.25])
+    ref = lambda res, g: spread_2d_bwd(ny, nx, n_spread, use_erf, res, g)
+    pallas = lambda res, g: pallas_spread_vjp_2d(ny, nx, n_spread, use_erf, res, g)
+    for f_ref, f_pallas in (
+        (lambda gg: ref(res, gg), lambda gg: pallas(res, gg)),
+        (lambda p: ref((*res[:4], p), g), lambda p: pallas((*res[:4], p), g)),
+    ):
+        pass
+    tan_ref = jax.vmap(lambda t: jax.jvp(lambda gg: ref(res, gg), (g,), (t,))[1])(tg)
+    tan_pallas = jax.vmap(lambda t: jax.jvp(lambda gg: pallas(res, gg), (g,), (t,))[1])(
+        tg
+    )
+    for r, p in zip(tan_ref, tan_pallas):
+        assert jnp.allclose(p, r, atol=1e-4, rtol=1e-4)
+    tan_ref = jax.vmap(
+        lambda t: jax.jvp(lambda p: ref((*res[:4], p), g), (res[4],), (t,))[1]
+    )(tpix)
+    tan_pallas = jax.vmap(
+        lambda t: jax.jvp(lambda p: pallas((*res[:4], p), g), (res[4],), (t,))[1]
+    )(tpix)
+    for r, p in zip(tan_ref, tan_pallas):
+        assert jnp.allclose(p, r, atol=1e-4, rtol=1e-4)
+
+
+# Layer 3: routing. One launch per kernel kind, one grid axis, tangent outputs batched.
+
+
+def _hvp_loss_2d(use_erf, enable_pallas):
+    ny, nx, n_spread = 48, 40, 7
+    i, j, amplitude, variance = _index_points_2d(jax.random.PRNGKey(32), 150, ny, nx)
+    pixel_size = jnp.asarray(1.3)
+    target = jax.random.normal(jax.random.PRNGKey(33), (ny, nx))
+    x, y = i * pixel_size - nx / 2 * pixel_size, j * pixel_size - ny / 2 * pixel_size
+
+    def loss(p):
+        xx, yy, a, v, pix = p
+        image = spread_gaussians_2d(
+            xx,
+            yy,
+            a,
+            v,
+            (ny, nx),
+            pixel_size=pix,
+            n_spread=n_spread,
+            use_erf=use_erf,
+            enable_pallas=enable_pallas,
+        )
+        return jnp.sum((image - target) ** 2)
+
+    return loss, (x, y, amplitude, variance, pixel_size)
+
+
+@requires_gpu
+@pytest.mark.parametrize("n_directions, n_launches", [(1, 2), (3, 2), (12, 2), (13, 4)])
+def test_tangent_map_launches_one_multi_direction_kernel_per_kind(
+    n_directions, n_launches
+):
+    """`jax.linearize` records the tangent map; applying it in `n_directions` runs the
+    tangent scatter and tangent gather once each per chunk, on one grid axis, and no
+    primal kernel at all -- the property an optimizer holding the gradient relies on."""
+    from cryojax.ndimage._spreading.pallas_spread import _MAX_JVP_DIRECTIONS
+
+    assert _MAX_JVP_DIRECTIONS == 12  # the (13, 4) row above assumes two chunks
+    loss, p = _hvp_loss_2d(use_erf=True, enable_pallas=True)
+    dirs = _direction_tangents(jax.random.PRNGKey(34), p, n_directions)
+    _, tangent_map = jax.linearize(jax.value_and_grad(loss), p)
+    calls = _pallas_calls(lambda d: jax.vmap(tangent_map)(d), dirs)
+    assert len(calls) == n_launches
+    cap = _MAX_JVP_DIRECTIONS
+    n_pixels, chunk_sizes = 48 * 40, {min(n_directions, cap), n_directions % cap or cap}
+    for n_outputs, out_shape, n_grid_axes in calls:
+        assert n_grid_axes == 1  # generic batching would add a second grid axis
+        # tangent scatter: one flattened `(directions * pixels,)` image; tangent gather:
+        # five `(directions, points)` outputs
+        assert n_outputs in (1, 5)
+        directions = out_shape[0] // n_pixels if n_outputs == 1 else out_shape[0]
+        assert directions in chunk_sizes
+
+
+@requires_gpu
+@pytest.mark.parametrize("use_erf", [False, True])
+@pytest.mark.parametrize("n_directions", [1, 3])
+def test_linearized_hvp_2d_matches_pure_jax(use_erf, n_directions):
+    """The optimizer's composition: gradient once, then the tangent map in the needed
+    directions, against the pure-JAX backend doing the same."""
+    loss_p, p = _hvp_loss_2d(use_erf, enable_pallas=True)
+    loss_r, _ = _hvp_loss_2d(use_erf, enable_pallas=False)
+    dirs = _direction_tangents(jax.random.PRNGKey(44), p, n_directions)
+
+    def step(loss):
+        (f, g), tangent_map = jax.linearize(jax.value_and_grad(loss), p)
+        return f, g, jax.vmap(tangent_map)(dirs)[1]
+
+    f_r, g_r, hv_r = jax.jit(lambda: step(loss_r))()
+    f_p, g_p, hv_p = jax.jit(lambda: step(loss_p))()
+    assert jnp.allclose(f_p, f_r, rtol=1e-6)
+    for r, q in zip(g_r, g_p):
+        assert jnp.allclose(q, r, atol=1e-4, rtol=1e-4)
+    for r, q in zip(hv_r, hv_p):
+        assert not jnp.any(jnp.isnan(q))
+        assert jnp.allclose(q, r, atol=1e-3, rtol=1e-3)
+
+
+@requires_gpu
+def test_reverse_mode_never_enters_the_direction_path():
+    loss, p = _hvp_loss_2d(use_erf=True, enable_pallas=True)
+    calls = _pallas_calls(jax.grad(loss), p)
+    assert [c[0] for c in calls] == [1, 5]  # plain scatter, plain gather
+
+
+@requires_gpu
+@pytest.mark.parametrize("use_erf", [False, True])
+@pytest.mark.parametrize("n_directions", [2, 3])
+def test_public_vmapped_hvp_2d_matches_pure_jax(use_erf, n_directions):
+    loss_p, p = _hvp_loss_2d(use_erf, enable_pallas=True)
+    loss_r, _ = _hvp_loss_2d(use_erf, enable_pallas=False)
+    dirs = _direction_tangents(jax.random.PRNGKey(35), p, n_directions)
+    hvp = lambda loss: jax.jit(
+        lambda d: jax.vmap(lambda dd: jax.jvp(jax.grad(loss), (p,), (dd,))[1])(d)
+    )(dirs)
+    for r, q in zip(hvp(loss_r), hvp(loss_p)):
+        assert not jnp.any(jnp.isnan(q))
+        assert jnp.allclose(q, r, atol=1e-3, rtol=1e-3)
+
+
+@requires_gpu
+@pytest.mark.parametrize("use_erf", [False, True])
+@pytest.mark.parametrize("n_directions", [1, 3, 11])
+def test_pallas_spread_jvp_3d_over_directions_matches_pure_jax(use_erf, n_directions):
+    from cryojax.ndimage._spreading.pallas_spread import pallas_spread_3d
+    from cryojax.ndimage._spreading.spread import spread_3d_impl
+
+    nz, ny, nx, n_spread = 20, 24, 28, 5
+    i, j, k, amplitude, variance = _index_points_3d(
+        jax.random.PRNGKey(36), 150, nz, ny, nx
+    )
+    primals = (i, j, k, amplitude, variance, jnp.asarray(1.1))
+    dirs = _direction_tangents(jax.random.PRNGKey(37), primals, n_directions)
+    ref = lambda i, j, k, a, v, p: spread_3d_impl(
+        i, j, k, a, v, nz, ny, nx, voxel_size=p, n_spread=n_spread, use_erf=use_erf
+    )
+    pallas = lambda i, j, k, a, v, p: pallas_spread_3d(
+        i, j, k, a, v, p, nz, ny, nx, n_spread, use_erf
+    )
+    batched_jvp = lambda f: jax.vmap(lambda t: jax.jvp(f, primals, t))(dirs)
+    out_ref, tan_ref = batched_jvp(ref)
+    out_pallas, tan_pallas = batched_jvp(pallas)
+    assert jnp.allclose(out_pallas, out_ref, atol=1e-4, rtol=1e-4)
+    assert not jnp.any(jnp.isnan(tan_pallas))
+    assert jnp.allclose(tan_pallas, tan_ref, atol=1e-4, rtol=1e-4)
+    for d in range(n_directions):
+        single = jax.jvp(pallas, primals, tuple(t[d] for t in dirs))[1]
+        assert jnp.allclose(tan_pallas[d], single, atol=1e-9, rtol=1e-9)
+
+
+@requires_gpu
+@pytest.mark.parametrize("use_erf", [False, True])
+@pytest.mark.parametrize("n_directions", [1, 3, 11])
+def test_pallas_spread_vjp_jvp_3d_over_directions_matches_pure_jax(use_erf, n_directions):
+    from cryojax.ndimage._spreading.pallas_spread import pallas_spread_vjp_3d
+    from cryojax.ndimage._spreading.spread import spread_3d_bwd
+
+    nz, ny, nx, n_spread = 20, 24, 28, 5
+    i, j, k, amplitude, variance = _index_points_3d(
+        jax.random.PRNGKey(38), 150, nz, ny, nx
+    )
+    res = (i, j, k, amplitude, variance, jnp.asarray(1.1))
+    g = jax.random.normal(jax.random.PRNGKey(39), (nz, ny, nx))
+    dirs = (
+        _direction_tangents(jax.random.PRNGKey(40), res, n_directions),
+        jax.random.normal(jax.random.PRNGKey(41), (n_directions, nz, ny, nx)),
+    )
+    ref = lambda res, g: spread_3d_bwd(nz, ny, nx, n_spread, use_erf, res, g)
+    pallas = lambda res, g: pallas_spread_vjp_3d(nz, ny, nx, n_spread, use_erf, res, g)
+    batched_jvp = lambda f: jax.vmap(lambda t: jax.jvp(f, (res, g), t))(dirs)
+    out_ref, tan_ref = batched_jvp(ref)
+    out_pallas, tan_pallas = batched_jvp(pallas)
+    for r, p in zip(out_ref, out_pallas):
+        assert jnp.allclose(p, r, atol=1e-4, rtol=1e-4)
+    for r, p in zip(tan_ref, tan_pallas):
+        assert not jnp.any(jnp.isnan(p))
+        assert jnp.allclose(p, r, atol=1e-4, rtol=1e-4)
+    for d in range(n_directions):
+        single = jax.jvp(pallas, (res, g), jax.tree.map(lambda t: t[d], dirs))[1]
+        for s, p in zip(single, tan_pallas):
+            if jnp.ndim(s) == 0:
+                assert jnp.allclose(p[d], s, rtol=1e-12, atol=0.0)
+            else:
+                assert jnp.array_equal(p[d], s)
+
+
+@requires_gpu
+@pytest.mark.parametrize("n_directions", [2, 3])
+def test_public_vmapped_hvp_3d_matches_pure_jax(points_3d, n_directions):
+    x, y, z, amplitude, variance, voxel_size, shape = points_3d
+    n_spread = 5
+    target = jax.random.normal(jax.random.PRNGKey(42), shape)
+
+    def make_loss(key):
+        def loss(p):
+            volume = _JIT_SPREAD_3D[key](*p, shape, n_spread, True)
+            return jnp.sum((volume - target) ** 2)
+
+        return loss
+
+    p = (x, y, z, amplitude, variance, voxel_size)
+    dirs = _direction_tangents(jax.random.PRNGKey(43), p, n_directions)
+    hvp = lambda loss: jax.jit(
+        lambda d: jax.vmap(lambda dd: jax.jvp(jax.grad(loss), (p,), (dd,))[1])(d)
+    )(dirs)
+    for r, q in zip(hvp(make_loss("pure_jax")), hvp(make_loss("full"))):
+        assert not jnp.any(jnp.isnan(q))
+        assert jnp.allclose(q, r, atol=1e-3, rtol=1e-3)
+
+
+@requires_gpu
+@pytest.mark.parametrize("n_directions", [1, 3])
+def test_linearized_hvp_3d_matches_pure_jax(points_3d, n_directions):
+    x, y, z, amplitude, variance, voxel_size, shape = points_3d
+    n_spread = 5
+    target = jax.random.normal(jax.random.PRNGKey(45), shape)
+
+    def make_loss(key):
+        def loss(p):
+            volume = _JIT_SPREAD_3D[key](*p, shape, n_spread, True)
+            return jnp.sum((volume - target) ** 2)
+
+        return loss
+
+    p = (x, y, z, amplitude, variance, voxel_size)
+    dirs = _direction_tangents(jax.random.PRNGKey(46), p, n_directions)
+
+    def step(loss):
+        (f, g), tangent_map = jax.linearize(jax.value_and_grad(loss), p)
+        return f, g, jax.vmap(tangent_map)(dirs)[1]
+
+    f_r, g_r, hv_r = jax.jit(lambda: step(make_loss("pure_jax")))()
+    f_p, g_p, hv_p = jax.jit(lambda: step(make_loss("full")))()
+    assert jnp.allclose(f_p, f_r, rtol=1e-6)
+    for r, q in zip(g_r, g_p):
+        assert jnp.allclose(q, r, atol=1e-4, rtol=1e-4)
+    for r, q in zip(hv_r, hv_p):
+        assert not jnp.any(jnp.isnan(q))
+        assert jnp.allclose(q, r, atol=1e-3, rtol=1e-3)
