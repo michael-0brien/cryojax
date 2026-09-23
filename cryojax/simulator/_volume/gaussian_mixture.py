@@ -188,13 +188,14 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
             Additional per-atom B-factors that are added to
             the values in `scattering_parameters.b`.
         """  # noqa: E501
-        amplitudes = jnp.asarray(parameters.a, dtype=float)
-        b_factors = jnp.asarray(parameters.b, dtype=float)
+        amplitudes = leaf_asarray(parameters.a, dtype=float)
+        b_factors = leaf_asarray(parameters.b, dtype=float)
         if extra_b_factors is not None:
-            extra_b_factors = jnp.asarray(extra_b_factors, dtype=float)
+            extra_b_factors = leaf_asarray(extra_b_factors, dtype=float)
             if extra_b_factors.ndim == 1:
                 extra_b_factors = extra_b_factors[:, None]
-            b_factors += extra_b_factors
+            # Out of place: `leaf_asarray` may hand back the caller's own numpy table.
+            b_factors = b_factors + extra_b_factors
         return cls(atom_positions, amplitudes, b_factor_to_variance(b_factors))
 
     @override

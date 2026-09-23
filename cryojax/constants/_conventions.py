@@ -2,6 +2,7 @@ import jax.numpy as jnp
 import numpy as np
 from jaxtyping import Array, Float
 
+from .._internal import leaf_asarray
 from ..jax_util import NDArrayLike
 
 
@@ -26,7 +27,7 @@ def b_factor_to_variance(
 
     The variance.
     """
-    return jnp.asarray(b_factor / (8 * np.pi**2))
+    return leaf_asarray(b_factor / (8 * np.pi**2), dtype=float)
 
 
 def variance_to_b_factor(
