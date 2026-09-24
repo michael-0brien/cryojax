@@ -2,6 +2,7 @@ import math
 
 import cryojax.simulator as cxs
 import equinox as eqx
+import numpy as np
 import pytest
 
 
@@ -134,6 +135,72 @@ def test_pixel_size_gradient_no_nan(shape):
     ps = jnp.array(1.5)
     grad = eqx.filter_grad(radial_norm_sum)(ps)
     assert jnp.isfinite(grad), f"NaN/Inf gradient for shape {shape}: {grad}"
+
+
+@pytest.mark.parametrize("astigmatism_in_angstroms", [0.0, 300.0])
+def test_ctf_pixel_size_derivatives_no_nan(astigmatism_in_angstroms):
+    """The CTF phase must have finite first AND second derivatives w.r.t. the pixel
+    size. `arctan2` on the frequency grid made the second derivative NaN at the origin;
+    the astigmatic term is now a polynomial in the frequency components."""
+    import jax
+    import jax.numpy as jnp
+
+    shape = (16, 16)
+    transfer_theory = cxs.ContrastTransferTheory(
+        cxs.AstigmaticCTF(
+            defocus_in_angstroms=10000.0,
+            astigmatism_in_angstroms=astigmatism_in_angstroms,
+            astigmatism_angle=30.0,
+        )
+    )
+    spectrum = jax.random.normal(
+        jax.random.key(0), (shape[0], shape[1] // 2 + 1), dtype=complex
+    )
+
+    def image_sum_sq(pixel_size):
+        cfg = cxs.BasicImageConfig(
+            shape, pixel_size=pixel_size, voltage_in_kilovolts=300.0
+        )
+        image = jnp.fft.irfftn(transfer_theory.propagate_object(spectrum, cfg), s=shape)
+        return jnp.sum(image**2)
+
+    ps = jnp.array(1.5)
+    assert jnp.isfinite(jax.grad(image_sum_sq)(ps))
+    assert jnp.isfinite(jax.hessian(image_sum_sq)(ps))
+
+
+def test_ctf_phase_matches_polar_form():
+    """The polynomial astigmatic term equals the `cos(2 (azimuth - angle))` form."""
+    import jax.numpy as jnp
+    from cryojax.ndimage import make_frequency_grid
+
+    grid = make_frequency_grid((16, 12), 1.7)
+    defocus, astigmatism, angle_in_degrees, wavelength, cs_in_mm = (
+        12000.0,
+        400.0,
+        35.0,
+        0.0197,
+        2.7,
+    )
+    k_sqr = jnp.sum(grid**2, axis=-1)
+    azimuth = jnp.arctan2(grid[..., 0], grid[..., 1])
+    astigmatic_defocus = defocus + 0.5 * astigmatism * jnp.cos(
+        2.0 * (azimuth - jnp.deg2rad(angle_in_degrees))
+    )
+    polar_form = (2 * jnp.pi) * (
+        -0.5 * astigmatic_defocus * wavelength * k_sqr
+        + 0.25 * (cs_in_mm * 1e7) * wavelength**3 * k_sqr**2
+    )
+    ctf = cxs.AstigmaticCTF(
+        defocus_in_angstroms=defocus,
+        astigmatism_in_angstroms=astigmatism,
+        astigmatism_angle=angle_in_degrees,
+        spherical_aberration_in_mm=cs_in_mm,
+    )
+    polynomial_form = ctf.compute_aberration_phase_shifts(
+        grid, wavelength_in_angstroms=wavelength
+    )
+    np.testing.assert_allclose(polynomial_form, polar_form, rtol=1e-10, atol=1e-10)
 
 
 def test_compile_time_eval():
