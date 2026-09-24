@@ -203,7 +203,9 @@ def test_normalize_and_transform(std, signal_centering, voxel_info, basic_config
         signal_centering=signal_centering,
     )
     image = compute_image(image_model)
-    np.testing.assert_approx_equal(np.std(image), std)
+    # 'mean' is a z-score; 'bg' is unit root-mean-square about the background it removes
+    scale = np.std(image) if signal_centering == "mean" else np.sqrt(np.mean(image**2))
+    np.testing.assert_approx_equal(scale, std)
 
 
 @pytest.mark.parametrize("use_transform", (True, False))
@@ -347,3 +349,36 @@ def test_postprocess_fourier_matches_real_space(
 @eqx.filter_jit
 def compute_image(image_model):
     return image_model.simulate()
+
+
+def test_bg_normalization_scales_about_the_background(voxel_volume, voxel_size):
+    """'bg' scales the background-subtracted image to unit root-mean-square about that
+    background within `signal_region`. A `std` would measure spread about the region's
+    own mean and so drop the signal's contrast against the background from the scale."""
+    shape = voxel_volume.shape[0:2]
+    config = cxs.BasicImageConfig(
+        shape=shape, pixel_size=voxel_size, voltage_in_kilovolts=300.0, padded_shape=shape
+    )
+    y, x = np.indices(shape)
+    signal_region = (y - shape[0] // 2) ** 2 + (x - shape[1] // 2) ** 2 < (
+        shape[0] // 4
+    ) ** 2
+    make = lambda normalizes: cxs.make_image_model(
+        voxel_volume,
+        config,
+        pose=cxs.EulerAnglePose(),
+        transfer_theory=cxs.ContrastTransferTheory(
+            cxs.AstigmaticCTF(), amplitude_contrast_ratio=0.1
+        ),
+        normalizes_signal=normalizes,
+        signal_centering="bg",
+        signal_region=signal_region,
+    )
+    contrast = np.asarray(make(False).simulate())
+    contrast = contrast - np.median(
+        np.concatenate((contrast[0], contrast[-1], contrast[1:-1, 0], contrast[1:-1, -1]))
+    )
+    # the particle sits above the background inside the region: a std would drop this
+    assert abs(contrast[signal_region].mean()) > 0.1 * contrast[signal_region].std()
+    expected = contrast / np.sqrt(np.mean(contrast[signal_region] ** 2))
+    np.testing.assert_allclose(make(True).simulate(), expected, rtol=1e-4, atol=1e-5)
