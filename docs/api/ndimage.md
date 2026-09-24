@@ -35,13 +35,6 @@ This documentation is a collection of functions used to work with coordinate sys
 ::: cryojax.ndimage.make_1d_frequency_grid
 
 
-### Transforming coordinate systems
-
-`cryojax` also provides functions that transform between coordinate conventions.
-
-::: cryojax.ndimage.cartesian_to_polar
-
-
 ## Image transforms (e.g. filters and masks)
 
 ??? abstract "`cryojax.ndimage.AbstractImageTransform`"
