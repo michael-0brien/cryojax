@@ -46,6 +46,7 @@ from ._scattering_theory import (
     WeakPhaseScatteringTheory as WeakPhaseScatteringTheory,
 )
 from ._transfer_theory import (
+    AberratedCTF as AberratedCTF,
     AbstractCTF as AbstractCTF,
     AbstractTransferTheory as AbstractTransferTheory,
     AstigmaticCTF as AstigmaticCTF,

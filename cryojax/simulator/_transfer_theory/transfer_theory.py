@@ -119,6 +119,27 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
             # phase shifts
             contrast_spectrum = ctf_array * object_spectrum
         else:
+            # The kernel below evaluates the phase shifts at `q` for both the `q` and
+            # `-q` terms, which is only correct for even aberrations.
+            if (
+                self.ctf.compute_aberration_phase_shifts(
+                    frequency_grid,
+                    wavelength_in_angstroms=image_config.wavelength_in_angstroms,
+                    parity="odd",
+                )
+                is not None
+            ):
+                ctf_name = self.ctf.__class__.__name__
+                raise NotImplementedError(
+                    f"Found that `ContrastTransferTheory(ctf={ctf_name}(...))` has odd "
+                    "aberrations (e.g. `AberratedCTF(coma_xy_in_um=...)` or "
+                    "`AberratedCTF(trefoil_xy_in_um=...)`), but it was used with a "
+                    "volume integrator that outputs the Ewald sphere (e.g. "
+                    "`EwaldSphereExtraction`). Odd aberrations are not yet supported "
+                    "with the Ewald sphere. Either instantiate the CTF without odd "
+                    "aberrations, or use a volume integrator that outputs a "
+                    "projection (e.g. `FourierSliceExtraction`)."
+                )
             # Propagate to the exit plane when the phase spectrum is
             # the surface of the ewald sphere
             aberration_phase_shifts = self.ctf.compute_aberration_phase_shifts(
