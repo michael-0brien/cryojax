@@ -9,7 +9,7 @@ The `AbstractImageConfig` is an object at the core of simulating images in `cryo
                 - pixel_size
                 - voltage_in_kilovolts
                 - padded_shape
-                - magnification_matrix
+                - anisotropy_matrix
                 - options
 
 ---
@@ -56,7 +56,7 @@ The `AbstractImageConfig` is an object at the core of simulating images in `cryo
         options:
             members:
                 - __init__
-                - magnification_matrix
+                - anisotropy_matrix
                 - wavelength_in_angstroms
                 - lorentz_factor
                 - interaction_constant

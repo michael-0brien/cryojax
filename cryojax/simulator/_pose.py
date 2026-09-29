@@ -63,7 +63,7 @@ class AbstractPose(Module, strict=True):
         fourier_image: Complex[Array, "{shape[0]} {shape[1]}//2+1"],
         shape: tuple[int, int],
         pixel_size: FloatLike,
-        magnification_matrix: Float[Array, "2 2"] | None = None,
+        anisotropy_matrix: Float[Array, "2 2"] | None = None,
     ) -> Complex[Array, "{shape[0]} {shape[1]}//2+1"]:
         """Translate an image in Fourier space by the in-plane offset, with phase
         shifts $\\exp{(- 2 \\pi i (t_x q_x + t_y q_y))}$.
@@ -76,7 +76,7 @@ class AbstractPose(Module, strict=True):
             The shape of `fourier_image` in real space.
         - `pixel_size`:
             The pixel size in angstroms.
-        - `magnification_matrix`:
+        - `anisotropy_matrix`:
             An optional linear map `D` of the offset, which translates the image by
             `D t` for the offset `t`.
 
@@ -88,14 +88,14 @@ class AbstractPose(Module, strict=True):
             fourier_image, shape, includes_dc=False, mode="zero"
         )
         return fourier_image * self.compute_translation_operator(
-            shape, pixel_size, magnification_matrix
+            shape, pixel_size, anisotropy_matrix
         )
 
     def compute_translation_operator(
         self,
         shape: tuple[int, int],
         pixel_size: FloatLike,
-        magnification_matrix: Float[Array, "2 2"] | None = None,
+        anisotropy_matrix: Float[Array, "2 2"] | None = None,
     ) -> Complex[Array, "{shape[0]} {shape[1]}//2+1"]:
         """Compute the phase shifts from the in-plane translation.
 
@@ -105,7 +105,7 @@ class AbstractPose(Module, strict=True):
             The real-space image shape $(N_y, N_x)$.
         - `pixel_size`:
             The pixel size in angstroms.
-        - `magnification_matrix`:
+        - `anisotropy_matrix`:
             An optional linear map `D` of the offset, which translates by `D t` for
             the offset `t`.
 
@@ -115,8 +115,8 @@ class AbstractPose(Module, strict=True):
         grid of in-plane phase shifts $\\exp{(- 2 \\pi i (t_x q_x + t_y q_y))}$.
         """
         offset_in_angstroms = jnp.asarray(self.offset_in_angstroms)[:2]
-        if magnification_matrix is not None:
-            offset_in_angstroms = magnification_matrix @ offset_in_angstroms
+        if anisotropy_matrix is not None:
+            offset_in_angstroms = anisotropy_matrix @ offset_in_angstroms
         q_x, q_y = (
             make_1d_frequency_grid(shape[1], pixel_size, outputs_rfftfreqs=True),
             make_1d_frequency_grid(shape[0], pixel_size, outputs_rfftfreqs=False),

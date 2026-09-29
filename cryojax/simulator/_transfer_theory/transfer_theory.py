@@ -103,7 +103,7 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
         - `is_real_space`:
             If `True`, `object_spectrum` is the object in real space.
         """
-        object_spectrum = _magnify_object(
+        object_spectrum = _resample_object(
             object_spectrum,
             image_config,
             is_real_space=is_real_space,
@@ -219,7 +219,7 @@ class WaveTransferTheory(AbstractTransferTheory, strict=True):
             )
             wavefunction_spectrum = nufft_resample(
                 wavefunction - 1.0,
-                image_config.magnification_matrix,
+                image_config.anisotropy_matrix,
                 outputs_rfft=False,
                 **image_config.options.get("nufft", {}),
             )
@@ -245,16 +245,15 @@ class WaveTransferTheory(AbstractTransferTheory, strict=True):
         return wavefunction_spectrum
 
 
-def _magnify_object(
+def _resample_object(
     object: Inexact[Array, "y_dim x_dim"] | Complex[Array, "y_dim x_dim//2+1"],
     image_config: AbstractImageConfig,
     *,
     is_real_space: bool,
     is_complex_object: bool,
 ) -> Complex[Array, "y_dim x_dim"] | Complex[Array, "y_dim x_dim//2+1"]:
-    """Magnify an object onto the detector, returning its spectrum: resampled through
-    the anisotropic magnification, if any, as the full plane for a complex object and
-    otherwise the half plane."""
+    """Resample an object through the anisotropic magnification, if any, returning its
+    spectrum as the full plane for a complex object and otherwise the half plane."""
     shape = image_config.padded_shape
     if image_config.is_anisotropic:
         if not is_real_space:
@@ -265,7 +264,7 @@ def _magnify_object(
             )
         return nufft_resample(
             object,
-            image_config.magnification_matrix,
+            image_config.anisotropy_matrix,
             outputs_rfft=not is_complex_object,
             **image_config.options.get("nufft", {}),
         )

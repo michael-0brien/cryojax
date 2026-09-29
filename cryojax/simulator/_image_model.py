@@ -200,7 +200,7 @@ class AbstractImageModel(eqx.Module, strict=True):
             fourier_image,
             image_config.padded_shape,
             image_config.pixel_size,
-            image_config.magnification_matrix if image_config.is_anisotropic else None,
+            image_config.anisotropy_matrix if image_config.is_anisotropic else None,
         )
 
     def _atom_translate(self, volrep: AbstractVolumeRepresentation) -> AbstractAtomVolume:
@@ -501,7 +501,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
                 self.volume_integrator.integrate(
                     volume_representation, self.image_config, outputs_real_space=True
                 ),
-                self.image_config.magnification_matrix,
+                self.image_config.anisotropy_matrix,
                 outputs_rfft=not self.volume_integrator.outputs_ewald_sphere,
                 **self.image_config.options.get("nufft", {}),
             )
