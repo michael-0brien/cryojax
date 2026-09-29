@@ -1065,3 +1065,229 @@ def test_map_frequencies_rejects_non_rfft_shape(shape):
         im.map_frequencies(
             jnp.zeros(shape, dtype=complex), (jnp.zeros((3,)), jnp.zeros((3,)))
         )
+
+
+#
+# Non-uniform FFT
+#
+def _grid_points(shape, pixel_size=1.0):
+    """Pixel centres of `shape` in the units of `pixel_size`, with the origin at the
+    grid centre `N//2`, as `(x, y[, z])` positions."""
+    axes = [(np.arange(n) - n // 2) * pixel_size for n in shape]
+    mesh = np.meshgrid(*axes, indexing="ij")
+    return np.stack([m.ravel() for m in mesh[::-1]], axis=-1)
+
+
+@pytest.mark.parametrize("shape", [(8, 6), (7, 9), (6, 5, 4), (5, 7, 6)])
+@pytest.mark.parametrize("fftshifted", [False, True])
+def test_dispatch_nufft1_on_grid_points_equals_fftn(shape, fftshifted):
+    image = np.random.default_rng(0).normal(size=shape)
+    strengths = jnp.asarray(image.ravel(), dtype=complex)
+    fourier_image = im.dispatch_nufft1(
+        jnp.asarray(_grid_points(shape)),
+        strengths,
+        shape,
+        fftshifted=fftshifted,
+        eps=1e-12,
+    )
+    expected = np.fft.fftn(image)
+    if fftshifted:
+        expected = np.fft.fftshift(expected)
+    np.testing.assert_allclose(fourier_image, expected, atol=1e-8)
+
+
+def test_dispatch_nufft1_positions_are_in_units_of_pixel_size():
+    shape, pixel_size = (8, 6), 1.7
+    strengths = jnp.asarray(np.random.default_rng(0).normal(size=48), dtype=complex)
+    positions = jnp.asarray(np.random.default_rng(1).uniform(-2.0, 2.0, (48, 2)))
+    np.testing.assert_allclose(
+        im.dispatch_nufft1(
+            positions * pixel_size, strengths, shape, pixel_size=pixel_size
+        ),
+        im.dispatch_nufft1(positions, strengths, shape),
+        atol=1e-10,
+    )
+
+
+def test_dispatch_nufft1_does_not_mutate_options():
+    options = {"upsampfac": 2.0}
+    im.dispatch_nufft1(
+        jnp.zeros((3, 2)), jnp.ones(3, dtype=complex), (6, 6), options=options
+    )
+    assert options == {"upsampfac": 2.0}
+
+
+@pytest.mark.parametrize(
+    "positions_shape, shape", [((3, 2), (6, 6, 6)), ((3, 3), (6, 6)), ((3, 1), (6,))]
+)
+def test_dispatch_nufft1_rejects_dimension_mismatch(positions_shape, shape):
+    with pytest.raises(ValueError, match="dispatch_nufft1"):
+        im.dispatch_nufft1(jnp.zeros(positions_shape), jnp.ones(3, dtype=complex), shape)
+
+
+#
+# NUFFT resampling
+#
+def _anisotropy_matrix(magnitude, angle_in_degrees):
+    theta = 2 * np.deg2rad(angle_in_degrees)
+    e0, e1 = magnitude * np.cos(theta), magnitude * np.sin(theta)
+    return np.eye(2) + np.array([[-e0, e1], [e1, e0]])
+
+
+def _gaussian_image(shape, center, covariance):
+    """Point samples of a 2D gaussian on the pixel grid (origin at the center N//2)."""
+    x = _grid_points(shape).reshape(*shape, 2) - np.asarray(center)
+    precision = np.linalg.inv(covariance)
+    return np.exp(-0.5 * np.einsum("...i,ij,...j->...", x, precision, x))
+
+
+@pytest.mark.parametrize("magnitude, angle", [(0.02, 0.0), (0.05, 30.0), (0.1, 125.0)])
+@pytest.mark.parametrize("shape", [(64, 64), (63, 60)])
+def test_nufft_resample_of_a_gaussian_is_the_anisotropic_gaussian(
+    magnitude, angle, shape
+):
+    """A gaussian resampled by `D` is the gaussian with covariance `σ² D Dᵀ` centered
+    at `D r₀`, over the whole band: at `σ = 3` pixels, its spectrum at Nyquist is below
+    the accuracy of the non-uniform FFT (~1e-9 relative), even where `D` compresses."""
+    sigma, center = 3.0, np.array([3.5, -2.2])
+    D = _anisotropy_matrix(magnitude, angle)
+    image = _gaussian_image(shape, center, sigma**2 * np.eye(2))
+    expected = _gaussian_image(shape, D @ center, sigma**2 * D @ D.T)
+    np.testing.assert_allclose(
+        im.nufft_resample(jnp.asarray(image), jnp.asarray(D), eps=1e-12),
+        np.fft.rfftn(expected),
+        atol=2e-7,
+    )
+    np.testing.assert_allclose(
+        im.nufft_resample(
+            jnp.asarray(image), jnp.asarray(D), outputs_real_space=True, eps=1e-12
+        ),
+        expected,
+        atol=2e-9,
+    )
+
+
+@pytest.mark.parametrize("shape", [(16, 12), (15, 13)])
+@pytest.mark.parametrize("is_complex", [False, True])
+def test_nufft_resample_with_the_identity_is_the_fft(shape, is_complex):
+    image = np.random.default_rng(0).normal(size=shape)
+    if is_complex:
+        image = image + 1j * np.random.default_rng(1).normal(size=shape)
+        expected = np.fft.fftn(image)
+    else:
+        expected = np.fft.rfftn(image)
+    np.testing.assert_allclose(
+        im.nufft_resample(
+            jnp.asarray(image), jnp.eye(2), outputs_rfft=not is_complex, eps=1e-12
+        ),
+        expected,
+        atol=1e-8,
+    )
+
+
+def test_nufft_resample_composes():
+    shape, sigma = (64, 64), 3.0
+    D1, D2 = _anisotropy_matrix(0.04, 20.0), _anisotropy_matrix(0.03, 110.0)
+    image = jnp.asarray(_gaussian_image(shape, np.zeros(2), sigma**2 * np.eye(2)))
+    twice = im.nufft_resample(
+        im.nufft_resample(image, jnp.asarray(D1), outputs_real_space=True, eps=1e-12),
+        jnp.asarray(D2),
+        eps=1e-12,
+    )
+    np.testing.assert_allclose(
+        twice, im.nufft_resample(image, jnp.asarray(D2 @ D1), eps=1e-12), atol=2e-7
+    )
+
+
+def test_nufft_resample_scales_the_zero_mode_by_the_determinant():
+    image = np.random.default_rng(0).normal(size=(16, 12))
+    D = _anisotropy_matrix(0.08, 40.0)
+    fourier_image = im.nufft_resample(jnp.asarray(image), jnp.asarray(D), eps=1e-12)
+    np.testing.assert_allclose(
+        fourier_image[0, 0], np.linalg.det(D) * image.sum(), rtol=1e-10
+    )
+
+
+def test_nufft_resample_of_a_real_image_is_hermitian():
+    shape = (15, 13)
+    image = np.random.default_rng(0).normal(size=shape)
+    D = _anisotropy_matrix(0.05, 30.0)
+    fourier_image = np.asarray(
+        im.nufft_resample(jnp.asarray(image), jnp.asarray(D), outputs_rfft=False)
+    )
+    flipped = np.roll(np.flip(fourier_image, axis=(0, 1)), 1, axis=(0, 1))
+    np.testing.assert_allclose(fourier_image, np.conj(flipped), atol=1e-10)
+
+
+def test_nufft_resample_matrix_gradients_match_finite_differences():
+    image = jnp.asarray(_gaussian_image((32, 32), (1.5, -1.0), 4.0 * np.eye(2)))
+    weights = jnp.asarray(np.random.default_rng(0).normal(size=(32, 17)))
+
+    def loss(anisotropy_xy):
+        e0, e1 = anisotropy_xy[0], anisotropy_xy[1]
+        D = jnp.eye(2) + jnp.array([[-e0, e1], [e1, e0]])
+        fourier_image = im.nufft_resample(image, D, eps=1e-12)
+        return jnp.sum(weights * jnp.abs(fourier_image) ** 2)
+
+    anisotropy_xy = jnp.array([0.03, -0.02])
+    gradient = jax.grad(loss)(anisotropy_xy)
+    h = 1e-6
+    finite_differences = np.array(
+        [
+            (loss(anisotropy_xy.at[i].add(h)) - loss(anisotropy_xy.at[i].add(-h)))
+            / (2 * h)
+            for i in range(2)
+        ]
+    )
+    np.testing.assert_allclose(gradient, finite_differences, rtol=1e-5)
+
+
+def test_nufft_resample_under_jit():
+    image = jnp.asarray(np.random.default_rng(0).normal(size=(16, 12)))
+    D = jnp.asarray(_anisotropy_matrix(0.05, 30.0))
+    np.testing.assert_allclose(
+        jax.jit(im.nufft_resample)(image, D), im.nufft_resample(image, D), atol=1e-12
+    )
+
+
+def test_nufft_resample_rejects_a_half_plane_for_a_complex_image():
+    image = jnp.ones((8, 8), dtype=complex)
+    with pytest.raises(ValueError, match="nufft_resample"):
+        im.nufft_resample(image, jnp.eye(2), outputs_rfft=True)
+
+
+@pytest.mark.parametrize(
+    "kwargs, expected_upsampfac",
+    [({}, 1.25), ({"upsampfac": 2.0}, 2.0), ({"options": {"upsampfac": 3.0}}, 3.0)],
+)
+def test_dispatch_nufft1_upsampfac(monkeypatch, kwargs, expected_upsampfac):
+    """The default is 1.25, and backend `options` take precedence."""
+    from cryojax.ndimage import _nufft
+
+    recorded = {}
+    nufft2d1 = _nufft.nufftax.nufft2d1
+
+    def recording_nufft2d1(*args, upsampfac, **kw):
+        recorded["upsampfac"] = upsampfac
+        return nufft2d1(*args, upsampfac=upsampfac, **kw)
+
+    monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", "nufftax")
+    monkeypatch.setattr(_nufft.nufftax, "nufft2d1", recording_nufft2d1)
+    im.dispatch_nufft1(jnp.zeros((3, 2)), jnp.ones(3, dtype=complex), (6, 6), **kwargs)
+    assert recorded["upsampfac"] == expected_upsampfac
+
+
+def test_dispatch_nufft1_with_upsampfac_2_reaches_eps_for_broadband_signals():
+    shape = (32, 32)
+    image = np.random.default_rng(0).normal(size=shape)
+    fourier_image = im.dispatch_nufft1(
+        jnp.asarray(_grid_points(shape)),
+        jnp.asarray(image.ravel(), dtype=complex),
+        shape,
+        eps=1e-10,
+        upsampfac=2.0,
+    )
+    expected = np.fft.fftn(image)
+    np.testing.assert_allclose(
+        fourier_image, expected, atol=1e-8 * np.abs(expected).max()
+    )

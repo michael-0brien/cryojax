@@ -1,10 +1,10 @@
 import equinox as eqx
 import jax.numpy as jnp
-from jaxtyping import Array, Complex, Float
+from jaxtyping import Array, Complex, Float, Inexact
 
 from ..._internal import error_if_not_fractional, leaf_asarray
 from ...jax_util import FloatLike, NDArrayLike
-from ...ndimage import AbstractFourierOperator
+from ...ndimage import AbstractFourierOperator, nufft_resample
 from .._image_config import AbstractImageConfig
 from .transfer_function import AbstractCTF
 
@@ -71,7 +71,7 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
                 Array,
                 "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}",
             ]
-            | Complex[
+            | Inexact[
                 Array,
                 "{image_config.padded_y_dim} {image_config.padded_x_dim}",
             ]
@@ -80,6 +80,7 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
         *,
         defocus_offset: FloatLike | None = None,
         is_ewald_sphere: bool = False,
+        is_real_space: bool = False,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         """Apply the CTF directly to the phase shifts in the exit plane.
 
@@ -99,7 +100,15 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
         - `defocus_offset`:
             An optional defocus offset to apply to the CTF defocus at
             runtime.
+        - `is_real_space`:
+            If `True`, `object_spectrum` is the object in real space.
         """
+        object_spectrum = _resample_object(
+            object_spectrum,
+            image_config,
+            is_real_space=is_real_space,
+            is_complex_object=is_ewald_sphere,
+        )
         amplitude_contrast_ratio = error_if_not_fractional(
             jnp.asarray(self.amplitude_contrast_ratio)
         )
@@ -119,6 +128,27 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
             # phase shifts
             contrast_spectrum = ctf_array * object_spectrum
         else:
+            # The kernel below evaluates the phase shifts at `q` for both the `q` and
+            # `-q` terms, which is only correct for even aberrations.
+            if (
+                self.ctf.compute_aberration_phase_shifts(
+                    frequency_grid,
+                    wavelength_in_angstroms=image_config.wavelength_in_angstroms,
+                    parity="odd",
+                )
+                is not None
+            ):
+                ctf_name = self.ctf.__class__.__name__
+                raise NotImplementedError(
+                    f"Found that `ContrastTransferTheory(ctf={ctf_name}(...))` has odd "
+                    "aberrations (e.g. `AberratedCTF(coma_xy_in_um=...)` or "
+                    "`AberratedCTF(trefoil_xy_in_um=...)`), but it was used with a "
+                    "volume integrator that outputs the Ewald sphere (e.g. "
+                    "`EwaldSphereExtraction`). Odd aberrations are not yet supported "
+                    "with the Ewald sphere. Either instantiate the CTF without odd "
+                    "aberrations, or use a volume integrator that outputs a "
+                    "projection (e.g. `FourierSliceExtraction`)."
+                )
             # Propagate to the exit plane when the phase spectrum is
             # the surface of the ewald sphere
             aberration_phase_shifts = self.ctf.compute_aberration_phase_shifts(
@@ -163,8 +193,43 @@ class WaveTransferTheory(AbstractTransferTheory, strict=True):
         image_config: AbstractImageConfig,
         *,
         defocus_offset: FloatLike | None = None,
+        is_real_space: bool = False,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]:
-        """Apply the wave transfer function to the wavefunction in the exit plane."""
+        """Apply the wave transfer function to the wavefunction in the exit plane.
+
+        **Arguments:**
+
+        - `wavefunction_spectrum`:
+            The fourier spectrum of the wavefunction in the exit plane.
+        - `image_config`:
+            The configuration of the resulting image.
+        - `defocus_offset`:
+            An optional defocus offset to apply to the CTF defocus at
+            runtime.
+        - `is_real_space`:
+            If `True`, `wavefunction_spectrum` is the wavefunction in real space.
+        """
+        if image_config.is_anisotropic:
+            # Resample the scattered wave, which is compact, rather than the incident
+            # plane wave, which is not
+            wavefunction = (
+                wavefunction_spectrum
+                if is_real_space
+                else jnp.fft.ifftn(wavefunction_spectrum)
+            )
+            wavefunction_spectrum = nufft_resample(
+                wavefunction - 1.0,
+                image_config.anisotropy_matrix,
+                outputs_rfft=False,
+                **image_config.options.get("nufft", {}),
+            )
+            y_dim, x_dim = image_config.padded_shape
+            is_origin = (jnp.arange(y_dim) == 0)[:, None] & (jnp.arange(x_dim) == 0)[
+                None, :
+            ]
+            wavefunction_spectrum += image_config.padded_n_pixels * is_origin
+        elif is_real_space:
+            wavefunction_spectrum = jnp.fft.fftn(wavefunction_spectrum)
         frequency_grid = image_config.get_frequency_grid(padding=True, full=True)
         # Compute the wave transfer function
         ctf_array = self.ctf(
@@ -178,6 +243,34 @@ class WaveTransferTheory(AbstractTransferTheory, strict=True):
         wavefunction_spectrum = ctf_array * wavefunction_spectrum
 
         return wavefunction_spectrum
+
+
+def _resample_object(
+    object: Inexact[Array, "y_dim x_dim"] | Complex[Array, "y_dim x_dim//2+1"],
+    image_config: AbstractImageConfig,
+    *,
+    is_real_space: bool,
+    is_complex_object: bool,
+) -> Complex[Array, "y_dim x_dim"] | Complex[Array, "y_dim x_dim//2+1"]:
+    """Resample an object through the anisotropic magnification, if any, returning its
+    spectrum as the full plane for a complex object and otherwise the half plane."""
+    shape = image_config.padded_shape
+    if image_config.is_anisotropic:
+        if not is_real_space:
+            object = (
+                jnp.fft.ifftn(object, s=shape)
+                if is_complex_object
+                else jnp.fft.irfftn(object, s=shape)
+            )
+        return nufft_resample(
+            object,
+            image_config.anisotropy_matrix,
+            outputs_rfft=not is_complex_object,
+            **image_config.options.get("nufft", {}),
+        )
+    if is_real_space:
+        return jnp.fft.fftn(object) if is_complex_object else jnp.fft.rfftn(object)
+    return object
 
 
 def _compute_contrast_from_ewald_sphere(

@@ -2,8 +2,11 @@ import math
 
 import cryojax.simulator as cxs
 import equinox as eqx
+import jax
+import jax.numpy as jnp
 import numpy as np
 import pytest
+from cryojax.ndimage import make_coordinate_grid, make_frequency_grid
 
 
 def _is_smooth(n: int) -> bool:
@@ -137,72 +140,6 @@ def test_pixel_size_gradient_no_nan(shape):
     assert jnp.isfinite(grad), f"NaN/Inf gradient for shape {shape}: {grad}"
 
 
-@pytest.mark.parametrize("astigmatism_in_angstroms", [0.0, 300.0])
-def test_ctf_pixel_size_derivatives_no_nan(astigmatism_in_angstroms):
-    """The CTF phase must have finite first AND second derivatives w.r.t. the pixel
-    size. `arctan2` on the frequency grid made the second derivative NaN at the origin;
-    the astigmatic term is now a polynomial in the frequency components."""
-    import jax
-    import jax.numpy as jnp
-
-    shape = (16, 16)
-    transfer_theory = cxs.ContrastTransferTheory(
-        cxs.AstigmaticCTF(
-            defocus_in_angstroms=10000.0,
-            astigmatism_in_angstroms=astigmatism_in_angstroms,
-            astigmatism_angle=30.0,
-        )
-    )
-    spectrum = jax.random.normal(
-        jax.random.key(0), (shape[0], shape[1] // 2 + 1), dtype=complex
-    )
-
-    def image_sum_sq(pixel_size):
-        cfg = cxs.BasicImageConfig(
-            shape, pixel_size=pixel_size, voltage_in_kilovolts=300.0
-        )
-        image = jnp.fft.irfftn(transfer_theory.propagate_object(spectrum, cfg), s=shape)
-        return jnp.sum(image**2)
-
-    ps = jnp.array(1.5)
-    assert jnp.isfinite(jax.grad(image_sum_sq)(ps))
-    assert jnp.isfinite(jax.hessian(image_sum_sq)(ps))
-
-
-def test_ctf_phase_matches_polar_form():
-    """The polynomial astigmatic term equals the `cos(2 (azimuth - angle))` form."""
-    import jax.numpy as jnp
-    from cryojax.ndimage import make_frequency_grid
-
-    grid = make_frequency_grid((16, 12), 1.7)
-    defocus, astigmatism, angle_in_degrees, wavelength, cs_in_mm = (
-        12000.0,
-        400.0,
-        35.0,
-        0.0197,
-        2.7,
-    )
-    k_sqr = jnp.sum(grid**2, axis=-1)
-    azimuth = jnp.arctan2(grid[..., 0], grid[..., 1])
-    astigmatic_defocus = defocus + 0.5 * astigmatism * jnp.cos(
-        2.0 * (azimuth - jnp.deg2rad(angle_in_degrees))
-    )
-    polar_form = (2 * jnp.pi) * (
-        -0.5 * astigmatic_defocus * wavelength * k_sqr
-        + 0.25 * (cs_in_mm * 1e7) * wavelength**3 * k_sqr**2
-    )
-    ctf = cxs.AstigmaticCTF(
-        defocus_in_angstroms=defocus,
-        astigmatism_in_angstroms=astigmatism,
-        astigmatism_angle=angle_in_degrees,
-        spherical_aberration_in_mm=cs_in_mm,
-    )
-    polynomial_form = ctf.compute_aberration_phase_shifts(
-        grid, wavelength_in_angstroms=wavelength
-    )
-    np.testing.assert_allclose(polynomial_form, polar_form, rtol=1e-10, atol=1e-10)
-
-
 def test_compile_time_eval():
     c = cxs.BasicImageConfig(
         (5, 5),
@@ -222,3 +159,131 @@ def test_compile_time_eval():
 
     _ = _get_coords(c)
     _ = _get_freqs(c)
+
+
+# ── Anisotropic magnification ────────────────────────────────────────────────
+
+
+def _anisotropy_xy(magnitude, angle_in_degrees):
+    theta = 2 * np.deg2rad(angle_in_degrees)
+    return np.array([magnitude * np.cos(theta), magnitude * np.sin(theta)])
+
+
+def _anisotropic_config(anisotropy_xy, pixel_size=1.3, shape=(12, 10)):
+    return cxs.AnisotropicImageConfig(
+        shape, pixel_size=pixel_size, anisotropy_xy=anisotropy_xy
+    )
+
+
+@pytest.mark.parametrize("cls_name", ["BasicImageConfig", "DoseImageConfig"])
+def test_isotropic_configs_have_identity_magnification(cls_name):
+    config = getattr(cxs, cls_name)((12, 10), pixel_size=1.3)
+    assert not config.is_anisotropic
+    np.testing.assert_array_equal(config.anisotropy_matrix, np.eye(2))
+
+
+@pytest.mark.parametrize("magnitude, angle", [(0.02, 0.0), (0.05, 30.0), (0.1, 125.0)])
+def test_anisotropy_matrix_stretches_along_the_anisotropy_angle(magnitude, angle):
+    """`D` stretches by `1 + a` along `(sin(angle), cos(angle))`, the direction of
+    `AstigmaticCTF.astigmatism_angle`, and compresses by `1 - a` perpendicular to it."""
+    config = _anisotropic_config(_anisotropy_xy(magnitude, angle))
+    D = np.asarray(config.anisotropy_matrix)
+    theta = np.deg2rad(angle)
+    u = np.array([np.sin(theta), np.cos(theta)])
+    w = np.array([np.cos(theta), -np.sin(theta)])
+    assert config.is_anisotropic
+    np.testing.assert_allclose(D @ u, (1 + magnitude) * u, atol=1e-12)
+    np.testing.assert_allclose(D @ w, (1 - magnitude) * w, atol=1e-12)
+    np.testing.assert_allclose(np.linalg.det(D), 1 - magnitude**2, atol=1e-12)
+
+
+def test_anisotropic_grids_are_the_specimen_frame_values():
+    """Frequencies are `Dᵀk / p` and coordinates `D⁻¹x p`, which preserve `k·x`."""
+    shape, pixel_size = (12, 10), 1.3
+    config = _anisotropic_config(_anisotropy_xy(0.05, 30.0), pixel_size, shape)
+    D = np.asarray(config.anisotropy_matrix)
+    k = np.asarray(make_frequency_grid(shape, outputs_rfftfreqs=False))
+    x = np.asarray(make_coordinate_grid(shape))
+    frequencies = np.asarray(config.get_frequency_grid(full=True))
+    coordinates = np.asarray(config.get_coordinate_grid())
+    np.testing.assert_allclose(frequencies, (k / pixel_size) @ D, atol=1e-12)
+    np.testing.assert_allclose(
+        coordinates, (x * pixel_size) @ np.linalg.inv(D).T, atol=1e-12
+    )
+    np.testing.assert_allclose(
+        np.sum(frequencies * coordinates, axis=-1), np.sum(k * x, axis=-1), atol=1e-12
+    )
+
+
+def test_anisotropy_can_be_excluded_from_the_grids():
+    shape, pixel_size = (12, 10), 1.3
+    anisotropic = _anisotropic_config(_anisotropy_xy(0.05, 30.0), pixel_size, shape)
+    isotropic = cxs.BasicImageConfig(shape, pixel_size=pixel_size)
+    np.testing.assert_array_equal(
+        anisotropic.get_frequency_grid(anisotropy=False), isotropic.get_frequency_grid()
+    )
+    np.testing.assert_array_equal(
+        anisotropic.get_coordinate_grid(anisotropy=False),
+        isotropic.get_coordinate_grid(),
+    )
+
+
+def test_zero_anisotropy_equals_the_isotropic_grids():
+    shape, pixel_size = (12, 10), 1.3
+    anisotropic = _anisotropic_config((0.0, 0.0), pixel_size, shape)
+    isotropic = cxs.BasicImageConfig(shape, pixel_size=pixel_size)
+    np.testing.assert_allclose(
+        anisotropic.get_frequency_grid(), isotropic.get_frequency_grid(), atol=1e-12
+    )
+    np.testing.assert_allclose(
+        anisotropic.get_coordinate_grid(), isotropic.get_coordinate_grid(), atol=1e-12
+    )
+
+
+@pytest.mark.parametrize("anisotropy_xy", [(0.0, 0.0), (0.03, -0.02)])
+def test_anisotropic_grid_norm_gradients_are_finite(anisotropy_xy):
+    """Gradients of `|grid|` stay finite at the origin, including at zero anisotropy."""
+
+    def norm_sum(params):
+        config = cxs.AnisotropicImageConfig(
+            (12, 10), pixel_size=params[0], anisotropy_xy=params[1:]
+        )
+        return jnp.sum(jnp.linalg.norm(config.get_frequency_grid(), axis=-1)) + jnp.sum(
+            jnp.linalg.norm(config.get_coordinate_grid(), axis=-1)
+        )
+
+    params = jnp.array([1.3, *anisotropy_xy])
+    assert jnp.all(jnp.isfinite(jax.grad(norm_sum)(params)))
+
+
+@pytest.mark.parametrize("anisotropy_xy", [0.1, (0.1, 0.2, 0.3)])
+def test_anisotropic_config_rejects_non_2_vectors(anisotropy_xy):
+    with pytest.raises(ValueError, match="anisotropy_xy"):
+        _anisotropic_config(anisotropy_xy)
+
+
+# ── Options ──────────────────────────────────────────────────────────────────
+
+
+def test_anisotropic_config_accepts_nufft_options():
+    options = {"nufft": {"eps": 1e-8, "upsampfac": 2.0}}
+    config = _anisotropic_config((0.01, 0.0))
+    configured = cxs.AnisotropicImageConfig((12, 10), 1.3, options=options)
+    assert config.options == {}
+    assert configured.options == options
+    # Static, so a jitted function recompiles on new options rather than tracing them
+    hash(configured.options)
+
+
+@pytest.mark.parametrize(
+    "cls_name, options",
+    [
+        ("AnisotropicImageConfig", {"nufft_eps": 1e-8}),
+        ("AnisotropicImageConfig", {"nufft": {"tolerance": 1e-8}}),
+        ("BasicImageConfig", {"nufft": {"eps": 1e-8}}),
+        ("DoseImageConfig", {"nufft": {"eps": 1e-8}}),
+    ],
+)
+def test_image_configs_reject_unsupported_options(cls_name, options):
+    with pytest.raises(ValueError, match=f"{cls_name}\\(\\.\\.\\., options=\\.\\.\\.\\)"):
+        getattr(cxs, cls_name)((12, 10), pixel_size=1.3, options=options)

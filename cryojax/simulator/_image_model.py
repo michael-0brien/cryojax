@@ -19,6 +19,7 @@ from ..ndimage import (
     AbstractMask,
     compute_edge_value,
     crop_to_shape,
+    nufft_resample,
     standardize_fft,
 )
 from ._detector import AbstractDetector
@@ -193,17 +194,14 @@ class AbstractImageModel(eqx.Module, strict=True):
         return image if outputs_real_space else jnp.fft.rfftn(image)
 
     def _phase_shift_translate(self, fourier_image: Array) -> Array:
-        phase_shifts = self.pose.compute_translation_operator(
-            self.image_config.padded_shape,
-            self.image_config.pixel_size,
-        )
-        fourier_image = self.pose.translate_image(
+        # A translation of the specimen by `t` translates the detector image by `D t`
+        image_config = self.image_config
+        return self.pose.translate_fft(
             fourier_image,
-            phase_shifts,
-            self.image_config.padded_shape,
+            image_config.padded_shape,
+            image_config.pixel_size,
+            image_config.anisotropy_matrix if image_config.is_anisotropic else None,
         )
-
-        return fourier_image
 
     def _atom_translate(self, volrep: AbstractVolumeRepresentation) -> AbstractAtomVolume:
         if isinstance(volrep, AbstractAtomVolume):
@@ -367,16 +365,19 @@ class LinearImageModel(AbstractImageModel, strict=True):
         # Translate if using atom translations
         if self.translate_mode == "atom":
             volume_representation = self._atom_translate(volume_representation)
-        # Compute the projection image
-        fourier_image = self.volume_integrator.integrate(
-            volume_representation, self.image_config, outputs_real_space=False
+        # Compute the projection image, in real space with an anisotropic
+        # magnification so that it is resampled without an FFT round trip
+        is_real_space = self.image_config.is_anisotropic
+        image = self.volume_integrator.integrate(
+            volume_representation, self.image_config, outputs_real_space=is_real_space
         )
         # Compute the image
         fourier_image = self.transfer_theory.propagate_object(  # noqa: E501
-            fourier_image,
+            image,
             self.image_config,
             is_ewald_sphere=self.volume_integrator.outputs_ewald_sphere,
             defocus_offset=self.pose.offset_z_in_angstroms,
+            is_real_space=is_real_space,
         )
         # Now for the in-plane translation if using phase shifts
         if self.translate_mode == "fft":
@@ -494,10 +495,20 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
         # Translate if using atom translations
         if self.translate_mode == "atom":
             volume_representation = self._atom_translate(volume_representation)
-        # Compute the projection image
-        fourier_image = self.volume_integrator.integrate(
-            volume_representation, self.image_config, outputs_real_space=False
-        )
+        # Compute the projection image, resampled through an anisotropic magnification
+        if self.image_config.is_anisotropic:
+            fourier_image = nufft_resample(
+                self.volume_integrator.integrate(
+                    volume_representation, self.image_config, outputs_real_space=True
+                ),
+                self.image_config.anisotropy_matrix,
+                outputs_rfft=not self.volume_integrator.outputs_ewald_sphere,
+                **self.image_config.options.get("nufft", {}),
+            )
+        else:
+            fourier_image = self.volume_integrator.integrate(
+                volume_representation, self.image_config, outputs_real_space=False
+            )
         # Now for the in-plane translation
         if self.translate_mode == "fft":
             fourier_image = self._phase_shift_translate(fourier_image)

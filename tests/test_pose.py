@@ -3,7 +3,11 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from cryojax.ndimage import FourierPhaseShifts, make_frequency_grid
+from cryojax.ndimage import (
+    FourierPhaseShifts,
+    enforce_rfftn_self_conjugates,
+    make_frequency_grid,
+)
 from cryojax.rotations import SO3
 
 
@@ -57,14 +61,56 @@ def test_rotate_coordinates_matches_vmap_over_grid():
         (-3.0, 0.0, (32, 33), 2.0),
     ],
 )
+def test_translate_fft_applies_the_phase_shifts(tx, ty, shape, pixel_size):
+    pose = cxs.EulerAnglePose(tx, ty)
+    fourier_image = _random_rfft(shape)
+    result = pose.translate_fft(fourier_image, shape, jnp.asarray(pixel_size))
+    # Reference: evaluate FourierPhaseShifts on the full 2D rfft frequency grid
+    frequency_grid = make_frequency_grid(shape, pixel_size)
+    phase_shifts = FourierPhaseShifts(jnp.asarray([tx, ty]))(frequency_grid)
+    expected = (
+        enforce_rfftn_self_conjugates(
+            fourier_image, shape, includes_dc=False, mode="zero"
+        )
+        * phase_shifts
+    )
+    np.testing.assert_allclose(np.asarray(result), np.asarray(expected), atol=1e-6)
+
+
+@pytest.mark.parametrize(
+    "tx, ty, shape, pixel_size",
+    [
+        (1.5, -2.3, (32, 32), 1.0),
+        (0.0, 4.1, (33, 32), 0.5),
+        (-3.0, 0.0, (32, 33), 2.0),
+    ],
+)
 def test_translation_operator_separable(tx, ty, shape, pixel_size):
     pose = cxs.EulerAnglePose(tx, ty)
-    # New separable implementation
+    # Separable implementation
     result = pose.compute_translation_operator(shape, jnp.asarray(pixel_size))
     # Reference: evaluate FourierPhaseShifts on the full 2D rfft frequency grid
     frequency_grid = make_frequency_grid(shape, pixel_size)
     expected = FourierPhaseShifts(jnp.asarray([tx, ty]))(frequency_grid)
     np.testing.assert_allclose(np.asarray(result), np.asarray(expected), atol=1e-6)
+
+
+def test_translate_fft_with_a_anisotropy_matrix_translates_by_the_mapped_offset():
+    shape, pixel_size, offset = (32, 33), 1.2, np.array([1.5, -2.3])
+    D = np.array([[0.97, 0.02], [0.02, 1.03]])
+    fourier_image = _random_rfft(shape)
+    np.testing.assert_allclose(
+        cxs.EulerAnglePose(*offset).translate_fft(
+            fourier_image, shape, pixel_size, jnp.asarray(D)
+        ),
+        cxs.EulerAnglePose(*(D @ offset)).translate_fft(fourier_image, shape, pixel_size),
+        atol=1e-12,
+    )
+
+
+def _random_rfft(shape):
+    image = np.random.default_rng(0).normal(size=shape)
+    return jnp.fft.rfftn(jnp.asarray(image))
 
 
 def test_translation_agreement():

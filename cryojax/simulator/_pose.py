@@ -58,40 +58,45 @@ class AbstractPose(Module, strict=True):
         # `(N1, N2, N3, 3)` directly, without explicit `jax.vmap`.
         return rotation.apply(target)
 
-    def translate_image(
+    def translate_fft(
         self,
         fourier_image: Complex[Array, "{shape[0]} {shape[1]}//2+1"],
-        translation_operator: Complex[Array, "{shape[0]} {shape[1]}//2+1"],
         shape: tuple[int, int],
+        pixel_size: FloatLike,
+        anisotropy_matrix: Float[Array, "2 2"] | None = None,
     ) -> Complex[Array, "{shape[0]} {shape[1]}//2+1"]:
-        """Apply translational phase shifts to a fourier-space image.
+        """Translate an image in Fourier space by the in-plane offset, with phase
+        shifts $\\exp{(- 2 \\pi i (t_x q_x + t_y q_y))}$.
 
         **Arguments:**
 
         - `fourier_image`:
-            The image in fourier-space, which is the output of a call
-            to `cryojax.image.rfftn`.
-        - `phase_shifts`:
-            The phase shifts for translation, which are computed from
-            `AbstractPose.compute_translation_operator`.
+            The image in Fourier space, as the output of `jax.numpy.fft.rfftn`.
         - `shape`:
-            The shape of `fourier_image` in real-space.
+            The shape of `fourier_image` in real space.
+        - `pixel_size`:
+            The pixel size in angstroms.
+        - `anisotropy_matrix`:
+            An optional linear map `D` of the offset, which translates the image by
+            `D t` for the offset `t`.
 
-        **Return:**
+        **Returns:**
 
-        The translated `fourier_image`, taking care to avoid image
-        artifacts when applying the phase shifts.
+        The translated `fourier_image`.
         """
         fourier_image = enforce_rfftn_self_conjugates(
             fourier_image, shape, includes_dc=False, mode="zero"
         )
-        return fourier_image * translation_operator
+        return fourier_image * self.compute_translation_operator(
+            shape, pixel_size, anisotropy_matrix
+        )
 
     def compute_translation_operator(
         self,
         shape: tuple[int, int],
-        pixel_size: Float[NDArrayLike, ""],
-    ) -> Complex[Array, "y_dim x_dim//2+1"]:
+        pixel_size: FloatLike,
+        anisotropy_matrix: Float[Array, "2 2"] | None = None,
+    ) -> Complex[Array, "{shape[0]} {shape[1]}//2+1"]:
         """Compute the phase shifts from the in-plane translation.
 
         **Arguments:**
@@ -99,20 +104,25 @@ class AbstractPose(Module, strict=True):
         - `shape`:
             The real-space image shape $(N_y, N_x)$.
         - `pixel_size`:
-            The pixel size in Angstroms.
+            The pixel size in angstroms.
+        - `anisotropy_matrix`:
+            An optional linear map `D` of the offset, which translates by `D t` for
+            the offset `t`.
 
         **Returns:**
 
         From the vector $(t_x, t_y)$ (given by `self.offset_in_angstroms`), returns the
         grid of in-plane phase shifts $\\exp{(- 2 \\pi i (t_x q_x + t_y q_y))}$.
         """
-        offset_in_angstroms = jnp.asarray(self.offset_in_angstroms)
-        tx, ty = offset_in_angstroms[0], offset_in_angstroms[1]
+        offset_in_angstroms = jnp.asarray(self.offset_in_angstroms)[:2]
+        if anisotropy_matrix is not None:
+            offset_in_angstroms = anisotropy_matrix @ offset_in_angstroms
         q_x, q_y = (
             make_1d_frequency_grid(shape[1], pixel_size, outputs_rfftfreqs=True),
             make_1d_frequency_grid(shape[0], pixel_size, outputs_rfftfreqs=False),
         )
-        phase_x, phase_y = (FourierPhaseShifts(tx)(q_x), FourierPhaseShifts(ty)(q_y))
+        phase_x = FourierPhaseShifts(offset_in_angstroms[0])(q_x)
+        phase_y = FourierPhaseShifts(offset_in_angstroms[1])(q_y)
         return phase_y[:, None] * phase_x[None, :]
 
     @cached_property
