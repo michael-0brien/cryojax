@@ -77,6 +77,24 @@ def test_translate_fft_applies_the_phase_shifts(tx, ty, shape, pixel_size):
     np.testing.assert_allclose(np.asarray(result), np.asarray(expected), atol=1e-6)
 
 
+@pytest.mark.parametrize(
+    "tx, ty, shape, pixel_size",
+    [
+        (1.5, -2.3, (32, 32), 1.0),
+        (0.0, 4.1, (33, 32), 0.5),
+        (-3.0, 0.0, (32, 33), 2.0),
+    ],
+)
+def test_translation_operator_separable(tx, ty, shape, pixel_size):
+    pose = cxs.EulerAnglePose(tx, ty)
+    # Separable implementation
+    result = pose.compute_translation_operator(shape, jnp.asarray(pixel_size))
+    # Reference: evaluate FourierPhaseShifts on the full 2D rfft frequency grid
+    frequency_grid = make_frequency_grid(shape, pixel_size)
+    expected = FourierPhaseShifts(jnp.asarray([tx, ty]))(frequency_grid)
+    np.testing.assert_allclose(np.asarray(result), np.asarray(expected), atol=1e-6)
+
+
 def test_translate_fft_with_a_magnification_matrix_translates_by_the_mapped_offset():
     shape, pixel_size, offset = (32, 33), 1.2, np.array([1.5, -2.3])
     D = np.array([[0.97, 0.02], [0.02, 1.03]])

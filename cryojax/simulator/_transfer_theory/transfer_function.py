@@ -15,9 +15,6 @@ from .phase_shifts import (
 )
 
 
-Parity = Literal["all", "even", "odd"]
-
-
 class AbstractCTF(eqx.Module, strict=True):
     """An abstract base class for a CTF in cryo-EM."""
 
@@ -27,7 +24,7 @@ class AbstractCTF(eqx.Module, strict=True):
         frequency_grid_in_angstroms: Float[Array, "y_dim x_dim 2"],
         wavelength_in_angstroms: FloatLike,
         defocus_offset: FloatLike | None = None,
-        parity: Parity = "all",
+        parity: Literal["all", "even", "odd"] = "all",
     ) -> Float[Array, "y_dim x_dim"] | None:
         """Compute the frequency-dependent phase shifts due to wave aberration,
         or their even or odd part.
@@ -183,7 +180,7 @@ class AstigmaticCTF(AbstractCTF, strict=True):
         frequency_grid_in_angstroms: Float[Array, "y_dim x_dim 2"],
         wavelength_in_angstroms: FloatLike,
         defocus_offset: FloatLike | None = None,
-        parity: Parity = "all",
+        parity: Literal["all", "even", "odd"] = "all",
     ) -> Float[Array, "y_dim x_dim"] | None:
         """Compute the frequency-dependent phase shifts due to wave aberration.
 
@@ -347,7 +344,7 @@ class AberratedCTF(AbstractCTF, strict=True):
         frequency_grid_in_angstroms: Float[Array, "y_dim x_dim 2"],
         wavelength_in_angstroms: FloatLike,
         defocus_offset: FloatLike | None = None,
-        parity: Parity = "all",
+        parity: Literal["all", "even", "odd"] = "all",
     ) -> Float[Array, "y_dim x_dim"] | None:
         """Compute the frequency-dependent phase shifts due to wave aberration.
 

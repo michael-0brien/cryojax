@@ -103,7 +103,7 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
         - `is_real_space`:
             If `True`, `object_spectrum` is the object in real space.
         """
-        object_spectrum = _object_to_detector_spectrum(
+        object_spectrum = _magnify_object(
             object_spectrum,
             image_config,
             is_real_space=is_real_space,
@@ -245,16 +245,16 @@ class WaveTransferTheory(AbstractTransferTheory, strict=True):
         return wavefunction_spectrum
 
 
-def _object_to_detector_spectrum(
+def _magnify_object(
     object: Inexact[Array, "y_dim x_dim"] | Complex[Array, "y_dim x_dim//2+1"],
     image_config: AbstractImageConfig,
     *,
     is_real_space: bool,
     is_complex_object: bool,
 ) -> Complex[Array, "y_dim x_dim"] | Complex[Array, "y_dim x_dim//2+1"]:
-    """The spectrum of an object on the detector: resampled through the anisotropic
-    magnification, if any, as the full plane for a complex object and otherwise the
-    half plane."""
+    """Magnify an object onto the detector, returning its spectrum: resampled through
+    the anisotropic magnification, if any, as the full plane for a complex object and
+    otherwise the half plane."""
     shape = image_config.padded_shape
     if image_config.is_anisotropic:
         if not is_real_space:
