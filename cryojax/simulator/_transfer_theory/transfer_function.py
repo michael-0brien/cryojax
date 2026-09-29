@@ -6,7 +6,7 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
-from ..._internal import error_if_negative, leaf_asarray
+from ..._internal import error_if_negative, leaf_asarray, leaf_asarray_vector
 from ...jax_util import FloatLike, NDArrayLike
 from .phase_shifts import (
     compute_amplitude_contrast_phase_shift,
@@ -280,8 +280,8 @@ class AberratedCTF(AbstractCTF, strict=True):
             is no trefoil.
         """
         self.defocus_in_um = leaf_asarray(defocus_in_um, dtype=float)
-        self.astigmatism_xy_in_um = _xy_leaf_asarray(
-            astigmatism_xy_in_um, "astigmatism_xy_in_um"
+        self.astigmatism_xy_in_um = leaf_asarray_vector(
+            astigmatism_xy_in_um, 2, name="AberratedCTF(..., astigmatism_xy_in_um=...)"
         )
         self.spherical_aberration_in_mm = leaf_asarray(
             spherical_aberration_in_mm, dtype=float
@@ -289,12 +289,16 @@ class AberratedCTF(AbstractCTF, strict=True):
         self.coma_xy_in_um = (
             None
             if coma_xy_in_um is None
-            else _xy_leaf_asarray(coma_xy_in_um, "coma_xy_in_um")
+            else leaf_asarray_vector(
+                coma_xy_in_um, 2, name="AberratedCTF(..., coma_xy_in_um=...)"
+            )
         )
         self.trefoil_xy_in_um = (
             None
             if trefoil_xy_in_um is None
-            else _xy_leaf_asarray(trefoil_xy_in_um, "trefoil_xy_in_um")
+            else leaf_asarray_vector(
+                trefoil_xy_in_um, 2, name="AberratedCTF(..., trefoil_xy_in_um=...)"
+            )
         )
 
     @classmethod
@@ -410,20 +414,6 @@ def _polar_to_xy(magnitude, angle_in_degrees, fold: int) -> Float[Array, "... 2"
     magnitude = jnp.asarray(magnitude, dtype=float)
     theta = fold * jnp.deg2rad(jnp.asarray(angle_in_degrees, dtype=float))
     return jnp.stack([magnitude * jnp.cos(theta), magnitude * jnp.sin(theta)], axis=-1)
-
-
-def _xy_leaf_asarray(
-    value: Float[NDArrayLike, "... 2"] | Sequence[float], name: str
-) -> Float[NDArrayLike, "... 2"]:
-    """`leaf_asarray` for a 2-vector `AberratedCTF` argument."""
-    value = leaf_asarray(value, dtype=float)
-    if value.ndim == 0 or value.shape[-1] != 2:
-        raise ValueError(
-            f"Found that `AberratedCTF(..., {name}=...)` has shape {value.shape}, "
-            "but it must be a 2-vector with shape `(..., 2)`, e.g. "
-            f"`AberratedCTF(..., {name}=(0.1, -0.2))`."
-        )
-    return value
 
 
 def _um_to_angstroms(value) -> Array | None:

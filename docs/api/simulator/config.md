@@ -9,6 +9,8 @@ The `AbstractImageConfig` is an object at the core of simulating images in `cryo
                 - pixel_size
                 - voltage_in_kilovolts
                 - padded_shape
+                - magnification_matrix
+                - options
 
 ---
 
@@ -21,6 +23,7 @@ The `AbstractImageConfig` is an object at the core of simulating images in `cryo
                 - interaction_constant
                 - get_coordinate_grid
                 - get_frequency_grid
+                - apply_magnification
                 - n_pixels
                 - y_dim
                 - x_dim
@@ -39,6 +42,27 @@ The `AbstractImageConfig` is an object at the core of simulating images in `cryo
                 - interaction_constant
                 - get_coordinate_grid
                 - get_frequency_grid
+                - apply_magnification
+                - n_pixels
+                - y_dim
+                - x_dim
+                - padded_n_pixels
+                - padded_y_dim
+                - padded_x_dim
+
+---
+
+::: cryojax.simulator.AnisotropicImageConfig
+        options:
+            members:
+                - __init__
+                - magnification_matrix
+                - wavelength_in_angstroms
+                - lorentz_factor
+                - interaction_constant
+                - get_coordinate_grid
+                - get_frequency_grid
+                - apply_magnification
                 - n_pixels
                 - y_dim
                 - x_dim

@@ -52,6 +52,19 @@ def leaf_asarray(x, dtype=float) -> NDArrayLike:
     return np.asarray(x, dtype=target)
 
 
+def leaf_asarray_vector(x, size: int, *, name: str, dtype=float) -> NDArrayLike:
+    """Convert an `__init__` input to an array leaf with [`leaf_asarray`][], requiring
+    a trailing dimension of length `size`. `name` identifies the input in the error
+    message, e.g. `"AberratedCTF(..., coma_xy_in_um=...)"`."""
+    x = leaf_asarray(x, dtype=dtype)
+    if x.ndim == 0 or x.shape[-1] != size:
+        raise ValueError(
+            f"Found that `{name}` has shape {x.shape}, but it must have shape "
+            f"`(..., {size})`."
+        )
+    return x
+
+
 def leaf_stack(components, *, axis: int = -1, dtype=float) -> NDArrayLike:
     """Stack `__init__` inputs into a single array leaf, preserving backend.
 

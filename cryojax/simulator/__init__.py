@@ -13,6 +13,7 @@ from ._detector import (
 )
 from ._image_config import (
     AbstractImageConfig as AbstractImageConfig,
+    AnisotropicImageConfig as AnisotropicImageConfig,
     BasicImageConfig as BasicImageConfig,
     DoseImageConfig as DoseImageConfig,
 )

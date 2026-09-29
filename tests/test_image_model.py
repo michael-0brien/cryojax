@@ -382,3 +382,178 @@ def test_bg_normalization_scales_about_the_background(voxel_volume, voxel_size):
     assert abs(contrast[signal_region].mean()) > 0.1 * contrast[signal_region].std()
     expected = contrast / np.sqrt(np.mean(contrast[signal_region] ** 2))
     np.testing.assert_allclose(make(True).simulate(), expected, rtol=1e-4, atol=1e-5)
+
+
+# ── Anisotropic magnification ────────────────────────────────────────────────
+
+_SHAPE, _PIXEL_SIZE, _SIGMA = (64, 64), 1.0, 3.0
+_ANISOTROPY_XY = (0.05 * np.cos(np.deg2rad(60.0)), 0.05 * np.sin(np.deg2rad(60.0)))
+
+
+def _gaussian_volume(position):
+    return cxs.GaussianMixtureVolume(
+        np.asarray([position]), amplitudes=1.0, variances=_SIGMA**2
+    )
+
+
+def _analytic_anisotropic_projection(config, center):
+    """The projection of an isotropic gaussian at `center` (in the specimen frame),
+    seen through the magnification: `p(D⁻¹x)` on the detector pixels."""
+    D = np.asarray(config.magnification_matrix)
+    x = np.asarray(config.get_coordinate_grid(anisotropy=False))
+    r = x @ np.linalg.inv(D).T - np.asarray(center)[:2]
+    return np.exp(-0.5 * np.sum(r**2, axis=-1) / _SIGMA**2) / (2 * np.pi * _SIGMA**2)
+
+
+@pytest.mark.parametrize("translate_mode", ["fft", "atom"])
+def test_anisotropic_projection_is_the_analytic_projection(translate_mode):
+    """A specimen-frame offset `t` means the same in both translation modes."""
+    config = cxs.AnisotropicImageConfig(_SHAPE, _PIXEL_SIZE, anisotropy_xy=_ANISOTROPY_XY)
+    position, offset = np.array([3.5, -2.2, 0.0]), np.array([4.0, 1.5])
+    model = cxs.ProjectionImageModel(
+        _gaussian_volume(position),
+        cxs.EulerAnglePose(*offset),
+        config,
+        cxs.GaussianMixtureProjection(sampling_mode="point"),
+        translate_mode=translate_mode,
+    )
+    expected = _analytic_anisotropic_projection(config, position[:2] + offset)
+    np.testing.assert_allclose(model.simulate(), expected, atol=1e-5 * expected.max())
+
+
+def test_anisotropic_linear_image_applies_the_ctf_at_the_distorted_frequencies():
+    config = cxs.AnisotropicImageConfig(_SHAPE, _PIXEL_SIZE, anisotropy_xy=_ANISOTROPY_XY)
+    position, offset = np.array([3.5, -2.2, 0.0]), np.array([4.0, 1.5])
+    ctf = cxs.AberratedCTF(defocus_in_um=0.5, coma_xy_in_um=(0.5, 0.2))
+    model = cxs.LinearImageModel(
+        _gaussian_volume(position),
+        cxs.EulerAnglePose(*offset),
+        config,
+        cxs.ContrastTransferTheory(ctf, amplitude_contrast_ratio=0.1),
+        cxs.GaussianMixtureProjection(sampling_mode="point"),
+    )
+    ctf_array = ctf(
+        config.get_frequency_grid(padding=True),
+        config.wavelength_in_angstroms,
+        amplitude_contrast_ratio=0.1,
+    )
+    projection = _analytic_anisotropic_projection(config, position[:2] + offset)
+    expected = np.fft.irfftn(
+        np.asarray(ctf_array) * np.fft.rfftn(projection), s=_SHAPE, axes=(0, 1)
+    )
+    np.testing.assert_allclose(
+        model.simulate(), expected, atol=1e-5 * np.abs(expected).max()
+    )
+
+
+@pytest.mark.parametrize("anisotropy_xy", [None, _ANISOTROPY_XY])
+@pytest.mark.parametrize("is_ewald_sphere", [False, True])
+def test_propagate_object_accepts_real_space_objects(anisotropy_xy, is_ewald_sphere):
+    config = (
+        cxs.BasicImageConfig(_SHAPE, _PIXEL_SIZE)
+        if anisotropy_xy is None
+        else cxs.AnisotropicImageConfig(_SHAPE, _PIXEL_SIZE, anisotropy_xy=anisotropy_xy)
+    )
+    rng = np.random.default_rng(0)
+    real_object = rng.normal(size=_SHAPE)
+    if is_ewald_sphere:
+        real_object = real_object + 1j * rng.normal(size=_SHAPE)
+    fourier_object = (
+        np.fft.fftn(real_object) if is_ewald_sphere else np.fft.rfftn(real_object)
+    )
+    transfer_theory = cxs.ContrastTransferTheory(cxs.AstigmaticCTF())
+    kwargs = dict(is_ewald_sphere=is_ewald_sphere)
+    np.testing.assert_allclose(
+        transfer_theory.propagate_object(
+            jax.numpy.asarray(real_object), config, is_real_space=True, **kwargs
+        ),
+        transfer_theory.propagate_object(
+            jax.numpy.asarray(fourier_object), config, **kwargs
+        ),
+        atol=1e-8,
+    )
+
+
+def _ewald_test_volume():
+    return cxs.FourierVoxelGridVolume.from_real_voxel_grid(
+        cxs.GaussianMixtureRenderFn((32, 32, 32), voxel_size=1.0)(
+            cxs.GaussianMixtureVolume(
+                np.array([[0.0, 0.0, 0.0], [3.0, -2.0, 1.0]]),
+                amplitudes=1.0,
+                variances=1.0,
+            )
+        )
+    )
+
+
+def test_anisotropic_ewald_sphere_matches_fourier_slice_at_high_voltage():
+    config = cxs.AnisotropicImageConfig(
+        (32, 32), 1.0, voltage_in_kilovolts=1e6, anisotropy_xy=_ANISOTROPY_XY
+    )
+
+    def simulate(integrator):
+        return cxs.IntensityImageModel(
+            _ewald_test_volume(),
+            cxs.EulerAnglePose(),
+            config,
+            cxs.WeakPhaseScatteringTheory(
+                integrator,
+                cxs.ContrastTransferTheory(
+                    cxs.AstigmaticCTF(defocus_in_angstroms=2500.0),
+                    amplitude_contrast_ratio=0.1,
+                ),
+            ),
+        ).simulate()
+
+    np.testing.assert_allclose(
+        simulate(cxs.EwaldSphereExtraction()),
+        simulate(cxs.FourierSliceExtraction()),
+        atol=1e-5,
+    )
+
+
+def test_anisotropic_rytov_matches_weak_phase():
+    config = cxs.AnisotropicImageConfig(_SHAPE, _PIXEL_SIZE, anisotropy_xy=_ANISOTROPY_XY)
+    ctf = cxs.AstigmaticCTF(defocus_in_angstroms=2500.0)
+    volume, pose = _gaussian_volume(np.array([3.5, -2.2, 0.0])), cxs.EulerAnglePose()
+    integrator = cxs.GaussianMixtureProjection(sampling_mode="point")
+    rytov = cxs.IntensityImageModel(
+        volume,
+        pose,
+        config,
+        cxs.RytovScatteringTheory(
+            integrator, cxs.WaveTransferTheory(ctf), amplitude_contrast_ratio=0.1
+        ),
+    )
+    weak_phase = cxs.IntensityImageModel(
+        volume,
+        pose,
+        config,
+        cxs.WeakPhaseScatteringTheory(
+            integrator, cxs.ContrastTransferTheory(ctf, amplitude_contrast_ratio=0.1)
+        ),
+    )
+    np.testing.assert_allclose(rytov.simulate(), weak_phase.simulate(), atol=1e-4)
+
+
+def test_anisotropic_nufft_options_reach_the_resampling():
+    """A tighter non-uniform FFT from `options` tightens the agreement with the
+    analytic projection."""
+    position = np.array([3.5, -2.2, 0.0])
+
+    def error(options):
+        config = cxs.AnisotropicImageConfig(
+            _SHAPE, _PIXEL_SIZE, anisotropy_xy=_ANISOTROPY_XY, options=options
+        )
+        model = cxs.ProjectionImageModel(
+            _gaussian_volume(position),
+            cxs.EulerAnglePose(),
+            config,
+            cxs.GaussianMixtureProjection(sampling_mode="point"),
+        )
+        expected = _analytic_anisotropic_projection(config, position)
+        return np.abs(np.asarray(model.simulate()) - expected).max() / expected.max()
+
+    default = error(None)
+    tight = error({"nufft": {"eps": 1e-10, "upsampfac": 2.0}})
+    assert tight < 1e-8 < default

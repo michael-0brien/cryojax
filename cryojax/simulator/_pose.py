@@ -58,62 +58,41 @@ class AbstractPose(Module, strict=True):
         # `(N1, N2, N3, 3)` directly, without explicit `jax.vmap`.
         return rotation.apply(target)
 
-    def translate_image(
+    def translate_fft(
         self,
         fourier_image: Complex[Array, "{shape[0]} {shape[1]}//2+1"],
-        translation_operator: Complex[Array, "{shape[0]} {shape[1]}//2+1"],
         shape: tuple[int, int],
+        pixel_size: FloatLike,
+        magnification_matrix: Float[Array, "2 2"] | None = None,
     ) -> Complex[Array, "{shape[0]} {shape[1]}//2+1"]:
-        """Apply translational phase shifts to a fourier-space image.
+        """Translate an image in Fourier space by the in-plane offset, with phase
+        shifts $\\exp{(- 2 \\pi i (t_x q_x + t_y q_y))}$.
 
         **Arguments:**
 
         - `fourier_image`:
-            The image in fourier-space, which is the output of a call
-            to `cryojax.image.rfftn`.
-        - `phase_shifts`:
-            The phase shifts for translation, which are computed from
-            `AbstractPose.compute_translation_operator`.
+            The image in Fourier space, as the output of `jax.numpy.fft.rfftn`.
         - `shape`:
-            The shape of `fourier_image` in real-space.
-
-        **Return:**
-
-        The translated `fourier_image`, taking care to avoid image
-        artifacts when applying the phase shifts.
-        """
-        fourier_image = enforce_rfftn_self_conjugates(
-            fourier_image, shape, includes_dc=False, mode="zero"
-        )
-        return fourier_image * translation_operator
-
-    def compute_translation_operator(
-        self,
-        shape: tuple[int, int],
-        pixel_size: Float[NDArrayLike, ""],
-    ) -> Complex[Array, "y_dim x_dim//2+1"]:
-        """Compute the phase shifts from the in-plane translation.
-
-        **Arguments:**
-
-        - `shape`:
-            The real-space image shape $(N_y, N_x)$.
+            The shape of `fourier_image` in real space.
         - `pixel_size`:
-            The pixel size in Angstroms.
+            The pixel size in angstroms.
+        - `magnification_matrix`:
+            An optional linear map `D` of the offset, which translates the image by
+            `D t` for the offset `t`.
 
         **Returns:**
 
-        From the vector $(t_x, t_y)$ (given by `self.offset_in_angstroms`), returns the
-        grid of in-plane phase shifts $\\exp{(- 2 \\pi i (t_x q_x + t_y q_y))}$.
+        The translated `fourier_image`.
         """
-        offset_in_angstroms = jnp.asarray(self.offset_in_angstroms)
-        tx, ty = offset_in_angstroms[0], offset_in_angstroms[1]
-        q_x, q_y = (
-            make_1d_frequency_grid(shape[1], pixel_size, outputs_rfftfreqs=True),
-            make_1d_frequency_grid(shape[0], pixel_size, outputs_rfftfreqs=False),
+        offset_in_angstroms = jnp.asarray(self.offset_in_angstroms)[:2]
+        if magnification_matrix is not None:
+            offset_in_angstroms = magnification_matrix @ offset_in_angstroms
+        fourier_image = enforce_rfftn_self_conjugates(
+            fourier_image, shape, includes_dc=False, mode="zero"
         )
-        phase_x, phase_y = (FourierPhaseShifts(tx)(q_x), FourierPhaseShifts(ty)(q_y))
-        return phase_y[:, None] * phase_x[None, :]
+        return fourier_image * _translation_operator(
+            offset_in_angstroms, shape, pixel_size
+        )
 
     @cached_property
     def offset_x_in_angstroms(self) -> Float[Array, "..."]:
@@ -430,6 +409,19 @@ class AxisAnglePose(AbstractPose, strict=True):
         return self.from_rotation_and_translation(
             self.rotation.inverse(), self.offset_in_angstroms
         )
+
+
+def _translation_operator(
+    offset_in_angstroms: Float[Array, "2"], shape: tuple[int, int], pixel_size: FloatLike
+) -> Complex[Array, "{shape[0]} {shape[1]}//2+1"]:
+    """The phase shifts of an in-plane translation, on the rfft grid of `shape`."""
+    q_x, q_y = (
+        make_1d_frequency_grid(shape[1], pixel_size, outputs_rfftfreqs=True),
+        make_1d_frequency_grid(shape[0], pixel_size, outputs_rfftfreqs=False),
+    )
+    phase_x = FourierPhaseShifts(offset_in_angstroms[0])(q_x)
+    phase_y = FourierPhaseShifts(offset_in_angstroms[1])(q_y)
+    return phase_y[:, None] * phase_x[None, :]
 
 
 def _negate_angle(angle):

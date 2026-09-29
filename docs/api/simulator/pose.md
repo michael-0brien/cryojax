@@ -47,9 +47,8 @@
         options:
             members:
                 - __init__
-                - compute_translation_operator
-                - translate_image
                 - rotate_coordinates
+                - translate_fft
                 - offset_in_angstroms
                 - rotation
                 - from_rotation
@@ -62,9 +61,8 @@
         options:
             members:
                 - __init__
-                - compute_translation_operator
-                - translate_image
                 - rotate_coordinates
+                - translate_fft
                 - offset_in_angstroms
                 - rotation
                 - from_rotation
@@ -77,9 +75,8 @@
         options:
             members:
                 - __init__
-                - compute_translation_operator
-                - translate_image
                 - rotate_coordinates
+                - translate_fft
                 - offset_in_angstroms
                 - rotation
                 - from_rotation

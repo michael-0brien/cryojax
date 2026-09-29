@@ -20,8 +20,7 @@ from cryojax.constants import (
     PengScatteringFactorParameters,
     check_atomic_numbers_supported,
 )
-from cryojax.ndimage import make_coordinate_grid
-from cryojax.simulator._volume import gaussian_fourier
+from cryojax.ndimage import _nufft, make_coordinate_grid
 from jaxtyping import Array
 
 
@@ -94,16 +93,12 @@ def compute_projection_at_pose(
     fourier_projection = integrator.integrate(
         rotated_volume, image_config, outputs_real_space=False
     )
-    translation_operator = pose.compute_translation_operator(
-        image_config.padded_shape,
-        image_config.pixel_size,
-    )
     return im.crop_to_shape(
         jnp.fft.irfftn(
-            pose.translate_image(
+            pose.translate_fft(
                 fourier_projection,
-                translation_operator,
                 image_config.padded_shape,
+                image_config.pixel_size,
             ),
             s=image_config.padded_shape,
         ),
@@ -696,7 +691,7 @@ def _make_fft_projection_exact_volumes(pdb_info):
 )
 @_backends
 def test_fft_atom_projection_exact(monkeypatch, pdb_info, pixel_size, shape, backend):
-    monkeypatch.setattr(gaussian_fourier, "CRYOJAX_FINUFFT_BACKEND", backend)
+    monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", backend)
     gaussian_volume, gaussian_integrator, atom_volume, image_config = (
         _make_fft_projection_exact_volumes(pdb_info)
     )
@@ -721,13 +716,13 @@ def test_fft_atom_projection_exact_backends_agree(
 ):
     """nufftax and jax-finufft must produce identical projections."""
     _, _, atom_volume, image_config = _make_fft_projection_exact_volumes(pdb_info)
-    monkeypatch.setattr(gaussian_fourier, "CRYOJAX_FINUFFT_BACKEND", "nufftax")
+    monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", "nufftax")
     proj_nufftax = compute_projection(
         atom_volume,
         cxs.GaussianFourierProjection(sampling_mode="point", eps=1e-10),
         image_config,
     )
-    monkeypatch.setattr(gaussian_fourier, "CRYOJAX_FINUFFT_BACKEND", "jax-finufft")
+    monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", "jax-finufft")
     proj_jax_finufft = compute_projection(
         atom_volume,
         cxs.GaussianFourierProjection(sampling_mode="point", eps=1e-10),
@@ -761,7 +756,7 @@ def _make_antialias_volumes(pdb_info, width, pixel_size, shape):
 def test_fft_atom_projection_antialias(
     monkeypatch, pdb_info, width, pixel_size, shape, backend
 ):
-    monkeypatch.setattr(gaussian_fourier, "CRYOJAX_FINUFFT_BACKEND", backend)
+    monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", backend)
     gaussian_volume, gaussian_integrator, atom_volume, image_config = (
         _make_antialias_volumes(pdb_info, width, pixel_size, shape)
     )
@@ -788,13 +783,13 @@ def test_fft_atom_projection_antialias_backends_agree(
     _, _, atom_volume, image_config = _make_antialias_volumes(
         pdb_info, width, pixel_size, shape
     )
-    monkeypatch.setattr(gaussian_fourier, "CRYOJAX_FINUFFT_BACKEND", "nufftax")
+    monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", "nufftax")
     proj_nufftax = compute_projection(
         atom_volume,
         cxs.GaussianFourierProjection(eps=1e-10, upsample_factor=2.0),
         image_config,
     )
-    monkeypatch.setattr(gaussian_fourier, "CRYOJAX_FINUFFT_BACKEND", "jax-finufft")
+    monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", "jax-finufft")
     proj_jax_finufft = compute_projection(
         atom_volume,
         cxs.GaussianFourierProjection(eps=1e-10, upsample_factor=2.0),
@@ -845,7 +840,7 @@ def _make_peng_volumes(pdb_info, upsampfac):
 def test_fft_projection_peng(
     monkeypatch, pdb_info, pixel_size, shape, upsampfac, eps, backend
 ):
-    monkeypatch.setattr(gaussian_fourier, "CRYOJAX_FINUFFT_BACKEND", backend)
+    monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", backend)
     gaussian_volume, gaussian_integrator, atom_volume = _make_peng_volumes(
         pdb_info, upsampfac
     )
@@ -876,7 +871,7 @@ def test_fft_projection_peng_backends_agree(
     """nufftax and jax-finufft must produce identical Peng-tabulated projections."""
     _, _, atom_volume = _make_peng_volumes(pdb_info, upsampfac)
     image_config = cxs.BasicImageConfig(shape, pixel_size, voltage_in_kilovolts=300.0)
-    monkeypatch.setattr(gaussian_fourier, "CRYOJAX_FINUFFT_BACKEND", "nufftax")
+    monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", "nufftax")
     proj_nufftax = compute_projection(
         atom_volume,
         cxs.GaussianFourierProjection(
@@ -886,7 +881,7 @@ def test_fft_projection_peng_backends_agree(
         ),
         image_config,
     )
-    monkeypatch.setattr(gaussian_fourier, "CRYOJAX_FINUFFT_BACKEND", "jax-finufft")
+    monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", "jax-finufft")
     proj_jax_finufft = compute_projection(
         atom_volume,
         cxs.GaussianFourierProjection(
@@ -926,7 +921,7 @@ def test_fft_atom_projection_custom_upsampfac_jax_finufft(monkeypatch, upsampfac
     """Smoke test: custom opts via options (jax-finufft) runs without error."""
     from jax_finufft.options import NestedOpts, Opts
 
-    monkeypatch.setattr(gaussian_fourier, "CRYOJAX_FINUFFT_BACKEND", "jax-finufft")
+    monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", "jax-finufft")
     positions = np.array([[0.0, 0.0, 0.0], [1.0, 0.5, -0.5]])
     shape, pixel_size = (8, 8), 1.0
     image_config = cxs.BasicImageConfig(shape, pixel_size, voltage_in_kilovolts=300.0)
@@ -973,7 +968,7 @@ def _make_render_volumes(pdb_info, width):
 )
 @_backends
 def test_fft_atom_render(monkeypatch, pdb_info, width, voxel_size, shape, backend):
-    monkeypatch.setattr(gaussian_fourier, "CRYOJAX_FINUFFT_BACKEND", backend)
+    monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", backend)
     gaussian_volume, atom_volume = _make_render_volumes(pdb_info, width)
     gaussian_render_fn = cxs.GaussianMixtureRenderFn(shape, voxel_size)
     atom_render_fn = cxs.GaussianFourierRenderFn(
@@ -997,11 +992,11 @@ def test_fft_atom_render(monkeypatch, pdb_info, width, voxel_size, shape, backen
 def test_fft_atom_render_backends_agree(monkeypatch, pdb_info, width, voxel_size, shape):
     """nufftax and jax-finufft must produce identical rendered voxel grids."""
     _, atom_volume = _make_render_volumes(pdb_info, width)
-    monkeypatch.setattr(gaussian_fourier, "CRYOJAX_FINUFFT_BACKEND", "nufftax")
+    monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", "nufftax")
     voxels_nufftax = cxs.GaussianFourierRenderFn(shape, voxel_size, eps=1e-10)(
         atom_volume
     )
-    monkeypatch.setattr(gaussian_fourier, "CRYOJAX_FINUFFT_BACKEND", "jax-finufft")
+    monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", "jax-finufft")
     voxels_jax_finufft = cxs.GaussianFourierRenderFn(shape, voxel_size, eps=1e-10)(
         atom_volume
     )
@@ -1062,7 +1057,7 @@ def test_fft_atom_render_custom_upsampfac_jax_finufft(monkeypatch, upsampfac):
     """Smoke test: custom opts via options (jax-finufft) runs without error."""
     from jax_finufft.options import NestedOpts, Opts
 
-    monkeypatch.setattr(gaussian_fourier, "CRYOJAX_FINUFFT_BACKEND", "jax-finufft")
+    monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", "jax-finufft")
     positions = np.array([[0.0, 0.0, 0.0], [1.0, 0.5, -0.5]])
     shape, voxel_size = (8, 8, 8), 1.0
     atom_volume = cxs.GaussianFourierVolume(
