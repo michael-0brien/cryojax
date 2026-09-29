@@ -54,6 +54,7 @@ from ._normalize import (
     standardize_fft as standardize_fft,
     standardize_image as standardize_image,
 )
+from ._nufft import dispatch_nufft1 as dispatch_nufft1
 from ._operators import (
     AbstractFourierOperator as AbstractFourierOperator,
     AbstractRealOperator as AbstractRealOperator,
@@ -70,6 +71,7 @@ from ._radial_average import (
     compute_binned_radial_average as compute_binned_radial_average,
     radial_average_to_grid as radial_average_to_grid,
 )
+from ._resample import nufft_resample as nufft_resample
 from ._rescale_pixel_size import (
     rescale_pixel_size as rescale_pixel_size,
 )
