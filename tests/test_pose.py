@@ -95,7 +95,7 @@ def test_translation_operator_separable(tx, ty, shape, pixel_size):
     np.testing.assert_allclose(np.asarray(result), np.asarray(expected), atol=1e-6)
 
 
-def test_translate_fft_with_a_magnification_matrix_translates_by_the_mapped_offset():
+def test_translate_fft_with_a_anisotropy_matrix_translates_by_the_mapped_offset():
     shape, pixel_size, offset = (32, 33), 1.2, np.array([1.5, -2.3])
     D = np.array([[0.97, 0.02], [0.02, 1.03]])
     fourier_image = _random_rfft(shape)

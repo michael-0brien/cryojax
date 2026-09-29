@@ -399,7 +399,7 @@ def _gaussian_volume(position):
 def _analytic_anisotropic_projection(config, center):
     """The projection of an isotropic gaussian at `center` (in the specimen frame),
     seen through the magnification: `p(D⁻¹x)` on the detector pixels."""
-    D = np.asarray(config.magnification_matrix)
+    D = np.asarray(config.anisotropy_matrix)
     x = np.asarray(config.get_coordinate_grid(anisotropy=False))
     r = x @ np.linalg.inv(D).T - np.asarray(center)[:2]
     return np.exp(-0.5 * np.sum(r**2, axis=-1) / _SIGMA**2) / (2 * np.pi * _SIGMA**2)

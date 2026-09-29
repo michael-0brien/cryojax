@@ -143,7 +143,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
 
     @property
     @abstractmethod
-    def magnification_matrix(self) -> Float[Array, "2 2"]:
+    def anisotropy_matrix(self) -> Float[Array, "2 2"]:
         """The linear map `D` from the specimen to the detector plane, so that the
         detector records an image `p(x)` as `p(D⁻¹ x)`. The identity if the
         magnification is isotropic."""
@@ -300,7 +300,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
     ) -> Float[Array, "y_dim x_dim 2"]:
         """Convert a unitless grid to physical units in the specimen frame. Frequencies
         (in FFT order) map to `Dᵀk / pixel_size` and coordinates (centered) to
-        `D⁻¹x * pixel_size`, for the `magnification_matrix` `D`.
+        `D⁻¹x * pixel_size`, for the `anisotropy_matrix` `D`.
 
         **Arguments:**
 
@@ -316,7 +316,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
         grid = _safe_constant_multiply(grid, constant, is_fft_grid=not is_real_space)
         if not (self.is_anisotropic and anisotropy):
             return grid
-        matrix = self.magnification_matrix
+        matrix = self.anisotropy_matrix
         matrix = _inverse_2x2(matrix).T if is_real_space else matrix
         return _safe_matrix_multiply(grid, matrix, is_fft_grid=not is_real_space)
 
@@ -504,7 +504,7 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
         self.precompute_mode = precompute_mode
 
     @property
-    def magnification_matrix(self) -> Float[Array, "2 2"]:
+    def anisotropy_matrix(self) -> Float[Array, "2 2"]:
         """The identity: the magnification is isotropic."""
         return jnp.eye(2)
 
@@ -599,7 +599,7 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
         self.precompute_mode = precompute_mode
 
     @property
-    def magnification_matrix(self) -> Float[Array, "2 2"]:
+    def anisotropy_matrix(self) -> Float[Array, "2 2"]:
         """The identity: the magnification is isotropic."""
         return jnp.eye(2)
 
@@ -695,7 +695,7 @@ class AnisotropicImageConfig(AbstractImageConfig, strict=True):
         self.precompute_mode = precompute_mode
 
     @property
-    def magnification_matrix(self) -> Float[Array, "... 2 2"]:
+    def anisotropy_matrix(self) -> Float[Array, "... 2 2"]:
         """`D = I + [[-e0, e1], [e1, e0]]`, for `anisotropy_xy = (e0, e1)`."""
         anisotropy_xy = jnp.asarray(self.anisotropy_xy)
         e0, e1 = anisotropy_xy[..., 0], anisotropy_xy[..., 1]

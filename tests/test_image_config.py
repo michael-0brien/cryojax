@@ -179,15 +179,15 @@ def _anisotropic_config(anisotropy_xy, pixel_size=1.3, shape=(12, 10)):
 def test_isotropic_configs_have_identity_magnification(cls_name):
     config = getattr(cxs, cls_name)((12, 10), pixel_size=1.3)
     assert not config.is_anisotropic
-    np.testing.assert_array_equal(config.magnification_matrix, np.eye(2))
+    np.testing.assert_array_equal(config.anisotropy_matrix, np.eye(2))
 
 
 @pytest.mark.parametrize("magnitude, angle", [(0.02, 0.0), (0.05, 30.0), (0.1, 125.0)])
-def test_magnification_matrix_stretches_along_the_anisotropy_angle(magnitude, angle):
+def test_anisotropy_matrix_stretches_along_the_anisotropy_angle(magnitude, angle):
     """`D` stretches by `1 + a` along `(sin(angle), cos(angle))`, the direction of
     `AstigmaticCTF.astigmatism_angle`, and compresses by `1 - a` perpendicular to it."""
     config = _anisotropic_config(_anisotropy_xy(magnitude, angle))
-    D = np.asarray(config.magnification_matrix)
+    D = np.asarray(config.anisotropy_matrix)
     theta = np.deg2rad(angle)
     u = np.array([np.sin(theta), np.cos(theta)])
     w = np.array([np.cos(theta), -np.sin(theta)])
@@ -201,7 +201,7 @@ def test_anisotropic_grids_are_the_specimen_frame_values():
     """Frequencies are `Dᵀk / p` and coordinates `D⁻¹x p`, which preserve `k·x`."""
     shape, pixel_size = (12, 10), 1.3
     config = _anisotropic_config(_anisotropy_xy(0.05, 30.0), pixel_size, shape)
-    D = np.asarray(config.magnification_matrix)
+    D = np.asarray(config.anisotropy_matrix)
     k = np.asarray(make_frequency_grid(shape, outputs_rfftfreqs=False))
     x = np.asarray(make_coordinate_grid(shape))
     frequencies = np.asarray(config.get_frequency_grid(full=True))

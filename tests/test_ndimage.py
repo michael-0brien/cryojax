@@ -1128,7 +1128,7 @@ def test_dispatch_nufft1_rejects_dimension_mismatch(positions_shape, shape):
 #
 # NUFFT resampling
 #
-def _magnification_matrix(magnitude, angle_in_degrees):
+def _anisotropy_matrix(magnitude, angle_in_degrees):
     theta = 2 * np.deg2rad(angle_in_degrees)
     e0, e1 = magnitude * np.cos(theta), magnitude * np.sin(theta)
     return np.eye(2) + np.array([[-e0, e1], [e1, e0]])
@@ -1150,7 +1150,7 @@ def test_nufft_resample_of_a_gaussian_is_the_anisotropic_gaussian(
     at `D r₀`, over the whole band: at `σ = 3` pixels, its spectrum at Nyquist is below
     the accuracy of the non-uniform FFT (~1e-9 relative), even where `D` compresses."""
     sigma, center = 3.0, np.array([3.5, -2.2])
-    D = _magnification_matrix(magnitude, angle)
+    D = _anisotropy_matrix(magnitude, angle)
     image = _gaussian_image(shape, center, sigma**2 * np.eye(2))
     expected = _gaussian_image(shape, D @ center, sigma**2 * D @ D.T)
     np.testing.assert_allclose(
@@ -1187,7 +1187,7 @@ def test_nufft_resample_with_the_identity_is_the_fft(shape, is_complex):
 
 def test_nufft_resample_composes():
     shape, sigma = (64, 64), 3.0
-    D1, D2 = _magnification_matrix(0.04, 20.0), _magnification_matrix(0.03, 110.0)
+    D1, D2 = _anisotropy_matrix(0.04, 20.0), _anisotropy_matrix(0.03, 110.0)
     image = jnp.asarray(_gaussian_image(shape, np.zeros(2), sigma**2 * np.eye(2)))
     twice = im.nufft_resample(
         im.nufft_resample(image, jnp.asarray(D1), outputs_real_space=True, eps=1e-12),
@@ -1201,7 +1201,7 @@ def test_nufft_resample_composes():
 
 def test_nufft_resample_scales_the_zero_mode_by_the_determinant():
     image = np.random.default_rng(0).normal(size=(16, 12))
-    D = _magnification_matrix(0.08, 40.0)
+    D = _anisotropy_matrix(0.08, 40.0)
     fourier_image = im.nufft_resample(jnp.asarray(image), jnp.asarray(D), eps=1e-12)
     np.testing.assert_allclose(
         fourier_image[0, 0], np.linalg.det(D) * image.sum(), rtol=1e-10
@@ -1211,7 +1211,7 @@ def test_nufft_resample_scales_the_zero_mode_by_the_determinant():
 def test_nufft_resample_of_a_real_image_is_hermitian():
     shape = (15, 13)
     image = np.random.default_rng(0).normal(size=shape)
-    D = _magnification_matrix(0.05, 30.0)
+    D = _anisotropy_matrix(0.05, 30.0)
     fourier_image = np.asarray(
         im.nufft_resample(jnp.asarray(image), jnp.asarray(D), outputs_rfft=False)
     )
@@ -1244,7 +1244,7 @@ def test_nufft_resample_matrix_gradients_match_finite_differences():
 
 def test_nufft_resample_under_jit():
     image = jnp.asarray(np.random.default_rng(0).normal(size=(16, 12)))
-    D = jnp.asarray(_magnification_matrix(0.05, 30.0))
+    D = jnp.asarray(_anisotropy_matrix(0.05, 30.0))
     np.testing.assert_allclose(
         jax.jit(im.nufft_resample)(image, D), im.nufft_resample(image, D), atol=1e-12
     )
