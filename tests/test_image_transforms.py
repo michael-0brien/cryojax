@@ -204,6 +204,44 @@ def test_whitening_filter_downsample_regression():
     assert jnp.std(array) < 0.15
 
 
+@pytest.mark.parametrize("seed", range(4))
+def test_whitening_filter_upsampling_from_few_images_adds_no_spikes(seed):
+    # Regression test for the upsampling path. With only a few images, the
+    # real-space kernel's tail is noisy; padding the kernel with its edge values
+    # spreads that tail over the whole added region, which rings in Fourier space
+    # and zeros or spikes the filter at isolated frequencies. Zero padding keeps
+    # every gain within the few percent of the source grid's own range that its
+    # sparse radial bins allow.
+    images = jax.random.normal(jax.random.key(seed), (5, 64, 64))
+    native = np.asarray(im.WhiteningFilter(images).get()).ravel()[1:]
+    array = np.asarray(im.WhiteningFilter(images, shape=(256, 256)).get()).ravel()[1:]
+    assert 0.9 * native.min() <= array.min()
+    assert array.max() <= 1.1 * native.max()
+
+
+def test_whitening_filter_upsampling_keeps_the_shared_frequencies_gain():
+    # Every frequency of a 64-pixel grid is on a 128-pixel one, where the upsampled
+    # filter must equal the source filter, up to the normalization over each grid:
+    # zero padding the kernel interpolates the power trigonometrically.
+    images = jax.random.normal(jax.random.key(3), (5, 64, 64))
+    native = np.asarray(im.WhiteningFilter(images).get())
+    doubled = np.asarray(im.WhiteningFilter(images, shape=(128, 128)).get())
+    ratio = (doubled[::2, ::2][:, : native.shape[1]] / native).ravel()[1:]
+    np.testing.assert_allclose(ratio, np.median(ratio), rtol=1e-5)
+
+
+def test_whitening_filter_growing_one_axis_adds_no_spikes():
+    # A shape that grows along one axis and shrinks along the other pads the kernel
+    # along the first.
+    images = jax.random.normal(jax.random.key(4), (5, 64, 64))
+    native = np.asarray(im.WhiteningFilter(images).get()).ravel()[1:]
+    array = np.asarray(im.WhiteningFilter(images, shape=(48, 200)).get())
+    assert array.shape == (48, 101)
+    assert array[0, 0] == 1.0
+    gains = array.ravel()[1:]
+    assert 0.9 * native.min() <= gains.min() and gains.max() <= 1.1 * native.max()
+
+
 def test_rotation_fn(basic_config, voxel_volume):
     """Rotating an image in fourier space must agree with rotating the object
     itself (via its pose) before projecting it."""

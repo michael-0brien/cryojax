@@ -287,9 +287,11 @@ def _resize_power_spectrum(
     # array center, otherwise the crop/pad (which operates about the center)
     # discards the peak. This shift used to be baked into the
     # `cryojax.ndimage.irfftn`/`rfftn` wrappers and is now applied explicitly.
+    # Pad with zeros: edge padding repeats the kernel's noisy tail, which rings
+    # into zeros and spikes in the filter.
     kernel = jnp.fft.fftshift(jnp.fft.irfftn(power, s=source_shape))
     resized = jnp.fft.ifftshift(
-        resize_with_crop_or_pad(kernel, target_shape, mode="edge")
+        resize_with_crop_or_pad(kernel, target_shape, mode="constant")
     )
     power = jnp.fft.rfftn(resized).real
     # ... resampling can introduce small negative values
