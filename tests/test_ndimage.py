@@ -361,6 +361,30 @@ def test_frc_fsc_matches_full_grid_definition(shape):
     np.testing.assert_allclose(curve, expected, rtol=1e-5)
 
 
+def test_binned_radial_average_is_accurate_in_float32():
+    # About a million elements per bin, beyond what one float32 sum per bin holds.
+    rng = np.random.default_rng(0)
+    radius = rng.uniform(0.0, 4.0, (2048, 2048)).astype(np.float32)
+    image = rng.uniform(1.0, 2.0, (2048, 2048)).astype(np.float32)
+    bins = np.arange(5, dtype=np.float32)
+    average = im.compute_binned_radial_average(
+        jnp.asarray(image), jnp.asarray(radius), jnp.asarray(bins)
+    )
+    index = np.digitize(radius, bins, right=True).ravel()
+    expected = np.bincount(
+        index, weights=image.ravel().astype(np.float64), minlength=5
+    ) / np.bincount(index, minlength=5)
+    np.testing.assert_allclose(np.asarray(average, np.float64), expected, rtol=1e-6)
+
+
+def test_binned_radial_average_with_fewer_elements_than_bins():
+    radius = jnp.asarray([[0.5, 1.5], [2.5, 3.5]])
+    image = jnp.asarray([[1.0, 2.0], [3.0, 4.0]])
+    average = im.compute_binned_radial_average(image, radius, jnp.arange(1.0, 9.0))
+    np.testing.assert_allclose(average[:4], [1.0, 2.0, 3.0, 4.0])
+    assert np.all(np.isnan(average[4:]))
+
+
 @pytest.mark.parametrize(
     "shape, expected",
     [
