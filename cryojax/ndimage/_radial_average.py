@@ -68,9 +68,10 @@ def compute_binned_radial_average(
 def _bincount(indices, weights=None, *, length):
     """`jnp.bincount` into interleaved copies of the bins, summed after: a single copy
     serialises every GPU thread on a few bins, and one float32 sum per bin loses
-    precision as it fills.
+    precision as it fills. As many copies as elements per bin, up to 1024, past which
+    the contention is gone.
     """
-    copies = 1024
+    copies = max(1, min(1024, indices.size // length))
     lane = jnp.arange(indices.size, dtype=indices.dtype) % copies
     # Out-of-range indices are dropped, as `jnp.bincount` drops them.
     index = jnp.where(indices < length, lane * length + indices, copies * length)

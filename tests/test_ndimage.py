@@ -377,6 +377,14 @@ def test_binned_radial_average_is_accurate_in_float32():
     np.testing.assert_allclose(np.asarray(average, np.float64), expected, rtol=1e-6)
 
 
+def test_binned_radial_average_with_fewer_elements_than_bins():
+    radius = jnp.asarray([[0.5, 1.5], [2.5, 3.5]])
+    image = jnp.asarray([[1.0, 2.0], [3.0, 4.0]])
+    average = im.compute_binned_radial_average(image, radius, jnp.arange(1.0, 9.0))
+    np.testing.assert_allclose(average[:4], [1.0, 2.0, 3.0, 4.0])
+    assert np.all(np.isnan(average[4:]))
+
+
 @pytest.mark.parametrize(
     "shape, expected",
     [
