@@ -2,9 +2,9 @@
 
 import math
 from abc import abstractmethod
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Sequence
 from functools import cached_property
-from typing import Any, ClassVar, Literal, cast
+from typing import ClassVar, Literal, cast
 
 import equinox as eqx
 import jax
@@ -137,15 +137,14 @@ class AbstractImageConfig(eqx.Module, strict=True):
         Literal["none", "rfft", "fft", "all", "compile_time_eval"]
     ]
     precomputed_grids: eqx.AbstractVar[PrecomputedGrids | None]
-    options: eqx.AbstractVar[Mapping[str, Any]]
 
     is_anisotropic: eqx.AbstractClassVar[bool]
 
     @property
     @abstractmethod
     def anisotropy_matrix(self) -> Float[Array, "2 2"]:
-        """The linear map `D` from the specimen to the detector plane, so that the
-        detector records an image `p(x)` as `p(D⁻¹ x)`. The identity if the
+        """The 2x2 matrix `D` with which a projected image `p(x)` is resampled as
+        `p(D⁻¹x)`, for coordinates `x` about the image center. The identity if the
         magnification is isotropic."""
         raise NotImplementedError
 
@@ -433,7 +432,6 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
         eqx.field(static=True)
     )
     precomputed_grids: PrecomputedGrids | None
-    options: Mapping[str, Any] = eqx.field(static=True)
 
     is_anisotropic: ClassVar[bool] = False
 
@@ -448,7 +446,6 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
         precompute_mode: Literal[
             "none", "rfft", "fft", "all", "compile_time_eval"
         ] = "none",
-        options: Mapping[str, Any] | None = None,
     ):
         """**Arguments:**
 
@@ -487,8 +484,6 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
             - 'compile_time_eval':
                 Evaluate grids as needed at compile time using
                 `jax.ensure_compile_time_eval`.
-        - `options`:
-            Advanced options for the simulation. No keys are currently accepted.
         """
         # Set parameters
         self.pixel_size = leaf_asarray(pixel_size, dtype=float)
@@ -496,7 +491,6 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
         # Set shape and padded shape
         self.shape = shape
         self.padded_shape = _set_padded_shape(type(self), shape, padded_shape, pad_scale)
-        self.options = _resolve_options_dict(type(self), options, supported={})
         # Finally, grid precompute
         self.precomputed_grids = _make_precomputed_grids(
             self.shape, self.padded_shape, precompute_mode
@@ -523,7 +517,6 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
         eqx.field(static=True)
     )
     precomputed_grids: PrecomputedGrids | None
-    options: Mapping[str, Any] = eqx.field(static=True)
 
     is_anisotropic: ClassVar[bool] = False
 
@@ -539,7 +532,6 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
         precompute_mode: Literal[
             "none", "rfft", "fft", "all", "compile_time_eval"
         ] = "none",
-        options: Mapping[str, Any] | None = None,
     ):
         """**Arguments:**
 
@@ -581,8 +573,6 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
             - 'compile_time_eval':
                 Evaluate grids as needed at compile time using
                 `jax.ensure_compile_time_eval`.
-        - `options`:
-            Advanced options for the simulation. No keys are currently accepted.
         """
         # Set parameters
         self.pixel_size = leaf_asarray(pixel_size, dtype=float)
@@ -591,7 +581,6 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
         # Set shape and padded shape
         self.shape = shape
         self.padded_shape = _set_padded_shape(type(self), shape, padded_shape, pad_scale)
-        self.options = _resolve_options_dict(type(self), options, supported={})
         # Finally, grid precompute
         self.precomputed_grids = _make_precomputed_grids(
             self.shape, self.padded_shape, precompute_mode
@@ -620,6 +609,21 @@ class AnisotropicImageConfig(AbstractImageConfig, strict=True):
     by `1 - a` perpendicular to it, with `angle` measured as for
     `AstigmaticCTF.astigmatism_angle`. It is parametrized by the vector
     `anisotropy_xy = a * (cos(2 * angle), sin(2 * angle))`.
+
+    !!! info "Resampling with the anisotropy matrix"
+
+        The volume integrator's output `p(x)` (a projection, or an exit wave minus
+        the incident plane wave) is resampled as `p(D⁻¹x)` on the same pixel grid,
+        before the CTF is applied at frequencies `Dᵀk`. The resampling interpolates
+        `p` at `D⁻¹x` with a cubic B-spline, takes the FFT, and divides the spectrum
+        by the B-spline's response at `Dᵀk`. Its cost is 16 interpolation taps and
+        one elementwise division per pixel; the FFT is the one the simulation
+        computes regardless when the integrator outputs real space, as
+        `GaussianMixtureProjection` does, and one round trip of FFTs otherwise.
+
+        It is exact for `anisotropy_xy = (0, 0)`. Otherwise, its error is aliasing
+        that grows towards Nyquist, and is smallest for images whose spectrum decays
+        well before Nyquist.
     """
 
     shape: tuple[int, int]
@@ -632,7 +636,6 @@ class AnisotropicImageConfig(AbstractImageConfig, strict=True):
         eqx.field(static=True)
     )
     precomputed_grids: PrecomputedGrids | None
-    options: Mapping[str, Any] = eqx.field(static=True)
 
     is_anisotropic: ClassVar[bool] = True
 
@@ -648,7 +651,6 @@ class AnisotropicImageConfig(AbstractImageConfig, strict=True):
         precompute_mode: Literal[
             "none", "rfft", "fft", "all", "compile_time_eval"
         ] = "none",
-        options: Mapping[str, Any] | None = None,
     ):
         """**Arguments:**
 
@@ -669,12 +671,6 @@ class AnisotropicImageConfig(AbstractImageConfig, strict=True):
         - `precompute_mode`:
             How to pre-compute coordinate and frequency grids, as for
             `BasicImageConfig`.
-        - `options`:
-            Advanced options for the simulation. The accepted keys are:
-            - `'nufft'`:
-                A dictionary of keyword arguments for
-                [`cryojax.ndimage.nufft_resample`][], with keys `'eps'` and
-                `'upsampfac'`.
         """
         # Set parameters
         self.pixel_size = leaf_asarray(pixel_size, dtype=float)
@@ -685,9 +681,6 @@ class AnisotropicImageConfig(AbstractImageConfig, strict=True):
         # Set shape and padded shape
         self.shape = shape
         self.padded_shape = _set_padded_shape(type(self), shape, padded_shape, pad_scale)
-        self.options = _resolve_options_dict(
-            type(self), options, supported={"nufft": ("eps", "upsampfac")}
-        )
         # Finally, grid precompute
         self.precomputed_grids = _make_precomputed_grids(
             self.shape, self.padded_shape, precompute_mode
@@ -759,57 +752,6 @@ def _inverse_2x2(matrix: Float[Array, "2 2"]) -> Float[Array, "2 2"]:
         [jnp.stack([d, -b], axis=-1), jnp.stack([-c, a], axis=-1)], axis=-2
     )
     return adjugate / (a * d - b * c)[..., None, None]
-
-
-def _resolve_options_dict(
-    cls: type,
-    options: Mapping[str, Any] | None,
-    supported: Mapping[str, tuple[str, ...]],
-) -> Mapping[str, Any]:
-    """Check the `options` of an image config against the `supported` keys (each with
-    the keys of its sub-dictionary), and freeze it so that it may be a static field."""
-    options = {} if options is None else options
-    for key, value in options.items():
-        if key not in supported:
-            raise ValueError(
-                f"Found invalid value for `{cls.__name__}(..., options=...)`. "
-                f"Supported keys are {list(supported)}, but got key {key!r}."
-            )
-        subkeys = supported[key]
-        if not isinstance(value, Mapping) or not set(value).issubset(subkeys):
-            raise ValueError(
-                f"Found invalid value for `{cls.__name__}(..., options=...)`. The "
-                f"value of {key!r} must be a dictionary with keys in {list(subkeys)}, "
-                f"but got {value!r}."
-            )
-    return _FrozenDict(
-        {
-            key: _FrozenDict(value) if isinstance(value, Mapping) else value
-            for key, value in options.items()
-        }
-    )
-
-
-class _FrozenDict(Mapping):
-    """A read-only, hashable dictionary, for the static `options` of an image config."""
-
-    def __init__(self, mapping: Mapping[str, Any]):
-        self._dict = dict(mapping)
-
-    def __getitem__(self, key: str) -> Any:
-        return self._dict[key]
-
-    def __iter__(self) -> Iterator[str]:
-        return iter(self._dict)
-
-    def __len__(self) -> int:
-        return len(self._dict)
-
-    def __hash__(self) -> int:
-        return hash(tuple(sorted(self._dict.items())))
-
-    def __repr__(self) -> str:
-        return repr(self._dict)
 
 
 def _make_precomputed_grids(

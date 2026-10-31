@@ -10,7 +10,6 @@ The `AbstractImageConfig` is an object at the core of simulating images in `cryo
                 - voltage_in_kilovolts
                 - padded_shape
                 - anisotropy_matrix
-                - options
 
 ---
 

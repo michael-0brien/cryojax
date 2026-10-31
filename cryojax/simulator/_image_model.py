@@ -19,12 +19,12 @@ from ..ndimage import (
     AbstractMask,
     compute_edge_value,
     crop_to_shape,
-    nufft_resample,
     standardize_fft,
 )
 from ._detector import AbstractDetector
 from ._image_config import AbstractImageConfig, DoseImageConfig
 from ._pose import AbstractPose
+from ._resample import resample_with_anisotropy_matrix
 from ._scattering_theory import AbstractScatteringTheory
 from ._transfer_theory import ContrastTransferTheory
 from ._volume import (
@@ -497,13 +497,12 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
             volume_representation = self._atom_translate(volume_representation)
         # Compute the projection image, resampled through an anisotropic magnification
         if self.image_config.is_anisotropic:
-            fourier_image = nufft_resample(
+            fourier_image = resample_with_anisotropy_matrix(
                 self.volume_integrator.integrate(
                     volume_representation, self.image_config, outputs_real_space=True
                 ),
-                self.image_config.anisotropy_matrix,
+                self.image_config,
                 outputs_rfft=not self.volume_integrator.outputs_ewald_sphere,
-                **self.image_config.options.get("nufft", {}),
             )
         else:
             fourier_image = self.volume_integrator.integrate(

@@ -260,30 +260,3 @@ def test_anisotropic_grid_norm_gradients_are_finite(anisotropy_xy):
 def test_anisotropic_config_rejects_non_2_vectors(anisotropy_xy):
     with pytest.raises(ValueError, match="anisotropy_xy"):
         _anisotropic_config(anisotropy_xy)
-
-
-# ── Options ──────────────────────────────────────────────────────────────────
-
-
-def test_anisotropic_config_accepts_nufft_options():
-    options = {"nufft": {"eps": 1e-8, "upsampfac": 2.0}}
-    config = _anisotropic_config((0.01, 0.0))
-    configured = cxs.AnisotropicImageConfig((12, 10), 1.3, options=options)
-    assert config.options == {}
-    assert configured.options == options
-    # Static, so a jitted function recompiles on new options rather than tracing them
-    hash(configured.options)
-
-
-@pytest.mark.parametrize(
-    "cls_name, options",
-    [
-        ("AnisotropicImageConfig", {"nufft_eps": 1e-8}),
-        ("AnisotropicImageConfig", {"nufft": {"tolerance": 1e-8}}),
-        ("BasicImageConfig", {"nufft": {"eps": 1e-8}}),
-        ("DoseImageConfig", {"nufft": {"eps": 1e-8}}),
-    ],
-)
-def test_image_configs_reject_unsupported_options(cls_name, options):
-    with pytest.raises(ValueError, match=f"{cls_name}\\(\\.\\.\\., options=\\.\\.\\.\\)"):
-        getattr(cxs, cls_name)((12, 10), pixel_size=1.3, options=options)

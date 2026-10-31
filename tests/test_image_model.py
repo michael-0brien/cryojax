@@ -387,6 +387,9 @@ def test_bg_normalization_scales_about_the_background(voxel_volume, voxel_size):
 # ── Anisotropic magnification ────────────────────────────────────────────────
 
 _SHAPE, _PIXEL_SIZE, _SIGMA = (64, 64), 1.0, 3.0
+# Cubic resampling to the detector is accurate to ~1e-3 of the spectrum at 0.1-0.2
+# cycles/pixel, where a `_SIGMA = 3` pixel gaussian has the last of its power
+_RESAMPLING_RTOL = 3e-4
 _ANISOTROPY_XY = (0.05 * np.cos(np.deg2rad(60.0)), 0.05 * np.sin(np.deg2rad(60.0)))
 
 
@@ -418,7 +421,9 @@ def test_anisotropic_projection_is_the_analytic_projection(translate_mode):
         translate_mode=translate_mode,
     )
     expected = _analytic_anisotropic_projection(config, position[:2] + offset)
-    np.testing.assert_allclose(model.simulate(), expected, atol=1e-5 * expected.max())
+    np.testing.assert_allclose(
+        model.simulate(), expected, atol=_RESAMPLING_RTOL * expected.max()
+    )
 
 
 def test_anisotropic_linear_image_applies_the_ctf_at_the_distorted_frequencies():
@@ -442,7 +447,7 @@ def test_anisotropic_linear_image_applies_the_ctf_at_the_distorted_frequencies()
         np.asarray(ctf_array) * np.fft.rfftn(projection), s=_SHAPE, axes=(0, 1)
     )
     np.testing.assert_allclose(
-        model.simulate(), expected, atol=1e-5 * np.abs(expected).max()
+        model.simulate(), expected, atol=_RESAMPLING_RTOL * np.abs(expected).max()
     )
 
 
@@ -534,26 +539,3 @@ def test_anisotropic_rytov_matches_weak_phase():
         ),
     )
     np.testing.assert_allclose(rytov.simulate(), weak_phase.simulate(), atol=1e-4)
-
-
-def test_anisotropic_nufft_options_reach_the_resampling():
-    """A tighter non-uniform FFT from `options` tightens the agreement with the
-    analytic projection."""
-    position = np.array([3.5, -2.2, 0.0])
-
-    def error(options):
-        config = cxs.AnisotropicImageConfig(
-            _SHAPE, _PIXEL_SIZE, anisotropy_xy=_ANISOTROPY_XY, options=options
-        )
-        model = cxs.ProjectionImageModel(
-            _gaussian_volume(position),
-            cxs.EulerAnglePose(),
-            config,
-            cxs.GaussianMixtureProjection(sampling_mode="point"),
-        )
-        expected = _analytic_anisotropic_projection(config, position)
-        return np.abs(np.asarray(model.simulate()) - expected).max() / expected.max()
-
-    default = error(None)
-    tight = error({"nufft": {"eps": 1e-10, "upsampfac": 2.0}})
-    assert tight < 1e-8 < default

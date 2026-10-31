@@ -71,7 +71,6 @@ from ._radial_average import (
     compute_binned_radial_average as compute_binned_radial_average,
     radial_average_to_grid as radial_average_to_grid,
 )
-from ._resample import nufft_resample as nufft_resample
 from ._rescale_pixel_size import (
     rescale_pixel_size as rescale_pixel_size,
 )

@@ -4,8 +4,9 @@ from jaxtyping import Array, Complex, Float, Inexact
 
 from ..._internal import error_if_not_fractional, leaf_asarray
 from ...jax_util import FloatLike, NDArrayLike
-from ...ndimage import AbstractFourierOperator, nufft_resample
+from ...ndimage import AbstractFourierOperator
 from .._image_config import AbstractImageConfig
+from .._resample import resample_with_anisotropy_matrix
 from .transfer_function import AbstractCTF
 
 
@@ -217,11 +218,8 @@ class WaveTransferTheory(AbstractTransferTheory, strict=True):
                 if is_real_space
                 else jnp.fft.ifftn(wavefunction_spectrum)
             )
-            wavefunction_spectrum = nufft_resample(
-                wavefunction - 1.0,
-                image_config.anisotropy_matrix,
-                outputs_rfft=False,
-                **image_config.options.get("nufft", {}),
+            wavefunction_spectrum = resample_with_anisotropy_matrix(
+                wavefunction - 1.0, image_config, outputs_rfft=False
             )
             y_dim, x_dim = image_config.padded_shape
             is_origin = (jnp.arange(y_dim) == 0)[:, None] & (jnp.arange(x_dim) == 0)[
@@ -262,11 +260,8 @@ def _resample_object(
                 if is_complex_object
                 else jnp.fft.irfftn(object, s=shape)
             )
-        return nufft_resample(
-            object,
-            image_config.anisotropy_matrix,
-            outputs_rfft=not is_complex_object,
-            **image_config.options.get("nufft", {}),
+        return resample_with_anisotropy_matrix(
+            object, image_config, outputs_rfft=not is_complex_object
         )
     if is_real_space:
         return jnp.fft.fftn(object) if is_complex_object else jnp.fft.rfftn(object)
