@@ -224,7 +224,8 @@ def make_image_model(
             within `signal_region`. This normalizes the image
             to be a z-score.
         - 'bg':
-            Subtract mean value at the image edges.
+            Subtract the median value at the image edges, then scale to
+            unit root-mean-square about that background within `signal_region`.
             This makes the image fade to a background with values
             equal to zero. Requires that `image_config.padded_shape`
             is large enough so that the signal sufficiently decays.

@@ -245,16 +245,17 @@ class AbstractImageModel(eqx.Module, strict=True):
         return image
 
     def _bg_subtract_normalize(self, image: Array, background_image: Array) -> Array:
+        """Subtract the background, then scale to unit root-mean-square about it
+        within `signal_region`, so the signal's contrast against the background sets
+        the scale. A `std` would measure spread about the region's own mean and
+        discard that contrast."""
         signal_region = (
             None if self.signal_region is None else jnp.asarray(self.signal_region)
         )
-        bg_value, std = (
-            compute_edge_value(background_image),
-            jnp.std(image, where=signal_region),
-        )
-        image = (image - bg_value) / std
-
-        return image
+        background_level = compute_edge_value(background_image)
+        contrast = image - background_level
+        contrast_rms = jnp.sqrt(jnp.mean(contrast**2, where=signal_region))
+        return contrast / contrast_rms
 
 
 class LinearImageModel(AbstractImageModel, strict=True):
@@ -314,7 +315,8 @@ class LinearImageModel(AbstractImageModel, strict=True):
                 Normalize the image to be mean 0
                 within `signal_region`.
             - 'bg':
-                Subtract mean value at the image edges.
+                Subtract the median value at the image edges, then scale to
+                unit root-mean-square about that background within `signal_region`.
                 This makes the image fade to a background with values
                 equal to zero. Requires that `image_config.padded_shape`
                 is large enough so that the signal sufficiently decays.
@@ -441,7 +443,8 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
                 Normalize the image to be mean 0
                 within `signal_region`.
             - 'bg':
-                Subtract mean value at the image edges.
+                Subtract the median value at the image edges, then scale to
+                unit root-mean-square about that background within `signal_region`.
                 This makes the image fade to a background with values
                 equal to zero. Requires that `image_config.padded_shape`
                 is large enough so that the signal sufficiently decays.
@@ -807,7 +810,8 @@ _init_doc = """**Arguments:**
         Normalize the image to be mean 0
         within `signal_region`.
     - 'bg':
-        Subtract mean value at the image edges.
+        Subtract the median value at the image edges, then scale to
+        unit root-mean-square about that background within `signal_region`.
         This makes the image fade to a background with values
         equal to zero. Requires that `image_config.padded_shape`
         is large enough so that the signal sufficiently decays.
