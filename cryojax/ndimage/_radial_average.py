@@ -47,22 +47,36 @@ def compute_binned_radial_average(
     # Compute the radial profile as the (weighted) average value of the image
     # in each bin
     if weights is None:
-        numerator = jnp.bincount(
+        numerator = _bincount(
             digitized_radial_grid.ravel(), weights=image.ravel(), length=bins.size
         )
-        denominator = jnp.bincount(digitized_radial_grid.ravel(), length=bins.size)
+        denominator = _bincount(digitized_radial_grid.ravel(), length=bins.size)
     else:
         weights = jnp.broadcast_to(weights, image.shape)
-        numerator = jnp.bincount(
+        numerator = _bincount(
             digitized_radial_grid.ravel(),
             weights=(image * weights).ravel(),
             length=bins.size,
         )
-        denominator = jnp.bincount(
+        denominator = _bincount(
             digitized_radial_grid.ravel(), weights=weights.ravel(), length=bins.size
         )
 
     return numerator / denominator
+
+
+def _bincount(indices, weights=None, *, length):
+    """`jnp.bincount` into interleaved copies of the bins, summed after: a single copy
+    serialises every GPU thread on a few bins, and one float32 sum per bin loses
+    precision as it fills. As many copies as elements per bin, up to 1024, past which
+    the contention is gone.
+    """
+    copies = max(1, min(1024, indices.size // length))
+    lane = jnp.arange(indices.size, dtype=indices.dtype) % copies
+    # Out-of-range indices are dropped, as `jnp.bincount` drops them.
+    index = jnp.where(indices < length, lane * length + indices, copies * length)
+    counts = jnp.bincount(index, weights=weights, length=copies * length)
+    return counts.reshape(copies, length).sum(axis=0)
 
 
 def radial_average_to_grid(
