@@ -543,13 +543,14 @@ def _load_atom_info(df: pd.DataFrame, model_index: int | None, stack_models: boo
         )
     # Load atom info
     if model_index is not None:
-        df = df[df["model"] == model_index]
-        if df.size == 0:
+        df_at_model = df[df["model"] == model_index]
+        if df_at_model.size == 0:
             raise ValueError(
                 f"Found no atoms matching `model_index = {model_index}`. "
                 "Model numbers available for indexing are "
                 f"{df['model'].unique().tolist()}. "
             )
+        df = df_at_model
     if model_index is None and stack_models:
         model_numbers = df["model"].unique().tolist()
     else:
