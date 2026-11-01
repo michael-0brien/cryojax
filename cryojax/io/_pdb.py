@@ -29,6 +29,7 @@ else:
         masses: Float[np.ndarray, "... n_atoms"]
         b_factors: Float[np.ndarray, "... n_atoms"]
         charges: Float[np.ndarray, "... n_atoms"]
+        occupancies: Float[np.ndarray, "... n_atoms"]
 
 
 @overload
@@ -412,7 +413,7 @@ def _load_atom_info(df: pd.DataFrame, model_index: int | None, stack_models: boo
     else:
         model_numbers = [None]
     atom_positions, atomic_numbers = [], []
-    atom_masses, b_factors, charges = [], [], []
+    atom_masses, b_factors, charges, occupancies = [], [], [], []
     for index in model_numbers:
         df_at_model = df if index is None else df[df["model"] == index]
         atom_positions.append(df_at_model[["x", "y", "z"]].to_numpy())
@@ -420,6 +421,7 @@ def _load_atom_info(df: pd.DataFrame, model_index: int | None, stack_models: boo
         atom_masses.append(df_at_model["atomic_weight"].to_numpy())
         b_factors.append(df_at_model["b_isotropic"].to_numpy())
         charges.append(df_at_model["charge"].to_numpy())
+        occupancies.append(df_at_model["occupancy"].to_numpy())
 
     if len(atomic_numbers) > 1:
         if not all(np.array_equal(arr, atomic_numbers[0]) for arr in atomic_numbers):
@@ -435,6 +437,7 @@ def _load_atom_info(df: pd.DataFrame, model_index: int | None, stack_models: boo
         charges=np.asarray(charges, dtype=int),
         b_factors=np.asarray(b_factors, dtype=float),
         masses=np.asarray(atom_masses, dtype=float),
+        occupancies=np.asarray(occupancies, dtype=float),
     )
     atom_info = _AtomicModelInfo(
         positions=np.asarray(atom_positions, dtype=float),

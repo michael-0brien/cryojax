@@ -52,6 +52,17 @@ def test_read_structure_no_properties(sample_pdb_path):
     assert atom_positions.shape[0] == 77
 
 
+def test_read_structure_loads_occupancies(sample_pdb_path):
+    _, atomic_numbers, atom_properties = read_atoms_from_pdb(
+        sample_pdb_path, loads_properties=True
+    )
+    df = mmdf.read(sample_pdb_path)
+    np.testing.assert_array_equal(
+        atom_properties["occupancies"], df["occupancy"].to_numpy()
+    )
+    assert atom_properties["occupancies"].shape == atomic_numbers.shape
+
+
 def test_read_pdb_multiple_structures_stack(pdb_multiple_structures_path):
     atom_positions, atomic_numbers, atom_properties = read_atoms_from_pdb(
         pdb_multiple_structures_path,
