@@ -145,6 +145,63 @@ def test_load_atom_volume(tabulation, sample_pdb_path: str):
     assert isinstance(atom_volume, cxs.GaussianFourierVolume)
 
 
+@pytest.fixture
+def partially_occupied_atom_data(sample_pdb_path):
+    import pathlib
+
+    import mmdf
+
+    atom_data = mmdf.read(pathlib.Path(sample_pdb_path))
+    atom_data["occupancy"] = np.random.default_rng(0).uniform(size=len(atom_data))
+    return atom_data
+
+
+def test_load_tabulated_volume_ignores_occupancies_by_default(
+    pdb_info, partially_occupied_atom_data
+):
+    _, atomic_numbers, _ = pdb_info
+    volume = cxs.load_tabulated_volume(
+        partially_occupied_atom_data, output_type=cxs.GaussianMixtureVolume
+    )
+    np.testing.assert_allclose(
+        volume.amplitudes, PengScatteringFactorParameters(atomic_numbers).a
+    )
+
+
+def test_load_tabulated_volume_weights_by_occupancy_when_asked(
+    pdb_info, partially_occupied_atom_data
+):
+    _, atomic_numbers, _ = pdb_info
+    occupancies = partially_occupied_atom_data["occupancy"].to_numpy()
+    volume = cxs.load_tabulated_volume(
+        partially_occupied_atom_data,
+        output_type=cxs.GaussianMixtureVolume,
+        include_occupancies=True,
+    )
+    np.testing.assert_allclose(
+        volume.amplitudes,
+        PengScatteringFactorParameters(atomic_numbers).a * occupancies[:, None],
+    )
+
+
+def test_load_tabulated_volume_rejects_all_zero_occupancies(sample_waterbox_pdb):
+    with pytest.raises(ValueError, match="occupancies"):
+        cxs.load_tabulated_volume(
+            sample_waterbox_pdb,
+            output_type=cxs.GaussianMixtureVolume,
+            include_occupancies=True,
+        )
+
+
+def test_load_tabulated_volume_fourier_rejects_occupancies(sample_pdb_path):
+    with pytest.raises(ValueError, match="include_occupancies"):
+        cxs.load_tabulated_volume(
+            sample_pdb_path,
+            output_type=cxs.GaussianFourierVolume,
+            include_occupancies=True,
+        )
+
+
 # ── scattering factor parameters ──────────────────────────────────────────────
 
 
@@ -1230,3 +1287,45 @@ def test_b_factors_default_adds_nothing(pdb_info):
         atom_positions, parameters
     )
     np.testing.assert_allclose(volume.variances, b_factor_to_variance(parameters.b))
+
+
+def test_occupancies_none_scales_nothing(pdb_info):
+    atom_positions, atomic_numbers, _ = pdb_info
+    parameters = PengScatteringFactorParameters(atomic_numbers)
+    volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(
+        atom_positions, parameters, occupancies=None
+    )
+    np.testing.assert_allclose(volume.amplitudes, parameters.a)
+
+
+def test_occupancies_scale_amplitudes(pdb_info):
+    atom_positions, atomic_numbers, _ = pdb_info
+    parameters = PengScatteringFactorParameters(atomic_numbers)
+    occupancies = np.random.default_rng(0).uniform(size=len(atomic_numbers))
+    volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(
+        atom_positions, parameters, occupancies=occupancies
+    )
+    np.testing.assert_allclose(volume.amplitudes, parameters.a * occupancies[:, None])
+    np.testing.assert_allclose(volume.variances, b_factor_to_variance(parameters.b))
+
+
+def test_zero_occupancy_projects_like_a_removed_atom(pdb_info):
+    atom_positions, atomic_numbers, _ = pdb_info
+    occupancies = np.ones(len(atomic_numbers))
+    occupancies[::7] = 0.0
+    kept = occupancies > 0
+    image_config = cxs.BasicImageConfig((64, 64), 1.0, voltage_in_kilovolts=300.0)
+    integrator = cxs.GaussianMixtureProjection()
+    weighted = cxs.GaussianMixtureVolume.from_tabulated_parameters(
+        atom_positions,
+        PengScatteringFactorParameters(atomic_numbers),
+        occupancies=occupancies,
+    )
+    removed = cxs.GaussianMixtureVolume.from_tabulated_parameters(
+        atom_positions[kept], PengScatteringFactorParameters(atomic_numbers[kept])
+    )
+    np.testing.assert_allclose(
+        integrator.integrate(weighted, image_config, outputs_real_space=True),
+        integrator.integrate(removed, image_config, outputs_real_space=True),
+        atol=1e-10,
+    )
