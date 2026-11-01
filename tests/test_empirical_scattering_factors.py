@@ -161,13 +161,34 @@ def test_truncated_side_chain_hydrogens_not_drawn(
     )
 
 
-def test_missing_drawn_hydrogens_raise(frame):
+def test_unselected_hydrogens_raise(frame):
     _, atomic_numbers, atom_chemistry = mmdf_to_atoms(
         frame, loads_chemistry=True, selection_string="not element H"
     )
-    with pytest.raises(ValueError, match="hydrogens") as error:
+    with pytest.raises(
+        ValueError, match="atom N of residue GLY at index 0 has 0 of its 3 hydrogens"
+    ) as error:
         EmpiricalScatteringFactorParameters(atomic_numbers, atom_chemistry)
+    assert "not selected" in str(error.value)
     assert "(" not in str(error.value)
+
+
+def test_chain_break_hydrogens_raise(frame):
+    edited = drop(frame, 5, frame.loc[frame["residue_id"] == 5, "atom"].tolist())
+    with pytest.raises(
+        ValueError,
+        match=f"atom N of residue THR at index {row(edited, 6, 'N')} has 1 of its 3 ",
+    ) as error:
+        parameters(edited)
+    assert "chain ends and breaks" in str(error.value)
+
+
+def test_lengths_must_match(frame):
+    _, atomic_numbers, atom_chemistry = mmdf_to_atoms(frame, loads_chemistry=True)
+    with pytest.raises(
+        ValueError, match="`atomic_numbers` has 137 atoms, but `atom_chemistry` has 138"
+    ):
+        EmpiricalScatteringFactorParameters(atomic_numbers[:-1], atom_chemistry)
 
 
 def test_selection_keeps_full_model_parameters(frame):
@@ -235,3 +256,18 @@ def test_volume_from_empirical_parameters(frame):
     assert empirical.b[row(frame, 2, "CA")].min() == 0
     volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(positions, empirical)
     assert np.all(np.asarray(volume.variances) > 0)
+
+
+@pytest.mark.parametrize(
+    "residue_id, name, neighbours", [(6, "TPO", [5, 7]), (10, "NME", [9])]
+)
+def test_bonded_non_standard_residue(frame, residue_id, name, neighbours):
+    renamed = frame.copy()
+    renamed.loc[renamed["residue_id"] == residue_id, "residue"] = name
+    complete, actual = parameters(frame), parameters(renamed)
+    rows = np.flatnonzero(frame["residue_id"].isin(neighbours))
+    np.testing.assert_array_equal(actual.a[rows], complete.a[rows])
+    np.testing.assert_array_equal(actual.b[rows], complete.b[rows])
+    own = np.flatnonzero(frame["residue_id"] == residue_id)
+    peng = PengScatteringFactorParameters(frame["atomic_number"].to_numpy()[own])
+    np.testing.assert_array_equal(actual.a[own], peng.a)

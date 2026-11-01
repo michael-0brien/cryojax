@@ -5,6 +5,7 @@ from typing import Any, TypedDict
 import numpy as np
 import pandas as pd
 from jaxtyping import Int, Shaped
+from scipy.spatial import KDTree
 
 
 if hasattr(typing, "GENERATING_DOCUMENTATION"):
@@ -24,53 +25,58 @@ def _read_chemistry(
     atomic_numbers = df["atomic_number"].to_numpy()
     positions = df[["x", "y", "z"]].to_numpy(dtype=float)
     residues: dict[tuple, list[int]] = {}
-    for row, key in enumerate(zip(df["model"], df["chain"], df["residue_id"])):
+    keys = zip(df["model"], df["chain"], df["residue_id"], residue_names)
+    for row, key in enumerate(keys):
         residues.setdefault(key, []).append(row)
     amino_acids = [
-        (key, rows)
-        for key, rows in residues.items()
-        if residue_names[rows[0]] in _AMINO_ACID_BONDS
+        (key, rows) for key, rows in residues.items() if key[3] in _AMINO_ACID_BONDS
     ]
     heavy_atoms = [
-        _heavy_atoms(key, rows, residue_names, atom_names, atomic_numbers)
-        for key, rows in amino_acids
+        _heavy_atoms(key, rows, atom_names, atomic_numbers) for key, rows in amino_acids
     ]
-    bonds, missing_bonds = [], []
-    starts, ends = set(range(len(amino_acids))), set(range(len(amino_acids)))
-    for i, j in zip(range(len(amino_acids)), range(1, len(amino_acids))):
-        c, n = heavy_atoms[i].get("C"), heavy_atoms[j].get("N")
-        if (
-            amino_acids[i][0][:2] == amino_acids[j][0][:2]
-            and c is not None
-            and n is not None
-            and np.linalg.norm(positions[c] - positions[n]) < _MAX_PEPTIDE_BOND
-        ):
-            bonds.append((c, n))
-            ends.discard(i)
-            starts.discard(j)
-    sulfurs = [
-        (key[0], atoms["SG"])
-        for (key, rows), atoms in zip(amino_acids, heavy_atoms)
-        if residue_names[rows[0]] == "CYS" and "SG" in atoms
+    models, chains = df["model"].to_numpy(), df["chain"].to_numpy()
+    residue_of = np.empty(len(df), dtype=int)
+    for k, rows in enumerate(residues.values()):
+        residue_of[rows] = k
+    # A residue's C bonds the N of another residue of its chain.
+    carbons = np.flatnonzero((atom_names == "C") & (atomic_numbers == 6))
+    nitrogens = np.flatnonzero((atom_names == "N") & (atomic_numbers == 7))
+    close = KDTree(positions[carbons]).sparse_distance_matrix(
+        KDTree(positions[nitrogens]), _MAX_PEPTIDE_BOND, output_type="ndarray"
+    )
+    c, n = carbons[close["i"]], nitrogens[close["j"]]
+    is_peptide = (
+        (residue_of[c] != residue_of[n])
+        & (models[c] == models[n])
+        & (chains[c] == chains[n])
+    )
+    peptides = np.stack([c[is_peptide], n[is_peptide]], axis=-1)
+    sulfurs = np.array(
+        [
+            atoms["SG"]
+            for (key, _), atoms in zip(amino_acids, heavy_atoms)
+            if key[3] == "CYS" and "SG" in atoms
+        ],
+        dtype=int,
+    )
+    disulfides = sulfurs[
+        KDTree(positions[sulfurs]).query_pairs(_MAX_DISULFIDE_BOND, output_type="ndarray")
     ]
-    bridged = set()
-    for k, (model_1, s_1) in enumerate(sulfurs):
-        for model_2, s_2 in sulfurs[k + 1 :]:
-            distance = np.linalg.norm(positions[s_1] - positions[s_2])
-            if model_1 == model_2 and distance < _MAX_DISULFIDE_BOND:
-                bonds.append((s_1, s_2))
-                bridged |= {s_1, s_2}
-    for i, ((key, rows), atoms) in enumerate(zip(amino_acids, heavy_atoms)):
-        residue = residue_names[rows[0]]
-        residue_bonds = list(_AMINO_ACID_BONDS[residue])
-        if i in ends:
+    disulfides = disulfides[models[disulfides[:, 0]] == models[disulfides[:, 1]]]
+    bonds, missing_bonds = peptides.tolist() + disulfides.tolist(), []
+    bonded_carbons = set(peptides[:, 0].tolist())
+    bonded_nitrogens = set(peptides[:, 1].tolist())
+    bridged = set(disulfides.ravel().tolist())
+    for (key, rows), atoms in zip(amino_acids, heavy_atoms):
+        residue_bonds = list(_AMINO_ACID_BONDS[key[3]])
+        if atoms.get("C") not in bonded_carbons:
             residue_bonds.append(("C", "OXT"))
         expected_hydrogens = Counter(
             a if b.startswith("H") else b
             for a, b in residue_bonds
             if a.startswith("H") or b.startswith("H")
         )
-        if i in starts:
+        if atoms.get("N") not in bonded_nitrogens:
             expected_hydrogens["N"] += 2
         if atoms.get("SG") in bridged:
             expected_hydrogens["SG"] -= 1
@@ -89,7 +95,7 @@ def _read_chemistry(
         if hydrogens:
             if not atoms:
                 raise ValueError(
-                    f"Found hydrogens but no heavy atoms in {_describe(key, residue)}."
+                    f"Found hydrogens but no heavy atoms in {_describe(key)}."
                 )
             heavy_rows = np.array(list(atoms.values()))
             distances = np.linalg.norm(
@@ -101,8 +107,10 @@ def _read_chemistry(
         for name, row in atoms.items():
             if found[row] > expected_hydrogens[name]:
                 raise ValueError(
-                    f"Found an unexpected hydrogen on atom {name} of "
-                    f"{_describe(key, residue)}."
+                    f"Found too many hydrogens on atom {name} of {_describe(key)}: "
+                    f"{found[row]}, but the CCP4 Monomer Library's protonation, with "
+                    f"charged termini at chain ends and breaks, has "
+                    f"{expected_hydrogens[name]}."
                 )
             missing_bonds.extend([(row, 1)] * (expected_hydrogens[name] - found[row]))
     return _AtomChemistry(
@@ -113,22 +121,21 @@ def _read_chemistry(
     )
 
 
-def _heavy_atoms(key, rows, residue_names, atom_names, atomic_numbers):
-    residue = residue_names[rows[0]]
-    known = {name for bond in _AMINO_ACID_BONDS[residue] for name in bond} | {"OXT"}
+def _heavy_atoms(key, rows, atom_names, atomic_numbers):
+    known = {name for bond in _AMINO_ACID_BONDS[key[3]] for name in bond} | {"OXT"}
     atoms = {}
     for row in rows:
         if atomic_numbers[row] == 1:
             continue
         name = atom_names[row]
         if name not in known:
-            raise ValueError(
-                f"Found an unknown atom {name} in {_describe(key, residue)}."
-            )
+            raise ValueError(f"Found an unknown atom {name} in {_describe(key)}.")
         if name in atoms:
             raise ValueError(
-                f"Found atom {name} twice in {_describe(key, residue)}; alternate "
-                "conformations are not supported, so select one."
+                f"Found atom {name} twice in {_describe(key)}. `mmdf` keeps no "
+                "alternate-location labels or insertion codes, so this is an alternate "
+                "conformation, an insertion code or a repeated chain ID; keep one copy "
+                "of each atom per residue."
             )
         atoms[name] = row
     return atoms
@@ -164,8 +171,8 @@ def _as_pairs(pairs, sorts_each):
     return pairs[np.lexsort((pairs[:, 1], pairs[:, 0]))]
 
 
-def _describe(key, residue):
-    model, chain, residue_id = key
+def _describe(key):
+    model, chain, residue_id, residue = key
     return f"residue {residue} {residue_id} of chain {chain} (model {model})"
 
 
