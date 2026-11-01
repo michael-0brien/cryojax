@@ -479,7 +479,7 @@ def load_tabulated_volume(
             else None
         )
         atom_volume = GaussianMixtureVolume.from_tabulated_parameters(
-            atom_positions, peng_parameters, extra_b_factors=b_factors
+            atom_positions, peng_parameters, b_factors=b_factors
         )
     elif output_type is GaussianFourierVolume:
         (positions_by_id, b_factor_by_id), atom_ids = split_atoms_by_element(

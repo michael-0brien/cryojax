@@ -18,6 +18,7 @@ import pytest
 from cryojax.atom_util import split_atoms_by_element
 from cryojax.constants import (
     PengScatteringFactorParameters,
+    b_factor_to_variance,
     check_atomic_numbers_supported,
 )
 from cryojax.ndimage import _nufft, make_coordinate_grid
@@ -804,7 +805,7 @@ def _make_peng_volumes(pdb_info, upsampfac):
     peng_parameters = PengScatteringFactorParameters(atom_ids)
     peng_parameters_by_id = PengScatteringFactorParameters(unique_atom_ids)
     gaussian_volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(
-        atom_positions, peng_parameters, extra_b_factors=4.0
+        atom_positions, peng_parameters, b_factors=4.0
     )
     atom_volume = cxs.GaussianFourierVolume.from_tabulated_parameters(
         positions_by_id,
@@ -1220,3 +1221,21 @@ def test_suggest_n_spread_output_is_plain_python_not_jax():
     termwise_n_spread = cxs.suggest_n_spread(volume, 1.0, mode="termwise")
     assert type(global_n_spread) is int
     assert all(type(n) is int for n in termwise_n_spread)
+
+
+def test_b_factors_default_is_a_floor(pdb_info):
+    atom_positions, atomic_numbers, _ = pdb_info
+    parameters = PengScatteringFactorParameters(atomic_numbers)
+    volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(
+        atom_positions, parameters
+    )
+    np.testing.assert_allclose(volume.variances, b_factor_to_variance(parameters.b + 0.2))
+
+
+def test_b_factors_none_adds_nothing(pdb_info):
+    atom_positions, atomic_numbers, _ = pdb_info
+    parameters = PengScatteringFactorParameters(atomic_numbers)
+    volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(
+        atom_positions, parameters, b_factors=None
+    )
+    np.testing.assert_allclose(volume.variances, b_factor_to_variance(parameters.b))
