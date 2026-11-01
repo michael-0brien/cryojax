@@ -795,7 +795,7 @@ def _make_gmm_voxel_scene(pdb_info):
     gmm_volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(
         atom_positions,
         peng_parameters,
-        extra_b_factors=5.0,
+        b_factors=5.0,
     )
     render_fn = cxs.GaussianMixtureRenderFn((dim, dim, dim), pixel_size)
     real_voxel_grid = render_fn(gmm_volume)

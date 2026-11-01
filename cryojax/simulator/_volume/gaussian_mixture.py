@@ -1,5 +1,6 @@
+import warnings
 from collections.abc import Mapping
-from typing import ClassVar, Literal, Self
+from typing import Any, ClassVar, Literal, Self
 from typing_extensions import override
 
 import equinox as eqx
@@ -28,6 +29,10 @@ from .base_volume import (
     VoxelArray,
 )
 from .common import spread_and_sum_gaussian_components
+
+
+_B_FACTOR_FLOOR = 0.2
+_MISSING = object()
 
 
 def _leaf_broadcast_to(x, shape):
@@ -162,7 +167,9 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
         cls,
         atom_positions: Float[NDArrayLike, "n_atoms 3"],
         parameters: PengScatteringFactorParameters,
-        extra_b_factors: FloatLike | Float[NDArrayLike, " n_atoms"] | None = None,
+        b_factors: FloatLike | Float[NDArrayLike, " n_atoms"] | None = _B_FACTOR_FLOOR,
+        *,
+        extra_b_factors: Any = _MISSING,
     ) -> Self:
         """Initialize a `GaussianMixtureVolume` from tabulated electron
         scattering factor parameters (Peng et al. 1996). This treats
@@ -184,19 +191,35 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
         - `parameters`:
             A pytree for the scattering factor parameters from
             Peng et al. (1996).
+        - `b_factors`:
+            Per-atom B-factors added to `parameters.b`. The default, 0.2,
+            keeps every gaussian at a nonzero width; `None` adds nothing.
         - `extra_b_factors`:
-            Additional per-atom B-factors that are added to
-            the values in `scattering_parameters.b`.
+            Deprecated; use `b_factors`.
         """  # noqa: E501
+        if extra_b_factors is not _MISSING:
+            if b_factors is not _B_FACTOR_FLOOR:
+                raise ValueError(
+                    "Passed both `b_factors` and the deprecated `extra_b_factors` "
+                    "to `GaussianMixtureVolume.from_tabulated_parameters`. "
+                    "Pass `b_factors` only."
+                )
+            warnings.warn(
+                "`extra_b_factors` is deprecated and will be removed in cryoJAX "
+                "0.7.0. Use `b_factors` instead.",
+                FutureWarning,
+                stacklevel=2,
+            )
+            b_factors = extra_b_factors
         amplitudes = leaf_asarray(parameters.a, dtype=float)
-        b_factors = leaf_asarray(parameters.b, dtype=float)
-        if extra_b_factors is not None:
-            extra_b_factors = leaf_asarray(extra_b_factors, dtype=float)
-            if extra_b_factors.ndim == 1:
-                extra_b_factors = extra_b_factors[:, None]
+        tabulated_b_factors = leaf_asarray(parameters.b, dtype=float)
+        if b_factors is not None:
+            b_factors = leaf_asarray(b_factors, dtype=float)
+            if b_factors.ndim == 1:
+                b_factors = b_factors[:, None]
             # Out of place: `leaf_asarray` may hand back the caller's own numpy table.
-            b_factors = b_factors + extra_b_factors
-        return cls(atom_positions, amplitudes, b_factor_to_variance(b_factors))
+            tabulated_b_factors = tabulated_b_factors + b_factors
+        return cls(atom_positions, amplitudes, b_factor_to_variance(tabulated_b_factors))
 
     @override
     def rotate_to_pose(self, pose: AbstractPose) -> Self:
