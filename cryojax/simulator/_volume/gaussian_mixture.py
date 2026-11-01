@@ -35,7 +35,6 @@ from .base_volume import (
 from .common import spread_and_sum_gaussian_components
 
 
-_B_FACTOR_FLOOR = 0.2
 _MISSING = object()
 
 
@@ -171,7 +170,7 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
         cls,
         atom_positions: Float[NDArrayLike, "n_atoms 3"],
         parameters: PengScatteringFactorParameters | EmpiricalScatteringFactorParameters,
-        b_factors: FloatLike | Float[NDArrayLike, " n_atoms"] | None = _B_FACTOR_FLOOR,
+        b_factors: FloatLike | Float[NDArrayLike, " n_atoms"] | None = None,
         *,
         extra_b_factors: Any = _MISSING,
     ) -> Self:
@@ -196,13 +195,12 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
             The scattering factor parameters, from Peng et al. (1996) or
             Shtyrov et al. (2026).
         - `b_factors`:
-            Per-atom B-factors added to `parameters.b`. The default, 0.2,
-            keeps every gaussian at a nonzero width; `None` adds nothing.
+            Per-atom B-factors added to `parameters.b`.
         - `extra_b_factors`:
             Deprecated; use `b_factors`.
         """  # noqa: E501
         if extra_b_factors is not _MISSING:
-            if b_factors is not _B_FACTOR_FLOOR:
+            if b_factors is not None:
                 raise ValueError(
                     "Passed both `b_factors` and the deprecated `extra_b_factors` "
                     "to `GaussianMixtureVolume.from_tabulated_parameters`. "

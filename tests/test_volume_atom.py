@@ -1223,19 +1223,10 @@ def test_suggest_n_spread_output_is_plain_python_not_jax():
     assert all(type(n) is int for n in termwise_n_spread)
 
 
-def test_b_factors_default_is_a_floor(pdb_info):
+def test_b_factors_default_adds_nothing(pdb_info):
     atom_positions, atomic_numbers, _ = pdb_info
     parameters = PengScatteringFactorParameters(atomic_numbers)
     volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(
         atom_positions, parameters
-    )
-    np.testing.assert_allclose(volume.variances, b_factor_to_variance(parameters.b + 0.2))
-
-
-def test_b_factors_none_adds_nothing(pdb_info):
-    atom_positions, atomic_numbers, _ = pdb_info
-    parameters = PengScatteringFactorParameters(atomic_numbers)
-    volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(
-        atom_positions, parameters, b_factors=None
     )
     np.testing.assert_allclose(volume.variances, b_factor_to_variance(parameters.b))

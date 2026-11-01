@@ -43,8 +43,7 @@ class EmpiricalScatteringFactorParameters(eqx.Module, strict=True):
     lacks, take the factors of `PengScatteringFactorParameters`, as in Shtyrov et
     al. The model must have explicit hydrogens; hydrogens whose positions the fit
     could not fix count toward their neighbours' types but get `a = 0`. Each
-    atom's terms are sorted by `b`. Some `b` are zero, so render with positive
-    B-factors.
+    atom's terms are sorted by `b`.
 
     **References:**
 
@@ -61,6 +60,7 @@ class EmpiricalScatteringFactorParameters(eqx.Module, strict=True):
         atomic_numbers: Int[np.ndarray, " n_atoms"],
         atom_chemistry: dict[str, Any],
         table: Literal["catalase", "emdb"] = "catalase",
+        b_minimum: float = 0.2,
     ):
         """**Arguments:**
 
@@ -71,6 +71,9 @@ class EmpiricalScatteringFactorParameters(eqx.Module, strict=True):
             `loads_chemistry = True`.
         - `table`:
             `"catalase"` or `"emdb"`.
+        - `b_minimum`:
+            Each `b` is raised to at least this, in angstroms squared, since some
+            tabulated `b` are zero.
         """
         if table not in _EMPIRICAL_TABLES:
             raise ValueError(
@@ -99,7 +102,9 @@ class EmpiricalScatteringFactorParameters(eqx.Module, strict=True):
         parameters[_find_hidden_hydrogens(atomic_numbers, atom_chemistry)] = 0.0
         order = np.argsort(parameters[:, 1], axis=1, kind="stable")
         self.a = np.take_along_axis(parameters[:, 0], order, axis=1)
-        self.b = np.take_along_axis(parameters[:, 1], order, axis=1)
+        self.b = np.maximum(
+            np.take_along_axis(parameters[:, 1], order, axis=1), b_minimum
+        )
 
 
 def _atom_types(atomic_numbers, atom_chemistry):
