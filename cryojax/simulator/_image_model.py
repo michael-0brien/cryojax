@@ -376,7 +376,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
             image,
             self.image_config,
             is_ewald_sphere=self.volume_integrator.outputs_ewald_sphere,
-            defocus_offset=self.pose.offset_z_in_angstroms,
+            offset_z_in_angstroms=self.pose.offset_z_in_angstroms,
             is_real_space=is_real_space,
         )
         # Now for the in-plane translation if using phase shifts
@@ -593,7 +593,7 @@ class ContrastImageModel(AbstractPhysicalImageModel, strict=True):
             volume_representation,
             self.image_config,
             rng_key,
-            defocus_offset=self.pose.offset_z_in_angstroms,
+            offset_z_in_angstroms=self.pose.offset_z_in_angstroms,
         )
         # Apply the translation
         if self.translate_mode == "fft":
@@ -672,7 +672,7 @@ class IntensityImageModel(AbstractPhysicalImageModel, strict=True):
             volume_representation,
             self.image_config,
             rng_key,
-            defocus_offset=self.pose.offset_z_in_angstroms,
+            offset_z_in_angstroms=self.pose.offset_z_in_angstroms,
         )
         if self.translate_mode == "fft":
             intensity_spectrum = self._phase_shift_translate(intensity_spectrum)
@@ -749,7 +749,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
             fourier_intensity = self.scattering_theory.compute_intensity_spectrum(
                 volume_representation,
                 self.image_config,
-                defocus_offset=self.pose.offset_z_in_angstroms,
+                offset_z_in_angstroms=self.pose.offset_z_in_angstroms,
             )
             if self.translate_mode == "fft":
                 fourier_intensity = self._phase_shift_translate(fourier_intensity)
@@ -774,7 +774,7 @@ class ElectronCountsImageModel(AbstractPhysicalImageModel, strict=True):
                 volume_representation,
                 self.image_config,
                 keys[1],
-                defocus_offset=self.pose.offset_z_in_angstroms,
+                offset_z_in_angstroms=self.pose.offset_z_in_angstroms,
             )
             if self.translate_mode == "fft":
                 fourier_intensity = self._phase_shift_translate(fourier_intensity)

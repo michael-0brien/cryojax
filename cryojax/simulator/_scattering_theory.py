@@ -21,7 +21,7 @@ class AbstractScatteringTheory(eqx.Module, strict=True):
         volume_representation: AbstractVolumeRepresentation,
         image_config: AbstractImageConfig,
         rng_key: PRNGKeyArray | None = None,
-        defocus_offset: FloatLike | None = None,
+        offset_z_in_angstroms: FloatLike | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         raise NotImplementedError
 
@@ -31,7 +31,7 @@ class AbstractScatteringTheory(eqx.Module, strict=True):
         volume_representation: AbstractVolumeRepresentation,
         image_config: AbstractImageConfig,
         rng_key: PRNGKeyArray | None = None,
-        defocus_offset: FloatLike | None = None,
+        offset_z_in_angstroms: FloatLike | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         raise NotImplementedError
 
@@ -56,7 +56,7 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
         volume_representation: AbstractVolumeRepresentation,
         image_config: AbstractImageConfig,
         rng_key: PRNGKeyArray | None = None,
-        defocus_offset: FloatLike | None = None,
+        offset_z_in_angstroms: FloatLike | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         # ... compute the exit wave, resampled from real space with an anisotropic
         # magnification
@@ -68,7 +68,7 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
         fourier_wavefunction = self.transfer_theory.propagate_exit_wave(
             wavefunction if is_real_space else jnp.fft.fftn(wavefunction),
             image_config,
-            defocus_offset=defocus_offset,
+            offset_z_in_angstroms=offset_z_in_angstroms,
             is_real_space=is_real_space,
         )
         wavefunction = jnp.fft.ifftn(fourier_wavefunction)
@@ -83,7 +83,7 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
         volume_representation: AbstractVolumeRepresentation,
         image_config: AbstractImageConfig,
         rng_key: PRNGKeyArray | None = None,
-        defocus_offset: FloatLike | None = None,
+        offset_z_in_angstroms: FloatLike | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         """Compute the contrast at the detector plane, given the squared wavefunction."""
         # ... compute the exit wave, resampled from real space with an anisotropic
@@ -96,7 +96,7 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
         fourier_wavefunction = self.transfer_theory.propagate_exit_wave(
             wavefunction if is_real_space else jnp.fft.fftn(wavefunction),
             image_config,
-            defocus_offset=defocus_offset,
+            offset_z_in_angstroms=offset_z_in_angstroms,
             is_real_space=is_real_space,
         )
         wavefunction = jnp.fft.ifftn(fourier_wavefunction)
@@ -154,7 +154,7 @@ class WeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
         volume_representation: AbstractVolumeRepresentation,
         image_config: AbstractImageConfig,
         rng_key: PRNGKeyArray | None = None,
-        defocus_offset: FloatLike | None = None,
+        offset_z_in_angstroms: FloatLike | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         # With an anisotropic magnification, the object is resampled from real space
         is_real_space = image_config.is_anisotropic
@@ -165,7 +165,7 @@ class WeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
             object_spectrum,
             image_config,
             is_ewald_sphere=self.volume_integrator.outputs_ewald_sphere,
-            defocus_offset=defocus_offset,
+            offset_z_in_angstroms=offset_z_in_angstroms,
             is_real_space=is_real_space,
         )
 
@@ -177,7 +177,7 @@ class WeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
         volume_representation: AbstractVolumeRepresentation,
         image_config: AbstractImageConfig,
         rng_key: PRNGKeyArray | None = None,
-        defocus_offset: FloatLike | None = None,
+        offset_z_in_angstroms: FloatLike | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         """Compute the squared wavefunction at the detector plane, given the
         contrast.
@@ -186,7 +186,10 @@ class WeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
         # ... compute the squared wavefunction directly from the image contrast
         # as |psi|^2 = 1 + 2C.
         contrast_spectrum = self.compute_contrast_spectrum(
-            volume_representation, image_config, rng_key, defocus_offset=defocus_offset
+            volume_representation,
+            image_config,
+            rng_key,
+            offset_z_in_angstroms=offset_z_in_angstroms,
         )
         intensity_spectrum = (2 * contrast_spectrum).at[0, 0].add(1.0 * N1 * N2)
         return intensity_spectrum

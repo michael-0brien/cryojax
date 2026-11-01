@@ -23,7 +23,7 @@ class AbstractCTF(eqx.Module, strict=True):
         self,
         frequency_grid_in_angstroms: Float[Array, "y_dim x_dim 2"],
         wavelength_in_angstroms: FloatLike,
-        defocus_offset: FloatLike | None = None,
+        offset_z_in_angstroms: FloatLike | None = None,
         parity: Literal["all", "even", "odd"] = "all",
     ) -> Float[Array, "y_dim x_dim"] | None:
         """Compute the frequency-dependent phase shifts due to wave aberration,
@@ -35,8 +35,9 @@ class AbstractCTF(eqx.Module, strict=True):
             The grid of frequencies in units of inverse angstroms.
         - `wavelength_in_angstroms`:
             The wavelength of the incident electrons in Angstroms.
-        - `defocus_offset`:
-            An optional defocus offset, in Angstroms, to apply at runtime.
+        - `offset_z_in_angstroms`:
+            An optional offset in Angstroms of the specimen along z, added to the
+            defocus at runtime, e.g. the `offset_z_in_angstroms` of an `AbstractPose`.
         - `parity`:
             Whether to return `'all'` of the phase shifts, or their `'even'` or
             `'odd'` part in the frequency. The odd part is `None` if the CTF has no
@@ -51,7 +52,7 @@ class AbstractCTF(eqx.Module, strict=True):
         amplitude_contrast_ratio: FloatLike = 0.1,
         phase_shift: FloatLike = 0.0,
         outputs_exp: bool = False,
-        defocus_offset: FloatLike | None = None,
+        offset_z_in_angstroms: FloatLike | None = None,
     ) -> Float[Array, "y_dim x_dim"] | Complex[Array, "y_dim x_dim"]:
         """Compute the CTF as a JAX array.
 
@@ -72,6 +73,9 @@ class AbstractCTF(eqx.Module, strict=True):
         - `outputs_exp`:
             If `False`, return the CTF used in linear image formation theory. If `True`, return
             the CTF (or wave transfer function) as a complex exponential.
+        - `offset_z_in_angstroms`:
+            An optional offset in Angstroms of the specimen along z, added to the
+            defocus at runtime, e.g. the `offset_z_in_angstroms` of an `AbstractPose`.
 
         With odd aberrations and `outputs_exp = False`, the CTF is complex.
         """  # noqa: E501
@@ -85,13 +89,13 @@ class AbstractCTF(eqx.Module, strict=True):
             aberration_phase_shifts = self.compute_aberration_phase_shifts(
                 frequency_grid_in_angstroms,
                 wavelength_in_angstroms=wavelength_in_angstroms,
-                defocus_offset=defocus_offset,
+                offset_z_in_angstroms=offset_z_in_angstroms,
                 parity="even",
             )
             odd_phase_shifts = self.compute_aberration_phase_shifts(
                 frequency_grid_in_angstroms,
                 wavelength_in_angstroms=wavelength_in_angstroms,
-                defocus_offset=defocus_offset,
+                offset_z_in_angstroms=offset_z_in_angstroms,
                 parity="odd",
             )
             amplitude_contrast_phase_shift = compute_amplitude_contrast_phase_shift(
@@ -109,7 +113,7 @@ class AbstractCTF(eqx.Module, strict=True):
             aberration_phase_shifts = self.compute_aberration_phase_shifts(
                 frequency_grid_in_angstroms,
                 wavelength_in_angstroms=wavelength_in_angstroms,
-                defocus_offset=defocus_offset,
+                offset_z_in_angstroms=offset_z_in_angstroms,
             )
             return jnp.exp(-1.0j * (aberration_phase_shifts - phase_shift))
 
@@ -179,7 +183,7 @@ class AstigmaticCTF(AbstractCTF, strict=True):
         self,
         frequency_grid_in_angstroms: Float[Array, "y_dim x_dim 2"],
         wavelength_in_angstroms: FloatLike,
-        defocus_offset: FloatLike | None = None,
+        offset_z_in_angstroms: FloatLike | None = None,
         parity: Literal["all", "even", "odd"] = "all",
     ) -> Float[Array, "y_dim x_dim"] | None:
         """Compute the frequency-dependent phase shifts due to wave aberration.
@@ -196,8 +200,9 @@ class AstigmaticCTF(AbstractCTF, strict=True):
             The wavelength of the incident electrons in Angstroms. This
             can be retrieved from the accelerating voltage using the function
             the function [`cryojax.constants.wavelength_from_kilovolts`][].
-        - `defocus_offset`:
-            An optional defocus offset to apply to the `defocus_in_angstroms` at runtime.
+        - `offset_z_in_angstroms`:
+            An optional offset in Angstroms of the specimen along z, added to the
+            defocus at runtime, e.g. the `offset_z_in_angstroms` of an `AbstractPose`.
         - `parity`:
             The phase shifts are even, so `'odd'` returns `None`.
         """
@@ -215,8 +220,9 @@ class AstigmaticCTF(AbstractCTF, strict=True):
             jnp.asarray(wavelength_in_angstroms, dtype=float),
             (
                 defocus_in_angstroms
-                if defocus_offset is None
-                else defocus_in_angstroms + jnp.asarray(defocus_offset, dtype=float)
+                if offset_z_in_angstroms is None
+                else defocus_in_angstroms
+                + jnp.asarray(offset_z_in_angstroms, dtype=float)
             ),
             _polar_to_xy(self.astigmatism_in_angstroms, self.astigmatism_angle, 2),
             spherical_aberration_in_angstroms,
@@ -343,7 +349,7 @@ class AberratedCTF(AbstractCTF, strict=True):
         self,
         frequency_grid_in_angstroms: Float[Array, "y_dim x_dim 2"],
         wavelength_in_angstroms: FloatLike,
-        defocus_offset: FloatLike | None = None,
+        offset_z_in_angstroms: FloatLike | None = None,
         parity: Literal["all", "even", "odd"] = "all",
     ) -> Float[Array, "y_dim x_dim"] | None:
         """Compute the frequency-dependent phase shifts due to wave aberration.
@@ -356,8 +362,9 @@ class AberratedCTF(AbstractCTF, strict=True):
         - `wavelength_in_angstroms`:
             The wavelength of the incident electrons in Angstroms. This can be
             computed with [`cryojax.constants.wavelength_from_kilovolts`][].
-        - `defocus_offset`:
-            An optional defocus offset, in Angstroms, to apply at runtime.
+        - `offset_z_in_angstroms`:
+            An optional offset in Angstroms of the specimen along z, added to the
+            defocus at runtime, e.g. the `offset_z_in_angstroms` of an `AbstractPose`.
         - `parity`:
             `'even'` for the defocus, astigmatism, and spherical aberration, `'odd'`
             for the coma and trefoil, or `'all'`. The odd part is `None` if there is
@@ -368,8 +375,8 @@ class AberratedCTF(AbstractCTF, strict=True):
         even_phase_shifts, odd_phase_shifts = None, None
         if parity in ("all", "even"):
             defocus_in_angstroms = jnp.asarray(self.defocus_in_um) * 1e4
-            if defocus_offset is not None:
-                defocus_in_angstroms += jnp.asarray(defocus_offset, dtype=float)
+            if offset_z_in_angstroms is not None:
+                defocus_in_angstroms += jnp.asarray(offset_z_in_angstroms, dtype=float)
             spherical_aberration_in_angstroms = (
                 error_if_negative(jnp.asarray(self.spherical_aberration_in_mm)) * 1e7
             )

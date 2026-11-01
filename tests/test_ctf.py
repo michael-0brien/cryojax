@@ -169,6 +169,47 @@ def test_aberrated_ctf_without_odd_terms_reduces_to_astigmatic_ctf(outputs_exp):
     np.testing.assert_allclose(actual, expected, rtol=1e-10, atol=1e-10)
 
 
+@pytest.mark.parametrize(
+    "make_ctf",
+    [
+        lambda dz: cxs.AstigmaticCTF(defocus_in_angstroms=12000.0 + dz),
+        lambda dz: cxs.AberratedCTF(defocus_in_um=1.2 + dz / 1e4),
+    ],
+)
+@pytest.mark.parametrize("outputs_exp", [False, True])
+def test_offset_z_is_in_angstroms_for_every_ctf(make_ctf, outputs_exp):
+    """`offset_z_in_angstroms` is in Angstroms, including for `AberratedCTF`, whose
+    defocus is in microns."""
+    grid = make_frequency_grid((16, 12), 1.7)
+    kwargs = dict(amplitude_contrast_ratio=0.07, outputs_exp=outputs_exp)
+    np.testing.assert_allclose(
+        make_ctf(0.0)(grid, _WAVELENGTH, offset_z_in_angstroms=500.0, **kwargs),
+        make_ctf(500.0)(grid, _WAVELENGTH, **kwargs),
+        rtol=1e-10,
+        atol=1e-10,
+    )
+
+
+def test_image_model_adds_the_pose_offset_z_to_the_defocus():
+    config = cxs.BasicImageConfig((32, 32), 1.0)
+    volume = cxs.GaussianMixtureVolume(
+        np.array([[2.0, -1.0, 0.0]]), amplitudes=1.0, variances=2.0
+    )
+
+    def simulate(defocus_in_um, offset_z_in_angstroms):
+        return cxs.LinearImageModel(
+            volume,
+            cxs.EulerAnglePose(offset_z_in_angstroms=offset_z_in_angstroms),
+            config,
+            cxs.ContrastTransferTheory(cxs.AberratedCTF(defocus_in_um=defocus_in_um)),
+            cxs.GaussianMixtureProjection(),
+        ).simulate()
+
+    np.testing.assert_allclose(
+        simulate(1.0, 500.0), simulate(1.05, 0.0), rtol=1e-10, atol=1e-12
+    )
+
+
 def test_odd_aberrations_make_the_ctf_complex_and_hermitian():
     grid = make_frequency_grid((15, 15), 1.3, outputs_rfftfreqs=False)
     ctf = _aberrated_ctf(coma=_COMA, trefoil=_TREFOIL)
