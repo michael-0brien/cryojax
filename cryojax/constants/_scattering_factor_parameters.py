@@ -78,9 +78,16 @@ class EmpiricalScatteringFactorParameters(eqx.Module, strict=True):
                 f"'catalase' or 'emdb', but got `table = {table!r}`."
             )
         atomic_numbers = np.asarray(atomic_numbers, dtype=int)
+        if len(atomic_numbers) != len(atom_chemistry["residue_names"]):
+            raise ValueError(
+                f"`atomic_numbers` has {len(atomic_numbers)} atoms, but "
+                f"`atom_chemistry` has {len(atom_chemistry['residue_names'])}."
+            )
         atom_types = _atom_types(atomic_numbers, atom_chemistry)
         tabulated = _EMPIRICAL_TABLES[table]
-        is_tabulated = np.isin(atom_types, list(tabulated))
+        is_tabulated = np.isin(atom_types, list(tabulated)) & np.isin(
+            atom_chemistry["residue_names"], list(_AMINO_ACIDS)
+        )
         parameters = np.empty((len(atomic_numbers), 2, 5))
         if is_tabulated.any():
             parameters[is_tabulated] = [tabulated[t] for t in atom_types[is_tabulated]]
@@ -125,14 +132,20 @@ def _find_hidden_hydrogens(atomic_numbers, atom_chemistry):
         [name in _HIDDEN_HYDROGEN_PARENTS for name in zip(residue_names, atom_names)],
         dtype=bool,
     ).reshape(-1) | (truncated & (atom_names != "N"))
+    is_hydrogen = atomic_numbers == 1
     for parent in missing_bonds[missing_bonds[:, 1] == 1, 0].tolist():
         if not hides_hydrogens[parent]:
+            neighbours = bonds[(bonds == parent).any(axis=1)].ravel()
+            found = np.count_nonzero(is_hydrogen[neighbours])
+            missing = np.count_nonzero(np.all(missing_bonds == (parent, 1), axis=1))
             raise ValueError(
-                "`EmpiricalScatteringFactorParameters` requires a model with "
-                f"hydrogens, but atom {atom_names[parent]} of residue "
-                f"{residue_names[parent]} at index {parent} lacks one."
+                "`EmpiricalScatteringFactorParameters` needs every hydrogen of the "
+                "CCP4 Monomer Library's protonation, with charged termini at chain "
+                f"ends and breaks, but atom {atom_names[parent]} of residue "
+                f"{residue_names[parent]} at index {parent} has {found} of its "
+                f"{found + missing} hydrogens. They are absent from the model, "
+                "protonated differently, or not selected."
             )
-    is_hydrogen = atomic_numbers == 1
     hidden = np.zeros(len(atomic_numbers), dtype=bool)
     for hydrogen, parent in (bonds.T, bonds[:, ::-1].T):
         hidden[hydrogen[is_hydrogen[hydrogen] & hides_hydrogens[parent]]] = True
@@ -140,6 +153,30 @@ def _find_hidden_hydrogens(atomic_numbers, atom_chemistry):
 
 
 _EMPIRICAL_TABLES = {"catalase": _CATALASE_TABLE, "emdb": _EMDB_TABLE}
+_AMINO_ACIDS = frozenset(
+    (
+        "ALA",
+        "ARG",
+        "ASN",
+        "ASP",
+        "CYS",
+        "GLN",
+        "GLU",
+        "GLY",
+        "HIS",
+        "ILE",
+        "LEU",
+        "LYS",
+        "MET",
+        "PHE",
+        "PRO",
+        "SER",
+        "THR",
+        "TRP",
+        "TYR",
+        "VAL",
+    )
+)
 _SYMBOLS = {1: "H", 6: "C", 7: "N", 8: "O", 16: "S"}
 _FLAGS = {
     ("ASP", "OD1"): ", carboxyl",
