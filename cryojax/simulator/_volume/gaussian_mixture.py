@@ -173,6 +173,7 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
         parameters: PengScatteringFactorParameters | EmpiricalScatteringFactorParameters,
         b_factors: FloatLike | Float[NDArrayLike, " n_atoms"] | None = None,
         *,
+        occupancies: Float[NDArrayLike, " n_atoms"] | None = None,
         extra_b_factors: Any = _MISSING,
     ) -> Self:
         """Initialize a `GaussianMixtureVolume` from tabulated electron
@@ -197,6 +198,8 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
             Shtyrov et al. (2026).
         - `b_factors`:
             Per-atom B-factors added to `parameters.b`.
+        - `occupancies`:
+            Per-atom occupancies multiplying `parameters.a`.
         - `extra_b_factors`:
             Deprecated; use `b_factors`.
         """  # noqa: E501
@@ -215,6 +218,8 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
             )
             b_factors = extra_b_factors
         amplitudes = leaf_asarray(parameters.a, dtype=float)
+        if occupancies is not None:
+            amplitudes = amplitudes * leaf_asarray(occupancies, dtype=float)[:, None]
         tabulated_b_factors = leaf_asarray(parameters.b, dtype=float)
         if b_factors is not None:
             b_factors = leaf_asarray(b_factors, dtype=float)
