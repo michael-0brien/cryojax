@@ -70,7 +70,13 @@ def test_read_atoms_loads_chemistry(sample_pdb_path):
     expected = mmdf_to_atoms(mmdf.read(sample_pdb_path), loads_chemistry=True)
     np.testing.assert_array_equal(positions, expected[0])
     np.testing.assert_array_equal(atomic_numbers, expected[1])
-    for key in ("residue_names", "atom_names", "bonds", "missing_bonds"):
+    for key in (
+        "residue_names",
+        "atom_names",
+        "bonds",
+        "missing_bonds",
+        "unselected_bonds",
+    ):
         np.testing.assert_array_equal(atom_chemistry[key], expected[2][key])
 
 
