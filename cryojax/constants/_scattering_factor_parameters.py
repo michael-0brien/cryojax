@@ -112,8 +112,9 @@ def _atom_types(atomic_numbers, atom_chemistry):
     for i, j in atom_chemistry["bonds"].tolist():
         neighbours[i].append(int(atomic_numbers[j]))
         neighbours[j].append(int(atomic_numbers[i]))
-    for i, atomic_number in atom_chemistry["missing_bonds"].tolist():
-        neighbours[i].append(atomic_number)
+    for key in ("missing_bonds", "unselected_bonds"):
+        for i, atomic_number in atom_chemistry[key].tolist():
+            neighbours[i].append(atomic_number)
     atom_types = []
     for i, bonded in enumerate(neighbours):
         if not bonded:
@@ -138,6 +139,15 @@ def _find_hidden_hydrogens(atomic_numbers, atom_chemistry):
         dtype=bool,
     ).reshape(-1) | (truncated & (atom_names != "N"))
     is_hydrogen = atomic_numbers == 1
+    unselected_bonds = atom_chemistry["unselected_bonds"]
+    orphans = unselected_bonds[is_hydrogen[unselected_bonds[:, 0]], 0]
+    if len(orphans) > 0:
+        i = int(orphans[0])
+        raise ValueError(
+            "`EmpiricalScatteringFactorParameters` needs the atom each hydrogen bonds, "
+            f"but hydrogen {atom_names[i]} of residue {residue_names[i]} at index {i} "
+            "bonds an atom that is not selected."
+        )
     for parent in missing_bonds[missing_bonds[:, 1] == 1, 0].tolist():
         if not hides_hydrogens[parent]:
             neighbours = bonds[(bonds == parent).any(axis=1)].ravel()
@@ -148,8 +158,8 @@ def _find_hidden_hydrogens(atomic_numbers, atom_chemistry):
                 "CCP4 Monomer Library's protonation, with charged termini at chain "
                 f"ends and breaks, but atom {atom_names[parent]} of residue "
                 f"{residue_names[parent]} at index {parent} has {found} of its "
-                f"{found + missing} hydrogens. They are absent from the model, "
-                "protonated differently, or not selected."
+                f"{found + missing} hydrogens. They are absent from the model or "
+                "protonated differently."
             )
     hidden = np.zeros(len(atomic_numbers), dtype=bool)
     for hydrogen, parent in (bonds.T, bonds[:, ::-1].T):

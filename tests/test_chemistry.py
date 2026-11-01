@@ -88,6 +88,7 @@ def test_bonds_match_mdtraj_on_1uao(frame, sample_pdb_path):
 
 def test_complete_model_has_no_missing_bonds(frame):
     assert chemistry(frame)["missing_bonds"].shape == (0, 2)
+    assert chemistry(frame)["unselected_bonds"].shape == (0, 2)
 
 
 def test_missing_oxt(frame):
@@ -112,11 +113,15 @@ def test_truncated_side_chain(frame):
     )
 
 
-def test_selection_cut_records_missing_peptide_bonds(frame):
-    kept = frame[frame["residue_id"].between(3, 8)].reset_index(drop=True)
+def test_selection_cut_records_unselected_bonds(frame):
+    edited = drop(frame, 10, ["OXT"])
+    kept = edited[edited["residue_id"] >= 8].reset_index(drop=True)
+    atom_chemistry = chemistry(edited, selection_string="resSeq 8 to 10")
     np.testing.assert_array_equal(
-        chemistry(frame, selection_string="resSeq 3 to 8")["missing_bonds"],
-        [[row(kept, 3, "N"), 6], [row(kept, 8, "C"), 7]],
+        atom_chemistry["unselected_bonds"], [[row(kept, 8, "N"), 6]]
+    )
+    np.testing.assert_array_equal(
+        atom_chemistry["missing_bonds"], [[row(kept, 10, "C"), 8]]
     )
 
 

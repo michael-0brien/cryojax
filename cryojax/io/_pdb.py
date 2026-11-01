@@ -172,14 +172,14 @@ def read_atoms_from_pdb(
     - `loads_chemistry`:
         If `True`, return a dictionary of the atoms' chemistry, after any
         properties: `residue_names`, `atom_names`, `bonds`, the covalent bonds
-        between returned atoms as pairs of indices, and `missing_bonds`, an
-        `(index, atomic number)` pair for each bond to an atom that is not
-        returned, being absent from the model or not selected. Bonds are found on
-        the whole model. Bonds within residues are those of the 20 standard amino
-        acids, protonated as in the CCP4 Monomer Library with charged termini at
-        chain ends and breaks; peptide bonds, also to other residues, and
-        disulfides are found by distance, and each hydrogen bonds to the nearest
-        heavy atom of its residue.
+        between returned atoms as pairs of indices, `missing_bonds`, an
+        `(index, atomic number)` pair for each bond to an atom absent from the
+        model, and `unselected_bonds`, the same for each bond to an atom that is
+        not selected. Bonds are found on the whole model. Bonds within residues
+        are those of the 20 standard amino acids, protonated as in the CCP4
+        Monomer Library with charged termini at chain ends and breaks; peptide
+        bonds, also to other residues, and disulfides are found by distance, and
+        each hydrogen bonds to the nearest heavy atom of its residue.
     - `selection_string`:
         A selection string in `mdtraj`'s format.
     - `model_index`:

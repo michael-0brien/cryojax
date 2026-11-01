@@ -17,6 +17,7 @@ else:
         atom_names: Shaped[np.ndarray, " n_atoms"]
         bonds: Int[np.ndarray, "n_bonds 2"]
         missing_bonds: Int[np.ndarray, "n_missing 2"]
+        unselected_bonds: Int[np.ndarray, "n_unselected 2"]
 
 
 def _read_chemistry(
@@ -118,6 +119,7 @@ def _read_chemistry(
         atom_names=atom_names,
         bonds=_as_pairs(bonds, sorts_each=True),
         missing_bonds=_as_pairs(missing_bonds, sorts_each=False),
+        unselected_bonds=_as_pairs([], sorts_each=False),
     )
 
 
@@ -148,19 +150,21 @@ def _select_chemistry(atom_chemistry, selected, atomic_numbers):
     kept = index[bonds] >= 0
     both, first = kept.all(axis=1), kept[:, 0] & ~kept[:, 1]
     second = kept[:, 1] & ~kept[:, 0]
-    cut = np.concatenate(
+    missing_bonds = missing_bonds[index[missing_bonds[:, 0]] >= 0]
+    unselected_bonds = np.concatenate(
         [
             np.stack([bonds[first, 0], atomic_numbers[bonds[first, 1]]], axis=-1),
             np.stack([bonds[second, 1], atomic_numbers[bonds[second, 0]]], axis=-1),
-            missing_bonds[index[missing_bonds[:, 0]] >= 0],
         ]
     )
-    cut[:, 0] = index[cut[:, 0]]
+    for pairs in (missing_bonds, unselected_bonds):
+        pairs[:, 0] = index[pairs[:, 0]]
     return _AtomChemistry(
         residue_names=atom_chemistry["residue_names"][selected],
         atom_names=atom_chemistry["atom_names"][selected],
         bonds=_as_pairs(index[bonds[both]], sorts_each=True),
-        missing_bonds=_as_pairs(cut, sorts_each=False),
+        missing_bonds=_as_pairs(missing_bonds, sorts_each=False),
+        unselected_bonds=_as_pairs(unselected_bonds, sorts_each=False),
     )
 
 
