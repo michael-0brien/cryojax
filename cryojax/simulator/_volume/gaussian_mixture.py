@@ -175,9 +175,8 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
         extra_b_factors: Any = _MISSING,
     ) -> Self:
         """Initialize a `GaussianMixtureVolume` from tabulated electron
-        scattering factor parameters (Peng et al. 1996). This treats
-        the scattering potential as a mixture of five gaussians
-        per atom.
+        scattering factor parameters. This treats the scattering potential
+        as a mixture of five gaussians per atom.
 
         **References:**
 
@@ -186,6 +185,7 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
         - Peng, L-M., et al. "Robust parameterization of elastic and absorptive electron atomic
             scattering factors." Acta Crystallographica Section A: Foundations of Crystallography
             52.2 (1996): 257-276.
+        - Shtyrov et al., PNAS (2026), doi:10.1073/pnas.2528758123.
 
         **Arguments:**
 
