@@ -1,0 +1,209 @@
+{
+ "ALA": {
+  "C": "C(CNO)",
+  "CA": "C(HCCN)",
+  "CB": "C(HHHC)",
+  "N": "N(HCC)",
+  "O": "O(C)"
+ },
+ "ARG": {
+  "C": "C(CNO)",
+  "CA": "C(HCCN)",
+  "CB": "C(HHCC)",
+  "CD": "C(HHCN)",
+  "CG": "C(HHCC)",
+  "CZ": "C(NNN)",
+  "N": "N(HCC)",
+  "NE": "N(HCC)",
+  "NH1": "N(HHC)",
+  "NH2": "N(HHC)",
+  "O": "O(C)"
+ },
+ "ASN": {
+  "C": "C(CNO)",
+  "CA": "C(HCCN)",
+  "CB": "C(HHCC)",
+  "CG": "C(CNO)",
+  "N": "N(HCC)",
+  "ND2": "N(HHC)",
+  "O": "O(C)",
+  "OD1": "O(C, amide)"
+ },
+ "ASP": {
+  "C": "C(CNO)",
+  "CA": "C(HCCN)",
+  "CB": "C(HHCC)",
+  "CG": "C(COO)",
+  "N": "N(HCC)",
+  "O": "O(C)",
+  "OD1": "O(C, carboxyl)",
+  "OD2": "O(C, carboxyl)"
+ },
+ "CYS": {
+  "C": "C(CNO)",
+  "CA": "C(HCCN)",
+  "CB": "C(HHCS)",
+  "N": "N(HCC)",
+  "O": "O(C)",
+  "SG": "S(HC)"
+ },
+ "GLN": {
+  "C": "C(CNO)",
+  "CA": "C(HCCN)",
+  "CB": "C(HHCC)",
+  "CD": "C(CNO)",
+  "CG": "C(HHCC)",
+  "N": "N(HCC)",
+  "NE2": "N(HHC)",
+  "O": "O(C)",
+  "OE1": "O(C, amide)"
+ },
+ "GLU": {
+  "C": "C(CNO)",
+  "CA": "C(HCCN)",
+  "CB": "C(HHCC)",
+  "CD": "C(COO)",
+  "CG": "C(HHCC)",
+  "N": "N(HCC)",
+  "O": "O(C)",
+  "OE1": "O(C, carboxyl)",
+  "OE2": "O(C, carboxyl)"
+ },
+ "GLY": {
+  "C": "C(CNO)",
+  "CA": "C(HHCN)",
+  "N": "N(HCC)",
+  "O": "O(C)"
+ },
+ "HIS": {
+  "C": "C(CNO)",
+  "CA": "C(HCCN)",
+  "CB": "C(HHCC)",
+  "CD2": "C(HCN)",
+  "CE1": "C(HNN)",
+  "CG": "C(CCN)",
+  "N": "N(HCC)",
+  "ND1": "N(HCC)",
+  "NE2": "N(HCC)",
+  "O": "O(C)"
+ },
+ "ILE": {
+  "C": "C(CNO)",
+  "CA": "C(HCCN)",
+  "CB": "C(HCCC)",
+  "CD1": "C(HHHC)",
+  "CG1": "C(HHCC)",
+  "CG2": "C(HHHC)",
+  "N": "N(HCC)",
+  "O": "O(C)"
+ },
+ "LEU": {
+  "C": "C(CNO)",
+  "CA": "C(HCCN)",
+  "CB": "C(HHCC)",
+  "CD1": "C(HHHC)",
+  "CD2": "C(HHHC)",
+  "CG": "C(HCCC)",
+  "N": "N(HCC)",
+  "O": "O(C)"
+ },
+ "LYS": {
+  "C": "C(CNO)",
+  "CA": "C(HCCN)",
+  "CB": "C(HHCC)",
+  "CD": "C(HHCC)",
+  "CE": "C(HHCN)",
+  "CG": "C(HHCC)",
+  "N": "N(HCC)",
+  "NZ": "N(HHHC)",
+  "O": "O(C)"
+ },
+ "MET": {
+  "C": "C(CNO)",
+  "CA": "C(HCCN)",
+  "CB": "C(HHCC)",
+  "CE": "C(HHHS)",
+  "CG": "C(HHCS)",
+  "N": "N(HCC)",
+  "O": "O(C)",
+  "SD": "S(CC)"
+ },
+ "PHE": {
+  "C": "C(CNO)",
+  "CA": "C(HCCN)",
+  "CB": "C(HHCC)",
+  "CD1": "C(HCC)",
+  "CD2": "C(HCC)",
+  "CE1": "C(HCC)",
+  "CE2": "C(HCC)",
+  "CG": "C(CCC)",
+  "CZ": "C(HCC)",
+  "N": "N(HCC)",
+  "O": "O(C)"
+ },
+ "PRO": {
+  "C": "C(CNO)",
+  "CA": "C(HCCN)",
+  "CB": "C(HHCC)",
+  "CD": "C(HHCN)",
+  "CG": "C(HHCC)",
+  "N": "N(CCC)",
+  "O": "O(C)"
+ },
+ "SER": {
+  "C": "C(CNO)",
+  "CA": "C(HCCN)",
+  "CB": "C(HHCO)",
+  "N": "N(HCC)",
+  "O": "O(C)",
+  "OG": "O(HC)"
+ },
+ "THR": {
+  "C": "C(CNO)",
+  "CA": "C(HCCN)",
+  "CB": "C(HCCO)",
+  "CG2": "C(HHHC)",
+  "N": "N(HCC)",
+  "O": "O(C)",
+  "OG1": "O(HC)"
+ },
+ "TRP": {
+  "C": "C(CNO)",
+  "CA": "C(HCCN)",
+  "CB": "C(HHCC)",
+  "CD1": "C(HCN)",
+  "CD2": "C(CCC)",
+  "CE2": "C(CCN)",
+  "CE3": "C(HCC)",
+  "CG": "C(CCC)",
+  "CH2": "C(HCC)",
+  "CZ2": "C(HCC)",
+  "CZ3": "C(HCC)",
+  "N": "N(HCC)",
+  "NE1": "N(HCC)",
+  "O": "O(C)"
+ },
+ "TYR": {
+  "C": "C(CNO)",
+  "CA": "C(HCCN)",
+  "CB": "C(HHCC)",
+  "CD1": "C(HCC)",
+  "CD2": "C(HCC)",
+  "CE1": "C(HCC)",
+  "CE2": "C(HCC)",
+  "CG": "C(CCC)",
+  "CZ": "C(CCO)",
+  "N": "N(HCC)",
+  "O": "O(C)",
+  "OH": "O(HC)"
+ },
+ "VAL": {
+  "C": "C(CNO)",
+  "CA": "C(HCCN)",
+  "CB": "C(HCCC)",
+  "CG1": "C(HHHC)",
+  "CG2": "C(HHHC)",
+  "N": "N(HCC)",
+  "O": "O(C)"
+ }
+}
