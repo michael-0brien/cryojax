@@ -19,6 +19,7 @@ from jaxtyping import Float, Int
 from mdtraj.core import element as elem
 
 from ..atom_util import center_atom_positions
+from ._chemistry import _read_chemistry, _select_chemistry
 
 
 if hasattr(typing, "GENERATING_DOCUMENTATION"):
@@ -29,13 +30,15 @@ else:
         masses: Float[np.ndarray, "... n_atoms"]
         b_factors: Float[np.ndarray, "... n_atoms"]
         charges: Float[np.ndarray, "... n_atoms"]
+        occupancies: Float[np.ndarray, "... n_atoms"]
 
 
 @overload
 def read_atoms_from_pdb(
     filename: str | pathlib.Path,
     *,
-    loads_properties: Literal[False],
+    loads_properties: Literal[False] = False,
+    loads_chemistry: Literal[False] = False,
     center: bool = True,
     selection_string: str = "all",
     model_index: int | None = None,
@@ -46,10 +49,45 @@ def read_atoms_from_pdb(
 
 
 @overload
-def read_atoms_from_pdb(  # type: ignore
+def read_atoms_from_pdb(
     filename: str | pathlib.Path,
     *,
     loads_properties: Literal[True],
+    loads_chemistry: Literal[False] = False,
+    center: bool = True,
+    selection_string: str = "all",
+    model_index: int | None = None,
+    stack_models: bool = False,
+    standardizes_names: bool = True,
+    topology: mdtraj.Topology | None = None,
+) -> tuple[
+    Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, " n_atoms"], dict[str, Any]
+]: ...
+
+
+@overload
+def read_atoms_from_pdb(
+    filename: str | pathlib.Path,
+    *,
+    loads_properties: Literal[False] = False,
+    loads_chemistry: Literal[True],
+    center: bool = True,
+    selection_string: str = "all",
+    model_index: int | None = None,
+    stack_models: bool = False,
+    standardizes_names: bool = True,
+    topology: mdtraj.Topology | None = None,
+) -> tuple[
+    Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, " n_atoms"], dict[str, Any]
+]: ...
+
+
+@overload
+def read_atoms_from_pdb(
+    filename: str | pathlib.Path,
+    *,
+    loads_properties: Literal[True],
+    loads_chemistry: Literal[True],
     center: bool = True,
     selection_string: str = "all",
     model_index: int | None = None,
@@ -60,6 +98,7 @@ def read_atoms_from_pdb(  # type: ignore
     Float[np.ndarray, "... n_atoms 3"],
     Int[np.ndarray, " n_atoms"],
     dict[str, Any],
+    dict[str, Any],
 ]: ...
 
 
@@ -68,19 +107,7 @@ def read_atoms_from_pdb(
     filename: str | pathlib.Path,
     *,
     loads_properties: bool = False,
-    center: bool = True,
-    selection_string: str = "all",
-    model_index: int | None = None,
-    stack_models: bool = False,
-    standardizes_names: bool = True,
-    topology: mdtraj.Topology | None = None,
-) -> tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, "... n_atoms"]]: ...
-
-
-def read_atoms_from_pdb(
-    filename: str | pathlib.Path,
-    *,
-    loads_properties: bool = False,
+    loads_chemistry: bool = False,
     center: bool = True,
     selection_string: str = "all",
     model_index: int | None = None,
@@ -88,10 +115,39 @@ def read_atoms_from_pdb(
     standardizes_names: bool = True,
     topology: mdtraj.Topology | None = None,
 ) -> (
-    tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, "... n_atoms"]]
+    tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, " n_atoms"]]
+    | tuple[
+        Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, " n_atoms"], dict[str, Any]
+    ]
     | tuple[
         Float[np.ndarray, "... n_atoms 3"],
         Int[np.ndarray, " n_atoms"],
+        dict[str, Any],
+        dict[str, Any],
+    ]
+): ...
+
+
+def read_atoms_from_pdb(
+    filename: str | pathlib.Path,
+    *,
+    loads_properties: bool = False,
+    loads_chemistry: bool = False,
+    center: bool = True,
+    selection_string: str = "all",
+    model_index: int | None = None,
+    stack_models: bool = False,
+    standardizes_names: bool = True,
+    topology: mdtraj.Topology | None = None,
+) -> (
+    tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, " n_atoms"]]
+    | tuple[
+        Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, " n_atoms"], dict[str, Any]
+    ]
+    | tuple[
+        Float[np.ndarray, "... n_atoms 3"],
+        Int[np.ndarray, " n_atoms"],
+        dict[str, Any],
         dict[str, Any],
     ]
 ):
@@ -113,6 +169,17 @@ def read_atoms_from_pdb(
         with the origin.
     - `loads_properties`:
         If `True`, return a dictionary of the atom properties.
+    - `loads_chemistry`:
+        If `True`, return a dictionary of the atoms' chemistry, after any
+        properties: `residue_names`, `atom_names`, `bonds`, the covalent bonds
+        between returned atoms as pairs of indices, `missing_bonds`, an
+        `(index, atomic number)` pair for each bond to an atom absent from the
+        model, and `unselected_bonds`, the same for each bond to an atom that is
+        not selected. Bonds are found on the whole model. Bonds within residues
+        are those of the 20 standard amino acids, protonated as in the CCP4
+        Monomer Library with charged termini at chain ends and breaks; peptide
+        bonds, also to other residues, and disulfides are found by distance, and
+        each hydrogen bonds to the nearest heavy atom of its residue.
     - `selection_string`:
         A selection string in `mdtraj`'s format.
     - `model_index`:
@@ -158,6 +225,7 @@ def read_atoms_from_pdb(
     return mmdf_to_atoms(
         df,
         loads_properties=loads_properties,
+        loads_chemistry=loads_chemistry,
         center=center,
         selection_string=selection_string,
         model_index=model_index,
@@ -171,21 +239,57 @@ def read_atoms_from_pdb(
 def mmdf_to_atoms(
     df: pd.DataFrame,
     *,
-    loads_properties: Literal[False],
+    loads_properties: Literal[False] = False,
+    loads_chemistry: Literal[False] = False,
     center: bool = True,
     selection_string: str = "all",
     model_index: int | None = None,
     stack_models: bool = False,
     standardizes_names: bool = True,
     topology: mdtraj.Topology | None = None,
-) -> tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, "... n_atoms"]]: ...
+) -> tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, " n_atoms"]]: ...
 
 
 @overload
-def mmdf_to_atoms(  # type: ignore
+def mmdf_to_atoms(
     df: pd.DataFrame,
     *,
     loads_properties: Literal[True],
+    loads_chemistry: Literal[False] = False,
+    center: bool = True,
+    selection_string: str = "all",
+    model_index: int | None = None,
+    stack_models: bool = False,
+    standardizes_names: bool = True,
+    topology: mdtraj.Topology | None = None,
+) -> tuple[
+    Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, " n_atoms"], dict[str, Any]
+]: ...
+
+
+@overload
+def mmdf_to_atoms(
+    df: pd.DataFrame,
+    *,
+    loads_properties: Literal[False] = False,
+    loads_chemistry: Literal[True],
+    center: bool = True,
+    selection_string: str = "all",
+    model_index: int | None = None,
+    stack_models: bool = False,
+    standardizes_names: bool = True,
+    topology: mdtraj.Topology | None = None,
+) -> tuple[
+    Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, " n_atoms"], dict[str, Any]
+]: ...
+
+
+@overload
+def mmdf_to_atoms(
+    df: pd.DataFrame,
+    *,
+    loads_properties: Literal[True],
+    loads_chemistry: Literal[True],
     center: bool = True,
     selection_string: str = "all",
     model_index: int | None = None,
@@ -194,7 +298,8 @@ def mmdf_to_atoms(  # type: ignore
     topology: mdtraj.Topology | None = None,
 ) -> tuple[
     Float[np.ndarray, "... n_atoms 3"],
-    Int[np.ndarray, "... n_atoms"],
+    Int[np.ndarray, " n_atoms"],
+    dict[str, Any],
     dict[str, Any],
 ]: ...
 
@@ -204,19 +309,7 @@ def mmdf_to_atoms(
     df: pd.DataFrame,
     *,
     loads_properties: bool = False,
-    center: bool = True,
-    selection_string: str = "all",
-    model_index: int | None = None,
-    stack_models: bool = False,
-    standardizes_names: bool = True,
-    topology: mdtraj.Topology | None = None,
-) -> tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, "... n_atoms"]]: ...
-
-
-def mmdf_to_atoms(
-    df: pd.DataFrame,
-    *,
-    loads_properties: bool = False,
+    loads_chemistry: bool = False,
     center: bool = True,
     selection_string: str = "all",
     model_index: int | None = None,
@@ -224,10 +317,39 @@ def mmdf_to_atoms(
     standardizes_names: bool = True,
     topology: mdtraj.Topology | None = None,
 ) -> (
-    tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, "... n_atoms"]]
+    tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, " n_atoms"]]
+    | tuple[
+        Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, " n_atoms"], dict[str, Any]
+    ]
     | tuple[
         Float[np.ndarray, "... n_atoms 3"],
-        Int[np.ndarray, "... n_atoms"],
+        Int[np.ndarray, " n_atoms"],
+        dict[str, Any],
+        dict[str, Any],
+    ]
+): ...
+
+
+def mmdf_to_atoms(
+    df: pd.DataFrame,
+    *,
+    loads_properties: bool = False,
+    loads_chemistry: bool = False,
+    center: bool = True,
+    selection_string: str = "all",
+    model_index: int | None = None,
+    stack_models: bool = False,
+    standardizes_names: bool = True,
+    topology: mdtraj.Topology | None = None,
+) -> (
+    tuple[Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, " n_atoms"]]
+    | tuple[
+        Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, " n_atoms"], dict[str, Any]
+    ]
+    | tuple[
+        Float[np.ndarray, "... n_atoms 3"],
+        Int[np.ndarray, " n_atoms"],
+        dict[str, Any],
         dict[str, Any],
     ]
 ):
@@ -247,6 +369,19 @@ def mmdf_to_atoms(
     """
     # Load atom info from `mmdf` dataframe
     atom_info = _load_atom_info(df, model_index=model_index, stack_models=stack_models)
+    atom_chemistry: dict[str, Any] = {}
+    if loads_chemistry:
+        if model_index is not None:
+            df_at_model = df.loc[df["model"] == model_index]
+        elif stack_models:
+            df_at_model = df.loc[df["model"] == df["model"].iloc[0]]
+        else:
+            df_at_model = df
+        atom_chemistry = dict(
+            _read_chemistry(
+                df_at_model, *_standard_names(df_at_model, standardizes_names)
+            )
+        )
     if selection_string != "all":
         if topology is None:
             if model_index is None and stack_models:
@@ -262,6 +397,10 @@ def mmdf_to_atoms(
         atom_properties = jax.tree.map(
             lambda arr: arr[:, selected_indices], atom_info["properties"]
         )
+        if loads_chemistry:
+            atom_chemistry = dict(
+                _select_chemistry(atom_chemistry, selected_indices, atom_info["numbers"])
+            )
     else:
         atom_positions = atom_info["positions"]
         atomic_numbers = atom_info["numbers"]
@@ -277,9 +416,12 @@ def mmdf_to_atoms(
         atom_properties = jax.tree.map(
             lambda arr: arr[0] if arr.shape[0] == 1 else arr, atom_properties
         )
+        if loads_chemistry:
+            return atom_positions, atomic_numbers, atom_properties, atom_chemistry
         return atom_positions, atomic_numbers, atom_properties
-    else:
-        return atom_positions, atomic_numbers
+    if loads_chemistry:
+        return atom_positions, atomic_numbers, atom_chemistry
+    return atom_positions, atomic_numbers
 
 
 def mmdf_to_topology(
@@ -315,7 +457,7 @@ def mmdf_to_topology(
         )
     else:
         residue_name_replacements, atom_name_replacements = {}, {}
-    df_at_model = df if model_index is None else df[df["model"] == model_index]
+    df_at_model = df if model_index is None else df.loc[df["model"] == model_index]
     for atom_index in range(len(df_at_model)):
         df_at_index = df_at_model.iloc[atom_index]
         chain_id = df_at_index["chain"]
@@ -400,26 +542,28 @@ def _load_atom_info(df: pd.DataFrame, model_index: int | None, stack_models: boo
         )
     # Load atom info
     if model_index is not None:
-        df = df[df["model"] == model_index]
-        if df.size == 0:
+        df_at_model = df.loc[df["model"] == model_index]
+        if df_at_model.size == 0:
             raise ValueError(
                 f"Found no atoms matching `model_index = {model_index}`. "
                 "Model numbers available for indexing are "
                 f"{df['model'].unique().tolist()}. "
             )
+        df = df_at_model
     if model_index is None and stack_models:
         model_numbers = df["model"].unique().tolist()
     else:
         model_numbers = [None]
     atom_positions, atomic_numbers = [], []
-    atom_masses, b_factors, charges = [], [], []
+    atom_masses, b_factors, charges, occupancies = [], [], [], []
     for index in model_numbers:
-        df_at_model = df if index is None else df[df["model"] == index]
+        df_at_model = df if index is None else df.loc[df["model"] == index]
         atom_positions.append(df_at_model[["x", "y", "z"]].to_numpy())
         atomic_numbers.append(df_at_model["atomic_number"].to_numpy())
         atom_masses.append(df_at_model["atomic_weight"].to_numpy())
         b_factors.append(df_at_model["b_isotropic"].to_numpy())
         charges.append(df_at_model["charge"].to_numpy())
+        occupancies.append(df_at_model["occupancy"].to_numpy())
 
     if len(atomic_numbers) > 1:
         if not all(np.array_equal(arr, atomic_numbers[0]) for arr in atomic_numbers):
@@ -435,6 +579,7 @@ def _load_atom_info(df: pd.DataFrame, model_index: int | None, stack_models: boo
         charges=np.asarray(charges, dtype=int),
         b_factors=np.asarray(b_factors, dtype=float),
         masses=np.asarray(atom_masses, dtype=float),
+        occupancies=np.asarray(occupancies, dtype=float),
     )
     atom_info = _AtomicModelInfo(
         positions=np.asarray(atom_positions, dtype=float),
@@ -443,6 +588,24 @@ def _load_atom_info(df: pd.DataFrame, model_index: int | None, stack_models: boo
     )
 
     return atom_info
+
+
+def _standard_names(df, standardizes_names):
+    residue_names = df["residue"].to_numpy(dtype=str)
+    atom_names = df["atom"].to_numpy(dtype=str)
+    if standardizes_names:
+        residue_replacements, atom_replacements = _load_name_replacement_tables()
+        residue_names = np.asarray(
+            [residue_replacements.get(name, name) for name in residue_names], dtype=str
+        )
+        atom_names = np.asarray(
+            [
+                atom_replacements.get(residue, {}).get(name, name)
+                for residue, name in zip(residue_names, atom_names)
+            ],
+            dtype=str,
+        )
+    return residue_names, np.char.strip(atom_names)
 
 
 def _load_name_replacement_tables():

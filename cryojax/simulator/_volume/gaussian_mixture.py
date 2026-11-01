@@ -1,5 +1,6 @@
+import warnings
 from collections.abc import Mapping
-from typing import ClassVar, Literal, Self
+from typing import Any, ClassVar, Literal, Self
 from typing_extensions import override
 
 import equinox as eqx
@@ -10,7 +11,11 @@ import numpy as np
 from jaxtyping import Array, Float, PyTree
 
 from ..._internal import error_if_not_positive, leaf_asarray
-from ...constants import PengScatteringFactorParameters, b_factor_to_variance
+from ...constants import (
+    EmpiricalScatteringFactorParameters,
+    PengScatteringFactorParameters,
+    b_factor_to_variance,
+)
 from ...jax_util import FloatLike, NDArrayLike, filter_bscan
 from ...ndimage import (
     make_1d_coordinate_grid,
@@ -28,6 +33,9 @@ from .base_volume import (
     VoxelArray,
 )
 from .common import spread_and_sum_gaussian_components
+
+
+_MISSING = object()
 
 
 def _leaf_broadcast_to(x, shape):
@@ -161,13 +169,15 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
     def from_tabulated_parameters(
         cls,
         atom_positions: Float[NDArrayLike, "n_atoms 3"],
-        parameters: PengScatteringFactorParameters,
-        extra_b_factors: FloatLike | Float[NDArrayLike, " n_atoms"] | None = None,
+        parameters: PengScatteringFactorParameters | EmpiricalScatteringFactorParameters,
+        b_factors: FloatLike | Float[NDArrayLike, " n_atoms"] | None = None,
+        *,
+        occupancies: Float[NDArrayLike, " n_atoms"] | None = None,
+        extra_b_factors: Any = _MISSING,
     ) -> Self:
         """Initialize a `GaussianMixtureVolume` from tabulated electron
-        scattering factor parameters (Peng et al. 1996). This treats
-        the scattering potential as a mixture of five gaussians
-        per atom.
+        scattering factor parameters. This treats the scattering potential
+        as a mixture of five gaussians per atom.
 
         **References:**
 
@@ -176,27 +186,47 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
         - Peng, L-M., et al. "Robust parameterization of elastic and absorptive electron atomic
             scattering factors." Acta Crystallographica Section A: Foundations of Crystallography
             52.2 (1996): 257-276.
+        - Shtyrov et al., PNAS (2026), doi:10.1073/pnas.2528758123.
 
         **Arguments:**
 
         - `atom_positions`:
             The coordinates of the atoms in units of angstroms.
         - `parameters`:
-            A pytree for the scattering factor parameters from
-            Peng et al. (1996).
+            The scattering factor parameters, from Peng et al. (1996) or
+            Shtyrov et al. (2026).
+        - `b_factors`:
+            Per-atom B-factors added to `parameters.b`.
+        - `occupancies`:
+            Per-atom occupancies multiplying `parameters.a`.
         - `extra_b_factors`:
-            Additional per-atom B-factors that are added to
-            the values in `scattering_parameters.b`.
+            Deprecated; use `b_factors`.
         """  # noqa: E501
+        if extra_b_factors is not _MISSING:
+            if b_factors is not None:
+                raise ValueError(
+                    "Passed both `b_factors` and the deprecated `extra_b_factors` "
+                    "to `GaussianMixtureVolume.from_tabulated_parameters`. "
+                    "Pass `b_factors` only."
+                )
+            warnings.warn(
+                "`extra_b_factors` is deprecated and will be removed in cryoJAX "
+                "0.7.0. Use `b_factors` instead.",
+                FutureWarning,
+                stacklevel=2,
+            )
+            b_factors = extra_b_factors
         amplitudes = leaf_asarray(parameters.a, dtype=float)
-        b_factors = leaf_asarray(parameters.b, dtype=float)
-        if extra_b_factors is not None:
-            extra_b_factors = leaf_asarray(extra_b_factors, dtype=float)
-            if extra_b_factors.ndim == 1:
-                extra_b_factors = extra_b_factors[:, None]
+        if occupancies is not None:
+            amplitudes = amplitudes * leaf_asarray(occupancies, dtype=float)[:, None]
+        tabulated_b_factors = leaf_asarray(parameters.b, dtype=float)
+        if b_factors is not None:
+            b_factors = leaf_asarray(b_factors, dtype=float)
+            if b_factors.ndim == 1:
+                b_factors = b_factors[:, None]
             # Out of place: `leaf_asarray` may hand back the caller's own numpy table.
-            b_factors = b_factors + extra_b_factors
-        return cls(atom_positions, amplitudes, b_factor_to_variance(b_factors))
+            tabulated_b_factors = tabulated_b_factors + b_factors
+        return cls(atom_positions, amplitudes, b_factor_to_variance(tabulated_b_factors))
 
     @override
     def rotate_to_pose(self, pose: AbstractPose) -> Self:

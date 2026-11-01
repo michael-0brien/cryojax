@@ -1,8 +1,13 @@
+import re
+
 import cryojax as cx
 import cryojax.ndimage as cnd
 import cryojax.simulator as cxs
 import jax.numpy as jnp
+import numpy as np
 import pytest
+from cryojax.constants import PengScatteringFactorParameters
+from packaging.version import Version
 
 
 def test_fft_functions_deprecated():
@@ -95,3 +100,24 @@ def test_deprecated():
     for name in REMOVED_FROM_JAX_UTIL:
         with pytest.raises(AttributeError):
             _ = getattr(cx.jax_util, name)
+
+
+def test_extra_b_factors_deprecated(pdb_info):
+    atom_positions, atomic_numbers, _ = pdb_info
+    parameters = PengScatteringFactorParameters(atomic_numbers)
+    from_parameters = cxs.GaussianMixtureVolume.from_tabulated_parameters
+    match = re.match(r"(\d+\.\d+(?:\.\d+)?)", cx.__version__)
+    assert match, f"Could not parse current cryojax version {cx.__version__!r}"
+    current_version = Version(match.group(1))
+    for b_factors in (4.0, None):
+        with pytest.warns(FutureWarning) as record:
+            volume = from_parameters(
+                atom_positions, parameters, extra_b_factors=b_factors
+            )
+        message = str(record[0].message)
+        assert "0.7.0" in message and "b_factors" in message
+        assert current_version < Version("0.7.0")
+        expected = from_parameters(atom_positions, parameters, b_factors=b_factors)
+        np.testing.assert_array_equal(volume.variances, expected.variances)
+    with pytest.raises(ValueError):
+        from_parameters(atom_positions, parameters, 4.0, extra_b_factors=4.0)
