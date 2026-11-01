@@ -2,12 +2,9 @@ import typing
 from collections import Counter
 from typing import Any, TypedDict
 
-import mdtraj
 import numpy as np
 import pandas as pd
-from jaxtyping import Float, Int, Shaped
-
-from ._pdb import _load_name_replacement_tables, mmdf_to_atoms, mmdf_to_topology
+from jaxtyping import Int, Shaped
 
 
 if hasattr(typing, "GENERATING_DOCUMENTATION"):
@@ -21,63 +18,9 @@ else:
         missing_bonds: Int[np.ndarray, "n_missing 2"]
 
 
-def mmdf_to_chemistry(
-    df: pd.DataFrame,
-    *,
-    center: bool = True,
-    selection_string: str = "all",
-    model_index: int | None = None,
-    stack_models: bool = False,
-    standardizes_names: bool = True,
-    topology: mdtraj.Topology | None = None,
-) -> tuple[
-    Float[np.ndarray, "... n_atoms 3"], Int[np.ndarray, " n_atoms"], dict[str, Any]
-]:
-    """Load atoms as [`cryojax.io.mmdf_to_atoms`][] does, with their chemistry.
-
-    The chemistry is a dictionary of `residue_names`, `atom_names`, `bonds`, the
-    covalent bonds between returned atoms as pairs of indices, and `missing_bonds`,
-    an `(index, atomic number)` pair for each bond to an atom that is not returned,
-    being absent from the model or not selected. Bonds are found on the whole model.
-
-    Only the 20 standard amino acids have bonds, protonated as in the CCP4 Monomer
-    Library. Peptide bonds and disulfides are found by distance, and each hydrogen
-    bonds to the nearest heavy atom of its residue.
-
-    For the arguments, see [`cryojax.io.read_atoms_from_pdb`][].
-    """
-    if selection_string != "all" and topology is None:
-        topology = mmdf_to_topology(
-            df,
-            standardizes_names,
-            model_index=0 if model_index is None and stack_models else model_index,
-        )
-    positions, atomic_numbers = mmdf_to_atoms(
-        df,
-        center=center,
-        selection_string=selection_string,
-        model_index=model_index,
-        stack_models=stack_models,
-        standardizes_names=standardizes_names,
-        topology=topology,
-    )
-    if model_index is not None:
-        df = df[df["model"] == model_index]
-    elif stack_models:
-        df = df[df["model"] == df["model"].iloc[0]]
-    atom_chemistry = _read_chemistry(df, standardizes_names)
-    if selection_string != "all":
-        assert topology is not None
-        atom_chemistry = _select(
-            atom_chemistry,
-            topology.select(selection_string),
-            df["atomic_number"].to_numpy(),
-        )
-    return positions, atomic_numbers, atom_chemistry
-
-
-def _read_chemistry(df: pd.DataFrame, standardizes_names: bool) -> _AtomChemistry:
-    residue_names, atom_names = _standard_names(df, standardizes_names)
+def _read_chemistry(
+    df: pd.DataFrame, residue_names: np.ndarray, atom_names: np.ndarray
+) -> _AtomChemistry:
     atomic_numbers = df["atomic_number"].to_numpy()
     positions = df[["x", "y", "z"]].to_numpy(dtype=float)
     residues: dict[tuple, list[int]] = {}
@@ -170,24 +113,6 @@ def _read_chemistry(df: pd.DataFrame, standardizes_names: bool) -> _AtomChemistr
     )
 
 
-def _standard_names(df, standardizes_names):
-    residue_names = df["residue"].to_numpy(dtype=str)
-    atom_names = df["atom"].to_numpy(dtype=str)
-    if standardizes_names:
-        residue_replacements, atom_replacements = _load_name_replacement_tables()
-        residue_names = np.asarray(
-            [residue_replacements.get(name, name) for name in residue_names], dtype=str
-        )
-        atom_names = np.asarray(
-            [
-                atom_replacements.get(residue, {}).get(name, name)
-                for residue, name in zip(residue_names, atom_names)
-            ],
-            dtype=str,
-        )
-    return residue_names, np.char.strip(atom_names)
-
-
 def _heavy_atoms(key, rows, residue_names, atom_names, atomic_numbers):
     residue = residue_names[rows[0]]
     known = {name for bond in _AMINO_ACID_BONDS[residue] for name in bond} | {"OXT"}
@@ -209,7 +134,7 @@ def _heavy_atoms(key, rows, residue_names, atom_names, atomic_numbers):
     return atoms
 
 
-def _select(atom_chemistry, selected, atomic_numbers):
+def _select_chemistry(atom_chemistry, selected, atomic_numbers):
     index = np.full(len(atomic_numbers), -1)
     index[selected] = np.arange(len(selected))
     bonds, missing_bonds = atom_chemistry["bonds"], atom_chemistry["missing_bonds"]
