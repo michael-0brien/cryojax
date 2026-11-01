@@ -214,7 +214,9 @@ def test_fallback_to_peng_for_missing_type():
     peng = PengScatteringFactorParameters(np.array([7]))
     np.testing.assert_array_equal(catalase.a[0], peng.a[0])
     np.testing.assert_array_equal(catalase.b[0], peng.b[0])
-    emdb = EmpiricalScatteringFactorParameters(atomic_numbers, atom_chemistry, "emdb")
+    emdb = EmpiricalScatteringFactorParameters(
+        atomic_numbers, atom_chemistry, "emdb", b_minimum=0.0
+    )
     a, b = (np.asarray(x) for x in _EMDB_TABLE["N(HHCC)"])
     np.testing.assert_array_equal(emdb.a[0], a[np.argsort(b, kind="stable")])
     np.testing.assert_array_equal(emdb.b[0], np.sort(b))
@@ -250,10 +252,22 @@ def test_table_keyword(frame):
         parameters(frame, "peng")
 
 
+def test_b_minimum(frame):
+    _, atomic_numbers, atom_chemistry = mmdf_to_atoms(frame, loads_chemistry=True)
+    published = EmpiricalScatteringFactorParameters(
+        atomic_numbers, atom_chemistry, b_minimum=0.0
+    )
+    _, b = _CATALASE_TABLE["C(HCCN)"]
+    np.testing.assert_array_equal(published.b[row(frame, 2, "CA")], np.sort(b))
+    assert np.min(b) == 0
+    floored = EmpiricalScatteringFactorParameters(atomic_numbers, atom_chemistry)
+    np.testing.assert_array_equal(floored.a, published.a)
+    np.testing.assert_array_equal(floored.b, np.maximum(published.b, 0.2))
+
+
 def test_volume_from_empirical_parameters(frame):
     positions, atomic_numbers, atom_chemistry = mmdf_to_atoms(frame, loads_chemistry=True)
     empirical = EmpiricalScatteringFactorParameters(atomic_numbers, atom_chemistry)
-    assert empirical.b[row(frame, 2, "CA")].min() == 0
     volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(positions, empirical)
     assert np.all(np.asarray(volume.variances) > 0)
 
