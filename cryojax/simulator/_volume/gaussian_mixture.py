@@ -11,7 +11,11 @@ import numpy as np
 from jaxtyping import Array, Float, PyTree
 
 from ..._internal import error_if_not_positive, leaf_asarray
-from ...constants import PengScatteringFactorParameters, b_factor_to_variance
+from ...constants import (
+    EmpiricalScatteringFactorParameters,
+    PengScatteringFactorParameters,
+    b_factor_to_variance,
+)
 from ...jax_util import FloatLike, NDArrayLike, filter_bscan
 from ...ndimage import (
     make_1d_coordinate_grid,
@@ -166,7 +170,7 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
     def from_tabulated_parameters(
         cls,
         atom_positions: Float[NDArrayLike, "n_atoms 3"],
-        parameters: PengScatteringFactorParameters,
+        parameters: PengScatteringFactorParameters | EmpiricalScatteringFactorParameters,
         b_factors: FloatLike | Float[NDArrayLike, " n_atoms"] | None = _B_FACTOR_FLOOR,
         *,
         extra_b_factors: Any = _MISSING,
@@ -189,8 +193,8 @@ class GaussianMixtureVolume(AbstractAtomVolume, strict=True):
         - `atom_positions`:
             The coordinates of the atoms in units of angstroms.
         - `parameters`:
-            A pytree for the scattering factor parameters from
-            Peng et al. (1996).
+            The scattering factor parameters, from Peng et al. (1996) or
+            Shtyrov et al. (2026).
         - `b_factors`:
             Per-atom B-factors added to `parameters.b`. The default, 0.2,
             keeps every gaussian at a nonzero width; `None` adds nothing.
