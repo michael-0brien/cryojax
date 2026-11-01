@@ -284,6 +284,10 @@ This documentation is a collection of functions used to work with coordinate sys
 
 ::: cryojax.ndimage.variance_to_nspread
 
+### Non-uniform FFTs
+
+::: cryojax.ndimage.dispatch_nufft1
+
 ### Fourier projection-slice extraction
 
 ::: cryojax.ndimage.prepare_sampling_fft

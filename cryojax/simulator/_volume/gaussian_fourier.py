@@ -7,10 +7,8 @@ from typing_extensions import override
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-import nufftax
 from jaxtyping import Array, Float, PyTree
 
-from ..._config import CRYOJAX_FINUFFT_BACKEND
 from ..._internal import leaf_asarray
 from ...constants import (
     PengScatteringFactorParameters,
@@ -21,6 +19,7 @@ from ...ndimage import (
     FourierGaussian,
     FourierSinc,
     convert_fftn_to_rfftn,
+    dispatch_nufft1,
     query_efficient_grid_size,
     resize_with_crop_or_pad,
 )
@@ -34,16 +33,6 @@ from .base_volume import (
     VoxelArray,
 )
 from .common import make_frequencies_1d
-
-
-try:
-    import jax_finufft
-    from jax_finufft.options import NestedOpts, Opts
-
-    JAX_FINUFFT_IMPORT_ERROR = None
-except ModuleNotFoundError as err:
-    jax_finufft, Opts, NestedOpts = None, None, None
-    JAX_FINUFFT_IMPORT_ERROR = err
 
 
 T = TypeVar("T")
@@ -539,25 +528,20 @@ def _project_impl(
     is_leaf = lambda x: isinstance(x, AbstractFourierOperator)  # noqa: E731
     frequencies_1d = make_frequencies_1d(shape_u, pixel_size_u, modeord=0)
 
-    # Per-dimension NUFFT offset: 2*pi*(N//2)/N maps physical center (x=0) to
-    # integer pixel index N//2.  For even N this equals pi; for odd N it is
-    # pi*(1 - 1/N).  Must use the original output shape, not the upsampled one.
-    _nufft_offsets_2d = jnp.asarray(
-        [2 * jnp.pi * (s // 2) / s for s in shape_out[::-1][:2]]
-    )
+    center_shift = _center_shift(shape_u, shape_out, pixel_size_u)
 
     def fourier_impl(
         _positions: Float[Array, "_ 3"],
         _kernel_fn: FourierGaussian,
     ) -> Array:
-        _ns = jnp.asarray(shape_u[::-1][:2], dtype=float)
-        xy = 2 * jnp.pi * _positions[:, :2] / (pixel_size_u * _ns) + _nufft_offsets_2d
         return (
             _eval_kernel_impl(_kernel_fn, frequencies_1d)
-            * _nufft2d1(
+            * dispatch_nufft1(
+                _positions[:, :2] + center_shift,
+                jnp.ones(_positions.shape[0], dtype=complex),
                 shape_u,
-                source=jnp.ones(_positions.shape[0], dtype=complex),
-                xy=xy,
+                pixel_size=pixel_size_u,
+                fftshifted=True,
                 eps=eps,
                 options=options,
             )
@@ -585,19 +569,19 @@ def _render_impl(
     is_leaf = lambda x: isinstance(x, AbstractFourierOperator)  # noqa: E731
     frequencies_1d = make_frequencies_1d(shape_u, voxel_size_u, modeord=0)
 
-    _nufft_offsets_3d = jnp.asarray([2 * jnp.pi * (s // 2) / s for s in shape_out[::-1]])
+    center_shift = _center_shift(shape_u, shape_out, voxel_size_u)
 
     def fourier_impl(
         _positions: Float[Array, "_ 3"],
         _kernel_fn: FourierGaussian,
     ) -> Array:
-        _ns = jnp.asarray(shape_u[::-1], dtype=float)
-        xyz = 2 * jnp.pi * _positions / (voxel_size_u * _ns) + _nufft_offsets_3d
         return _eval_kernel_impl(_kernel_fn, frequencies_1d) * (
-            _nufft3d1(
+            dispatch_nufft1(
+                _positions + center_shift,
+                jnp.ones(_positions.shape[0], dtype=complex),
                 shape_u,
-                source=jnp.ones(_positions.shape[0], dtype=complex),
-                xyz=xyz,
+                pixel_size=voxel_size_u,
+                fftshifted=True,
                 eps=eps,
                 options=options,
             )
@@ -635,113 +619,17 @@ def _eval_separable_impl(
         )
 
 
-def _make_jax_finufft_opts(upsampfac: float):
-    assert NestedOpts is not None
-    assert Opts is not None
-    return NestedOpts(
-        forward=Opts(upsampfac=upsampfac, gpu_upsampfac=upsampfac),
-        backward=Opts(upsampfac=upsampfac, gpu_upsampfac=upsampfac),
+def _center_shift(
+    shape_u: tuple[int, ...], shape_out: tuple[int, ...], pixel_size_u: Float[Array, ""]
+) -> Float[Array, " d"]:
+    """The shift, in `(x, y[, z])` order, that places the physical origin at the output
+    grid's center `N//2` on the upsampled grid, whose own center is `N_u//2`."""
+    return jnp.asarray(
+        [
+            pixel_size_u * (n_u * (n // 2) / n - n_u // 2)
+            for n_u, n in zip(shape_u[::-1], shape_out[::-1])
+        ]
     )
-
-
-def _nufft2d1(
-    shape: tuple[int, int],
-    source: Array,
-    xy: Array,
-    *,
-    eps: float,
-    options: dict[str, Any],
-):
-    default_upsampfac = 1.25
-    if CRYOJAX_FINUFFT_BACKEND == "jax-finufft":
-        if jax_finufft is None:
-            raise RuntimeError(
-                "Tried to use the `jax-finufft` non-uniform FFT backend "
-                "(set via the `CRYOJAX_FINUFFT_BACKEND` environment "
-                "variable), but `jax-finufft` is not installed. "
-                "See https://github.com/flatironinstitute/jax-finufft "
-                "for installation instructions."
-            ) from JAX_FINUFFT_IMPORT_ERROR
-        opts = (
-            options.pop("opts")
-            if "opts" in options
-            else _make_jax_finufft_opts(upsampfac=default_upsampfac)
-        )
-        return jax_finufft.nufft1(
-            shape,
-            source,
-            xy[:, 1],
-            xy[:, 0],
-            eps=eps,
-            iflag=-1,
-            opts=opts,
-            **options,
-        )
-    else:
-        upsampfac = (
-            options.pop("upsampfac") if "upsampfac" in options else default_upsampfac
-        )
-        return nufftax.nufft2d1(
-            n_modes=shape[::-1],  # type: ignore
-            c=source,
-            x=xy[:, 0],
-            y=xy[:, 1],
-            eps=eps,
-            isign=-1,
-            upsampfac=upsampfac,
-            **options,
-        )
-
-
-def _nufft3d1(
-    shape: tuple[int, int, int],
-    source: Array,
-    xyz: Array,
-    *,
-    eps: float,
-    options: dict[str, Any],
-):
-    default_upsampfac = 1.25
-    if CRYOJAX_FINUFFT_BACKEND == "jax-finufft":
-        if jax_finufft is None:
-            raise RuntimeError(
-                "Tried to use the `jax-finufft` non-uniform FFT backend "
-                "(set via the `CRYOJAX_FINUFFT_BACKEND` environment "
-                "variable), but `jax-finufft` is not installed. "
-                "See https://github.com/flatironinstitute/jax-finufft "
-                "for installation instructions."
-            ) from JAX_FINUFFT_IMPORT_ERROR
-        opts = (
-            options.pop("opts")
-            if "opts" in options
-            else _make_jax_finufft_opts(upsampfac=default_upsampfac)
-        )
-        return jax_finufft.nufft1(
-            shape,
-            source,
-            xyz[:, 2],
-            xyz[:, 1],
-            xyz[:, 0],
-            eps=eps,
-            iflag=-1,
-            opts=opts,
-            **options,
-        )
-    else:
-        upsampfac = (
-            options.pop("upsampfac") if "upsampfac" in options else default_upsampfac
-        )
-        return nufftax.nufft3d1(
-            n_modes=shape[::-1],  # type: ignore
-            c=source,
-            x=xyz[:, 0],
-            y=xyz[:, 1],
-            z=xyz[:, 2],
-            eps=eps,
-            isign=-1,
-            upsampfac=upsampfac,
-            **options,
-        )
 
 
 def _build_extraction_mesh(
