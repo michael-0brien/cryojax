@@ -157,6 +157,11 @@ def test_read_pdb_at_structure(pdb_multiple_structures_path):
     assert atom_positions.shape[0] == 138
 
 
+def test_missing_model_index_lists_models(pdb_multiple_structures_path):
+    with pytest.raises(ValueError, match=r"are \[1, 2, 3, 4, 5, 6, 7, 8, 9, 10\]"):
+        read_atoms_from_pdb(pdb_multiple_structures_path, model_index=11)
+
+
 def test_read_cif(sample_cif_path):
     atom_positions, atomic_numbers, atom_properties = read_atoms_from_pdb(
         sample_cif_path,
