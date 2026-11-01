@@ -416,9 +416,8 @@ def mmdf_to_atoms(
         atom_properties = jax.tree.map(
             lambda arr: arr[0] if arr.shape[0] == 1 else arr, atom_properties
         )
-    if loads_properties and loads_chemistry:
-        return atom_positions, atomic_numbers, atom_properties, atom_chemistry
-    if loads_properties:
+        if loads_chemistry:
+            return atom_positions, atomic_numbers, atom_properties, atom_chemistry
         return atom_positions, atomic_numbers, atom_properties
     if loads_chemistry:
         return atom_positions, atomic_numbers, atom_chemistry
@@ -458,7 +457,7 @@ def mmdf_to_topology(
         )
     else:
         residue_name_replacements, atom_name_replacements = {}, {}
-    df_at_model = df if model_index is None else df[df["model"] == model_index]
+    df_at_model = df if model_index is None else df.loc[df["model"] == model_index]
     for atom_index in range(len(df_at_model)):
         df_at_index = df_at_model.iloc[atom_index]
         chain_id = df_at_index["chain"]
@@ -543,7 +542,7 @@ def _load_atom_info(df: pd.DataFrame, model_index: int | None, stack_models: boo
         )
     # Load atom info
     if model_index is not None:
-        df_at_model = df[df["model"] == model_index]
+        df_at_model = df.loc[df["model"] == model_index]
         if df_at_model.size == 0:
             raise ValueError(
                 f"Found no atoms matching `model_index = {model_index}`. "
@@ -558,7 +557,7 @@ def _load_atom_info(df: pd.DataFrame, model_index: int | None, stack_models: boo
     atom_positions, atomic_numbers = [], []
     atom_masses, b_factors, charges, occupancies = [], [], [], []
     for index in model_numbers:
-        df_at_model = df if index is None else df[df["model"] == index]
+        df_at_model = df if index is None else df.loc[df["model"] == index]
         atom_positions.append(df_at_model[["x", "y", "z"]].to_numpy())
         atomic_numbers.append(df_at_model["atomic_number"].to_numpy())
         atom_masses.append(df_at_model["atomic_weight"].to_numpy())
