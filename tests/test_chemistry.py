@@ -176,10 +176,21 @@ def test_disulfide(frame):
     assert [11, 1] in apart["missing_bonds"].tolist()
 
 
-def test_alternate_conformations_raise(frame):
+def test_repeated_atom_raises(frame):
     duplicated = pd.concat([frame, frame.iloc[[row(frame, 2, "CB")]]], ignore_index=True)
-    with pytest.raises(ValueError, match="alternate"):
+    with pytest.raises(
+        ValueError,
+        match="an alternate conformation, an insertion code or a repeated chain",
+    ):
         chemistry(duplicated)
+
+
+def test_residues_sharing_a_number(frame):
+    renumbered = frame.copy()
+    renumbered.loc[renumbered["residue_id"] == 7, "residue_id"] = 6
+    expected, actual = chemistry(frame), chemistry(renumbered)
+    np.testing.assert_array_equal(actual["bonds"], expected["bonds"])
+    np.testing.assert_array_equal(actual["missing_bonds"], expected["missing_bonds"])
 
 
 def test_unexpected_hydrogen_raises(frame):
@@ -188,7 +199,9 @@ def test_unexpected_hydrogen_raises(frame):
     cg = frame.iloc[row(frame, 3, "CG")][xyz].to_numpy(dtype=float)
     x, y, z = od2 + (od2 - cg) / np.linalg.norm(od2 - cg)
     hydrogen = new_atom(frame.iloc[[row(frame, 3, "H")]], atom="HD2", x=x, y=y, z=z)
-    with pytest.raises(ValueError, match="hydrogen"):
+    with pytest.raises(
+        ValueError, match="too many hydrogens on atom OD2 .*: 1, but the CCP4 .* has 0"
+    ):
         chemistry(pd.concat([frame, hydrogen], ignore_index=True))
 
 
@@ -202,3 +215,12 @@ def test_multi_model(sample_pdb_path, sample_pdb_path_assembly):
     assert flat["atom_names"].shape == (1380,)
     assert flat["bonds"].shape == (1410, 2)
     assert np.all(flat["bonds"][:, 0] // 138 == flat["bonds"][:, 1] // 138)
+
+
+def test_modified_residue_stays_in_chain(frame):
+    modified = frame.copy()
+    modified.loc[modified["residue_id"] == 6, "residue"] = "TPO"
+    atom_chemistry = chemistry(modified)
+    assert [row(frame, 5, "C"), row(frame, 6, "N")] in atom_chemistry["bonds"].tolist()
+    assert [row(frame, 6, "C"), row(frame, 7, "N")] in atom_chemistry["bonds"].tolist()
+    assert atom_chemistry["missing_bonds"].shape == (0, 2)
