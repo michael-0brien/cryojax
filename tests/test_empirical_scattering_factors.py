@@ -15,7 +15,7 @@ from cryojax.constants._empirical_tables import (
     _EMDB_TABLE,
 )
 from cryojax.constants._scattering_factor_parameters import _atom_types
-from cryojax.io import mmdf_to_atoms
+from cryojax.io import mmdf_to_atoms, mmdf_to_topology
 from cryojax.io._chemistry import _AMINO_ACID_BONDS
 
 
@@ -78,6 +78,7 @@ def test_residue_types_match_sffit_table():
             atom_names=np.array(names),
             bonds=np.array([[index[a], index[b]] for a, b in bonds]),
             missing_bonds=np.array([[index["N"], 6], [index["C"], 7]]),
+            unselected_bonds=np.zeros((0, 2), dtype=int),
         )
         atomic_numbers = np.array([ELEMENTS[name[0]] for name in names])
         actual = _atom_types(atomic_numbers, atom_chemistry)
@@ -161,16 +162,21 @@ def test_truncated_side_chain_hydrogens_not_drawn(
     )
 
 
-def test_unselected_hydrogens_raise(frame):
-    _, atomic_numbers, atom_chemistry = mmdf_to_atoms(
-        frame, loads_chemistry=True, selection_string="not element H"
-    )
+def test_missing_hydrogens_raise(frame):
+    edited = drop(frame, 2, ["H"])
     with pytest.raises(
-        ValueError, match="atom N of residue GLY at index 0 has 0 of its 3 hydrogens"
+        ValueError, match=f"atom N of residue TYR at index {row(edited, 2, 'N')} has 0 "
     ) as error:
-        EmpiricalScatteringFactorParameters(atomic_numbers, atom_chemistry)
-    assert "not selected" in str(error.value)
+        parameters(edited)
     assert "(" not in str(error.value)
+
+
+def test_hydrogen_without_its_atom_raises(frame):
+    _, atomic_numbers, atom_chemistry = mmdf_to_atoms(
+        frame, loads_chemistry=True, selection_string="not name OG1"
+    )
+    with pytest.raises(ValueError, match="hydrogen HG1 of residue THR at index"):
+        EmpiricalScatteringFactorParameters(atomic_numbers, atom_chemistry)
 
 
 def test_chain_break_hydrogens_raise(frame):
@@ -191,14 +197,21 @@ def test_lengths_must_match(frame):
         EmpiricalScatteringFactorParameters(atomic_numbers[:-1], atom_chemistry)
 
 
-def test_selection_keeps_full_model_parameters(frame):
+@pytest.mark.parametrize(
+    "selection_string",
+    [
+        "resSeq 3 to 8",
+        "not element H",
+        "not (name CB or name HB or name HB2 or name HB3 or name OG1 or name HG1)",
+    ],
+)
+def test_selection_keeps_full_model_parameters(frame, selection_string):
     complete = parameters(frame)
-    selected = parameters(frame, selection_string="resSeq 3 to 8")
-    rows = np.flatnonzero(frame["residue_id"].between(3, 8))
+    selected = parameters(frame, selection_string=selection_string)
+    topology = mmdf_to_topology(frame)
+    rows = topology.select(selection_string)
     np.testing.assert_array_equal(selected.a, complete.a[rows])
     np.testing.assert_array_equal(selected.b, complete.b[rows])
-    kept = frame.iloc[rows].reset_index(drop=True)
-    assert np.any(selected.a[row(kept, 3, "H")] != 0)
 
 
 def test_fallback_to_peng_for_missing_type():
@@ -208,6 +221,7 @@ def test_fallback_to_peng_for_missing_type():
         atom_names=np.array(["N", "CA", "CD", "H2", "H3"]),
         bonds=np.array([[0, 1], [0, 2], [0, 3], [0, 4]]),
         missing_bonds=np.zeros((0, 2), dtype=int),
+        unselected_bonds=np.zeros((0, 2), dtype=int),
     )
     assert _atom_types(atomic_numbers, atom_chemistry)[0] == "N(HHCC)"
     catalase = EmpiricalScatteringFactorParameters(atomic_numbers, atom_chemistry)
