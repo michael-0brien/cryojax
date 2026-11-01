@@ -1,4 +1,3 @@
-from ._chemistry import mmdf_to_chemistry as mmdf_to_chemistry
 from ._mrc import (
     read_array_from_mrc as read_array_from_mrc,
     write_image_stack_to_mrc as write_image_stack_to_mrc,

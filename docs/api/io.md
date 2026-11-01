@@ -6,6 +6,4 @@
 
 ::: cryojax.io.read_atoms_from_pdb
 
-::: cryojax.io.mmdf_to_chemistry
-
 ## Reading and writing MRC files
