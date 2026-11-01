@@ -5,7 +5,7 @@ import mmdf
 import numpy as np
 import pandas as pd
 import pytest
-from cryojax.io import mmdf_to_atoms, mmdf_to_chemistry
+from cryojax.io import mmdf_to_atoms
 from cryojax.io._chemistry import _AMINO_ACID_BONDS
 
 
@@ -62,13 +62,13 @@ def new_atom(template, **fields):
 
 
 def chemistry(df, **kwargs):
-    return mmdf_to_chemistry(df, **kwargs)[2]
+    return mmdf_to_atoms(df, loads_chemistry=True, **kwargs)[2]
 
 
 @pytest.mark.parametrize("selection_string", ["all", "resSeq 3 to 8"])
-def test_rows_match_mmdf_to_atoms(frame, selection_string):
-    positions, atomic_numbers, _ = mmdf_to_chemistry(
-        frame, selection_string=selection_string
+def test_chemistry_keeps_rows(frame, selection_string):
+    positions, atomic_numbers, _ = mmdf_to_atoms(
+        frame, loads_chemistry=True, selection_string=selection_string
     )
     expected_positions, expected_numbers = mmdf_to_atoms(
         frame, selection_string=selection_string
