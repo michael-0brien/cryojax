@@ -98,11 +98,9 @@ def test_missing_oxt(frame):
     )
 
 
-def test_missing_hydroxyl_hydrogen(frame):
+def test_an_absent_hydrogen_is_not_a_missing_bond(frame):
     edited = drop(frame, 6, ["HG1"])
-    np.testing.assert_array_equal(
-        chemistry(edited)["missing_bonds"], [[row(edited, 6, "OG1"), 1]]
-    )
+    assert chemistry(edited)["missing_bonds"].shape == (0, 2)
 
 
 def test_truncated_side_chain(frame):
@@ -125,13 +123,21 @@ def test_selection_cut_records_unselected_bonds(frame):
     )
 
 
-def test_hydrogen_names_do_not_matter(frame):
+def test_unknown_hydrogen_names_bond_the_nearest_atom(frame):
     renamed = frame.copy()
     is_hydrogen = renamed["atomic_number"] == 1
     renamed.loc[is_hydrogen, "atom"] = [f"HX{i}" for i in range(is_hydrogen.sum())]
     expected, actual = chemistry(frame), chemistry(renamed)
     np.testing.assert_array_equal(actual["bonds"], expected["bonds"])
     np.testing.assert_array_equal(actual["missing_bonds"], expected["missing_bonds"])
+
+
+def test_a_hydrogen_bonds_its_named_atom_wherever_it_lies(frame):
+    xyz = ["x", "y", "z"]
+    moved = frame.copy()
+    cb = moved.iloc[row(moved, 2, "CB")][xyz].to_numpy(dtype=float)
+    moved.loc[row(moved, 2, "HA"), xyz] = cb + [0.5, 0.0, 0.0]
+    np.testing.assert_array_equal(chemistry(moved)["bonds"], chemistry(frame)["bonds"])
 
 
 def test_unknown_residues_have_no_bonds(frame):
@@ -174,19 +180,13 @@ def cysteine_pair(template, sg_distance):
 def test_disulfide(frame):
     bonded = chemistry(cysteine_pair(frame.iloc[[0]], 2.04))
     assert [5, 11] in bonded["bonds"].tolist()
-    assert [5, 1] not in bonded["missing_bonds"].tolist()
     apart = chemistry(cysteine_pair(frame.iloc[[0]], 4.0))
     assert [5, 11] not in apart["bonds"].tolist()
-    assert [5, 1] in apart["missing_bonds"].tolist()
-    assert [11, 1] in apart["missing_bonds"].tolist()
 
 
 def test_repeated_atom_raises(frame):
     duplicated = pd.concat([frame, frame.iloc[[row(frame, 2, "CB")]]], ignore_index=True)
-    with pytest.raises(
-        ValueError,
-        match="an alternate conformation, an insertion code or a repeated chain",
-    ):
+    with pytest.raises(ValueError, match="atom CB twice in residue TYR 2 of chain"):
         chemistry(duplicated)
 
 
@@ -198,16 +198,29 @@ def test_residues_sharing_a_number(frame):
     np.testing.assert_array_equal(actual["missing_bonds"], expected["missing_bonds"])
 
 
-def test_unexpected_hydrogen_raises(frame):
+def test_an_extra_hydrogen_bonds_its_nearest_atom(frame):
     xyz = ["x", "y", "z"]
     od2 = frame.iloc[row(frame, 3, "OD2")][xyz].to_numpy(dtype=float)
     cg = frame.iloc[row(frame, 3, "CG")][xyz].to_numpy(dtype=float)
     x, y, z = od2 + (od2 - cg) / np.linalg.norm(od2 - cg)
     hydrogen = new_atom(frame.iloc[[row(frame, 3, "H")]], atom="HD2", x=x, y=y, z=z)
-    with pytest.raises(
-        ValueError, match="too many hydrogens on atom OD2 .*: 1, but the CCP4 .* has 0"
-    ):
-        chemistry(pd.concat([frame, hydrogen], ignore_index=True))
+    edited = pd.concat([frame, hydrogen], ignore_index=True)
+    assert [row(edited, 3, "OD2"), len(frame)] in chemistry(edited)["bonds"].tolist()
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        dict(atom="CX", element="C", atomic_number=6, x=80.0),
+        dict(chain="Z", atom="H", element="H", atomic_number=1),
+    ],
+)
+def test_atoms_the_rules_do_not_cover_have_no_bonds(frame, fields):
+    extra = new_atom(frame.iloc[[row(frame, 3, "CB")]], **fields)
+    edited = pd.concat([frame, extra], ignore_index=True)
+    actual, expected = chemistry(edited), chemistry(frame)
+    np.testing.assert_array_equal(actual["bonds"], expected["bonds"])
+    np.testing.assert_array_equal(actual["missing_bonds"], expected["missing_bonds"])
 
 
 def test_multi_model(sample_pdb_path, sample_pdb_path_assembly):
