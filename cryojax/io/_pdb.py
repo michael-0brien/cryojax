@@ -177,7 +177,8 @@ def read_atoms_from_pdb(
         model, and `unselected_bonds`, the same for each bond to an atom that is
         not selected. Bonds are found on the whole model. Bonds within residues
         are those of the 20 standard amino acids, protonated as in the CCP4
-        Monomer Library with charged termini at chain ends and breaks; peptide
+        Monomer Library; a C without OXT, or an N with only its mid-chain
+        hydrogens, is a cut, bonded as mid-chain to an absent atom. Peptide
         bonds, also to other residues, and disulfides are found by distance, and
         each hydrogen bonds to the nearest heavy atom of its residue.
     - `selection_string`:
