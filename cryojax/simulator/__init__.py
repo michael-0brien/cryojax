@@ -13,6 +13,7 @@ from ._detector import (
 )
 from ._image_config import (
     AbstractImageConfig as AbstractImageConfig,
+    AnisotropicImageConfig as AnisotropicImageConfig,
     BasicImageConfig as BasicImageConfig,
     DoseImageConfig as DoseImageConfig,
 )
@@ -46,6 +47,7 @@ from ._scattering_theory import (
     WeakPhaseScatteringTheory as WeakPhaseScatteringTheory,
 )
 from ._transfer_theory import (
+    AberratedCTF as AberratedCTF,
     AbstractCTF as AbstractCTF,
     AbstractTransferTheory as AbstractTransferTheory,
     AstigmaticCTF as AstigmaticCTF,

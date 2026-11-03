@@ -111,7 +111,9 @@ class FFTMultisliceIntegrator(
         # Compute the transmission function
         transmission = jnp.exp(1.0j * object_per_slice)
         # Compute the fresnel propagator (TODO: check numerical factors)
-        q = image_config.get_frequency_grid(padding=True, physical=True, full=True)
+        q = image_config.get_frequency_grid(
+            padding=True, physical=True, full=True, anisotropy=False
+        )
         q_sqr = jnp.sum(q**2, axis=-1)
         fresnel_propagator = jnp.exp(
             1.0j * jnp.pi * image_config.wavelength_in_angstroms * q_sqr * slice_thickness

@@ -54,6 +54,7 @@ from ._normalize import (
     standardize_fft as standardize_fft,
     standardize_image as standardize_image,
 )
+from ._nufft import dispatch_nufft1 as dispatch_nufft1
 from ._operators import (
     AbstractFourierOperator as AbstractFourierOperator,
     AbstractRealOperator as AbstractRealOperator,

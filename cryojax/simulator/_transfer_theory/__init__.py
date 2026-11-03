@@ -1,4 +1,5 @@
 from .transfer_function import (
+    AberratedCTF as AberratedCTF,
     AbstractCTF as AbstractCTF,
     AstigmaticCTF as AstigmaticCTF,
 )
