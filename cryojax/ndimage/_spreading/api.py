@@ -293,15 +293,18 @@ def variance_to_nspread(
     - `pixel_size`:
         The pixel/voxel size of the grid `variance` will be spread onto.
     - `n_sigma`:
-        The number of standard deviations of the Gaussian to truncate at.
+        The number of standard deviations of the Gaussian to truncate at,
+        wherever a point falls on the grid.
 
     **Returns:**
 
-    An integer `n_spread`, at least `2`.
+    An integer `n_spread`, at least `2` for a nonzero `variance`.
     """
     max_variance = float(np.max(np.asarray(variance)))
     n_spread = 2.0 * n_sigma * math.sqrt(max_variance) / float(pixel_size)
-    return max(2, math.ceil(n_spread))
+    # The window moves a whole pixel at a time, so its nearer edge can sit half a
+    # pixel closer to the point than `n_spread / 2`.
+    return math.ceil(n_spread) + 1
 
 
 # ============================================================================
