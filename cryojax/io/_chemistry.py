@@ -70,15 +70,17 @@ def _read_chemistry(
     bridged = set(disulfides.ravel().tolist())
     for (key, rows), atoms in zip(amino_acids, heavy_atoms):
         residue_bonds = list(_AMINO_ACID_BONDS[key[3]])
+        # A C without OXT, or an N with only its mid-chain hydrogens, is a cut.
         if atoms.get("C") not in bonded_carbons:
-            residue_bonds.append(("C", "OXT"))
+            if "OXT" in atoms:
+                residue_bonds.append(("C", "OXT"))
+            elif "C" in atoms:
+                missing_bonds.append((atoms["C"], 7))
         expected_hydrogens = Counter(
             a if b.startswith("H") else b
             for a, b in residue_bonds
             if a.startswith("H") or b.startswith("H")
         )
-        if atoms.get("N") not in bonded_nitrogens:
-            expected_hydrogens["N"] += 2
         if atoms.get("SG") in bridged:
             expected_hydrogens["SG"] -= 1
         for a, b in residue_bonds:
@@ -105,13 +107,18 @@ def _read_chemistry(
             parents = heavy_rows[np.argmin(distances, axis=1)]
             bonds.extend(zip(parents.tolist(), hydrogens))
             found = Counter(parents.tolist())
+        if "N" in atoms and atoms["N"] not in bonded_nitrogens:
+            if found[atoms["N"]] == expected_hydrogens["N"]:
+                missing_bonds.append((atoms["N"], 6))
+            else:
+                expected_hydrogens["N"] += 2
         for name, row in atoms.items():
             if found[row] > expected_hydrogens[name]:
                 raise ValueError(
                     f"Found too many hydrogens on atom {name} of {_describe(key)}: "
-                    f"{found[row]}, but the CCP4 Monomer Library's protonation, with "
-                    f"charged termini at chain ends and breaks, has "
-                    f"{expected_hydrogens[name]}."
+                    f"{found[row]}, but the CCP4 Monomer Library's protonation, in "
+                    "which a chain end either carries the charged terminus or is a "
+                    f"cut, has {expected_hydrogens[name]}."
                 )
             missing_bonds.extend([(row, 1)] * (expected_hydrogens[name] - found[row]))
     return _AtomChemistry(

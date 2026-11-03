@@ -179,14 +179,38 @@ def test_hydrogen_without_its_atom_raises(frame):
         EmpiricalScatteringFactorParameters(atomic_numbers, atom_chemistry)
 
 
-def test_chain_break_hydrogens_raise(frame):
-    edited = drop(frame, 5, frame.loc[frame["residue_id"] == 5, "atom"].tolist())
+def test_a_break_n_with_its_peptide_hydrogen_types_as_backbone(frame):
+    edited = frame[frame["residue_id"] != 5].reset_index(drop=True)
+    assert types(edited)[row(edited, 6, "N")] == "N(HCC)"
+    parameters(edited)
+
+
+def test_a_break_proline_n_without_hydrogen_types_as_backbone(frame):
+    edited = frame[frame["residue_id"] != 3].reset_index(drop=True)
+    assert types(edited)[row(edited, 4, "N")] == "N(CCC)"
+    parameters(edited)
+
+
+def test_a_break_n_with_two_hydrogens_raises(frame):
+    edited = frame[frame["residue_id"] != 5].reset_index(drop=True)
+    xyz = ["x", "y", "z"]
+    n = edited.iloc[row(edited, 6, "N")][xyz].to_numpy(dtype=float)
+    ca = edited.iloc[row(edited, 6, "CA")][xyz].to_numpy(dtype=float)
+    hydrogen = edited.iloc[[row(edited, 6, "H")]].copy()
+    hydrogen[xyz] = [n + (n - ca) / np.linalg.norm(n - ca)]
+    edited = pd.concat([edited, hydrogen], ignore_index=True)
     with pytest.raises(
         ValueError,
-        match=f"atom N of residue THR at index {row(edited, 6, 'N')} has 1 of its 3 ",
+        match=f"atom N of residue THR at index {row(edited, 6, 'N')} has 2 of its 3 ",
     ) as error:
         parameters(edited)
-    assert "chain ends and breaks" in str(error.value)
+    assert "either carries the charged terminus or is a cut" in str(error.value)
+
+
+def test_a_break_c_without_oxt_types_as_backbone(frame):
+    edited = drop(frame, 10, ["OXT"])
+    assert types(edited)[row(edited, 10, "C")] == "C(CNO)"
+    assert types(frame)[row(frame, 10, "C")] == "C(COO)"
 
 
 def test_lengths_must_match(frame):
