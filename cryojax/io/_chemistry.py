@@ -67,22 +67,14 @@ def _read_chemistry(
     bonds, missing_bonds = peptides.tolist() + disulfides.tolist(), []
     bonded_carbons = set(peptides[:, 0].tolist())
     bonded_nitrogens = set(peptides[:, 1].tolist())
-    bridged = set(disulfides.ravel().tolist())
     for (key, rows), atoms in zip(amino_acids, heavy_atoms):
-        residue_bonds = list(_AMINO_ACID_BONDS[key[3]])
+        residue_bonds = _AMINO_ACID_BONDS[key[3]]
         # A C without OXT, or an N with only its mid-chain hydrogens, is a cut.
-        if atoms.get("C") not in bonded_carbons:
+        if "C" in atoms and atoms["C"] not in bonded_carbons:
             if "OXT" in atoms:
-                residue_bonds.append(("C", "OXT"))
-            elif "C" in atoms:
+                bonds.append((atoms["C"], atoms["OXT"]))
+            else:
                 missing_bonds.append((atoms["C"], 7))
-        expected_hydrogens = Counter(
-            a if b.startswith("H") else b
-            for a, b in residue_bonds
-            if a.startswith("H") or b.startswith("H")
-        )
-        if atoms.get("SG") in bridged:
-            expected_hydrogens["SG"] -= 1
         for a, b in residue_bonds:
             if a.startswith("H") or b.startswith("H"):
                 continue
@@ -93,34 +85,30 @@ def _read_chemistry(
                 missing_bonds.append((row_a, _ATOMIC_NUMBERS[b[0]]))
             elif row_b is not None:
                 missing_bonds.append((row_b, _ATOMIC_NUMBERS[a[0]]))
-        hydrogens = [row for row in rows if atomic_numbers[row] == 1]
-        found = Counter()
-        if hydrogens:
-            if not atoms:
-                raise ValueError(
-                    f"Found hydrogens but no heavy atoms in {_describe(key)}."
-                )
-            heavy_rows = np.array(list(atoms.values()))
+        # A hydrogen bonds its named atom; one with no such atom, its nearest.
+        named = _HYDROGEN_PARENTS[key[3]]
+        parents = {
+            row: atoms[named[atom_names[row]]]
+            for row in rows
+            if atomic_numbers[row] == 1 and named.get(atom_names[row]) in atoms
+        }
+        unnamed = [r for r in rows if atomic_numbers[r] == 1 and r not in parents]
+        heavy_rows = np.array([row for row in rows if atomic_numbers[row] != 1])
+        if unnamed and len(heavy_rows) > 0:
             distances = np.linalg.norm(
-                positions[hydrogens, None] - positions[None, heavy_rows], axis=-1
+                positions[unnamed, None] - positions[None, heavy_rows], axis=-1
             )
-            parents = heavy_rows[np.argmin(distances, axis=1)]
-            bonds.extend(zip(parents.tolist(), hydrogens))
-            found = Counter(parents.tolist())
+            nearest = heavy_rows[np.argmin(distances, axis=1)].tolist()
+            parents.update(zip(unnamed, nearest))
+        bonds.extend((parent, row) for row, parent in parents.items())
+        found = Counter(parents.values())
         if "N" in atoms and atoms["N"] not in bonded_nitrogens:
-            if found[atoms["N"]] == expected_hydrogens["N"]:
+            mid_chain = sum(
+                "N" in bond and any(name.startswith("H") for name in bond)
+                for bond in residue_bonds
+            )
+            if found[atoms["N"]] == mid_chain:
                 missing_bonds.append((atoms["N"], 6))
-            else:
-                expected_hydrogens["N"] += 2
-        for name, row in atoms.items():
-            if found[row] > expected_hydrogens[name]:
-                raise ValueError(
-                    f"Found too many hydrogens on atom {name} of {_describe(key)}: "
-                    f"{found[row]}, but the CCP4 Monomer Library's protonation, in "
-                    "which a chain end either carries the charged terminus or is a "
-                    f"cut, has {expected_hydrogens[name]}."
-                )
-            missing_bonds.extend([(row, 1)] * (expected_hydrogens[name] - found[row]))
     return _AtomChemistry(
         residue_names=residue_names,
         atom_names=atom_names,
@@ -138,13 +126,11 @@ def _heavy_atoms(key, rows, atom_names, atomic_numbers):
             continue
         name = atom_names[row]
         if name not in known:
-            raise ValueError(f"Found an unknown atom {name} in {_describe(key)}.")
+            continue
         if name in atoms:
             raise ValueError(
-                f"Found atom {name} twice in {_describe(key)}. `mmdf` keeps no "
-                "alternate-location labels or insertion codes, so this is an alternate "
-                "conformation, an insertion code or a repeated chain ID; keep one copy "
-                "of each atom per residue."
+                f"Found atom {name} twice in {_describe(key)}, e.g. from an alternate "
+                "conformation; keep one copy of each atom."
             )
         atoms[name] = row
     return atoms
@@ -191,7 +177,7 @@ _ATOMIC_NUMBERS = {"H": 1, "C": 6, "N": 7, "O": 8, "S": 16}
 _MAX_PEPTIDE_BOND = 1.5 * 1.341
 _MAX_DISULFIDE_BOND = 1.5 * 2.04
 
-# Mid-chain bonds of the standard amino acids, from the CCP4 Monomer Library.
+# Mid-chain bonds of the standard amino acids.
 _AMINO_ACID_BONDS: dict[str, tuple[tuple[str, str], ...]] = {
     "ALA": (
         ("C", "O"),
@@ -544,4 +530,10 @@ _AMINO_ACID_BONDS: dict[str, tuple[tuple[str, str], ...]] = {
         ("N", "CA"),
         ("N", "H"),
     ),
+}
+# Each hydrogen's atom, by name; N-terminal hydrogens bond N.
+_HYDROGEN_PARENTS = {
+    residue: {"H": "N", "H1": "N", "H2": "N", "H3": "N"}
+    | {h: a for a, h in bonds if h.startswith("H")}
+    for residue, bonds in _AMINO_ACID_BONDS.items()
 }

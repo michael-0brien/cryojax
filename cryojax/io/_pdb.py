@@ -173,14 +173,15 @@ def read_atoms_from_pdb(
         If `True`, return a dictionary of the atoms' chemistry, after any
         properties: `residue_names`, `atom_names`, `bonds`, the covalent bonds
         between returned atoms as pairs of indices, `missing_bonds`, an
-        `(index, atomic number)` pair for each bond to an atom absent from the
-        model, and `unselected_bonds`, the same for each bond to an atom that is
-        not selected. Bonds are found on the whole model. Bonds within residues
-        are those of the 20 standard amino acids, protonated as in the CCP4
-        Monomer Library; a C without OXT, or an N with only its mid-chain
-        hydrogens, is a cut, bonded as mid-chain to an absent atom. Peptide
-        bonds, also to other residues, and disulfides are found by distance, and
-        each hydrogen bonds to the nearest heavy atom of its residue.
+        `(index, atomic number)` pair for each bond to a heavy atom absent from
+        the model, and `unselected_bonds`, the same for each bond to an atom that
+        is not selected. Bonds are found on the whole model. Bonds within
+        residues are those of the 20 standard amino acids; a C without OXT, or an
+        N with only its mid-chain hydrogens, is a cut, bonded as mid-chain to an
+        absent atom. Peptide bonds, also to other residues, and disulfides are
+        found by distance. Each hydrogen bonds to the atom its name gives, or
+        else to the nearest heavy atom of its residue. Atoms these rules do not
+        cover have no bonds.
     - `selection_string`:
         A selection string in `mdtraj`'s format.
     - `model_index`:
