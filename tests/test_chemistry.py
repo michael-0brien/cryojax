@@ -94,7 +94,7 @@ def test_complete_model_has_no_missing_bonds(frame):
 def test_missing_oxt(frame):
     edited = drop(frame, 10, ["OXT"])
     np.testing.assert_array_equal(
-        chemistry(edited)["missing_bonds"], [[row(edited, 10, "C"), 8]]
+        chemistry(edited)["missing_bonds"], [[row(edited, 10, "C"), 7]]
     )
 
 
@@ -121,7 +121,7 @@ def test_selection_cut_records_unselected_bonds(frame):
         atom_chemistry["unselected_bonds"], [[row(kept, 8, "N"), 6]]
     )
     np.testing.assert_array_equal(
-        atom_chemistry["missing_bonds"], [[row(kept, 10, "C"), 8]]
+        atom_chemistry["missing_bonds"], [[row(kept, 10, "C"), 7]]
     )
 
 

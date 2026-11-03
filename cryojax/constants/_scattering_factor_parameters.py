@@ -155,8 +155,9 @@ def _find_hidden_hydrogens(atomic_numbers, atom_chemistry):
             missing = np.count_nonzero(np.all(missing_bonds == (parent, 1), axis=1))
             raise ValueError(
                 "`EmpiricalScatteringFactorParameters` needs every hydrogen of the "
-                "CCP4 Monomer Library's protonation, with charged termini at chain "
-                f"ends and breaks, but atom {atom_names[parent]} of residue "
+                "CCP4 Monomer Library's protonation, in which a chain end either "
+                "carries the charged terminus or is a cut, but atom "
+                f"{atom_names[parent]} of residue "
                 f"{residue_names[parent]} at index {parent} has {found} of its "
                 f"{found + missing} hydrogens. They are absent from the model or "
                 "protonated differently."
