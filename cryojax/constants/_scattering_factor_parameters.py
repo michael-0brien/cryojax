@@ -39,11 +39,11 @@ class EmpiricalScatteringFactorParameters(eqx.Module, strict=True):
     There are two tables: `"catalase"`, 42 types fit to 0.005-0.625 inverse
     angstroms (200-1.60 angstroms), and `"emdb"`, 96 types fit to 0.008-0.544
     inverse angstroms (130-1.84 angstroms); outside its range a table is
-    extrapolated. Atoms outside the 20 standard amino acids, and types a table
-    lacks, take the factors of `PengScatteringFactorParameters`, as in Shtyrov et
-    al. The model must have explicit hydrogens; hydrogens whose positions the fit
-    could not fix count toward their neighbours' types but get `a = 0`. Each
-    atom's terms are sorted by `b`.
+    extrapolated. A type counts every atom bonded in the model, hydrogens
+    included, so the model should have explicit hydrogens. Atoms outside the 20
+    standard amino acids, and types a table lacks, take the factors of
+    `PengScatteringFactorParameters`, as in Shtyrov et al.; if every atom would, this
+    raises. Each atom's terms are sorted by `b`.
 
     **References:**
 
@@ -91,15 +91,18 @@ class EmpiricalScatteringFactorParameters(eqx.Module, strict=True):
         is_tabulated = np.isin(atom_types, list(tabulated)) & np.isin(
             atom_chemistry["residue_names"], list(_AMINO_ACIDS)
         )
+        if not is_tabulated.any():
+            raise ValueError(
+                f"No atom has a type in the {table!r} table, so every atom would take "
+                "the factors of `PengScatteringFactorParameters`."
+            )
         parameters = np.empty((len(atomic_numbers), 2, 5))
-        if is_tabulated.any():
-            parameters[is_tabulated] = [tabulated[t] for t in atom_types[is_tabulated]]
+        parameters[is_tabulated] = [tabulated[t] for t in atom_types[is_tabulated]]
         if not is_tabulated.all():
             check_atomic_numbers_supported(atomic_numbers[~is_tabulated])
             parameters[~is_tabulated] = _PENG_PARAMETER_TABLE[
                 atomic_numbers[~is_tabulated]
             ]
-        parameters[_find_hidden_hydrogens(atomic_numbers, atom_chemistry)] = 0.0
         order = np.argsort(parameters[:, 1], axis=1, kind="stable")
         self.a = np.take_along_axis(parameters[:, 0], order, axis=1)
         self.b = np.maximum(
@@ -126,46 +129,6 @@ def _atom_types(atomic_numbers, atom_chemistry):
             f"{_SYMBOLS[int(atomic_numbers[i])]}({symbols}{_FLAGS.get(name, '')})"
         )
     return np.asarray(atom_types, dtype=str)
-
-
-def _find_hidden_hydrogens(atomic_numbers, atom_chemistry):
-    residue_names = atom_chemistry["residue_names"]
-    atom_names = atom_chemistry["atom_names"]
-    bonds, missing_bonds = atom_chemistry["bonds"], atom_chemistry["missing_bonds"]
-    truncated = np.zeros(len(atomic_numbers), dtype=bool)
-    truncated[missing_bonds[missing_bonds[:, 1] > 1, 0]] = True
-    hides_hydrogens = np.array(
-        [name in _HIDDEN_HYDROGEN_PARENTS for name in zip(residue_names, atom_names)],
-        dtype=bool,
-    ).reshape(-1) | (truncated & (atom_names != "N"))
-    is_hydrogen = atomic_numbers == 1
-    unselected_bonds = atom_chemistry["unselected_bonds"]
-    orphans = unselected_bonds[is_hydrogen[unselected_bonds[:, 0]], 0]
-    if len(orphans) > 0:
-        i = int(orphans[0])
-        raise ValueError(
-            "`EmpiricalScatteringFactorParameters` needs the atom each hydrogen bonds, "
-            f"but hydrogen {atom_names[i]} of residue {residue_names[i]} at index {i} "
-            "bonds an atom that is not selected."
-        )
-    for parent in missing_bonds[missing_bonds[:, 1] == 1, 0].tolist():
-        if not hides_hydrogens[parent]:
-            neighbours = bonds[(bonds == parent).any(axis=1)].ravel()
-            found = np.count_nonzero(is_hydrogen[neighbours])
-            missing = np.count_nonzero(np.all(missing_bonds == (parent, 1), axis=1))
-            raise ValueError(
-                "`EmpiricalScatteringFactorParameters` needs every hydrogen of the "
-                "CCP4 Monomer Library's protonation, in which a chain end either "
-                "carries the charged terminus or is a cut, but atom "
-                f"{atom_names[parent]} of residue "
-                f"{residue_names[parent]} at index {parent} has {found} of its "
-                f"{found + missing} hydrogens. They are absent from the model or "
-                "protonated differently."
-            )
-    hidden = np.zeros(len(atomic_numbers), dtype=bool)
-    for hydrogen, parent in (bonds.T, bonds[:, ::-1].T):
-        hidden[hydrogen[is_hydrogen[hydrogen] & hides_hydrogens[parent]]] = True
-    return hidden
 
 
 _EMPIRICAL_TABLES = {"catalase": _CATALASE_TABLE, "emdb": _EMDB_TABLE}
@@ -201,15 +164,6 @@ _FLAGS = {
     ("GLU", "OE2"): ", carboxyl",
     ("ASN", "OD1"): ", amide",
     ("GLN", "OE1"): ", amide",
-}
-# Their hydrogens' positions are not fixed by geometry, so the fit did not draw them.
-_HIDDEN_HYDROGEN_PARENTS = {
-    ("SER", "OG"),
-    ("THR", "OG1"),
-    ("TYR", "OH"),
-    ("CYS", "SG"),
-    ("HIS", "ND1"),
-    ("HIS", "NE2"),
 }
 
 

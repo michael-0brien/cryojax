@@ -117,24 +117,16 @@ def test_terms_sorted_by_width(frame):
         assert np.all(np.diff(parameters(frame, table).b, axis=1) >= 0)
 
 
-def test_never_drawn_hydrogens(frame):
+def test_hydrogens_in_the_model_are_drawn(frame):
     empirical = parameters(frame)
-    for residue_id, name in [(2, "HH"), (6, "HG1"), (8, "HG1")]:
-        assert np.all(empirical.a[row(frame, residue_id, name)] == 0)
-    for residue_id, name in [(9, "HE1"), (2, "H"), (1, "H1")]:
+    for residue_id, name in [(2, "HH"), (6, "HG1"), (9, "HE1"), (2, "H"), (1, "H1")]:
         assert np.any(empirical.a[row(frame, residue_id, name)] != 0)
 
 
-def test_missing_never_drawn_hydrogen_allowed(frame):
-    complete = parameters(frame)
+def test_an_absent_hydrogen_changes_its_atoms_type(frame):
     edited = drop(frame, 6, ["HG1"])
-    actual = parameters(edited)
-    np.testing.assert_array_equal(
-        actual.a[row(edited, 6, "OG1")], complete.a[row(frame, 6, "OG1")]
-    )
-    np.testing.assert_array_equal(
-        actual.b[row(edited, 6, "OG1")], complete.b[row(frame, 6, "OG1")]
-    )
+    assert types(frame)[row(frame, 6, "OG1")] == "O(HC)"
+    assert types(edited)[row(edited, 6, "OG1")] == "O(C)"
 
 
 TYROSINE_RING = ["CG", "CD1", "CD2", "CE1", "CE2", "CZ", "OH"]
@@ -142,41 +134,49 @@ TYROSINE_RING_HYDROGENS = ["HD1", "HD2", "HE1", "HE2", "HH"]
 
 
 @pytest.mark.parametrize(
-    "residue_id, cut, removed, not_drawn",
+    "residue_id, cut, removed, hydrogens",
     [
         (2, "CA", ["CB", "HB2", "HB3"] + TYROSINE_RING + TYROSINE_RING_HYDROGENS, ["HA"]),
         (2, "CB", TYROSINE_RING + TYROSINE_RING_HYDROGENS, ["HB2", "HB3"]),
         (5, "CG", ["CD", "OE1", "OE2"], ["HG2", "HG3"]),
     ],
 )
-def test_truncated_side_chain_hydrogens_not_drawn(
-    frame, residue_id, cut, removed, not_drawn
+def test_a_truncated_side_chain_keeps_its_types(
+    frame, residue_id, cut, removed, hydrogens
 ):
     complete = parameters(frame)
     edited = drop(frame, residue_id, removed)
     actual = parameters(edited)
-    for name in not_drawn:
-        assert np.all(actual.a[row(edited, residue_id, name)] == 0), name
-    np.testing.assert_array_equal(
-        actual.a[row(edited, residue_id, cut)], complete.a[row(frame, residue_id, cut)]
-    )
+    for name in [cut, *hydrogens]:
+        np.testing.assert_array_equal(
+            actual.a[row(edited, residue_id, name)],
+            complete.a[row(frame, residue_id, name)],
+        )
 
 
-def test_missing_hydrogens_raise(frame):
-    edited = drop(frame, 2, ["H"])
-    with pytest.raises(
-        ValueError, match=f"atom N of residue TYR at index {row(edited, 2, 'N')} has 0 "
-    ) as error:
-        parameters(edited)
-    assert "(" not in str(error.value)
+def test_a_type_the_table_lacks_takes_peng(frame):
+    edited = frame[frame["residue_id"] != 3].reset_index(drop=True)
+    xyz = ["x", "y", "z"]
+    n = row(edited, 4, "N")
+    position = edited.iloc[n][xyz].to_numpy(dtype=float)
+    hydrogens = edited.iloc[[row(edited, 4, "HA")] * 2].assign(atom=["H2", "H3"])
+    for k, neighbour in enumerate(("CA", "CD")):
+        away = position - edited.iloc[row(edited, 4, neighbour)][xyz].to_numpy(float)
+        hydrogens.iloc[k, [hydrogens.columns.get_loc(c) for c in xyz]] = (
+            position + away / np.linalg.norm(away)
+        )
+    edited = pd.concat([edited, hydrogens], ignore_index=True)
+    assert types(edited)[n] == "N(HHCC)"
+    actual = parameters(edited)
+    peng = PengScatteringFactorParameters(np.array([7]))
+    np.testing.assert_array_equal(actual.a[n], peng.a[0])
+    np.testing.assert_array_equal(actual.b[n], peng.b[0])
 
 
-def test_hydrogen_without_its_atom_raises(frame):
-    _, atomic_numbers, atom_chemistry = mmdf_to_atoms(
-        frame, loads_chemistry=True, selection_string="not name OG1"
-    )
-    with pytest.raises(ValueError, match="hydrogen HG1 of residue THR at index"):
-        EmpiricalScatteringFactorParameters(atomic_numbers, atom_chemistry)
+def test_every_atom_taking_peng_raises(frame):
+    renamed = frame.assign(residue="UNK")
+    with pytest.raises(ValueError, match="No atom has a type in the 'catalase' table"):
+        parameters(renamed)
 
 
 def test_a_break_n_with_its_peptide_hydrogen_types_as_backbone(frame):
@@ -191,7 +191,7 @@ def test_a_break_proline_n_without_hydrogen_types_as_backbone(frame):
     parameters(edited)
 
 
-def test_a_break_n_with_two_hydrogens_raises(frame):
+def test_a_break_n_with_two_hydrogens_is_not_a_cut(frame):
     edited = frame[frame["residue_id"] != 5].reset_index(drop=True)
     xyz = ["x", "y", "z"]
     n = edited.iloc[row(edited, 6, "N")][xyz].to_numpy(dtype=float)
@@ -199,12 +199,7 @@ def test_a_break_n_with_two_hydrogens_raises(frame):
     hydrogen = edited.iloc[[row(edited, 6, "H")]].copy()
     hydrogen[xyz] = [n + (n - ca) / np.linalg.norm(n - ca)]
     edited = pd.concat([edited, hydrogen], ignore_index=True)
-    with pytest.raises(
-        ValueError,
-        match=f"atom N of residue THR at index {row(edited, 6, 'N')} has 2 of its 3 ",
-    ) as error:
-        parameters(edited)
-    assert "either carries the charged terminus or is a cut" in str(error.value)
+    assert types(edited)[row(edited, 6, "N")] == "N(HHC)"
 
 
 def test_a_break_c_without_oxt_types_as_backbone(frame):
@@ -226,6 +221,7 @@ def test_lengths_must_match(frame):
     [
         "resSeq 3 to 8",
         "not element H",
+        "not name OG1",
         "not (name CB or name HB or name HB2 or name HB3 or name OG1 or name HG1)",
     ],
 )
