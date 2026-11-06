@@ -114,7 +114,7 @@ def generate_projection_reference():
     gaussian_volume = cxs.GaussianMixtureVolume.from_tabulated_parameters(
         atom_positions,
         parameters=PengScatteringFactorParameters(atomic_numbers),
-        extra_b_factors=10.0,
+        b_factors=10.0,
     )
     render_fn = cxs.GaussianMixtureRenderFn((box_size, box_size, box_size), voxel_size)
     real_voxel_grid = np.asarray(render_fn(gaussian_volume), dtype=np.float32)

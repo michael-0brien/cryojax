@@ -52,6 +52,50 @@ def test_read_structure_no_properties(sample_pdb_path):
     assert atom_positions.shape[0] == 77
 
 
+def test_read_structure_loads_occupancies(sample_pdb_path):
+    _, atomic_numbers, atom_properties = read_atoms_from_pdb(
+        sample_pdb_path, loads_properties=True
+    )
+    df = mmdf.read(sample_pdb_path)
+    np.testing.assert_array_equal(
+        atom_properties["occupancies"], df["occupancy"].to_numpy()
+    )
+    assert atom_properties["occupancies"].shape == atomic_numbers.shape
+
+
+def test_read_atoms_loads_chemistry(sample_pdb_path):
+    positions, atomic_numbers, atom_chemistry = read_atoms_from_pdb(
+        sample_pdb_path, loads_chemistry=True
+    )
+    expected = mmdf_to_atoms(mmdf.read(sample_pdb_path), loads_chemistry=True)
+    np.testing.assert_array_equal(positions, expected[0])
+    np.testing.assert_array_equal(atomic_numbers, expected[1])
+    for key in (
+        "residue_names",
+        "atom_names",
+        "bonds",
+        "missing_bonds",
+        "unselected_bonds",
+    ):
+        np.testing.assert_array_equal(atom_chemistry[key], expected[2][key])
+
+
+def test_read_atoms_loads_properties_and_chemistry(sample_pdb_path):
+    outputs = read_atoms_from_pdb(
+        sample_pdb_path, loads_properties=True, loads_chemistry=True
+    )
+    assert len(outputs) == 4
+    assert "occupancies" in outputs[2] and "bonds" in outputs[3]
+
+
+def test_mmdf_to_atoms_loads_properties_and_chemistry(sample_pdb_path):
+    outputs = mmdf_to_atoms(
+        mmdf.read(sample_pdb_path), loads_properties=True, loads_chemistry=True
+    )
+    assert len(outputs) == 4
+    assert "occupancies" in outputs[2] and "bonds" in outputs[3]
+
+
 def test_read_pdb_multiple_structures_stack(pdb_multiple_structures_path):
     atom_positions, atomic_numbers, atom_properties = read_atoms_from_pdb(
         pdb_multiple_structures_path,
@@ -117,6 +161,11 @@ def test_read_pdb_at_structure(pdb_multiple_structures_path):
     assert atom_positions.shape[0] == atomic_numbers.shape[0]
     assert atom_positions.shape[1] == 3
     assert atom_positions.shape[0] == 138
+
+
+def test_missing_model_index_lists_models(pdb_multiple_structures_path):
+    with pytest.raises(ValueError, match=r"are \[1, 2, 3, 4, 5, 6, 7, 8, 9, 10\]"):
+        read_atoms_from_pdb(pdb_multiple_structures_path, model_index=11)
 
 
 def test_read_cif(sample_cif_path):

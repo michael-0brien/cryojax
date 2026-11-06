@@ -2,9 +2,13 @@
 Routines for loading atomic structures.
 """
 
+from typing import Any, Literal
+
 import equinox as eqx
 import numpy as np
 from jaxtyping import Float, Int
+
+from ._empirical_tables import _CATALASE_TABLE
 
 
 class PengScatteringFactorParameters(eqx.Module, strict=True):
@@ -25,6 +29,140 @@ class PengScatteringFactorParameters(eqx.Module, strict=True):
         parameters = _PENG_PARAMETER_TABLE[atomic_numbers]
         self.a = parameters[:, 0, :]
         self.b = parameters[:, 1, :]
+
+
+class EmpiricalScatteringFactorParameters(eqx.Module, strict=True):
+    """Loads electron scattering factor parameters fit to cryo-EM maps, per atom
+    type (an element in its bonded environment), from "Measurement of atomic
+    scattering factors by cryoelectron microscopy" by Shtyrov et al. (2026).
+
+    The table is the authors' catalase table: 42 types fit to 0.005-0.625 inverse
+    angstroms (200-1.60 angstroms), and extrapolated outside that range. A type
+    counts every atom bonded in the model, hydrogens included, so the model
+    should have explicit hydrogens. Atoms outside the 20 standard amino acids, and
+    types the table lacks, take the factors of `PengScatteringFactorParameters`,
+    as in Shtyrov et al.; if every atom would, this raises. Each atom's terms are
+    sorted by `b`.
+
+    **References:**
+
+    - Shtyrov et al., PNAS (2026), doi:10.1073/pnas.2528758123.
+    - Shtyrov & Murshudov, Zenodo, doi:10.5281/zenodo.17084047. The catalase
+        table is reproduced unchanged under CC BY-SA 4.0.
+    """
+
+    a: Float[np.ndarray, " n_atoms 5"]
+    b: Float[np.ndarray, " n_atoms 5"]
+
+    def __init__(
+        self,
+        atomic_numbers: Int[np.ndarray, " n_atoms"],
+        atom_chemistry: dict[str, Any],
+        table: Literal["catalase"] = "catalase",
+        b_minimum: float = 0.2,
+    ):
+        """**Arguments:**
+
+        - `atomic_numbers`:
+            An array of atomic numbers.
+        - `atom_chemistry`:
+            The atoms' chemistry, from [`cryojax.io.read_atoms_from_pdb`][] with
+            `loads_chemistry = True`.
+        - `table`:
+            `"catalase"`, the only table.
+        - `b_minimum`:
+            Each `b` is raised to at least this, in angstroms squared, since some
+            tabulated `b` are zero.
+        """
+        if table != "catalase":
+            raise ValueError(
+                "`EmpiricalScatteringFactorParameters` takes `table` equal to "
+                f"'catalase', but got `table = {table!r}`."
+            )
+        atomic_numbers = np.asarray(atomic_numbers, dtype=int)
+        if len(atomic_numbers) != len(atom_chemistry["residue_names"]):
+            raise ValueError(
+                f"`atomic_numbers` has {len(atomic_numbers)} atoms, but "
+                f"`atom_chemistry` has {len(atom_chemistry['residue_names'])}."
+            )
+        atom_types = _atom_types(atomic_numbers, atom_chemistry)
+        tabulated = _CATALASE_TABLE
+        is_tabulated = np.isin(atom_types, list(tabulated)) & np.isin(
+            atom_chemistry["residue_names"], list(_AMINO_ACIDS)
+        )
+        if not is_tabulated.any():
+            raise ValueError(
+                f"No atom has a type in the {table!r} table, so every atom would take "
+                "the factors of `PengScatteringFactorParameters`."
+            )
+        parameters = np.empty((len(atomic_numbers), 2, 5))
+        parameters[is_tabulated] = [tabulated[t] for t in atom_types[is_tabulated]]
+        if not is_tabulated.all():
+            check_atomic_numbers_supported(atomic_numbers[~is_tabulated])
+            parameters[~is_tabulated] = _PENG_PARAMETER_TABLE[
+                atomic_numbers[~is_tabulated]
+            ]
+        order = np.argsort(parameters[:, 1], axis=1, kind="stable")
+        self.a = np.take_along_axis(parameters[:, 0], order, axis=1)
+        self.b = np.maximum(
+            np.take_along_axis(parameters[:, 1], order, axis=1), b_minimum
+        )
+
+
+def _atom_types(atomic_numbers, atom_chemistry):
+    neighbours = [[] for _ in range(len(atomic_numbers))]
+    for i, j in atom_chemistry["bonds"].tolist():
+        neighbours[i].append(int(atomic_numbers[j]))
+        neighbours[j].append(int(atomic_numbers[i]))
+    for key in ("missing_bonds", "unselected_bonds"):
+        for i, atomic_number in atom_chemistry[key].tolist():
+            neighbours[i].append(atomic_number)
+    atom_types = []
+    for i, bonded in enumerate(neighbours):
+        if not bonded:
+            atom_types.append("")
+            continue
+        name = (atom_chemistry["residue_names"][i], atom_chemistry["atom_names"][i])
+        symbols = "".join(_SYMBOLS[z] for z in sorted(bonded))
+        atom_types.append(
+            f"{_SYMBOLS[int(atomic_numbers[i])]}({symbols}{_FLAGS.get(name, '')})"
+        )
+    return np.asarray(atom_types, dtype=str)
+
+
+_AMINO_ACIDS = frozenset(
+    (
+        "ALA",
+        "ARG",
+        "ASN",
+        "ASP",
+        "CYS",
+        "GLN",
+        "GLU",
+        "GLY",
+        "HIS",
+        "ILE",
+        "LEU",
+        "LYS",
+        "MET",
+        "PHE",
+        "PRO",
+        "SER",
+        "THR",
+        "TRP",
+        "TYR",
+        "VAL",
+    )
+)
+_SYMBOLS = {1: "H", 6: "C", 7: "N", 8: "O", 16: "S"}
+_FLAGS = {
+    ("ASP", "OD1"): ", carboxyl",
+    ("ASP", "OD2"): ", carboxyl",
+    ("GLU", "OE1"): ", carboxyl",
+    ("GLU", "OE2"): ", carboxyl",
+    ("ASN", "OD1"): ", amide",
+    ("GLN", "OE1"): ", amide",
+}
 
 
 def check_atomic_numbers_supported(atomic_numbers: Int[np.ndarray, " _"]):
