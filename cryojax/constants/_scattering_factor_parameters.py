@@ -8,7 +8,7 @@ import equinox as eqx
 import numpy as np
 from jaxtyping import Float, Int
 
-from ._empirical_tables import _CATALASE_TABLE, _EMDB_TABLE
+from ._empirical_tables import _CATALASE_TABLE
 
 
 class PengScatteringFactorParameters(eqx.Module, strict=True):
@@ -36,20 +36,19 @@ class EmpiricalScatteringFactorParameters(eqx.Module, strict=True):
     type (an element in its bonded environment), from "Measurement of atomic
     scattering factors by cryoelectron microscopy" by Shtyrov et al. (2026).
 
-    There are two tables: `"catalase"`, 42 types fit to 0.005-0.625 inverse
-    angstroms (200-1.60 angstroms), and `"emdb"`, 96 types fit to 0.008-0.544
-    inverse angstroms (130-1.84 angstroms); outside its range a table is
-    extrapolated. A type counts every atom bonded in the model, hydrogens
-    included, so the model should have explicit hydrogens. Atoms outside the 20
-    standard amino acids, and types a table lacks, take the factors of
-    `PengScatteringFactorParameters`, as in Shtyrov et al.; if every atom would, this
-    raises. Each atom's terms are sorted by `b`.
+    The table is the authors' catalase table: 42 types fit to 0.005-0.625 inverse
+    angstroms (200-1.60 angstroms), and extrapolated outside that range. A type
+    counts every atom bonded in the model, hydrogens included, so the model
+    should have explicit hydrogens. Atoms outside the 20 standard amino acids, and
+    types the table lacks, take the factors of `PengScatteringFactorParameters`,
+    as in Shtyrov et al.; if every atom would, this raises. Each atom's terms are
+    sorted by `b`.
 
     **References:**
 
     - Shtyrov et al., PNAS (2026), doi:10.1073/pnas.2528758123.
-    - Shtyrov & Murshudov, Zenodo, doi:10.5281/zenodo.17084047. The tables are
-        reproduced unchanged under CC BY-SA 4.0.
+    - Shtyrov & Murshudov, Zenodo, doi:10.5281/zenodo.17084047. The catalase
+        table is reproduced unchanged under CC BY-SA 4.0.
     """
 
     a: Float[np.ndarray, " n_atoms 5"]
@@ -59,7 +58,7 @@ class EmpiricalScatteringFactorParameters(eqx.Module, strict=True):
         self,
         atomic_numbers: Int[np.ndarray, " n_atoms"],
         atom_chemistry: dict[str, Any],
-        table: Literal["catalase", "emdb"] = "catalase",
+        table: Literal["catalase"] = "catalase",
         b_minimum: float = 0.2,
     ):
         """**Arguments:**
@@ -70,15 +69,15 @@ class EmpiricalScatteringFactorParameters(eqx.Module, strict=True):
             The atoms' chemistry, from [`cryojax.io.read_atoms_from_pdb`][] with
             `loads_chemistry = True`.
         - `table`:
-            `"catalase"` or `"emdb"`.
+            `"catalase"`, the only table.
         - `b_minimum`:
             Each `b` is raised to at least this, in angstroms squared, since some
             tabulated `b` are zero.
         """
-        if table not in _EMPIRICAL_TABLES:
+        if table != "catalase":
             raise ValueError(
                 "`EmpiricalScatteringFactorParameters` takes `table` equal to "
-                f"'catalase' or 'emdb', but got `table = {table!r}`."
+                f"'catalase', but got `table = {table!r}`."
             )
         atomic_numbers = np.asarray(atomic_numbers, dtype=int)
         if len(atomic_numbers) != len(atom_chemistry["residue_names"]):
@@ -87,7 +86,7 @@ class EmpiricalScatteringFactorParameters(eqx.Module, strict=True):
                 f"`atom_chemistry` has {len(atom_chemistry['residue_names'])}."
             )
         atom_types = _atom_types(atomic_numbers, atom_chemistry)
-        tabulated = _EMPIRICAL_TABLES[table]
+        tabulated = _CATALASE_TABLE
         is_tabulated = np.isin(atom_types, list(tabulated)) & np.isin(
             atom_chemistry["residue_names"], list(_AMINO_ACIDS)
         )
@@ -131,7 +130,6 @@ def _atom_types(atomic_numbers, atom_chemistry):
     return np.asarray(atom_types, dtype=str)
 
 
-_EMPIRICAL_TABLES = {"catalase": _CATALASE_TABLE, "emdb": _EMDB_TABLE}
 _AMINO_ACIDS = frozenset(
     (
         "ALA",

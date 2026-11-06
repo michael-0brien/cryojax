@@ -10,31 +10,21 @@ from cryojax.constants import (
     EmpiricalScatteringFactorParameters,
     PengScatteringFactorParameters,
 )
-from cryojax.constants._empirical_tables import (
-    _CATALASE_TABLE,
-    _EMDB_TABLE,
-)
+from cryojax.constants._empirical_tables import _CATALASE_TABLE
 from cryojax.constants._scattering_factor_parameters import _atom_types
 from cryojax.io import mmdf_to_atoms, mmdf_to_topology
 from cryojax.io._chemistry import _AMINO_ACID_BONDS
 
 
-def test_table_sizes():
+def test_table_size():
     assert len(_CATALASE_TABLE) == 42
-    assert len(_EMDB_TABLE) == 96
-    assert set(_CATALASE_TABLE) <= set(_EMDB_TABLE)
-    for table in (_CATALASE_TABLE, _EMDB_TABLE):
-        assert all(len(a) == len(b) == 5 for a, b in table.values())
+    assert all(len(a) == len(b) == 5 for a, b in _CATALASE_TABLE.values())
 
 
 def test_table_values():
     assert _CATALASE_TABLE["H(C)"] == (
         (-0.2309, 0.503, 0.5916, -0.9023, -0.4652),
         (0.6683, 16.7729, 9.7436, 49.7746, 87.8615),
-    )
-    assert _EMDB_TABLE["H(C)"] == (
-        (-0.1529, 4.135, -4.9181, 1.4351, -1.5408),
-        (0.076, 24.7071, 34.3897, 49.3086, 87.991),
     )
 
 
@@ -113,8 +103,7 @@ def test_rows_align(frame):
 
 
 def test_terms_sorted_by_width(frame):
-    for table in ("catalase", "emdb"):
-        assert np.all(np.diff(parameters(frame, table).b, axis=1) >= 0)
+    assert np.all(np.diff(parameters(frame).b, axis=1) >= 0)
 
 
 def test_hydrogens_in_the_model_are_drawn(frame):
@@ -248,12 +237,6 @@ def test_fallback_to_peng_for_missing_type():
     peng = PengScatteringFactorParameters(np.array([7]))
     np.testing.assert_array_equal(catalase.a[0], peng.a[0])
     np.testing.assert_array_equal(catalase.b[0], peng.b[0])
-    emdb = EmpiricalScatteringFactorParameters(
-        atomic_numbers, atom_chemistry, "emdb", b_minimum=0.0
-    )
-    a, b = (np.asarray(x) for x in _EMDB_TABLE["N(HHCC)"])
-    np.testing.assert_array_equal(emdb.a[0], a[np.argsort(b, kind="stable")])
-    np.testing.assert_array_equal(emdb.b[0], np.sort(b))
 
 
 def test_no_chemistry_rows_use_peng(frame):
@@ -279,11 +262,10 @@ def test_no_chemistry_rows_use_peng(frame):
     np.testing.assert_array_equal(actual.b[138:], peng.b)
 
 
-def test_table_keyword(frame):
-    ca = row(frame, 2, "CA")
-    assert not np.array_equal(parameters(frame).a[ca], parameters(frame, "emdb").a[ca])
-    with pytest.raises(ValueError):
-        parameters(frame, "peng")
+@pytest.mark.parametrize("table", ["emdb", "peng"])
+def test_table_keyword_takes_only_catalase(frame, table):
+    with pytest.raises(ValueError, match="takes `table` equal to 'catalase'"):
+        parameters(frame, table)
 
 
 def test_b_minimum(frame):
