@@ -14,15 +14,23 @@ def make_frequencies_1d(
     shape_u: tuple[int, ...],
     pixel_size_u: Float[Array, ""],
     modeord: int = 0,
+    outputs_rfft: bool = False,
 ):
+    """One-dimensional frequencies in `(x, y[, z])` order. If `outputs_rfft`, the x
+    entry holds only the non-negative frequencies (requires `modeord=1`)."""
+    if outputs_rfft and modeord != 1:
+        raise ValueError(
+            "`make_frequencies_1d` with `outputs_rfft` requires `modeord=1`. "
+            f"Got `modeord = {modeord}`."
+        )
     return tuple(
         make_1d_frequency_grid(
             s,
             pixel_size_u,
-            outputs_rfftfreqs=False,
+            outputs_rfftfreqs=outputs_rfft and i == 0,
             fftshifted=(True if modeord == 0 else False),
         )
-        for s in shape_u[::-1]
+        for i, s in enumerate(shape_u[::-1])
     )
 
 
@@ -57,9 +65,19 @@ def center_shift(
 
 
 def build_extraction_mesh(
-    shape: tuple[int, ...], shape_ds: tuple[int, ...], *, modeord: int
+    shape: tuple[int, ...],
+    shape_ds: tuple[int, ...],
+    *,
+    modeord: int,
+    outputs_rfft: bool = False,
 ):
-    """Build indices to extract modes from FFT output."""
+    """Build indices to extract modes from FFT output. If `outputs_rfft`, the input is
+    an `rfftn` and the last axis keeps `0 ... shape_ds[-1] // 2` (needs `modeord=1`)."""
+    if outputs_rfft and modeord != 1:
+        raise ValueError(
+            "`build_extraction_mesh` with `outputs_rfft` requires `modeord=1`. "
+            f"Got `modeord = {modeord}`."
+        )
     assert len(shape) == len(shape_ds)
     assert len(shape) in [2, 3]
     mean_factor = math.prod(shape_ds) / math.prod(shape)
@@ -67,6 +85,8 @@ def build_extraction_mesh(
         build_extraction_indices_1d(dim, dim_ds, modeord=modeord)
         for dim, dim_ds in zip(shape, shape_ds)
     )
+    if outputs_rfft:
+        indices_1d = indices_1d[:-1] + (jnp.arange(shape_ds[-1] // 2 + 1),)
     return jnp.meshgrid(*indices_1d, indexing="ij"), mean_factor
 
 
