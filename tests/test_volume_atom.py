@@ -1249,3 +1249,234 @@ def test_make_frequencies_1d_rfft():
     np.testing.assert_allclose(rfft[1], full[1])
     with pytest.raises(ValueError, match="modeord"):
         make_frequencies_1d(shape_u, p, modeord=0, outputs_rfft=True)
+
+
+# ── GaussianMixtureProjection: deblurring and upsampling ─────────────────────
+
+
+def _max_shell_relative_error(a, b, image_config):
+    """The largest relative L2 error of rfft spectrum `a` against `b` over radial
+    shells, with the corners beyond Nyquist as one shell. An even x Nyquist column is
+    left out: it holds +n/2 in `GaussianMixtureProjection`, -n/2 in the reference."""
+    n_y, n_x = image_config.padded_shape
+    pixel_size = float(image_config.pixel_size)
+    frequencies_y = np.fft.fftfreq(n_y, pixel_size)[:, None]
+    frequencies_x = np.fft.rfftfreq(n_x, pixel_size)
+    radius = 2 * pixel_size * np.hypot(frequencies_y, frequencies_x)
+    n_shells = min(n_y, n_x) // 2
+    shells = np.minimum(np.floor(radius * n_shells), n_shells)
+    a, b = np.asarray(a), np.asarray(b)
+    if n_x % 2 == 0:
+        a, b, shells = a[:, :-1], b[:, :-1], shells[:, :-1]
+    return max(
+        np.linalg.norm((a - b)[shells == s]) / np.linalg.norm(b[shells == s])
+        for s in np.unique(shells)
+    )
+
+
+def _blur_variance(p, r):
+    """The blur that keeps folded-in content below 1e-2 at pixel size `p` and
+    upsampling factor `r`."""
+    return p**2 * np.log(200) / (2 * np.pi**2 * r * (r - 1))
+
+
+def _make_deblur_volumes(positions, variance):
+    gaussian_volume = cxs.GaussianMixtureVolume(
+        positions, amplitudes=1.0, variances=variance
+    )
+    atom_volume = cxs.GaussianFourierVolume(
+        positions=positions,
+        kernel_fns=im.FourierGaussian(b_factor=8 * np.pi**2 * variance),
+    )
+    return gaussian_volume, atom_volume
+
+
+class TestGMMDeblurAndUpsampling:
+    exact_integrator = cxs.GaussianFourierProjection(sampling_mode="point", eps=1e-10)
+
+    @pytest.mark.parametrize("n_spread", (None, 11))
+    def test_average_ignores_point_only_args(self, pdb_info, n_spread):
+        volume, _ = _make_deblur_volumes(pdb_info[0], 0.5)
+        image_config = cxs.BasicImageConfig((32, 32), 1.0, voltage_in_kilovolts=300.0)
+        default = cxs.GaussianMixtureProjection(n_spread=n_spread)
+        ignored = cxs.GaussianMixtureProjection(
+            n_spread=n_spread, upsample_factor=2, blur_variance=0.5
+        )
+        np.testing.assert_array_equal(
+            ignored.integrate(volume, image_config),
+            default.integrate(volume, image_config),
+        )
+
+    @pytest.mark.parametrize("shape", ((32, 32), (31, 31)))
+    def test_average_deblur_matches_exact(self, pdb_info, shape):
+        gaussian_volume, atom_volume = _make_deblur_volumes(
+            pdb_info[0], 100.0 / (8 * np.pi**2)
+        )
+        image_config = cxs.BasicImageConfig(
+            shape,
+            0.5,
+            voltage_in_kilovolts=300.0,
+            padded_shape=(2 * shape[0] + shape[0] % 2, 2 * shape[1] + shape[1] % 2),
+        )
+        integrator = cxs.GaussianMixtureProjection(deblur=True)
+        projection = integrator.integrate(
+            gaussian_volume, image_config, outputs_real_space=True
+        )
+        exact = self.exact_integrator.integrate(
+            atom_volume, image_config, outputs_real_space=True
+        )
+        np.testing.assert_allclose(projection, exact, atol=1e-6 * np.abs(exact).max())
+
+    @pytest.mark.parametrize("variance", (0.05, 0.5))
+    @pytest.mark.parametrize("shape", ((32, 32), (31, 31), (31, 32), (32, 30)))
+    @pytest.mark.parametrize("upsample_factor", (2, 3))
+    def test_point_deblur_upsampled_matches_exact(
+        self, pdb_info, upsample_factor, shape, variance
+    ):
+        gaussian_volume, atom_volume = _make_deblur_volumes(pdb_info[0], variance)
+        image_config = cxs.BasicImageConfig(shape, 1.0, voltage_in_kilovolts=300.0)
+        integrator = cxs.GaussianMixtureProjection(
+            sampling_mode="point",
+            deblur=True,
+            upsample_factor=upsample_factor,
+            blur_variance=_blur_variance(1.0, upsample_factor),
+        )
+        projection = integrator.integrate(gaussian_volume, image_config)
+        exact = self.exact_integrator.integrate(atom_volume, image_config)
+        assert _max_shell_relative_error(projection, exact, image_config) <= 1e-2
+
+    def test_point_deblur_requires_upsampling(self):
+        with pytest.raises(ValueError, match="upsample_factor"):
+            cxs.GaussianMixtureProjection(
+                sampling_mode="point", deblur=True, upsample_factor=1
+            )
+
+    @pytest.mark.parametrize(
+        "kwargs, keyword",
+        (
+            ({"upsample_factor": 0}, "upsample_factor"),
+            ({"upsample_factor": 1.5}, "upsample_factor"),
+            ({"blur_variance": -1.0}, "blur_variance"),
+        ),
+    )
+    def test_invalid_values(self, kwargs, keyword):
+        with pytest.raises(ValueError, match=keyword):
+            cxs.GaussianMixtureProjection(sampling_mode="point", **kwargs)
+
+    def test_upsampled_real_space_matches_fourier(self, pdb_info):
+        volume, _ = _make_deblur_volumes(pdb_info[0], 0.05)
+        image_config = cxs.BasicImageConfig((31, 32), 1.0, voltage_in_kilovolts=300.0)
+        integrator = cxs.GaussianMixtureProjection(
+            sampling_mode="point",
+            deblur=True,
+            upsample_factor=2,
+            blur_variance=_blur_variance(1.0, 2),
+        )
+        real = integrator.integrate(volume, image_config, outputs_real_space=True)
+        fourier = integrator.integrate(volume, image_config)
+        np.testing.assert_allclose(
+            real,
+            jnp.fft.irfftn(fourier, s=image_config.padded_shape),
+            atol=1e-12 * np.abs(real).max(),
+        )
+
+    def test_upsampled_with_shape_field(self, pdb_info):
+        # Even, so the 2n grid's Nyquist corner, one-sided differently in the
+        # reference, falls in the column `_max_shell_relative_error` leaves out
+        n = 32
+        gaussian_volume, atom_volume = _make_deblur_volumes(pdb_info[0], 0.05)
+        image_config = cxs.BasicImageConfig((n, n), 1.0, voltage_in_kilovolts=300.0)
+        integrator = cxs.GaussianMixtureProjection(
+            shape=(2 * n, 2 * n),
+            sampling_mode="point",
+            deblur=True,
+            upsample_factor=2,
+            blur_variance=_blur_variance(1.0, 2),
+        )
+        exact_integrator = cxs.GaussianFourierProjection(
+            sampling_mode="point", eps=1e-10, shape=(2 * n, 2 * n)
+        )
+        projection = integrator.integrate(gaussian_volume, image_config)
+        exact = exact_integrator.integrate(atom_volume, image_config)
+        assert projection.shape == (n, n // 2 + 1)
+        assert _max_shell_relative_error(projection, exact, image_config) <= 1e-2
+
+    @pytest.mark.parametrize("n_spread", (None, 11))
+    def test_upsampled_n_batches_agree(self, pdb_info, n_spread):
+        volume, _ = _make_deblur_volumes(pdb_info[0], 0.05)
+        image_config = cxs.BasicImageConfig((31, 32), 1.0, voltage_in_kilovolts=300.0)
+        kwargs = dict(
+            sampling_mode="point",
+            deblur=True,
+            upsample_factor=2,
+            blur_variance=_blur_variance(1.0, 2),
+            n_spread=n_spread,
+        )
+        reference = cxs.GaussianMixtureProjection(**kwargs).integrate(
+            volume, image_config
+        )
+        batched = cxs.GaussianMixtureProjection(n_batches=2, **kwargs).integrate(
+            volume, image_config
+        )
+        np.testing.assert_allclose(
+            batched, reference, atol=1e-12 * np.abs(reference).max()
+        )
+
+    def test_point_deblur_gradients(self, pdb_info):
+        shape, variance, pixel_size = (31, 32), 0.05, 1.0
+        integrator = cxs.GaussianMixtureProjection(
+            sampling_mode="point",
+            deblur=True,
+            upsample_factor=2,
+            blur_variance=_blur_variance(pixel_size, 2),
+        )
+
+        # Random complex weights over the inner half of the band, so that the loss
+        # sees phases (center shifts) where the spectrum is accurate to well below 1e-2
+        n_y, n_x = shape
+        key_re, key_im = jax.random.split(jax.random.key(0))
+        weights = jax.random.normal(key_re, (n_y, n_x // 2 + 1)) + 1j * (
+            jax.random.normal(key_im, (n_y, n_x // 2 + 1))
+        )
+        radius = (
+            2
+            * pixel_size
+            * jnp.hypot(
+                jnp.fft.fftfreq(n_y, pixel_size)[:, None],
+                jnp.fft.rfftfreq(n_x, pixel_size),
+            )
+        )
+        weights = weights * (radius < 0.5)
+
+        def make_grad_fn(volume_index, integrator):
+            def loss(positions, variance, pixel_size):
+                volume = _make_deblur_volumes(positions, variance)[volume_index]
+                image_config = cxs.BasicImageConfig(
+                    shape, pixel_size, voltage_in_kilovolts=300.0
+                )
+                spectrum = integrator.integrate(volume, image_config)
+                return jnp.sum(jnp.real(spectrum * weights))
+
+            return jax.grad(loss, argnums=(0, 1, 2))
+
+        args = (jnp.asarray(pdb_info[0]), jnp.asarray(variance), jnp.asarray(pixel_size))
+        grads = make_grad_fn(0, integrator)(*args)
+        exact_grads = make_grad_fn(1, self.exact_integrator)(*args)
+        for grad, exact_grad in zip(grads, exact_grads):
+            error = np.linalg.norm(grad - exact_grad) / np.linalg.norm(exact_grad)
+            assert error <= 1e-2
+
+    def test_point_deblur_float32(self, pdb_info):
+        gaussian_volume, atom_volume = _make_deblur_volumes(pdb_info[0], 0.05)
+        image_config = cxs.BasicImageConfig((31, 32), 1.0, voltage_in_kilovolts=300.0)
+        integrator = cxs.GaussianMixtureProjection(
+            sampling_mode="point",
+            deblur=True,
+            upsample_factor=2,
+            blur_variance=_blur_variance(1.0, 2),
+        )
+        exact = self.exact_integrator.integrate(atom_volume, image_config)
+        with jax.enable_x64(False):
+            projection = integrator.integrate(gaussian_volume, image_config)
+        assert projection.dtype == jnp.complex64
+        assert _max_shell_relative_error(projection, exact, image_config) <= 1e-2
