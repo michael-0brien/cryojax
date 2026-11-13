@@ -32,7 +32,13 @@ from .base_volume import (
     ProjectionArray,
     VoxelArray,
 )
-from .internal import check_anisotropy_supported, make_frequencies_1d
+from .internal import (
+    build_extraction_mesh,
+    center_shift,
+    check_anisotropy_supported,
+    eval_separable_impl,
+    make_frequencies_1d,
+)
 
 
 T = TypeVar("T")
@@ -325,10 +331,10 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
         if self.sampling_mode == "average":
             box_fn = FourierSinc(box_width=voxel_size)
             frequencies_1d = make_frequencies_1d(shape_u, voxel_size_u, modeord=1)
-            rendering_fft *= _eval_separable_impl(box_fn, frequencies_1d)
+            rendering_fft *= eval_separable_impl(box_fn, frequencies_1d)
         # Downsample by extracting fourier modes
         if self.shape != shape_u:
-            (indices_z, indices_y, indices_x), fac = _build_extraction_mesh(
+            (indices_z, indices_y, indices_x), fac = build_extraction_mesh(
                 shape_u, self.shape, modeord=1
             )
             rendering_fft = fac * rendering_fft[indices_z, indices_y, indices_x]
@@ -468,12 +474,10 @@ class GaussianFourierProjection(
         if self.sampling_mode == "average":
             box_fn = FourierSinc(box_width=pixel_size)
             frequencies_1d = make_frequencies_1d(shape_u, pixel_size_u, modeord=1)
-            projection_fft *= _eval_separable_impl(box_fn, frequencies_1d)
+            projection_fft *= eval_separable_impl(box_fn, frequencies_1d)
         # Downsample by extracting fourier modes
         if shape != shape_u:
-            (indices_y, indices_x), fac = _build_extraction_mesh(
-                shape_u, shape, modeord=1
-            )
+            (indices_y, indices_x), fac = build_extraction_mesh(shape_u, shape, modeord=1)
             projection_fft = fac * projection_fft[indices_y, indices_x]
         projection_fft = convert_fftn_to_rfftn(projection_fft, mode="real")
         if output_shape == shape:
@@ -530,7 +534,7 @@ def _project_impl(
     is_leaf = lambda x: isinstance(x, AbstractFourierOperator)  # noqa: E731
     frequencies_1d = make_frequencies_1d(shape_u, pixel_size_u, modeord=0)
 
-    center_shift = _center_shift(shape_u, shape_out, pixel_size_u)
+    shift = center_shift(shape_u, shape_out, pixel_size_u)
 
     def fourier_impl(
         _positions: Float[Array, "_ 3"],
@@ -539,7 +543,7 @@ def _project_impl(
         return (
             _eval_kernel_impl(_kernel_fn, frequencies_1d)
             * dispatch_nufft1(
-                _positions[:, :2] + center_shift,
+                _positions[:, :2] + shift,
                 jnp.ones(_positions.shape[0], dtype=complex),
                 shape_u,
                 pixel_size=pixel_size_u,
@@ -571,7 +575,7 @@ def _render_impl(
     is_leaf = lambda x: isinstance(x, AbstractFourierOperator)  # noqa: E731
     frequencies_1d = make_frequencies_1d(shape_u, voxel_size_u, modeord=0)
 
-    center_shift = _center_shift(shape_u, shape_out, voxel_size_u)
+    shift = center_shift(shape_u, shape_out, voxel_size_u)
 
     def fourier_impl(
         _positions: Float[Array, "_ 3"],
@@ -579,7 +583,7 @@ def _render_impl(
     ) -> Array:
         return _eval_kernel_impl(_kernel_fn, frequencies_1d) * (
             dispatch_nufft1(
-                _positions + center_shift,
+                _positions + shift,
                 jnp.ones(_positions.shape[0], dtype=complex),
                 shape_u,
                 pixel_size=voxel_size_u,
@@ -600,68 +604,8 @@ def _render_impl(
 def _eval_kernel_impl(kernel_fn: FourierGaussian, frequencies_1d: tuple[Array, ...]):
     a, b = kernel_fn.amplitude, kernel_fn.b_factor
     make_gaussians = jax.vmap(lambda _a, _b: FourierGaussian(amplitude=_a, b_factor=_b))
-    eval_gaussians = jax.vmap(_eval_separable_impl, in_axes=(0, None))
+    eval_gaussians = jax.vmap(eval_separable_impl, in_axes=(0, None))
     return jnp.sum(eval_gaussians(make_gaussians(a, b), frequencies_1d), axis=0)
-
-
-def _eval_separable_impl(
-    kernel_fn: FourierGaussian | FourierSinc, frequencies_1d: tuple[Array, ...]
-):
-    ndim = len(frequencies_1d)
-    assert 1 in kernel_fn.spatial_dims and ndim in [2, 3]
-    if len(frequencies_1d) == 2:
-        q_x, q_y = frequencies_1d
-        return kernel_fn(q_x)[None, :] * kernel_fn(q_y)[:, None]
-    else:
-        q_x, q_y, q_z = frequencies_1d
-        return (
-            kernel_fn(q_x)[None, None, :]
-            * kernel_fn(q_y)[None, :, None]
-            * kernel_fn(q_z)[:, None, None]
-        )
-
-
-def _center_shift(
-    shape_u: tuple[int, ...], shape_out: tuple[int, ...], pixel_size_u: Float[Array, ""]
-) -> Float[Array, " d"]:
-    """The shift, in `(x, y[, z])` order, that places the physical origin at the output
-    grid's center `N//2` on the upsampled grid, whose own center is `N_u//2`."""
-    return jnp.asarray(
-        [
-            pixel_size_u * (n_u * (n // 2) / n - n_u // 2)
-            for n_u, n in zip(shape_u[::-1], shape_out[::-1])
-        ]
-    )
-
-
-def _build_extraction_mesh(
-    shape: tuple[int, ...], shape_ds: tuple[int, ...], *, modeord: int
-):
-    """Build indices to extract modes from FFT output."""
-    assert len(shape) == len(shape_ds)
-    assert len(shape) in [2, 3]
-    mean_factor = math.prod(shape_ds) / math.prod(shape)
-    indices_1d = tuple(
-        _build_extraction_indices_1d(dim, dim_ds, modeord=modeord)
-        for dim, dim_ds in zip(shape, shape_ds)
-    )
-    return jnp.meshgrid(*indices_1d, indexing="ij"), mean_factor
-
-
-def _build_extraction_indices_1d(dim: int, dim_ds: int, *, modeord: int):
-    """Build indices to extract modes from FFT output. Adapted from `nufftax`"""
-    q_min = -(dim_ds // 2)
-    q_max = (dim_ds - 1) // 2
-
-    idx_pos = jnp.arange(q_max + 1)
-    idx_neg = jnp.arange(dim + q_min, dim)
-
-    if modeord == 0:
-        indices = jnp.concatenate([idx_neg, idx_pos])
-    else:
-        indices = jnp.concatenate([idx_pos, idx_neg])
-
-    return indices
 
 
 def _prepare_upsample(
