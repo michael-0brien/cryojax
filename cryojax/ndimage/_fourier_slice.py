@@ -364,7 +364,7 @@ def _ewald_sphere_from_slice(
     q_squared = jnp.sum(q_at_slice**2, axis=-1)
     q_at_surface = (
         q_at_slice
-        + (wavelength / voxel_size)
+        - (wavelength / voxel_size)
         * (q_squared[..., None] * zhat[None, None, None, :])
         / 2
     )

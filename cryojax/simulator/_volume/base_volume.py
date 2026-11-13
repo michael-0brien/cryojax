@@ -198,6 +198,9 @@ class AbstractVoxelVolume(AbstractVolumeRepresentation, strict=True):
 class AbstractVolumeIntegrator(eqx.Module, Generic[VolRep], strict=True):
     """Base class for a method of integrating a volume onto
     the exit plane.
+
+    Integrators with `outputs_ewald_sphere = True` return the field at the volume
+    origin for a beam along +z.
     """
 
     outputs_ewald_sphere: eqx.AbstractClassVar[bool]

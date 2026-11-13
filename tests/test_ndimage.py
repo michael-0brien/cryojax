@@ -825,7 +825,7 @@ def test_sample_fft_slice_shape_check():
 
 def test_ewald_sphere_from_slice_curvature():
     # For an unrotated slice, the Ewald surface keeps the in-plane
-    # coordinates and displaces out of plane by `(wavelength / voxel_size) *
+    # coordinates and displaces out of plane by `-(wavelength / voxel_size) *
     # |q|**2 / 2` along the slice normal. The `wavelength=0` call gives the
     # flat, fully-reconstructed slice used as the in-plane reference.
     N, voxel_size, wavelength = 16, 1.3, 0.02
@@ -840,7 +840,7 @@ def test_ewald_sphere_from_slice_curvature():
     np.testing.assert_allclose(surface[..., 0:2], flat[..., 0:2], atol=1e-6)
     # Out-of-plane displacement matches the analytic Ewald curvature.
     q_squared = flat[..., 0] ** 2 + flat[..., 1] ** 2
-    predicted_z = (wavelength / voxel_size) * q_squared / 2
+    predicted_z = -(wavelength / voxel_size) * q_squared / 2
     np.testing.assert_allclose(surface[..., 2], predicted_z, atol=1e-6)
 
 
