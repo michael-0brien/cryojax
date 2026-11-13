@@ -21,6 +21,7 @@ from cryojax.constants import (
     check_atomic_numbers_supported,
 )
 from cryojax.ndimage import _nufft, make_coordinate_grid
+from cryojax.simulator._volume.internal import build_extraction_mesh, make_frequencies_1d
 from jaxtyping import Array
 
 
@@ -1220,3 +1221,31 @@ def test_suggest_n_spread_output_is_plain_python_not_jax():
     termwise_n_spread = cxs.suggest_n_spread(volume, 1.0, mode="termwise")
     assert type(global_n_spread) is int
     assert all(type(n) is int for n in termwise_n_spread)
+
+
+@pytest.mark.parametrize("shape, shape_ds", [((64, 48), (32, 24)), ((63, 45), (31, 23))])
+def test_build_extraction_mesh_rfft_matches_full(shape, shape_ds):
+    x = jax.random.normal(jax.random.key(0), shape)
+    mesh_full, factor = build_extraction_mesh(shape, shape_ds, modeord=1)
+    mesh_rfft, factor_rfft = build_extraction_mesh(
+        shape, shape_ds, modeord=1, outputs_rfft=True
+    )
+    n_cols = shape_ds[-1] // 2 + 1
+    full = (jnp.fft.fftn(x)[tuple(mesh_full)] * factor)[..., :n_cols]
+    rfft = jnp.fft.rfftn(x)[tuple(mesh_rfft)] * factor_rfft
+    assert rfft.shape[-1] == n_cols
+    if shape_ds[-1] % 2 == 0:
+        full, rfft = full[..., :-1], rfft[..., :-1]
+    np.testing.assert_allclose(rfft, full, atol=1e-4)
+    with pytest.raises(ValueError, match="modeord"):
+        build_extraction_mesh(shape, shape_ds, modeord=0, outputs_rfft=True)
+
+
+def test_make_frequencies_1d_rfft():
+    shape_u, p = (12, 10), jnp.asarray(1.3)
+    full = make_frequencies_1d(shape_u, p, modeord=1)
+    rfft = make_frequencies_1d(shape_u, p, modeord=1, outputs_rfft=True)
+    np.testing.assert_allclose(rfft[0], jnp.fft.rfftfreq(shape_u[-1], p))
+    np.testing.assert_allclose(rfft[1], full[1])
+    with pytest.raises(ValueError, match="modeord"):
+        make_frequencies_1d(shape_u, p, modeord=0, outputs_rfft=True)
