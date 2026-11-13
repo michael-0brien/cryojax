@@ -384,16 +384,6 @@ def test_ewald_sphere_without_odd_aberrations_matches_astigmatic_ctf():
     )
 
 
-def test_ewald_sphere_with_odd_aberrations_raises():
-    shape = (16, 16)
-    config = cxs.BasicImageConfig(shape, pixel_size=1.0, voltage_in_kilovolts=300.0)
-    transfer_theory = cxs.ContrastTransferTheory(_aberrated_ctf(coma=_COMA))
-    with pytest.raises(NotImplementedError):
-        transfer_theory.propagate_object(
-            _ewald_spectrum(shape), config, is_ewald_sphere=True
-        )
-
-
 def test_coma_matches_cistem_beam_tilt():
     """cisTEM applies a beam tilt `tau` at azimuth `alpha_tau` to its (real) CTF as
     `exp(+i phi)`, `phi = 2 pi Cs lambda^2 |k|^3 tau cos(alpha - alpha_tau)`

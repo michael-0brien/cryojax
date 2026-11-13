@@ -95,7 +95,8 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
             approximation and is therefore the fourier transform of a real-valued
             array. If `True`, `object_spectrum` is extracted from
             the ewald sphere and is therefore the fourier transform of a complex-valued
-            array.
+            array. `object_spectrum` is used as given (not conjugated); odd aberrations
+            are supported.
         - `offset_z_in_angstroms`:
             An optional offset in Angstroms of the specimen along z, added to the
             defocus at runtime, e.g. the `offset_z_in_angstroms` of an `AbstractPose`.
@@ -105,49 +106,41 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
         )
         phase_shift = jnp.asarray(self.phase_shift)
         frequency_grid = image_config.get_frequency_grid(padding=True, physical=True)
+        # Compute the CTF, including additional phase shifts
+        ctf_array = self.ctf(
+            image_config,
+            padding=True,
+            phase_shift=phase_shift,
+            amplitude_contrast_ratio=amplitude_contrast_ratio,
+            outputs_exp=False,
+            offset_z_in_angstroms=offset_z_in_angstroms,
+        )
         if not is_ewald_sphere:
-            # Compute the CTF, including additional phase shifts
-            ctf_array = self.ctf(
-                image_config,
-                padding=True,
-                phase_shift=phase_shift,
-                amplitude_contrast_ratio=amplitude_contrast_ratio,
-                outputs_exp=False,
-                offset_z_in_angstroms=offset_z_in_angstroms,
-            )
             # ... compute the contrast as the CTF multiplied by the exit plane
             # phase shifts
             contrast_spectrum = ctf_array * object_spectrum
         else:
-            # The kernel below evaluates the phase shifts at `q` for both the `q` and
-            # `-q` terms, which is only correct for even aberrations.
-            if (
-                self.ctf.compute_aberration_phase_shifts(
-                    image_config, padding=True, parity="odd"
-                )
-                is not None
-            ):
-                ctf_name = self.ctf.__class__.__name__
-                raise NotImplementedError(
-                    f"Found that `ContrastTransferTheory(ctf={ctf_name}(...))` has odd "
-                    "aberrations (e.g. `AberratedCTF(coma_xy_in_um=...)` or "
-                    "`AberratedCTF(trefoil_xy_in_um=...)`), but it was used with a "
-                    "volume integrator that outputs the Ewald sphere (e.g. "
-                    "`EwaldSphereExtraction`). Odd aberrations are not yet supported "
-                    "with the Ewald sphere. Either instantiate the CTF without odd "
-                    "aberrations, or use a volume integrator that outputs a "
-                    "projection (e.g. `FourierSliceExtraction`)."
-                )
-            # Propagate to the exit plane when the phase spectrum is
-            # the surface of the ewald sphere
-            aberration_phase_shifts = self.ctf.compute_aberration_phase_shifts(
-                image_config, padding=True, offset_z_in_angstroms=offset_z_in_angstroms
-            ) - jnp.deg2rad(phase_shift)
-            contrast_spectrum = _compute_contrast_from_ewald_sphere(
-                object_spectrum,
-                aberration_phase_shifts,
-                amplitude_contrast_ratio,
+            # ... split the spectrum into those of the real and imaginary parts of
+            # the exit plane phase shifts, on the half plane
+            x_dim = image_config.padded_x_dim
+            spectrum_at_q = object_spectrum[:, : x_dim // 2 + 1]
+            spectrum_at_minus_q = jnp.roll(
+                jnp.flip(object_spectrum, axis=(0, 1)), 1, axis=(0, 1)
+            )[:, : x_dim // 2 + 1]
+            real_spectrum = (spectrum_at_q + jnp.conj(spectrum_at_minus_q)) / 2
+            imaginary_spectrum = (spectrum_at_q - jnp.conj(spectrum_at_minus_q)) / 2j
+            # ... and transfer the imaginary part with the CTF at a phase shift
+            # lowered by 90 degrees
+            imaginary_ctf_array = self.ctf(
                 image_config,
+                padding=True,
+                phase_shift=phase_shift - 90.0,
+                amplitude_contrast_ratio=amplitude_contrast_ratio,
+                outputs_exp=False,
+                offset_z_in_angstroms=offset_z_in_angstroms,
+            )
+            contrast_spectrum = (
+                ctf_array * real_spectrum - imaginary_ctf_array * imaginary_spectrum
             )
         if self.envelope is not None:
             contrast_spectrum *= self.envelope(frequency_grid)
@@ -206,96 +199,3 @@ class WaveTransferTheory(AbstractTransferTheory, strict=True):
         wavefunction_spectrum = ctf_array * wavefunction_spectrum
 
         return wavefunction_spectrum
-
-
-def _compute_contrast_from_ewald_sphere(
-    object_spectrum,
-    aberration_phase_shifts,
-    amplitude_contrast_ratio,
-    image_config,
-):
-    cos, sin = jnp.cos(aberration_phase_shifts), jnp.sin(aberration_phase_shifts)
-    ac = amplitude_contrast_ratio
-    # Compute the contrast, breaking the computation into positive and
-    # negative frequencies
-    y_dim, x_dim = image_config.padded_y_dim, image_config.padded_x_dim
-    # ... first handle the grid of frequencies
-    pos_object_yx = object_spectrum[1:, 1 : x_dim // 2 + x_dim % 2]
-    neg_object_yx = jnp.flip(
-        jnp.flip(object_spectrum[1:, x_dim // 2 + x_dim % 2 :], axis=-1),
-        axis=0,
-    )
-    if x_dim % 2 == 0:
-        pos_object_yx = jnp.concatenate(
-            (pos_object_yx, neg_object_yx[:, -1, None].conj()), axis=-1
-        )
-    contrast_yx = _ewald_propagate_kernel(
-        pos_object_yx,
-        neg_object_yx,
-        ac,
-        sin[1:, 1:],
-        cos[1:, 1:],
-    )
-    # ... next handle the line of frequencies at y = 0
-    pos_object_0x = object_spectrum[0, 1 : x_dim // 2 + x_dim % 2]
-    neg_object_0x = jnp.flip(object_spectrum[0, x_dim // 2 + x_dim % 2 :], axis=-1)
-    if x_dim % 2 == 0:
-        pos_object_0x = jnp.concatenate(
-            (pos_object_0x, neg_object_0x[-1, None].conj()), axis=0
-        )
-    contrast_0x = _ewald_propagate_kernel(
-        pos_object_0x,
-        neg_object_0x,
-        ac,
-        sin[0, 1 : x_dim // 2 + 1],
-        cos[0, 1 : x_dim // 2 + 1],
-    )
-    # ... then handle the line of frequencies at x = 0
-    pos_object_y0 = object_spectrum[1 : y_dim // 2 + y_dim % 2, 0]
-    neg_object_y0 = jnp.flip(object_spectrum[y_dim // 2 + y_dim % 2 :, 0], axis=-1)
-    if y_dim % 2 == 0:
-        pos_object_y0 = jnp.concatenate(
-            (pos_object_y0, neg_object_y0[-1, None].conj()), axis=0
-        )
-    contrast_y0 = _ewald_propagate_kernel(
-        pos_object_y0,
-        neg_object_y0,
-        ac,
-        sin[1 : y_dim // 2 + 1, 0],
-        cos[1 : y_dim // 2 + 1, 0],
-    )
-    # ... concatenate the zero mode to the line of frequencies at x = 0
-    object_00 = object_spectrum[0, 0]
-    contrast_00 = _ewald_propagate_kernel(
-        object_00,
-        object_00,
-        ac,
-        sin[0, 0],
-        cos[0, 0],
-    )
-    contrast_y0 = jnp.concatenate(
-        (
-            contrast_00[None],
-            (contrast_y0 if y_dim % 2 == 1 else contrast_y0[:-1]),
-            jnp.flip(contrast_y0.conjugate()),
-        ),
-        axis=0,
-    )
-    # ... concatenate the results
-    contrast_yx = jnp.concatenate((contrast_0x[None, :], contrast_yx), axis=0)
-    contrast_spectrum = jnp.concatenate((contrast_y0[:, None], contrast_yx), axis=1)
-
-    return contrast_spectrum
-
-
-def _ewald_propagate_kernel(pos, neg, ac, sin, cos):
-    w1, w2 = ac, jnp.sqrt(1 - ac**2)
-    return 0.5 * (
-        (w2 * (pos.real + neg.real) + w1 * (pos.imag + neg.imag)) * sin
-        + (w2 * (pos.imag + neg.imag) - w1 * (pos.real + neg.real)) * cos
-        + 1.0j
-        * (
-            (w2 * (pos.imag - neg.imag) + w1 * (neg.real - pos.real)) * sin
-            + (w2 * (neg.real - pos.real) + w1 * (neg.imag - pos.imag)) * cos
-        )
-    )

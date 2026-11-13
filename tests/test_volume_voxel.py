@@ -432,7 +432,7 @@ def test_ewald_sphere_high_voltage_limit_cubic(fourier_cubic_volume, image_confi
 # A gaussian mixture has a closed-form 3D fourier transform,
 #     hat_V(q) = sum_i a_i * exp(-2 pi^2 sigma_i^2 |q|^2) * exp(-2 pi i q . r_i),
 # evaluated here directly on the curved Ewald sphere surface (paraxial
-# approximation q_z = wavelength / 2 * |q_parallel|^2, valid at identity pose
+# approximation q_z = -wavelength / 2 * |q_parallel|^2, valid at identity pose
 # where the beam axis is exactly z), independent of the voxel grid entirely.
 #
 # A variance of 4 A^2 (sigma=2 px) is used, rather than sigma=1 px used
@@ -479,7 +479,7 @@ def _ewald_sphere_analytic_ground_truth(volume, voltage_in_kilovolts: float) -> 
     # independent of the interpolation logic under test).
     q_at_slice = _full_slice_from_half_slice(volume.frequency_slice)[0]
     q_parallel_squared = jnp.sum(q_at_slice[..., :2] ** 2, axis=-1)
-    q_z_curvature = 0.5 * wavelength * q_parallel_squared
+    q_z_curvature = -0.5 * wavelength * q_parallel_squared
     q_at_surface = q_at_slice.at[..., 2].add(q_z_curvature)
 
     transform = _gaussian_mixture_fourier_transform(
