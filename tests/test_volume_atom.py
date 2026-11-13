@@ -1480,3 +1480,104 @@ class TestGMMDeblurAndUpsampling:
             projection = integrator.integrate(gaussian_volume, image_config)
         assert projection.dtype == jnp.complex64
         assert _max_shell_relative_error(projection, exact, image_config) <= 1e-2
+
+
+def _make_two_component_volumes(positions, variances=(0.05, 0.5)):
+    gaussian_volume = cxs.GaussianMixtureVolume(
+        positions,
+        amplitudes=np.ones((len(positions), 2)),
+        variances=np.broadcast_to(variances, (len(positions), 2)),
+    )
+    atom_volume = cxs.GaussianFourierVolume(
+        positions=(positions, positions),
+        kernel_fns=tuple(
+            im.FourierGaussian(b_factor=8 * np.pi**2 * v) for v in variances
+        ),
+    )
+    return gaussian_volume, atom_volume
+
+
+class TestGMMWithCalibration:
+    def test_with_calibration_blur_formula(self, pdb_info):
+        volume, _ = _make_two_component_volumes(pdb_info[0])
+        image_config = cxs.BasicImageConfig((32, 32), 1.0, voltage_in_kilovolts=300.0)
+        integrator = cxs.GaussianMixtureProjection.with_calibration(
+            volume,
+            image_config,
+            sampling_mode="point",
+            deblur=True,
+            upsample_factor=2,
+        )
+        assert integrator.blur_variance == pytest.approx(np.log(200) / (4 * np.pi**2))
+
+    def test_with_calibration_sizes_n_spread_on_blurred_fine_grid(self, pdb_info):
+        volume, _ = _make_two_component_volumes(pdb_info[0])
+        image_config = cxs.BasicImageConfig((32, 32), 1.0, voltage_in_kilovolts=300.0)
+        integrator = cxs.GaussianMixtureProjection.with_calibration(
+            volume,
+            image_config,
+            sampling_mode="point",
+            deblur=True,
+            upsample_factor=2,
+        )
+        blurred = eqx.tree_at(
+            lambda v: v.variances, volume, volume.variances + integrator.blur_variance
+        )
+        expected = cxs.suggest_n_spread(blurred, 0.5, cutoff_sigma=4.0)
+        assert isinstance(integrator.n_spread, tuple)
+        assert integrator.n_spread == expected
+
+    def test_with_calibration_average(self, pdb_info):
+        volume, _ = _make_two_component_volumes(pdb_info[0])
+        image_config = cxs.BasicImageConfig((32, 32), 1.0, voltage_in_kilovolts=300.0)
+        integrator = cxs.GaussianMixtureProjection.with_calibration(volume, image_config)
+        assert integrator.blur_variance == 0.0
+        assert integrator.n_spread == cxs.suggest_n_spread(volume, 1.0)
+
+    def test_with_calibration_refuses_factor_1(self, pdb_info):
+        volume, _ = _make_two_component_volumes(pdb_info[0])
+        image_config = cxs.BasicImageConfig((32, 32), 1.0, voltage_in_kilovolts=300.0)
+        with pytest.raises(ValueError, match="upsample_factor"):
+            cxs.GaussianMixtureProjection.with_calibration(
+                volume,
+                image_config,
+                sampling_mode="point",
+                deblur=True,
+                upsample_factor=1,
+            )
+
+    @pytest.mark.parametrize("tolerance", (0.0, -1e-2, 2.0, 5.0))
+    def test_with_calibration_invalid_tolerance(self, pdb_info, tolerance):
+        volume, _ = _make_two_component_volumes(pdb_info[0])
+        image_config = cxs.BasicImageConfig((32, 32), 1.0, voltage_in_kilovolts=300.0)
+        with pytest.raises(ValueError, match="tolerance"):
+            cxs.GaussianMixtureProjection.with_calibration(
+                volume,
+                image_config,
+                tolerance=tolerance,
+                sampling_mode="point",
+                deblur=True,
+                upsample_factor=2,
+            )
+
+    @pytest.mark.parametrize("float32", (False, True))
+    @pytest.mark.parametrize("shape", ((32, 30), (31, 31)))
+    @pytest.mark.parametrize("upsample_factor", (2, 3))
+    def test_calibrated_point_deblur_within_tolerance(
+        self, pdb_info, upsample_factor, shape, float32
+    ):
+        gaussian_volume, atom_volume = _make_two_component_volumes(pdb_info[0])
+        image_config = cxs.BasicImageConfig(shape, 1.0, voltage_in_kilovolts=300.0)
+        integrator = cxs.GaussianMixtureProjection.with_calibration(
+            gaussian_volume,
+            image_config,
+            sampling_mode="point",
+            deblur=True,
+            upsample_factor=upsample_factor,
+        )
+        exact = TestGMMDeblurAndUpsampling.exact_integrator.integrate(
+            atom_volume, image_config
+        )
+        with jax.enable_x64(not float32):
+            projection = integrator.integrate(gaussian_volume, image_config)
+        assert _max_shell_relative_error(projection, exact, image_config) <= 1e-2

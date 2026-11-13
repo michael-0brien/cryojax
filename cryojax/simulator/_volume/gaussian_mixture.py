@@ -354,6 +354,80 @@ class GaussianMixtureProjection(
         self.upsample_factor = upsample_factor
         self.blur_variance = float(blur_variance)
 
+    @classmethod
+    def with_calibration(
+        cls,
+        volume: GaussianMixtureVolume,
+        image_config: AbstractImageConfig,
+        *,
+        tolerance: float = 1e-2,
+        cutoff_sigma: float = 4.0,
+        sampling_mode: Literal["average", "point"] = "average",
+        deblur: bool = False,
+        upsample_factor: int = 1,
+        shape: tuple[int, int] | None = None,
+        n_batches: int = 1,
+        enable_pallas: bool | Mapping[str, bool] | None = None,
+    ) -> Self:
+        """Build an integrator with `blur_variance` and `n_spread` chosen for
+        `volume` at `image_config.pixel_size`. Not JIT-compatible: call on
+        concrete values. Sizes for the given pixel size.
+
+        **Arguments:**
+
+        - `volume`: The volume to size `n_spread` for, with any B-factor
+            already added to its variances.
+        - `image_config`: The image configuration, for its pixel size.
+        - `tolerance`: With `sampling_mode = 'point'` and `deblur`, the relative
+            error allowed from content folded into the image's band.
+        - `cutoff_sigma`: Truncation width in standard deviations, for
+            [`cryojax.simulator.suggest_n_spread`][].
+
+        The other arguments are those of `GaussianMixtureProjection`.
+        """
+        if not 0 < tolerance < 2:
+            raise ValueError(
+                "`tolerance` in `GaussianMixtureProjection.with_calibration` must "
+                f"be between 0 and 2. Got `tolerance = {tolerance}`."
+            )
+        # Raises the constructor's errors before any arithmetic on the factor
+        cls(
+            shape=shape,
+            sampling_mode=sampling_mode,
+            n_batches=n_batches,
+            deblur=deblur,
+            upsample_factor=upsample_factor,
+        )
+        # Function-local, since `_api_utils` imports this module
+        from .._api_utils import suggest_n_spread
+
+        pixel_size = float(image_config.pixel_size)
+        blur_variance = 0.0
+        spread_pixel_size = pixel_size
+        if sampling_mode == "point":
+            r = upsample_factor
+            spread_pixel_size = pixel_size / r
+            if deblur:
+                blur_variance = (
+                    pixel_size**2 * np.log(2 / tolerance) / (2 * np.pi**2 * r * (r - 1))
+                )
+        blurred_volume = eqx.tree_at(
+            lambda v: v.variances, volume, volume.variances + blur_variance
+        )
+        n_spread = suggest_n_spread(
+            blurred_volume, spread_pixel_size, cutoff_sigma=cutoff_sigma
+        )
+        return cls(
+            shape=shape,
+            sampling_mode=sampling_mode,
+            n_batches=n_batches,
+            n_spread=n_spread,
+            enable_pallas=enable_pallas,
+            deblur=deblur,
+            upsample_factor=upsample_factor,
+            blur_variance=blur_variance,
+        )
+
     @override
     def integrate(
         self,
