@@ -1,5 +1,3 @@
-import functools as ft
-import math
 from collections.abc import Sequence
 from typing import Any, ClassVar, Literal, Self, TypeVar, cast
 from typing_extensions import override
@@ -20,7 +18,6 @@ from ...ndimage import (
     FourierSinc,
     convert_fftn_to_rfftn,
     dispatch_nufft1,
-    query_efficient_grid_size,
     resize_with_crop_or_pad,
 )
 from .._image_config import AbstractImageConfig
@@ -33,7 +30,6 @@ from .base_volume import (
     VoxelArray,
 )
 from .internal import (
-    build_extraction_mesh,
     center_shift,
     check_anisotropy_supported,
     eval_separable_impl,
@@ -230,7 +226,7 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
     voxel_size: Float[NDArrayLike, "..."]
 
     sampling_mode: Literal["average", "point"]
-    upsample_factor: float
+    upsample_factor: int
     eps: float
     options: dict[str, Any]
 
@@ -240,7 +236,7 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
         voxel_size: FloatLike,
         *,
         sampling_mode: Literal["average", "point"] = "average",
-        upsample_factor: int | float = 1.0,
+        upsample_factor: int = 1,
         eps: float = 1e-6,
         options: dict[str, Any] = {},
     ):
@@ -256,7 +252,10 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
             underlying continuous function. If `'point'`, the volume at
             a pixel will be point sampled.
         - `upsample_factor`:
-            How much to upsample the grid on which atoms are spread onto.
+            The spectrum is computed on a grid this many times finer, then
+            folded onto the voxel grid, so that the voxels converge to point
+            samples (or voxel averages) as it grows. If `1`, the voxel grid
+            is band-limited at Nyquist.
         - `eps`:
             The precision of the underlying non-uniform FFT implementation.
             See [`finufft`](https://finufft.readthedocs.io/en/latest/opts.html#options-parameters-cpu)
@@ -272,10 +271,15 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
                 "pixel or 'point' for point sampling. Got "
                 f"`sampling_mode = {sampling_mode}`."
             )
+        if not (isinstance(upsample_factor, int) and upsample_factor >= 1):
+            raise ValueError(
+                "`upsample_factor` in `GaussianFourierRenderFn` must be an "
+                f"integer of at least 1. Got `upsample_factor = {upsample_factor}`."
+            )
         self.shape = shape
         self.voxel_size = leaf_asarray(voxel_size, dtype=float)
         self.sampling_mode = sampling_mode
-        self.upsample_factor = float(upsample_factor)
+        self.upsample_factor = upsample_factor
         self.eps = eps
         self.options = options
 
@@ -312,11 +316,9 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
             volume_representation.kernel_fns,
         )
         kernel_fns = _standardize_kernel_fns(kernel_fns, spatial_dim=3)
-        (shape_u, voxel_size_u), upsampfac = _prepare_upsample(
-            shape=self.shape,
-            pixel_size=voxel_size,
-            upsampfac=self.upsample_factor,
-        )
+        upsample_factor = self.upsample_factor
+        shape_u = tuple(upsample_factor * n for n in self.shape)
+        voxel_size_u = voxel_size / upsample_factor
         # Compute
         rendering_fft = _render_impl(
             positions,
@@ -332,12 +334,15 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
             box_fn = FourierSinc(box_width=voxel_size)
             frequencies_1d = make_frequencies_1d(shape_u, voxel_size_u, modeord=1)
             rendering_fft *= eval_separable_impl(box_fn, frequencies_1d)
-        # Downsample by extracting fourier modes
-        if self.shape != shape_u:
-            (indices_z, indices_y, indices_x), fac = build_extraction_mesh(
-                shape_u, self.shape, modeord=1
+        # Downsample by folding fourier modes: fine mode k lands on k mod N
+        if upsample_factor > 1:
+            n_z, n_y, n_x = self.shape
+            rendering_fft = (
+                rendering_fft.reshape(
+                    upsample_factor, n_z, upsample_factor, n_y, upsample_factor, n_x
+                ).sum(axis=(0, 2, 4))
+                / upsample_factor**3
             )
-            rendering_fft = fac * rendering_fft[indices_z, indices_y, indices_x]
         return (
             jnp.fft.ifftn(rendering_fft).real
             if outputs_real_space
@@ -370,7 +375,7 @@ class GaussianFourierProjection(
     """  # noqa: E501
 
     sampling_mode: Literal["average", "point"]
-    upsample_factor: float
+    upsample_factor: int
     eps: float
     shape: tuple[int, int] | None
     options: dict[str, Any]
@@ -382,7 +387,7 @@ class GaussianFourierProjection(
         self,
         *,
         sampling_mode: Literal["average", "point"] = "average",
-        upsample_factor: int | float = 1.0,
+        upsample_factor: int = 1,
         eps: float = 1e-6,
         shape: tuple[int, int] | None = None,
         options: dict[str, Any] = {},
@@ -395,7 +400,10 @@ class GaussianFourierProjection(
             underlying continuous function. If `'point'`, the volume at
             a pixel will be point sampled.
         - `upsample_factor`:
-            How much to upsample the grid on which atoms are spread onto.
+            The spectrum is computed on a grid this many times finer, then
+            folded onto the image grid, so that the image converges to point
+            samples (or pixel averages) as it grows. If `1`, the image is
+            band-limited at Nyquist.
         - `eps`:
             The precision of the underlying non-uniform FFT implementation.
             See [`finufft`](https://finufft.readthedocs.io/en/latest/opts.html#options-parameters-cpu)
@@ -414,9 +422,14 @@ class GaussianFourierProjection(
                 "pixel or 'point' for point sampling. Got "
                 f"`sampling_mode = {sampling_mode}`."
             )
+        if not (isinstance(upsample_factor, int) and upsample_factor >= 1):
+            raise ValueError(
+                "`upsample_factor` in `GaussianFourierProjection` must be an "
+                f"integer of at least 1. Got `upsample_factor = {upsample_factor}`."
+            )
         self.sampling_mode = sampling_mode
         self.shape = shape
-        self.upsample_factor = float(upsample_factor)
+        self.upsample_factor = upsample_factor
         self.eps = eps
         self.options = options
 
@@ -455,11 +468,9 @@ class GaussianFourierProjection(
             volume_representation.kernel_fns,
         )
         kernel_fns = _standardize_kernel_fns(kernel_fns, spatial_dim=2)
-        (shape_u, pixel_size_u), upsampfac = _prepare_upsample(
-            shape=shape,
-            pixel_size=pixel_size,
-            upsampfac=self.upsample_factor,
-        )
+        upsample_factor = self.upsample_factor
+        shape_u = (upsample_factor * shape[0], upsample_factor * shape[1])
+        pixel_size_u = pixel_size / upsample_factor
         # Compute projection
         projection_fft = _project_impl(
             positions,
@@ -475,10 +486,15 @@ class GaussianFourierProjection(
             box_fn = FourierSinc(box_width=pixel_size)
             frequencies_1d = make_frequencies_1d(shape_u, pixel_size_u, modeord=1)
             projection_fft *= eval_separable_impl(box_fn, frequencies_1d)
-        # Downsample by extracting fourier modes
-        if shape != shape_u:
-            (indices_y, indices_x), fac = build_extraction_mesh(shape_u, shape, modeord=1)
-            projection_fft = fac * projection_fft[indices_y, indices_x]
+        # Downsample by folding fourier modes: fine mode k lands on k mod N
+        if upsample_factor > 1:
+            n_y, n_x = shape
+            projection_fft = (
+                projection_fft.reshape(upsample_factor, n_y, upsample_factor, n_x).sum(
+                    axis=(0, 2)
+                )
+                / upsample_factor**2
+            )
         projection_fft = convert_fftn_to_rfftn(projection_fft, mode="real")
         if output_shape == shape:
             return (
@@ -606,37 +622,6 @@ def _eval_kernel_impl(kernel_fn: FourierGaussian, frequencies_1d: tuple[Array, .
     make_gaussians = jax.vmap(lambda _a, _b: FourierGaussian(amplitude=_a, b_factor=_b))
     eval_gaussians = jax.vmap(eval_separable_impl, in_axes=(0, None))
     return jnp.sum(eval_gaussians(make_gaussians(a, b), frequencies_1d), axis=0)
-
-
-def _prepare_upsample(
-    shape: tuple[int, ...],
-    pixel_size: Float[Array, ""],
-    upsampfac: float,
-) -> tuple[tuple[tuple[int, ...], Array], float]:
-    """Find the upsampfac that perfectly divides the upsampled
-    image shape.
-    """
-    if upsampfac == 1.0:
-        return (shape, pixel_size), upsampfac
-    else:
-        dim = shape[0]
-        if not all(s == dim for s in shape):
-            # If rectangular image focus on accuracy. Make sure
-            # `upsampfac` is mapped directly onto a pixel size
-            # dilation
-            gcd = ft.reduce(math.gcd, shape)
-            upsampfac = round(gcd * upsampfac) / gcd
-            shape_u = tuple(s * upsampfac for s in shape)
-        else:
-            # Otherwise, find an efficient grid for FFTs close to
-            # the requested upsampfac and return the corrected upsampfac
-            shape_u = query_efficient_grid_size(shape, upsampfac)
-            dim_u = shape_u[0]
-            upsampfac = dim_u / dim
-        return (
-            (tuple(int(upsampfac * s) for s in shape), pixel_size / upsampfac),
-            upsampfac,
-        )
 
 
 def _prepare_fft_to_fft(f: Array, *, outputs_rfft: bool, fftshifted: bool) -> Array:
