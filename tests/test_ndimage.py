@@ -835,13 +835,13 @@ def test_ewald_sphere_from_slice_curvature():
 
     assert surface.shape == (1, N, N, 3)
     # The `wavelength=0` surface is flat (no out-of-plane displacement).
-    np.testing.assert_allclose(flat[..., 2], 0.0, atol=1e-6)
+    np.testing.assert_allclose(flat[..., 2], 0.0, atol=1e-12)
     # In-plane coordinates are unchanged by the curving.
-    np.testing.assert_allclose(surface[..., 0:2], flat[..., 0:2], atol=1e-6)
+    np.testing.assert_allclose(surface[..., 0:2], flat[..., 0:2], atol=1e-12)
     # Out-of-plane displacement matches the analytic Ewald curvature.
     q_squared = flat[..., 0] ** 2 + flat[..., 1] ** 2
     predicted_z = -(wavelength / voxel_size) * q_squared / 2
-    np.testing.assert_allclose(surface[..., 2], predicted_z, atol=1e-6)
+    np.testing.assert_allclose(surface[..., 2], predicted_z, atol=1e-12)
 
 
 #
