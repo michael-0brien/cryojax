@@ -316,7 +316,9 @@ class GaussianMixtureProjection(
             $2\\pi^2 p^2/3$ for pixel size $p$.
         - `upsample_factor`:
             How much to upsample the grid on which atoms are spread onto.
-            Ignored if `sampling_mode = 'average'`.
+            With `upsample_factor > 1`, the spread grid is cropped to the
+            image's band, so the image is band-limited rather than point
+            sampled. Ignored if `sampling_mode = 'average'`.
         - `blur_variance`:
             The variance, in angstroms squared, of a gaussian blur added to every
             gaussian before spreading. Ignored if `sampling_mode = 'average'`.

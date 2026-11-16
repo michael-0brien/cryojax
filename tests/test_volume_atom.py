@@ -763,7 +763,7 @@ def test_fft_atom_projection_antialias(
     )
     atom_integrator = cxs.GaussianFourierProjection(
         eps=1e-10,
-        upsample_factor=2.0,
+        upsample_factor=2,
     )
     proj_by_gaussians = compute_projection(
         gaussian_volume, gaussian_integrator, image_config
@@ -787,13 +787,13 @@ def test_fft_atom_projection_antialias_backends_agree(
     monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", "nufftax")
     proj_nufftax = compute_projection(
         atom_volume,
-        cxs.GaussianFourierProjection(eps=1e-10, upsample_factor=2.0),
+        cxs.GaussianFourierProjection(eps=1e-10, upsample_factor=2),
         image_config,
     )
     monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", "jax-finufft")
     proj_jax_finufft = compute_projection(
         atom_volume,
-        cxs.GaussianFourierProjection(eps=1e-10, upsample_factor=2.0),
+        cxs.GaussianFourierProjection(eps=1e-10, upsample_factor=2),
         image_config,
     )
     np.testing.assert_allclose(proj_nufftax, proj_jax_finufft, atol=1e-6)
@@ -825,8 +825,8 @@ def _make_peng_volumes(pdb_info, upsampfac):
         (0.25, (133, 134), 2, 1e-5),
         (0.25, (134, 134), 3, 1e-5),
         (0.25, (133, 133), 3, 1e-5),
-        (0.25, (134, 133), 3.0, 1e-5),
-        (0.25, (133, 134), 3.0, 1e-5),
+        (0.25, (134, 133), 3, 1e-5),
+        (0.25, (133, 134), 3, 1e-5),
         (0.25, (134, 134), 2, 1e-6),
         (0.25, (133, 133), 2, 1e-6),
         (0.25, (134, 133), 2, 1e-6),
@@ -1581,3 +1581,55 @@ class TestGMMWithCalibration:
         with jax.enable_x64(not float32):
             projection = integrator.integrate(gaussian_volume, image_config)
         assert _max_shell_relative_error(projection, exact, image_config) <= 1e-2
+
+
+# ── GaussianFourier upsampling: folding aliases onto the output grid ─────────
+
+
+def _max_relative_error(actual, expected):
+    return np.abs(actual - expected).max() / np.abs(expected).max()
+
+
+@pytest.mark.parametrize("sampling_mode", ("point", "average"))
+@pytest.mark.parametrize("shape", ((32, 32), (31, 32)))
+@pytest.mark.parametrize(
+    "b_factor, upsample_factor, rtol",
+    ((5.0, 8, 1e-8), (20.0, 3, 1e-4), (20.0, 8, 1e-8)),
+)
+def test_fft_projection_upsampling_converges_to_sampling(
+    sampling_mode, shape, b_factor, upsample_factor, rtol
+):
+    positions = np.random.default_rng(0).uniform(-8.0, 8.0, size=(20, 3))
+    gaussian_volume, atom_volume = _make_deblur_volumes(
+        positions, b_factor / (8 * np.pi**2)
+    )
+    image_config = cxs.BasicImageConfig(shape, 1.0, voltage_in_kilovolts=300.0)
+    exact = cxs.GaussianMixtureProjection(sampling_mode=sampling_mode).integrate(
+        gaussian_volume, image_config, outputs_real_space=True
+    )
+    integrator = cxs.GaussianFourierProjection(
+        sampling_mode=sampling_mode, eps=1e-12, upsample_factor=upsample_factor
+    )
+    projection = integrator.integrate(atom_volume, image_config, outputs_real_space=True)
+    assert _max_relative_error(projection, exact) <= rtol
+
+
+@pytest.mark.parametrize("upsample_factor, rtol", ((3, 1e-4), (4, 1e-8)))
+def test_fft_render_upsampling_converges_to_voxel_average(upsample_factor, rtol):
+    shape, voxel_size = (15, 16, 17), 1.0
+    # Away from the edges, since the fourier render is periodic and the reference not
+    positions = np.random.default_rng(0).uniform(-3.0, 3.0, size=(20, 3))
+    gaussian_volume, atom_volume = _make_deblur_volumes(positions, 20.0 / (8 * np.pi**2))
+    exact = cxs.GaussianMixtureRenderFn(shape, voxel_size)(gaussian_volume)
+    render_fn = cxs.GaussianFourierRenderFn(
+        shape, voxel_size, eps=1e-12, upsample_factor=upsample_factor
+    )
+    assert _max_relative_error(render_fn(atom_volume), exact) <= rtol
+
+
+@pytest.mark.parametrize("upsample_factor", (0, 1.5))
+def test_fft_upsample_factor_must_be_a_positive_integer(upsample_factor):
+    with pytest.raises(ValueError, match="upsample_factor"):
+        cxs.GaussianFourierProjection(upsample_factor=upsample_factor)
+    with pytest.raises(ValueError, match="upsample_factor"):
+        cxs.GaussianFourierRenderFn((8, 8, 8), 1.0, upsample_factor=upsample_factor)
