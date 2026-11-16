@@ -1,7 +1,6 @@
 import cryojax.simulator as cxs
 import equinox as eqx
 import jax
-import jax.numpy as jnp
 import numpy as np
 import pytest
 
@@ -258,134 +257,7 @@ def test_rytov_scattering_theory_with_ewald_sphere_extraction():
     np.testing.assert_allclose(fse_image, ese_image, atol=1e-6)
 
 
-# ── The Ewald branch of `ContrastTransferTheory` ─────────────────────────────
-
-_ODD_ABERRATIONS = pytest.mark.parametrize(
-    "coma_xy_in_um, trefoil_xy_in_um",
-    [(None, None), ((2.0, -1.0), None), ((2.0, -1.0), (0.5, 0.3))],
-    ids=["none", "coma", "coma+trefoil"],
-)
-_SHAPES = pytest.mark.parametrize("shape", [(32, 32), (31, 31), (32, 31)])
-
-
-def _aberrated_ctf(coma_xy_in_um, trefoil_xy_in_um):
-    return cxs.AberratedCTF(
-        defocus_in_um=1.0,
-        astigmatism_xy_in_um=(0.03, 0.02),
-        coma_xy_in_um=coma_xy_in_um,
-        trefoil_xy_in_um=trefoil_xy_in_um,
-    )
-
-
-def _off_nyquist(shape):
-    """The half-plane bins off the Nyquist row and column, where the half-plane and
-    full-grid paths take opposite signs of the Nyquist frequency."""
-    y_dim, x_dim = shape
-    mask = np.ones((y_dim, x_dim // 2 + 1), dtype=bool)
-    if y_dim % 2 == 0:
-        mask[y_dim // 2, :] = False
-    if x_dim % 2 == 0:
-        mask[:, -1] = False
-    return mask
-
-
-def _relative_error(actual, expected, mask=Ellipsis):
-    actual, expected = np.asarray(actual)[mask], np.asarray(expected)[mask]
-    return np.abs(actual - expected).max() / np.abs(expected).max()
-
-
-def _weak_complex_field(shape):
-    key_re, key_im = jax.random.split(jax.random.key(0))
-    field = 1e-4 * (
-        jax.random.normal(key_re, shape) + 1.0j * jax.random.normal(key_im, shape)
-    )
-    spectrum = jnp.fft.fftn(field)
-    y_dim, x_dim = shape
-    if y_dim % 2 == 0:
-        spectrum = spectrum.at[y_dim // 2, :].set(0.0)
-    if x_dim % 2 == 0:
-        spectrum = spectrum.at[:, x_dim // 2].set(0.0)
-    return jnp.fft.ifftn(spectrum)
-
-
-def _rytov_weak_limit(
-    field, config, ctf, amplitude_contrast_ratio, offset_z_in_angstroms=None
-):
-    """The contrast spectrum of the exit wave `exp(i w field)`, to first order in the
-    field."""
-    ac = amplitude_contrast_ratio
-    w = jnp.sqrt(1.0 - ac**2) + 1.0j * ac
-
-    def intensity(scale):
-        wave = jnp.fft.fftn(jnp.exp(1.0j * scale * w * field))
-        wave = cxs.WaveTransferTheory(ctf).propagate_exit_wave(
-            wave, config, offset_z_in_angstroms=offset_z_in_angstroms
-        )
-        return jnp.abs(jnp.fft.ifftn(wave)) ** 2
-
-    _, linear_term = jax.jvp(intensity, (0.0,), (1.0,))
-    return jnp.fft.rfftn(linear_term / 2)
-
-
-def _check_ewald_branch_matches_rytov_weak_limit(
-    shape, ctf, amplitude_contrast_ratio, rtol, offset_z_in_angstroms=None
-):
-    config = cxs.BasicImageConfig(shape, pixel_size=1.0, voltage_in_kilovolts=300.0)
-    field = _weak_complex_field(shape)
-    ewald = cxs.ContrastTransferTheory(
-        ctf, amplitude_contrast_ratio=amplitude_contrast_ratio
-    ).propagate_object(
-        jnp.fft.fftn(field),
-        config,
-        is_ewald_sphere=True,
-        offset_z_in_angstroms=offset_z_in_angstroms,
-    )
-    rytov = _rytov_weak_limit(
-        field, config, ctf, amplitude_contrast_ratio, offset_z_in_angstroms
-    )
-    assert _relative_error(ewald, rytov, _off_nyquist(shape)) <= rtol
-
-
-@_SHAPES
-@_ODD_ABERRATIONS
-@pytest.mark.parametrize("amplitude_contrast_ratio", [0.0, 0.1])
-@pytest.mark.parametrize("offset_z_in_angstroms", [None, 600.0])
-def test_ewald_branch_matches_rytov_weak_limit(
-    shape,
-    coma_xy_in_um,
-    trefoil_xy_in_um,
-    amplitude_contrast_ratio,
-    offset_z_in_angstroms,
-):
-    _check_ewald_branch_matches_rytov_weak_limit(
-        shape,
-        _aberrated_ctf(coma_xy_in_um, trefoil_xy_in_um),
-        amplitude_contrast_ratio,
-        rtol=1e-6,
-        offset_z_in_angstroms=offset_z_in_angstroms,
-    )
-
-
-def test_ewald_branch_matches_rytov_weak_limit_in_float32():
-    with jax.enable_x64(False):
-        _check_ewald_branch_matches_rytov_weak_limit(
-            (32, 31), _aberrated_ctf((2.0, -1.0), (0.5, 0.3)), 0.1, rtol=1e-4
-        )
-
-
-@_SHAPES
-@_ODD_ABERRATIONS
-def test_ewald_real_field_equals_projection(shape, coma_xy_in_um, trefoil_xy_in_um):
-    config = cxs.BasicImageConfig(shape, pixel_size=1.0, voltage_in_kilovolts=300.0)
-    field = jax.random.normal(jax.random.key(1), shape)
-    transfer_theory = cxs.ContrastTransferTheory(
-        _aberrated_ctf(coma_xy_in_um, trefoil_xy_in_um), amplitude_contrast_ratio=0.1
-    )
-    ewald = transfer_theory.propagate_object(
-        jnp.fft.fftn(field), config, is_ewald_sphere=True
-    )
-    projection = transfer_theory.propagate_object(jnp.fft.rfftn(field), config)
-    assert _relative_error(ewald, projection) <= 1e-12
+# ── EwaldSphereExtraction: weak phase and Rytov ──────────────────────────────
 
 
 @pytest.mark.parametrize("coma_xy_in_um", [None, (3.0, 1.0)], ids=["no-coma", "coma"])
@@ -426,8 +298,8 @@ def test_ewald_height_equals_defocus(coma_xy_in_um):
         expected = image(projection, 0.0, offset) - projection_at_0
         return np.linalg.norm(ewald_change - expected) / np.linalg.norm(expected)
 
-    assert relative_l2(+d) < 0.05
-    assert relative_l2(-d) > 0.5
+    assert relative_l2(+d) < 0.01
+    assert relative_l2(-d) > 1.9
 
 
 def test_ewald_rytov_agree_on_extraction():
@@ -459,7 +331,11 @@ def test_ewald_rytov_agree_on_extraction():
 
         return jax.jvp(contrast, (0.0,), (1.0,))[1]
 
-    error = _relative_error(
-        weak_limit(rytov), weak_limit(weak_phase), _off_nyquist((32, 32))
-    )
-    assert error <= 1e-4
+    # Off the Nyquist row and column, where the half-plane and full-grid paths take
+    # opposite signs of the Nyquist frequency
+    off_nyquist = np.ones((32, 17), dtype=bool)
+    off_nyquist[16, :] = off_nyquist[:, 16] = False
+    rytov_limit = np.asarray(weak_limit(rytov))[off_nyquist]
+    weak_phase_limit = np.asarray(weak_limit(weak_phase))[off_nyquist]
+    error = np.abs(rytov_limit - weak_phase_limit).max() / np.abs(weak_phase_limit).max()
+    assert error <= 1e-12

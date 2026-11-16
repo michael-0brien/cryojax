@@ -95,8 +95,7 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
             approximation and is therefore the fourier transform of a real-valued
             array. If `True`, `object_spectrum` is extracted from
             the ewald sphere and is therefore the fourier transform of a complex-valued
-            array. `object_spectrum` is used as given (not conjugated); odd aberrations
-            are supported.
+            array. `object_spectrum` is used as given (not conjugated).
         - `offset_z_in_angstroms`:
             An optional offset in Angstroms of the specimen along z, added to the
             defocus at runtime, e.g. the `offset_z_in_angstroms` of an `AbstractPose`.
