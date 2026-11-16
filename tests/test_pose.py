@@ -134,6 +134,21 @@ def test_euler_angle_conversion(phi, theta, psi):
     )
 
 
+@pytest.mark.parametrize("theta", [0.0, 180.0])
+def test_euler_angle_conversion_at_gimbal_lock(theta):
+    """At theta 0 or 180 degrees phi and psi turn about one axis: the conversion
+    puts the whole turn in phi and psi at exactly 0, call after call."""
+    rotation = cxs.EulerAnglePose(
+        phi_angle=30.0, theta_angle=theta, psi_angle=25.0
+    ).rotation
+    for _ in range(3):
+        pose = cxs.EulerAnglePose.from_rotation(rotation)
+        assert float(pose.psi_angle) == 0.0
+        np.testing.assert_allclose(
+            pose.rotation.as_matrix(), rotation.as_matrix(), atol=1e-6
+        )
+
+
 @pytest.mark.parametrize(
     "wxyz",
     [
