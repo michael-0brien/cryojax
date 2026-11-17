@@ -329,6 +329,7 @@ class TestIntegrateGMMToPixelsWithSpreadingBackend:
         integrator = cxs.GaussianMixtureProjection(
             sampling_mode=sampling_mode,
             n_spread=n_spread,
+            upsample_factor=2,
         )
         projection = jnp.fft.irfftn(integrator.integrate(atomic_volume, image_config))
 
@@ -356,6 +357,7 @@ class TestIntegrateGMMToPixelsWithSpreadingBackend:
         integrator = cxs.GaussianMixtureProjection(
             sampling_mode=sampling_mode,
             n_spread=n_spread,
+            upsample_factor=2,
         )
         projection = jnp.fft.irfftn(integrator.integrate(atomic_volume, image_config))
 
@@ -382,10 +384,13 @@ class TestIntegrateGMMToPixelsWithSpreadingBackend:
             pixel_size=voxel_size,
             voltage_in_kilovolts=300.0,
         )
-        dense_integrator = cxs.GaussianMixtureProjection(sampling_mode=sampling_mode)
+        dense_integrator = cxs.GaussianMixtureProjection(
+            sampling_mode=sampling_mode, upsample_factor=2
+        )
         spread_integrator = cxs.GaussianMixtureProjection(
             sampling_mode=sampling_mode,
             n_spread=n_spread,
+            upsample_factor=2,
         )
         dense_projection = dense_integrator.integrate(
             atomic_volume, image_config, outputs_real_space=True
@@ -415,6 +420,7 @@ class TestIntegrateGMMToPixelsWithSpreadingBackend:
         integrator = cxs.GaussianMixtureProjection(
             sampling_mode=sampling_mode,
             n_spread=n_spread,
+            upsample_factor=2,
         )
 
         def loss(positions, amplitudes, variances):
@@ -446,10 +452,13 @@ class TestIntegrateGMMToPixelsWithSpreadingBackend:
             pixel_size=voxel_size,
             voltage_in_kilovolts=300.0,
         )
-        dense_integrator = cxs.GaussianMixtureProjection(sampling_mode=sampling_mode)
+        dense_integrator = cxs.GaussianMixtureProjection(
+            sampling_mode=sampling_mode, upsample_factor=2
+        )
         spread_integrator = cxs.GaussianMixtureProjection(
             sampling_mode=sampling_mode,
             n_spread=n_spread,
+            upsample_factor=2,
         )
 
         def make_loss(integrator):
@@ -1341,16 +1350,26 @@ class TestGMMSamplingModes:
         exact = self.exact_integrator.integrate(atom_volume, image_config)
         assert _max_shell_relative_error(projection, exact, image_config) <= 1e-2
 
-    def test_point_requires_upsample_factor_2(self):
-        with pytest.raises(
-            ValueError, match="GaussianMixtureProjection.*upsample_factor.*1"
-        ):
-            cxs.GaussianMixtureProjection(sampling_mode="point", upsample_factor=1)
+    @pytest.mark.parametrize("n_spread", (None, 11))
+    def test_point_by_default_samples_the_projection(self, n_spread):
+        x0, y0, variance = 0.3, -1.7, 0.5
+        volume = cxs.GaussianMixtureVolume(
+            np.array([[x0, y0, 0.0]]), amplitudes=1.0, variances=variance
+        )
+        image_config = cxs.BasicImageConfig((16, 16), 1.0, voltage_in_kilovolts=300.0)
+        integrator = cxs.GaussianMixtureProjection(
+            sampling_mode="point", n_spread=n_spread
+        )
+        projection = integrator.integrate(volume, image_config, outputs_real_space=True)
+        y, x = np.meshgrid(np.arange(16) - 8.0, np.arange(16) - 8.0, indexing="ij")
+        r_squared = (x - x0) ** 2 + (y - y0) ** 2
+        expected = np.exp(-r_squared / (2 * variance)) / (2 * np.pi * variance)
+        np.testing.assert_allclose(projection, expected, atol=1e-10)
 
     def test_defaults(self):
         integrator = cxs.GaussianMixtureProjection()
         assert integrator.sampling_mode == "average"
-        assert integrator.upsample_factor == 2
+        assert integrator.upsample_factor == 1
 
     @pytest.mark.parametrize(
         "kwargs, keyword",
@@ -1412,7 +1431,7 @@ class TestGMMSamplingModes:
     def test_point_traced_pixel_size(self, pdb_info):
         volume, _ = _make_gaussian_volumes(pdb_info[0], 0.05)
         integrator = cxs.GaussianMixtureProjection(
-            sampling_mode="point", blur_variance=_blur_variance(1.0, 2)
+            sampling_mode="point", upsample_factor=2, blur_variance=_blur_variance(1.0, 2)
         )
 
         def project(pixel_size):
@@ -1483,7 +1502,9 @@ class TestGMMSamplingModes:
 
     def test_point_gradients_agree_between_backends(self, pdb_info):
         image_config = cxs.BasicImageConfig((31, 32), 1.0, voltage_in_kilovolts=300.0)
-        kwargs = dict(sampling_mode="point", blur_variance=_blur_variance(1.0, 2))
+        kwargs = dict(
+            sampling_mode="point", upsample_factor=2, blur_variance=_blur_variance(1.0, 2)
+        )
 
         def make_grad_fn(integrator):
             def loss(positions):
@@ -1620,10 +1641,21 @@ class TestGMMWithCalibration:
         assert integrator.blur_variance == 0.0
         assert integrator.n_spread == cxs.suggest_n_spread(volume, 1.0)
 
+    def test_with_calibration_defaults_to_upsample_factor_2(self, pdb_info):
+        volume, _ = _make_two_component_volumes(pdb_info[0])
+        image_config = cxs.BasicImageConfig((32, 32), 1.0, voltage_in_kilovolts=300.0)
+        for sampling_mode in ("average", "point"):
+            integrator = cxs.GaussianMixtureProjection.with_calibration(
+                volume, image_config, sampling_mode=sampling_mode
+            )
+            assert integrator.upsample_factor == 2
+
     def test_with_calibration_refuses_factor_1(self, pdb_info):
         volume, _ = _make_two_component_volumes(pdb_info[0])
         image_config = cxs.BasicImageConfig((32, 32), 1.0, voltage_in_kilovolts=300.0)
-        with pytest.raises(ValueError, match="upsample_factor"):
+        with pytest.raises(
+            ValueError, match="with_calibration.*point.*upsample_factor.*1"
+        ):
             cxs.GaussianMixtureProjection.with_calibration(
                 volume,
                 image_config,

@@ -226,7 +226,7 @@ def test_integrators_apply_the_anisotropic_magnification(
     [
         (integrator, volume, name)
         for integrator, volume in [
-            (cxs.GaussianMixtureProjection(sampling_mode="average"), None),
+            (cxs.GaussianMixtureProjection(sampling_mode="point"), None),
             (cxs.FourierSliceExtraction(), "voxels"),
         ]
         for name in ["projection", "weak phase", "weak phase theory", "rytov"]
