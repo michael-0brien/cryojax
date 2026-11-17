@@ -259,7 +259,9 @@ def fourier_crop_to_shape(
 
     The modes kept are those of the new shape on cryoJAX's frequency grid: for an even
     new size `n`, `+n/2` on the last axis of a real signal's `rfftn` and `-n/2` on
-    every other axis. The center pixel `N // 2` of each axis stays at `n // 2`.
+    every other axis. The center pixel `N // 2` of each axis stays at `n // 2`. In real
+    space, a real signal's last-axis Nyquist holds the average of `+n/2` and `-n/2`
+    (`irfftn` keeps only its hermitian part), so white noise keeps half its power there.
 
     **Arguments:**
 
