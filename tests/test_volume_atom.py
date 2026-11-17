@@ -762,8 +762,7 @@ def test_fft_atom_projection_antialias(
         _make_antialias_volumes(pdb_info, width, pixel_size, shape)
     )
     atom_integrator = cxs.GaussianFourierProjection(
-        eps=1e-10,
-        upsample_factor=2,
+        sampling_mode="average", eps=1e-10, upsample_factor=2
     )
     proj_by_gaussians = compute_projection(
         gaussian_volume, gaussian_integrator, image_config
@@ -787,13 +786,17 @@ def test_fft_atom_projection_antialias_backends_agree(
     monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", "nufftax")
     proj_nufftax = compute_projection(
         atom_volume,
-        cxs.GaussianFourierProjection(eps=1e-10, upsample_factor=2),
+        cxs.GaussianFourierProjection(
+            sampling_mode="average", eps=1e-10, upsample_factor=2
+        ),
         image_config,
     )
     monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", "jax-finufft")
     proj_jax_finufft = compute_projection(
         atom_volume,
-        cxs.GaussianFourierProjection(eps=1e-10, upsample_factor=2),
+        cxs.GaussianFourierProjection(
+            sampling_mode="average", eps=1e-10, upsample_factor=2
+        ),
         image_config,
     )
     np.testing.assert_allclose(proj_nufftax, proj_jax_finufft, atol=1e-6)
@@ -973,9 +976,7 @@ def test_fft_atom_render(monkeypatch, pdb_info, width, voxel_size, shape, backen
     gaussian_volume, atom_volume = _make_render_volumes(pdb_info, width)
     gaussian_render_fn = cxs.GaussianMixtureRenderFn(shape, voxel_size)
     atom_render_fn = cxs.GaussianFourierRenderFn(
-        shape,
-        voxel_size,
-        eps=1e-10,
+        shape, voxel_size, sampling_mode="average", eps=1e-10
     )
     voxels_by_gaussians = gaussian_render_fn(gaussian_volume)
     voxels_by_atoms = atom_render_fn(atom_volume)
@@ -1590,25 +1591,24 @@ def _max_relative_error(actual, expected):
     return np.abs(actual - expected).max() / np.abs(expected).max()
 
 
-@pytest.mark.parametrize("sampling_mode", ("point", "average"))
 @pytest.mark.parametrize("shape", ((32, 32), (31, 32)))
 @pytest.mark.parametrize(
     "b_factor, upsample_factor, rtol",
     ((5.0, 8, 1e-8), (20.0, 3, 1e-4), (20.0, 8, 1e-8)),
 )
-def test_fft_projection_upsampling_converges_to_sampling(
-    sampling_mode, shape, b_factor, upsample_factor, rtol
+def test_fft_projection_average_converges_to_pixel_average(
+    shape, b_factor, upsample_factor, rtol
 ):
     positions = np.random.default_rng(0).uniform(-8.0, 8.0, size=(20, 3))
     gaussian_volume, atom_volume = _make_deblur_volumes(
         positions, b_factor / (8 * np.pi**2)
     )
     image_config = cxs.BasicImageConfig(shape, 1.0, voltage_in_kilovolts=300.0)
-    exact = cxs.GaussianMixtureProjection(sampling_mode=sampling_mode).integrate(
+    exact = cxs.GaussianMixtureProjection(sampling_mode="average").integrate(
         gaussian_volume, image_config, outputs_real_space=True
     )
     integrator = cxs.GaussianFourierProjection(
-        sampling_mode=sampling_mode, eps=1e-12, upsample_factor=upsample_factor
+        sampling_mode="average", eps=1e-12, upsample_factor=upsample_factor
     )
     projection = integrator.integrate(atom_volume, image_config, outputs_real_space=True)
     assert _max_relative_error(projection, exact) <= rtol
@@ -1622,7 +1622,11 @@ def test_fft_render_upsampling_converges_to_voxel_average(upsample_factor, rtol)
     gaussian_volume, atom_volume = _make_deblur_volumes(positions, 20.0 / (8 * np.pi**2))
     exact = cxs.GaussianMixtureRenderFn(shape, voxel_size)(gaussian_volume)
     render_fn = cxs.GaussianFourierRenderFn(
-        shape, voxel_size, eps=1e-12, upsample_factor=upsample_factor
+        shape,
+        voxel_size,
+        sampling_mode="average",
+        eps=1e-12,
+        upsample_factor=upsample_factor,
     )
     assert _max_relative_error(render_fn(atom_volume), exact) <= rtol
 
@@ -1633,3 +1637,78 @@ def test_fft_upsample_factor_must_be_a_positive_integer(upsample_factor):
         cxs.GaussianFourierProjection(upsample_factor=upsample_factor)
     with pytest.raises(ValueError, match="upsample_factor"):
         cxs.GaussianFourierRenderFn((8, 8, 8), 1.0, upsample_factor=upsample_factor)
+
+
+# ── GaussianFourier: sampling modes ───────────────────────────────────────────
+
+
+def _corner_mask(shape):
+    """True except at an rfft's bin where both axes are at an even Nyquist, which four
+    frequencies share and `GaussianFourierProjection` fills from the opposite corner."""
+    mask = np.ones((shape[0], shape[1] // 2 + 1), bool)
+    if shape[0] % 2 == 0 and shape[1] % 2 == 0:
+        mask[shape[0] // 2, -1] = False
+    return mask
+
+
+@pytest.mark.parametrize(
+    "shape, new_shape", (((64, 64), (32, 32)), ((66, 66), (33, 33)), ((64, 64), (31, 31)))
+)
+def test_fft_point_nests_under_fourier_crop(shape, new_shape):
+    positions = np.random.default_rng(0).uniform(-8.0, 8.0, size=(20, 3))
+    _, atom_volume = _make_deblur_volumes(positions, 0.6)
+    integrator = cxs.GaussianFourierProjection(sampling_mode="point", eps=1e-10)
+    fine = integrator.integrate(
+        atom_volume,
+        cxs.BasicImageConfig(shape, 1.0, voltage_in_kilovolts=300.0),
+        outputs_real_space=True,
+    )
+    cropped = np.asarray(
+        im.fourier_crop_to_shape(
+            fine, new_shape, outputs_real_space=False, preserve_mean=True
+        )
+    )
+    coarse = np.asarray(
+        integrator.integrate(
+            atom_volume,
+            cxs.BasicImageConfig(new_shape, shape[0] / new_shape[0], 300.0),
+        )
+    )
+    mask = _corner_mask(new_shape)
+    np.testing.assert_allclose(
+        # The NUFFT is least accurate at the edge of its band, the Nyquist lines here
+        cropped[mask],
+        coarse[mask],
+        atol=1e-6 * np.abs(coarse).max(),
+    )
+
+
+def test_fft_point_ignores_upsample_factor():
+    positions = np.random.default_rng(0).uniform(-8.0, 8.0, size=(20, 3))
+    _, atom_volume = _make_deblur_volumes(positions, 0.6)
+    image_config = cxs.BasicImageConfig((32, 32), 1.0, voltage_in_kilovolts=300.0)
+    projections = [
+        cxs.GaussianFourierProjection(
+            sampling_mode="point", upsample_factor=factor
+        ).integrate(atom_volume, image_config)
+        for factor in (2, 4)
+    ]
+    np.testing.assert_array_equal(*projections)
+
+
+def test_fft_defaults():
+    for integrator in (
+        cxs.GaussianFourierProjection(),
+        cxs.GaussianFourierRenderFn((8, 8, 8), 1.0),
+    ):
+        assert integrator.sampling_mode == "point"
+        assert integrator.upsample_factor == 2
+
+
+def test_fft_average_requires_upsample_factor_2():
+    with pytest.raises(ValueError, match="GaussianFourierProjection.*upsample_factor.*1"):
+        cxs.GaussianFourierProjection(sampling_mode="average", upsample_factor=1)
+    with pytest.raises(ValueError, match="GaussianFourierRenderFn.*upsample_factor.*1"):
+        cxs.GaussianFourierRenderFn(
+            (8, 8, 8), 1.0, sampling_mode="average", upsample_factor=1
+        )
