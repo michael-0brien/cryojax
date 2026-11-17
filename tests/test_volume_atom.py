@@ -1532,7 +1532,17 @@ class TestGMMWithCalibration:
             sampling_mode="point",
             upsample_factor=2,
         )
-        assert integrator.blur_variance == pytest.approx(np.log(200) / (4 * np.pi**2))
+        # Tops up the narrowest component, of variance 0.05, to what the grid needs
+        required = np.log(200) / (4 * np.pi**2)
+        assert integrator.blur_variance == pytest.approx(required - 0.05)
+
+    def test_with_calibration_no_blur_for_wide_atoms(self, pdb_info):
+        volume, _ = _make_two_component_volumes(pdb_info[0], variances=(0.2, 0.5))
+        image_config = cxs.BasicImageConfig((32, 32), 1.0, voltage_in_kilovolts=300.0)
+        integrator = cxs.GaussianMixtureProjection.with_calibration(
+            volume, image_config, sampling_mode="point", upsample_factor=2
+        )
+        assert integrator.blur_variance == 0.0
 
     def test_with_calibration_sizes_n_spread_on_blurred_fine_grid(self, pdb_info):
         volume, _ = _make_two_component_volumes(pdb_info[0])
@@ -1584,7 +1594,7 @@ class TestGMMWithCalibration:
     @pytest.mark.parametrize("float32", (False, True))
     @pytest.mark.parametrize("shape", ((32, 30), (31, 31)))
     @pytest.mark.parametrize("upsample_factor", (2, 3))
-    def test_calibrated_point_deblur_within_tolerance(
+    def test_calibrated_point_within_tolerance(
         self, pdb_info, upsample_factor, shape, float32
     ):
         gaussian_volume, atom_volume = _make_two_component_volumes(pdb_info[0])

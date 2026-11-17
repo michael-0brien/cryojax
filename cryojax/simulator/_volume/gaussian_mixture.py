@@ -397,9 +397,11 @@ class GaussianMixtureProjection(
         if sampling_mode == "point":
             r = upsample_factor
             spread_pixel_size = pixel_size / r
-            blur_variance = (
+            # The variance the finer grid needs, topped up from the narrowest gaussian
+            required = (
                 pixel_size**2 * np.log(2 / tolerance) / (2 * np.pi**2 * r * (r - 1))
             )
+            blur_variance = max(0.0, required - float(np.min(volume.variances)))
         blurred_volume = eqx.tree_at(
             lambda v: v.variances, volume, volume.variances + blur_variance
         )
