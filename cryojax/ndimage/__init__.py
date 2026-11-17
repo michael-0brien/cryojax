@@ -37,6 +37,7 @@ from ._fourier_statistics import (
 )
 from ._fourier_utils import (
     convert_fftn_to_rfftn as convert_fftn_to_rfftn,
+    convert_rfftn_to_fftn as convert_rfftn_to_fftn,
     enforce_rfftn_self_conjugates as enforce_rfftn_self_conjugates,
     make_fftshift_phase as make_fftshift_phase,
     make_rfftn_multiplicity as make_rfftn_multiplicity,
