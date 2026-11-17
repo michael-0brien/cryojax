@@ -560,6 +560,39 @@ def test_enforce_rfftn_self_conjugates(shape, includes_dc, mode):
             np.testing.assert_array_equal(result[idx], arr[idx])
 
 
+@pytest.mark.parametrize("shape", [(8, 8), (8, 9), (9, 8), (6, 8, 8), (6, 8, 9)])
+def test_convert_fftn_to_rfftn_matches_rfftn_on_real_input(shape):
+    x = jr.normal(jr.key(0), shape)
+    got = im.convert_fftn_to_rfftn(jnp.fft.fftn(x), mode=None)
+    np.testing.assert_allclose(got, jnp.fft.rfftn(x), atol=1e-10)
+
+
+@pytest.mark.parametrize("shape", [(8, 8), (7, 8), (6, 8, 8)])
+def test_convert_fftn_to_rfftn_nyquist_column_is_positive_frequency(shape):
+    # A spectrum sampled at the fftfreq frequencies, hermitian as a function of q but
+    # with different values at -1/2 and +1/2: its rfft Nyquist column must hold +1/2
+    def spectrum(*q):
+        offset = (0.3, -0.7, 0.45)[: len(q)]
+        return np.exp(-sum(qi**2 for qi in q)) * np.exp(
+            -2j * np.pi * sum(qi * a for qi, a in zip(q, offset))
+        )
+
+    q_leading = np.meshgrid(*(np.fft.fftfreq(n) for n in shape[:-1]), indexing="ij")
+    q_full = np.meshgrid(*(np.fft.fftfreq(n) for n in shape), indexing="ij")
+    got = np.asarray(im.convert_fftn_to_rfftn(jnp.asarray(spectrum(*q_full)), mode=None))
+    expected = spectrum(*q_leading, 0.5)
+    # Where a leading frequency is also at -1/2, the column holds the opposite corner
+    mask = np.all([q != -0.5 for q in q_leading], axis=0)
+    np.testing.assert_allclose(got[..., -1][mask], expected[mask], atol=1e-12)
+
+
+@pytest.mark.parametrize("shape", [(8, 8), (8, 9), (9, 8), (6, 8, 8), (7, 6, 9)])
+def test_convert_rfftn_to_fftn_matches_fftn_on_real_input(shape):
+    x = jr.normal(jr.key(0), shape)
+    got = im.convert_rfftn_to_fftn(jnp.fft.rfftn(x), shape)
+    np.testing.assert_allclose(got, jnp.fft.fftn(x), atol=1e-10)
+
+
 def test_operators_instantiate():
     frequency_grid_1d = im.make_1d_frequency_grid(10)
     frequency_grid_2d = im.make_frequency_grid((10, 10))
