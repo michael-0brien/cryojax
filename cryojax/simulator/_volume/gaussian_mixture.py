@@ -263,7 +263,7 @@ class GaussianMixtureProjection(
         n_batches: int = 1,
         n_spread: int | tuple[int, ...] | None = None,
         enable_pallas: bool | Mapping[str, bool] | None = None,
-        upsample_factor: int = 2,
+        upsample_factor: int = 1,
         blur_variance: float = 0.0,
     ):
         """**Arguments:**
@@ -276,8 +276,9 @@ class GaussianMixtureProjection(
             If `'average'`, the average of the projected volume over each pixel,
             computed exactly with error functions. If `'point'`, the band-limited
             image, whose spectrum is the projected volume's at every frequency of
-            the grid, up to content past the finer grid's Nyquist, which folds in
-            unless the narrowest gaussian plus `blur_variance` is wide enough (see
+            the grid, up to content past the Nyquist of the grid gaussians are
+            spread on, which folds in unless `upsample_factor` is at least 2 and
+            the narrowest gaussian plus `blur_variance` is wide enough (see
             `with_calibration`).
         - `n_batches`:
             The number of batches over groups of positions
@@ -311,8 +312,7 @@ class GaussianMixtureProjection(
             the full picture. `None` (default) defers to `CRYOJAX_ENABLE_PALLAS`.
         - `upsample_factor`:
             Gaussians are spread on a grid this many times finer, then Fourier
-            cropped to the image grid. At least 2. Ignored if
-            `sampling_mode = 'average'`.
+            cropped to the image grid. Ignored if `sampling_mode = 'average'`.
         - `blur_variance`:
             The variance, in angstroms squared, of a gaussian blur added to every
             gaussian before spreading and divided out after the crop. Ignored if
@@ -334,12 +334,6 @@ class GaussianMixtureProjection(
             raise ValueError(
                 "`blur_variance` in `GaussianMixtureProjection` must be "
                 f"non-negative. Got `blur_variance = {blur_variance}`."
-            )
-        if sampling_mode == "point" and upsample_factor < 2:
-            raise ValueError(
-                "`GaussianMixtureProjection` with `sampling_mode = 'point'` requires "
-                "`upsample_factor` of at least 2. Got "
-                f"`upsample_factor = {upsample_factor}`."
             )
         self.shape = shape
         self.sampling_mode = sampling_mode
@@ -376,6 +370,8 @@ class GaussianMixtureProjection(
             from content folded into the image's band.
         - `cutoff_sigma`: Truncation width in standard deviations, for
             [`cryojax.simulator.suggest_n_spread`][].
+        - `upsample_factor`: As for `GaussianMixtureProjection`, but at least 2
+            with `sampling_mode = 'point'`.
 
         The other arguments are those of `GaussianMixtureProjection`.
         """
@@ -391,6 +387,12 @@ class GaussianMixtureProjection(
             n_batches=n_batches,
             upsample_factor=upsample_factor,
         )
+        if sampling_mode == "point" and upsample_factor < 2:
+            raise ValueError(
+                "`GaussianMixtureProjection.with_calibration` with "
+                "`sampling_mode = 'point'` requires `upsample_factor` of at least 2. "
+                f"Got `upsample_factor = {upsample_factor}`."
+            )
         # Function-local, since `_api_utils` imports this module
         from .._api_utils import suggest_n_spread
 
