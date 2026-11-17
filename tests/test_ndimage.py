@@ -123,6 +123,63 @@ def test_fourier_crop_downsample_matches_directly_rendered_gaussian(
     np.testing.assert_allclose(downsampled, coarse_gaussian, atol=2e-2)
 
 
+def _band_limited_gaussian_rfft(grid_shape, field_shape, band_shape):
+    """The rfft, on `grid_shape` with its origin at pixel `n // 2`, of an off-center
+    gaussian kept to the modes `|k| <= band / 2` per axis. Frequencies are `k / field`,
+    so grids of different shapes sample the same function over the same field."""
+    modes = [np.fft.fftfreq(n) * n for n in grid_shape[:-1]]
+    modes.append(np.arange(grid_shape[-1] // 2 + 1))
+    k = np.meshgrid(*modes, indexing="ij")
+    q = [k_i / n_i for k_i, n_i in zip(k, field_shape)]
+    offset = (1.3, -2.1, 0.7)[: len(grid_shape)]
+    spectrum = (
+        math.prod(grid_shape)
+        * np.exp(-2 * np.pi**2 * 4.0 * sum(q_i**2 for q_i in q))
+        * np.exp(-2j * np.pi * sum(q_i * a for q_i, a in zip(q, offset)))
+        * np.exp(-2j * np.pi * sum(k_i * (n // 2) / n for k_i, n in zip(k, grid_shape)))
+    )
+    inside = np.all([np.abs(k_i) <= b / 2 for k_i, b in zip(k, band_shape)], axis=0)
+    return np.where(inside, spectrum, 0.0)
+
+
+@pytest.mark.parametrize(
+    "shape, new_shape",
+    (
+        ((32, 32), (16, 16)),
+        ((32, 32), (15, 15)),
+        ((33, 33), (16, 16)),
+        ((31, 32), (15, 16)),
+        ((16, 16, 16), (8, 8, 8)),
+    ),
+)
+def test_fourier_crop_to_shape_nests_band_limited(shape, new_shape):
+    spectrum = _band_limited_gaussian_rfft(shape, shape, new_shape)
+    image = np.fft.irfftn(spectrum, s=shape, axes=tuple(range(len(shape))))
+    expected = _band_limited_gaussian_rfft(new_shape, shape, new_shape)
+    got = im.fourier_crop_to_shape(
+        image, new_shape, outputs_real_space=False, preserve_mean=True
+    )
+    np.testing.assert_allclose(got, expected, atol=1e-10 * np.abs(expected).max())
+
+
+@pytest.mark.parametrize(
+    "shape, new_shape",
+    (((32, 32), (15, 15)), ((33, 31), (16, 15)), ((32, 32), (16, 16))),
+)
+def test_fourier_crop_to_shape_complex_matches_real_parts(shape, new_shape):
+    # Without content at the new Nyquist, where a complex signal's -n/2 and +n/2 modes
+    # are independent, so that only the centering is compared
+    band = tuple(n - 1 for n in new_shape)
+    spectrum = _band_limited_gaussian_rfft(shape, shape, band)
+    x = np.fft.irfftn(spectrum, s=shape, axes=tuple(range(len(shape))))
+    y = np.roll(x, (3, -2), axis=(0, 1))
+    got = im.fourier_crop_to_shape(x + 1j * y, new_shape)
+    want = im.fourier_crop_to_shape(x, new_shape) + 1j * im.fourier_crop_to_shape(
+        y, new_shape
+    )
+    np.testing.assert_allclose(got, want, atol=1e-10)
+
+
 #
 # Cropping and padding
 #

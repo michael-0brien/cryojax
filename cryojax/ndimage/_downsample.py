@@ -7,11 +7,11 @@ from typing import Literal, overload
 import equinox as eqx
 import jax.numpy as jnp
 from jax import lax
-from jaxtyping import Array, Complex, Float, Inexact
+from jaxtyping import Array, Inexact
 
 from ..jax_util import NDArrayLike
-from ._coordinates import make_1d_frequency_grid, make_frequency_grid
-from ._edges import crop_to_shape
+from ._coordinates import make_frequency_grid
+from ._fourier_utils import convert_rfftn_to_fftn
 
 
 def block_reduce_downsample(
@@ -262,11 +262,9 @@ def fourier_crop_to_shape(
 ) -> Inexact[Array, "_ _"] | Inexact[Array, "_ _ _"]:
     """Downsample an array to a specified shape using fourier cropping.
 
-    For real signals, the Hartley Transform is used to downsample the signal.
-    For complex signals, the Fourier Transform is used to downsample the signal.
-
-    The real case is based on the `downsample_transform` function in cryoDRGN
-    https://github.com/ml-struct-bio/cryodrgn/blob/4ba75502d4dd1d0e5be3ecabf4a005c652edf4b5/cryodrgn/commands/downsample.py#L154
+    The modes kept are those of the new shape on cryoJAX's frequency grid: for an even
+    size, `+N/2` on the last axis of a real signal's `rfftn` and `-N/2` on every
+    other axis. The center pixel `N // 2` of each axis stays at the center `n // 2`.
 
     **Arguments:**
 
@@ -275,11 +273,11 @@ def fourier_crop_to_shape(
         The new shape after fourier cropping.
     - `outputs_real_space`:
         If `False`, the `image_or_volume` is returned in fourier space
-        with the zero-frequency component in the corner. For real signals,
-        hermitian symmetry is assumed.
+        with the zero-frequency component in the corner. For a real signal this is
+        the cropped spectrum itself, whose inverse `rfftn` is the real-space output.
     - `outputs_rfft`:
         Returns the result `fftn` instead of `rfftn` if equal to `False`.
-        Only applies to real signals, and ignored if `outputs_real_space` is `False`.
+        Only applies to real signals, and ignored if `outputs_real_space` is `True`.
     - `preserve_mean`:
         Preserve the mean of the volume after downsampling, rather
         than the sum.
@@ -315,130 +313,55 @@ def _fourier_crop_to_shape(
     array's center stays anchored to the original (unpadded) array's own
     center; `fourier_crop_to_shape` always calls with `shift = None`.
     """
-    if jnp.iscomplexobj(image_or_volume):
-        signal = _fft_ds_complex_signal_to_shape(
-            image_or_volume, shape, outputs_real_space=outputs_real_space, shift=shift
+    array = jnp.asarray(image_or_volume)
+    in_shape = array.shape
+    is_real = not jnp.iscomplexobj(array)
+    spectrum = jnp.fft.rfftn(array) if is_real else jnp.fft.fftn(array)
+    # Keep the new shape's modes by static slices: every full axis keeps
+    # 0 ... ceil(n/2) - 1 and -floor(n/2) ... -1, an rfft axis 0 ... n // 2
+    n_full_axes = len(in_shape) - 1 if is_real else len(in_shape)
+    for axis in range(n_full_axes):
+        n_in, n_out = in_shape[axis], shape[axis]
+        spectrum = jnp.concatenate(
+            [
+                lax.slice_in_dim(spectrum, 0, (n_out + 1) // 2, axis=axis),
+                lax.slice_in_dim(spectrum, n_in - n_out // 2, n_in, axis=axis),
+            ],
+            axis=axis,
         )
-    else:
-        signal = _fft_ds_real_signal_to_shape(
-            image_or_volume,
-            shape,
-            outputs_real_space=outputs_real_space,
-            outputs_rfft=outputs_rfft,
-            shift=shift,
-        )
-    n_pixels, n_pixels_ds = math.prod(image_or_volume.shape), math.prod(shape)
-    return (n_pixels_ds / n_pixels) * signal if preserve_mean else signal
+    if is_real:
+        spectrum = spectrum[..., : shape[-1] // 2 + 1]
+    spectrum = spectrum * _centering_phase(in_shape, shape, shift, is_real)
+    if preserve_mean:
+        spectrum = spectrum * (math.prod(shape) / math.prod(in_shape))
+    if outputs_real_space:
+        return jnp.fft.irfftn(spectrum, s=shape) if is_real else jnp.fft.ifftn(spectrum)
+    if is_real and not outputs_rfft:
+        return convert_rfftn_to_fftn(spectrum, shape)
+    return spectrum
 
 
-def _phase_shift_factor(
-    shape: tuple[int, ...], shift: tuple[float, ...], *, last_axis_is_rfft: bool
+def _centering_phase(
+    in_shape: tuple[int, ...],
+    shape: tuple[int, ...],
+    shift: tuple[float, ...] | None,
+    last_axis_is_rfft: bool,
 ) -> Array:
-    """Build the N-D phase ramp `exp(-2pi*i*sum(freq * shift))` as an outer
-    product of per-axis 1D phase factors, applied via broadcasting rather than
-    materializing a full N-D frequency grid."""
+    """`exp(2 pi i k [(N//2 - shift)/N - (n//2)/n])` on the kept modes `k` of each axis,
+    as an outer product: moves the center pixel `N // 2`, less `shift`, to `n // 2`.
+    Equal to 1 on an axis where both sizes are even and there is no shift."""
     ndim = len(shape)
+    shift = (0.0,) * ndim if shift is None else shift
     phase = jnp.asarray(1.0)
-    for axis in range(ndim):
-        freqs_1d = make_1d_frequency_grid(
-            shape[axis],
-            outputs_rfftfreqs=(last_axis_is_rfft and axis == ndim - 1),
-            fftshifted=not last_axis_is_rfft,
-        )
+    for axis, (n_in, n_out, s) in enumerate(zip(in_shape, shape, shift)):
+        offset = (n_in // 2 - s) / n_in - (n_out // 2) / n_out
+        if offset == 0:
+            continue
+        if last_axis_is_rfft and axis == ndim - 1:
+            modes = jnp.arange(n_out // 2 + 1)
+        else:
+            modes = jnp.fft.ifftshift(jnp.arange(-(n_out // 2), (n_out + 1) // 2))
         reshape = [1] * ndim
-        reshape[axis] = freqs_1d.shape[0]
-        phase = phase * jnp.exp(
-            -1.0j * 2 * jnp.pi * shift[axis] * freqs_1d.reshape(reshape)
-        )
+        reshape[axis] = modes.shape[0]
+        phase = phase * jnp.exp(2j * jnp.pi * offset * modes).reshape(reshape)
     return phase
-
-
-def _fft_ds_real_signal_to_shape(
-    image_or_volume: Float[NDArrayLike, "_ _"] | Float[NDArrayLike, "_ _ _"],
-    downsampled_shape: tuple[int, int] | tuple[int, int, int],
-    outputs_real_space: bool = True,
-    outputs_rfft: bool = True,
-    shift: tuple[float, ...] | None = None,
-) -> Inexact[Array, "_ _"] | Inexact[Array, "_ _ _"]:
-    shape = image_or_volume.shape
-    ndim = len(shape)
-
-    # Forward Hartley Transform, computed via `rfftn` (roughly half the
-    # compute/memory of a full `fftn`, since the input is real) instead of a
-    # full complex FFT. `rfftn` stores only the non-negative-frequency half of
-    # the last axis, in natural (DC-at-corner) order.
-    rfft_array = jnp.fft.rfftn(jnp.fft.ifftshift(image_or_volume))
-    if shift is not None:
-        rfft_array = (
-            _phase_shift_factor(shape, shift, last_axis_is_rfft=True) * rfft_array
-        )
-
-    # Per axis, the natural-order indices of the low-frequency modes kept by
-    # `crop_to_shape`'s centered crop window (positive frequencies, then the
-    # wrapped negative frequencies), gathered directly by index rather than via
-    # `fftshift` + `crop_to_shape` + `ifftshift` on the full-size spectrum.
-    def _extraction_indices(dim: int, dim_ds: int) -> tuple[Array, Array]:
-        q_min = -(dim_ds // 2)
-        q_max = (dim_ds - 1) // 2
-        return jnp.arange(q_max + 1), jnp.arange(dim + q_min, dim)
-
-    idx_pos, idx_neg = zip(
-        *(
-            _extraction_indices(dim, dim_ds)
-            for dim, dim_ds in zip(shape, downsampled_shape)
-        )
-    )
-    # All axes but the last are stored in full by `rfftn` -- gather both the
-    # positive- and negative-frequency indices for those directly.
-    leading_idx = [jnp.concatenate([idx_pos[i], idx_neg[i]]) for i in range(ndim - 1)]
-    last_pos, last_neg = idx_pos[-1], idx_neg[-1]
-
-    block_pos = rfft_array[jnp.ix_(*leading_idx, last_pos)]
-    if last_neg.size > 0:
-        # The last axis's negative-frequency modes aren't stored by `rfftn`, so
-        # reconstruct them from Hermitian symmetry:
-        # `X[..., y_i, ..., N - m] = conj(X[..., (N_i - y_i) % N_i, ..., m])`,
-        # gathered from the already-computed `rfft_array` rather than via
-        # another transform.
-        m_neg = shape[-1] - last_neg
-        mirror_idx = [(shape[i] - leading_idx[i]) % shape[i] for i in range(ndim - 1)]
-        block_neg = jnp.conj(rfft_array[jnp.ix_(*mirror_idx, m_neg)])
-        hartley_array = jnp.concatenate([block_pos, block_neg], axis=-1)
-    else:
-        hartley_array = block_pos
-    hartley_array = hartley_array.real - hartley_array.imag
-
-    # Inverse Hartley Transform. No `fftshift`/`ifftshift` is needed here (or
-    # before gathering `hartley_array` above): they are exact inverses of each
-    # other and the Hartley combine in between is pointwise, so the shifts that
-    # would otherwise bracket the crop cancel algebraically.
-    ds_array = jnp.fft.fftshift(jnp.fft.fftn(hartley_array))
-    ds_array /= hartley_array.size
-    ds_array = ds_array.real - ds_array.imag
-
-    if outputs_real_space:
-        return ds_array
-    else:
-        return jnp.fft.rfftn(ds_array) if outputs_rfft else jnp.fft.fftn(ds_array)
-
-
-def _fft_ds_complex_signal_to_shape(
-    image_or_volume: Complex[NDArrayLike, "_ _"] | Complex[NDArrayLike, "_ _ _"],
-    downsampled_shape: tuple[int, int] | tuple[int, int, int],
-    outputs_real_space: bool = True,
-    shift: tuple[float, ...] | None = None,
-) -> Complex[Array, "_ _"] | Complex[Array, "_ _ _"]:
-    fourier_array = jnp.fft.fftshift(jnp.fft.fftn(image_or_volume))
-    if shift is not None:
-        fourier_array = (
-            _phase_shift_factor(image_or_volume.shape, shift, last_axis_is_rfft=False)
-            * fourier_array
-        )
-
-    # Crop to the desired shape
-    cropped_fourier_array = crop_to_shape(fourier_array, downsampled_shape)
-
-    if outputs_real_space:
-        return jnp.fft.ifftn(jnp.fft.ifftshift(cropped_fourier_array))
-    else:
-        return jnp.fft.ifftshift(cropped_fourier_array)
