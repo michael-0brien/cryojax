@@ -732,10 +732,7 @@ def test_fft_atom_projection_exact(monkeypatch, pdb_info, pixel_size, shape, bac
     gaussian_volume, gaussian_integrator, atom_volume, image_config = (
         _make_fft_projection_exact_volumes(pdb_info)
     )
-    atom_integrator = cxs.GaussianFourierProjection(
-        sampling_mode="point",
-        eps=1e-10,
-    )
+    atom_integrator = cxs.GaussianFourierProjection(eps=1e-10)
     proj_by_gaussians = compute_projection(
         gaussian_volume, gaussian_integrator, image_config
     )
@@ -756,89 +753,19 @@ def test_fft_atom_projection_exact_backends_agree(
     monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", "nufftax")
     proj_nufftax = compute_projection(
         atom_volume,
-        cxs.GaussianFourierProjection(sampling_mode="point", eps=1e-10),
+        cxs.GaussianFourierProjection(eps=1e-10),
         image_config,
     )
     monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", "jax-finufft")
     proj_jax_finufft = compute_projection(
         atom_volume,
-        cxs.GaussianFourierProjection(sampling_mode="point", eps=1e-10),
+        cxs.GaussianFourierProjection(eps=1e-10),
         image_config,
     )
     np.testing.assert_allclose(proj_nufftax, proj_jax_finufft, atol=1e-6)
 
 
-def _make_antialias_volumes(pdb_info, width, pixel_size, shape):
-    atom_positions, _, _ = pdb_info
-    gaussian_volume = cxs.GaussianMixtureVolume(
-        atom_positions, amplitudes=1.0, variances=width**2
-    )
-    atom_volume = cxs.GaussianFourierVolume(
-        positions=atom_positions,
-        kernel_fns=im.FourierGaussian(amplitude=1.0, b_factor=width**2 * (8 * np.pi**2)),
-    )
-    gaussian_integrator = cxs.GaussianMixtureProjection(sampling_mode="average")
-    padded_shape = (2 * shape[0], 2 * shape[1])
-    image_config = cxs.BasicImageConfig(
-        shape, pixel_size, voltage_in_kilovolts=300.0, padded_shape=padded_shape
-    )
-    return gaussian_volume, gaussian_integrator, atom_volume, image_config
-
-
-@pytest.mark.parametrize(
-    "width, pixel_size, shape",
-    ((5.0, 0.5, (64, 64)), (1.0, 0.5, (64, 64)), (2.0, 1.0, (32, 32))),
-)
-@_backends
-def test_fft_atom_projection_antialias(
-    monkeypatch, pdb_info, width, pixel_size, shape, backend
-):
-    monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", backend)
-    gaussian_volume, gaussian_integrator, atom_volume, image_config = (
-        _make_antialias_volumes(pdb_info, width, pixel_size, shape)
-    )
-    atom_integrator = cxs.GaussianFourierProjection(
-        sampling_mode="average", eps=1e-10, upsample_factor=2
-    )
-    proj_by_gaussians = compute_projection(
-        gaussian_volume, gaussian_integrator, image_config
-    )
-    proj_by_atoms = compute_projection(atom_volume, atom_integrator, image_config)
-    np.testing.assert_allclose(proj_by_gaussians, proj_by_atoms, atol=1e-8)
-
-
-@pytest.mark.skipif(jnufft is None, reason="jax-finufft not installed")
-@pytest.mark.parametrize(
-    "width, pixel_size, shape",
-    ((5.0, 0.5, (64, 64)), (1.0, 0.5, (64, 64)), (2.0, 1.0, (32, 32))),
-)
-def test_fft_atom_projection_antialias_backends_agree(
-    monkeypatch, pdb_info, width, pixel_size, shape
-):
-    """nufftax and jax-finufft must produce identical antialiased projections."""
-    _, _, atom_volume, image_config = _make_antialias_volumes(
-        pdb_info, width, pixel_size, shape
-    )
-    monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", "nufftax")
-    proj_nufftax = compute_projection(
-        atom_volume,
-        cxs.GaussianFourierProjection(
-            sampling_mode="average", eps=1e-10, upsample_factor=2
-        ),
-        image_config,
-    )
-    monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", "jax-finufft")
-    proj_jax_finufft = compute_projection(
-        atom_volume,
-        cxs.GaussianFourierProjection(
-            sampling_mode="average", eps=1e-10, upsample_factor=2
-        ),
-        image_config,
-    )
-    np.testing.assert_allclose(proj_nufftax, proj_jax_finufft, atol=1e-6)
-
-
-def _make_peng_volumes(pdb_info, upsampfac):
+def _make_peng_volumes(pdb_info):
     atom_positions, atom_ids, _ = pdb_info
     positions_by_id, unique_atom_ids = split_atoms_by_element(atom_ids, atom_positions)
     peng_parameters = PengScatteringFactorParameters(atom_ids)
@@ -851,84 +778,55 @@ def _make_peng_volumes(pdb_info, upsampfac):
         peng_parameters_by_id,
         b_factor_by_element=4.0,
     )
-    gaussian_integrator = cxs.GaussianMixtureProjection(sampling_mode="average")
+    # Wide enough at 0.25 angstroms for the twice-finer grid without a blur
+    gaussian_integrator = cxs.GaussianMixtureProjection(
+        sampling_mode="point", upsample_factor=2
+    )
     return gaussian_volume, gaussian_integrator, atom_volume
 
 
 @pytest.mark.parametrize(
-    "pixel_size, shape, upsampfac, eps",
+    "pixel_size, shape, eps",
     (
-        (0.25, (134, 134), 2, 1e-5),
-        (0.25, (133, 133), 2, 1e-5),
-        (0.25, (134, 133), 2, 1e-5),
-        (0.25, (133, 134), 2, 1e-5),
-        (0.25, (134, 134), 3, 1e-5),
-        (0.25, (133, 133), 3, 1e-5),
-        (0.25, (134, 133), 3, 1e-5),
-        (0.25, (133, 134), 3, 1e-5),
-        (0.25, (134, 134), 2, 1e-6),
-        (0.25, (133, 133), 2, 1e-6),
-        (0.25, (134, 133), 2, 1e-6),
-        (0.25, (133, 134), 2, 1e-6),
-        (0.25, (134, 134), 3, 1e-6),
-        (0.25, (133, 133), 3, 1e-6),
-        (0.25, (134, 133), 3, 1e-6),
-        (0.25, (133, 134), 3, 1e-6),
+        (0.25, (134, 134), 1e-5),
+        (0.25, (133, 133), 1e-5),
+        (0.25, (134, 133), 1e-5),
+        (0.25, (133, 134), 1e-5),
+        (0.25, (134, 134), 1e-6),
+        (0.25, (133, 133), 1e-6),
+        (0.25, (134, 133), 1e-6),
+        (0.25, (133, 134), 1e-6),
     ),
 )
 @_backends
-def test_fft_projection_peng(
-    monkeypatch, pdb_info, pixel_size, shape, upsampfac, eps, backend
-):
+def test_fft_projection_peng(monkeypatch, pdb_info, pixel_size, shape, eps, backend):
     monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", backend)
-    gaussian_volume, gaussian_integrator, atom_volume = _make_peng_volumes(
-        pdb_info, upsampfac
-    )
+    gaussian_volume, gaussian_integrator, atom_volume = _make_peng_volumes(pdb_info)
     image_config = cxs.BasicImageConfig(shape, pixel_size, voltage_in_kilovolts=300.0)
-    atom_integrator = cxs.GaussianFourierProjection(
-        sampling_mode="average",
-        upsample_factor=upsampfac,
-        eps=eps,
-    )
+    atom_integrator = cxs.GaussianFourierProjection(eps=eps)
     proj_by_gaussians = compute_projection(
         gaussian_volume, gaussian_integrator, image_config
     )
     proj_by_atoms = compute_projection(atom_volume, atom_integrator, image_config)
-    np.testing.assert_allclose(proj_by_gaussians, proj_by_atoms, atol=5e-3)
+    np.testing.assert_allclose(proj_by_gaussians, proj_by_atoms, atol=1e-3)
 
 
 @pytest.mark.skipif(jnufft is None, reason="jax-finufft not installed")
-@pytest.mark.parametrize(
-    "pixel_size, shape, upsampfac",
-    (
-        (0.25, (134, 134), 2),
-        (0.25, (133, 133), 2),
-    ),
-)
-def test_fft_projection_peng_backends_agree(
-    monkeypatch, pdb_info, pixel_size, shape, upsampfac
-):
+@pytest.mark.parametrize("pixel_size, shape", ((0.25, (134, 134)), (0.25, (133, 133))))
+def test_fft_projection_peng_backends_agree(monkeypatch, pdb_info, pixel_size, shape):
     """nufftax and jax-finufft must produce identical Peng-tabulated projections."""
-    _, _, atom_volume = _make_peng_volumes(pdb_info, upsampfac)
+    _, _, atom_volume = _make_peng_volumes(pdb_info)
     image_config = cxs.BasicImageConfig(shape, pixel_size, voltage_in_kilovolts=300.0)
     monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", "nufftax")
     proj_nufftax = compute_projection(
         atom_volume,
-        cxs.GaussianFourierProjection(
-            sampling_mode="average",
-            upsample_factor=upsampfac,
-            eps=1e-10,
-        ),
+        cxs.GaussianFourierProjection(eps=1e-10),
         image_config,
     )
     monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", "jax-finufft")
     proj_jax_finufft = compute_projection(
         atom_volume,
-        cxs.GaussianFourierProjection(
-            sampling_mode="average",
-            upsample_factor=upsampfac,
-            eps=1e-10,
-        ),
+        cxs.GaussianFourierProjection(eps=1e-10),
         image_config,
     )
     np.testing.assert_allclose(proj_nufftax, proj_jax_finufft, atol=1e-6)
@@ -945,7 +843,6 @@ def test_fft_atom_projection_custom_upsampfac(upsampfac):
         kernel_fns=im.FourierGaussian(amplitude=1.0, b_factor=100.0),
     )
     atom_integrator = cxs.GaussianFourierProjection(
-        sampling_mode="point",
         eps=1e-6,
         options={"upsampfac": upsampfac},
     )
@@ -974,7 +871,6 @@ def test_fft_atom_projection_custom_upsampfac_jax_finufft(monkeypatch, upsampfac
         backward=Opts(upsampfac=upsampfac, gpu_upsampfac=upsampfac),
     )
     atom_integrator = cxs.GaussianFourierProjection(
-        sampling_mode="point",
         eps=1e-6,
         options={"opts": opts},
     )
@@ -984,7 +880,7 @@ def test_fft_atom_projection_custom_upsampfac_jax_finufft(monkeypatch, upsampfac
     assert result.shape == (shape[0], shape[1] // 2 + 1)
 
 
-# ── GaussianFourierRenderFn: each backend vs GaussianMixtureRenderFn ──────────
+# ── GaussianFourierRenderFn: each backend vs the sampled gaussians ────────────
 
 
 def _make_render_volumes(pdb_info, width):
@@ -999,6 +895,18 @@ def _make_render_volumes(pdb_info, width):
     return gaussian_volume, atom_volume
 
 
+def _sample_gaussians_3d(positions, variance, shape, voxel_size):
+    # Normalized isotropic gaussians at the voxel centers, the center at index N//2
+    x, y, z = (
+        np.exp(
+            -(((voxel_size * (np.arange(n) - n // 2))[None, :] - r[:, None]) ** 2)
+            / (2 * variance)
+        )
+        for n, r in zip(shape[::-1], positions.T)
+    )
+    return np.einsum("az, ay, ax -> zyx", z, y, x) / (2 * np.pi * variance) ** 1.5
+
+
 @pytest.mark.parametrize(
     "width, voxel_size, shape",
     (
@@ -1009,14 +917,12 @@ def _make_render_volumes(pdb_info, width):
 @_backends
 def test_fft_atom_render(monkeypatch, pdb_info, width, voxel_size, shape, backend):
     monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", backend)
-    gaussian_volume, atom_volume = _make_render_volumes(pdb_info, width)
-    gaussian_render_fn = cxs.GaussianMixtureRenderFn(shape, voxel_size)
-    atom_render_fn = cxs.GaussianFourierRenderFn(
-        shape, voxel_size, sampling_mode="average", eps=1e-10
-    )
-    voxels_by_gaussians = gaussian_render_fn(gaussian_volume)
-    voxels_by_atoms = atom_render_fn(atom_volume)
-    np.testing.assert_allclose(voxels_by_gaussians, voxels_by_atoms, atol=1e-8)
+    _, atom_volume = _make_render_volumes(pdb_info, width)
+    atom_render_fn = cxs.GaussianFourierRenderFn(shape, voxel_size, eps=1e-10)
+    # These gaussians have no content past the grid's Nyquist, so their samples are
+    # the band-limited voxel grid
+    expected = _sample_gaussians_3d(pdb_info[0], width**2, shape, voxel_size)
+    np.testing.assert_allclose(atom_render_fn(atom_volume), expected, atol=1e-8)
 
 
 @pytest.mark.skipif(jnufft is None, reason="jax-finufft not installed")
@@ -1320,7 +1226,7 @@ def _make_gaussian_volumes(positions, variance):
 
 
 class TestGMMSamplingModes:
-    exact_integrator = cxs.GaussianFourierProjection(sampling_mode="point", eps=1e-10)
+    exact_integrator = cxs.GaussianFourierProjection(eps=1e-10)
 
     @pytest.mark.parametrize("n_spread", (None, 11))
     def test_average_ignores_point_only_args(self, pdb_info, n_spread):
@@ -1472,9 +1378,7 @@ class TestGMMSamplingModes:
             upsample_factor=2,
             blur_variance=_blur_variance(1.0, 2),
         )
-        exact_integrator = cxs.GaussianFourierProjection(
-            sampling_mode="point", eps=1e-10, shape=(2 * n, 2 * n)
-        )
+        exact_integrator = cxs.GaussianFourierProjection(eps=1e-10, shape=(2 * n, 2 * n))
         projection = integrator.integrate(gaussian_volume, image_config)
         exact = exact_integrator.integrate(atom_volume, image_config)
         assert projection.shape == (n, n // 2 + 1)
@@ -1696,63 +1600,6 @@ class TestGMMWithCalibration:
         assert _max_shell_relative_error(projection, exact, image_config) <= 1e-2
 
 
-# ── GaussianFourier upsampling: folding aliases onto the output grid ─────────
-
-
-def _max_relative_error(actual, expected):
-    return np.abs(actual - expected).max() / np.abs(expected).max()
-
-
-@pytest.mark.parametrize("shape", ((32, 32), (31, 32)))
-@pytest.mark.parametrize(
-    "b_factor, upsample_factor, rtol",
-    ((5.0, 8, 1e-8), (20.0, 3, 1e-4), (20.0, 8, 1e-8)),
-)
-def test_fft_projection_average_converges_to_pixel_average(
-    shape, b_factor, upsample_factor, rtol
-):
-    positions = np.random.default_rng(0).uniform(-8.0, 8.0, size=(20, 3))
-    gaussian_volume, atom_volume = _make_gaussian_volumes(
-        positions, b_factor / (8 * np.pi**2)
-    )
-    image_config = cxs.BasicImageConfig(shape, 1.0, voltage_in_kilovolts=300.0)
-    exact = cxs.GaussianMixtureProjection(sampling_mode="average").integrate(
-        gaussian_volume, image_config, outputs_real_space=True
-    )
-    integrator = cxs.GaussianFourierProjection(
-        sampling_mode="average", eps=1e-12, upsample_factor=upsample_factor
-    )
-    projection = integrator.integrate(atom_volume, image_config, outputs_real_space=True)
-    assert _max_relative_error(projection, exact) <= rtol
-
-
-@pytest.mark.parametrize("upsample_factor, rtol", ((3, 1e-4), (4, 1e-8)))
-def test_fft_render_upsampling_converges_to_voxel_average(upsample_factor, rtol):
-    shape, voxel_size = (15, 16, 17), 1.0
-    # Away from the edges, since the fourier render is periodic and the reference not
-    positions = np.random.default_rng(0).uniform(-3.0, 3.0, size=(20, 3))
-    gaussian_volume, atom_volume = _make_gaussian_volumes(
-        positions, 20.0 / (8 * np.pi**2)
-    )
-    exact = cxs.GaussianMixtureRenderFn(shape, voxel_size)(gaussian_volume)
-    render_fn = cxs.GaussianFourierRenderFn(
-        shape,
-        voxel_size,
-        sampling_mode="average",
-        eps=1e-12,
-        upsample_factor=upsample_factor,
-    )
-    assert _max_relative_error(render_fn(atom_volume), exact) <= rtol
-
-
-@pytest.mark.parametrize("upsample_factor", (0, 1.5))
-def test_fft_upsample_factor_must_be_a_positive_integer(upsample_factor):
-    with pytest.raises(ValueError, match="upsample_factor"):
-        cxs.GaussianFourierProjection(upsample_factor=upsample_factor)
-    with pytest.raises(ValueError, match="upsample_factor"):
-        cxs.GaussianFourierRenderFn((8, 8, 8), 1.0, upsample_factor=upsample_factor)
-
-
 # ── GaussianFourier: sampling modes ───────────────────────────────────────────
 
 
@@ -1762,7 +1609,7 @@ def test_fft_upsample_factor_must_be_a_positive_integer(upsample_factor):
 def test_fft_point_nests_under_fourier_crop(shape, new_shape):
     positions = np.random.default_rng(0).uniform(-8.0, 8.0, size=(20, 3))
     _, atom_volume = _make_gaussian_volumes(positions, 0.6)
-    integrator = cxs.GaussianFourierProjection(sampling_mode="point", eps=1e-10)
+    integrator = cxs.GaussianFourierProjection(eps=1e-10)
     fine = integrator.integrate(
         atom_volume,
         cxs.BasicImageConfig(shape, 1.0, voltage_in_kilovolts=300.0),
@@ -1790,32 +1637,17 @@ def test_fft_point_nests_under_fourier_crop(shape, new_shape):
     )
 
 
-def test_fft_point_ignores_upsample_factor():
-    positions = np.random.default_rng(0).uniform(-8.0, 8.0, size=(20, 3))
-    _, atom_volume = _make_gaussian_volumes(positions, 0.6)
-    image_config = cxs.BasicImageConfig((32, 32), 1.0, voltage_in_kilovolts=300.0)
-    projections = [
-        cxs.GaussianFourierProjection(
-            sampling_mode="point", upsample_factor=factor
-        ).integrate(atom_volume, image_config)
-        for factor in (2, 4)
-    ]
-    np.testing.assert_array_equal(*projections)
-
-
-def test_fft_defaults():
-    for integrator in (
-        cxs.GaussianFourierProjection(),
-        cxs.GaussianFourierRenderFn((8, 8, 8), 1.0),
-    ):
-        assert integrator.sampling_mode == "point"
-        assert integrator.upsample_factor == 2
-
-
-def test_fft_average_requires_upsample_factor_2():
-    with pytest.raises(ValueError, match="GaussianFourierProjection.*upsample_factor.*1"):
-        cxs.GaussianFourierProjection(sampling_mode="average", upsample_factor=1)
-    with pytest.raises(ValueError, match="GaussianFourierRenderFn.*upsample_factor.*1"):
-        cxs.GaussianFourierRenderFn(
-            (8, 8, 8), 1.0, sampling_mode="average", upsample_factor=1
-        )
+@pytest.mark.parametrize(
+    "make",
+    (
+        lambda **kwargs: cxs.GaussianFourierProjection(**kwargs),
+        lambda **kwargs: cxs.GaussianFourierRenderFn((8, 8, 8), 1.0, **kwargs),
+    ),
+    ids=("projection", "render_fn"),
+)
+def test_fft_is_point_only(make):
+    assert make().sampling_mode == "point"
+    assert "sampling_mode='point'" in repr(make())
+    for kwargs in ({"sampling_mode": "average"}, {"upsample_factor": 2}):
+        with pytest.raises(TypeError):
+            make(**kwargs)
