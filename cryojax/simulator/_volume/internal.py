@@ -1,6 +1,5 @@
 """Shared helpers for volume rendering backends."""
 
-import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from ...ndimage import FourierGaussian, FourierSinc, make_1d_frequency_grid
@@ -47,19 +46,6 @@ def eval_separable_impl(
             * kernel_fn(q_y)[None, :, None]
             * kernel_fn(q_z)[:, None, None]
         )
-
-
-def center_shift(
-    shape_u: tuple[int, ...], shape_out: tuple[int, ...], pixel_size_u: Float[Array, ""]
-) -> Float[Array, " d"]:
-    """The shift, in `(x, y[, z])` order, that places the physical origin at the output
-    grid's center `N//2` on the upsampled grid, whose own center is `N_u//2`."""
-    return jnp.asarray(
-        [
-            pixel_size_u * (n_u * (n // 2) / n - n_u // 2)
-            for n_u, n in zip(shape_u[::-1], shape_out[::-1])
-        ]
-    )
 
 
 def check_anisotropy_supported(
