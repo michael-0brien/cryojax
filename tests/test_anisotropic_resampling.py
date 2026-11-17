@@ -106,7 +106,10 @@ def volumes():
 
 
 def _models(
-    config, volume=None, integrator=cxs.GaussianMixtureProjection(sampling_mode="point")
+    config,
+    volume=None,
+    # A projection made in real space, so that resampling adds no FFTs
+    integrator=cxs.GaussianMixtureProjection(sampling_mode="average"),
 ):
     volume = _gaussian_volume() if volume is None else volume
     ctf = cxs.AstigmaticCTF(defocus_in_angstroms=5000.0, astigmatism_in_angstroms=300.0)
@@ -223,7 +226,7 @@ def test_integrators_apply_the_anisotropic_magnification(
     [
         (integrator, volume, name)
         for integrator, volume in [
-            (cxs.GaussianMixtureProjection(sampling_mode="point"), None),
+            (cxs.GaussianMixtureProjection(sampling_mode="average"), None),
             (cxs.FourierSliceExtraction(), "voxels"),
         ]
         for name in ["projection", "weak phase", "weak phase theory", "rytov"]

@@ -21,7 +21,7 @@ from cryojax.constants import (
     check_atomic_numbers_supported,
 )
 from cryojax.ndimage import _nufft, make_coordinate_grid
-from cryojax.simulator._volume.internal import build_extraction_mesh, make_frequencies_1d
+from cryojax.simulator._volume.internal import make_frequencies_1d
 from jaxtyping import Array
 
 
@@ -323,7 +323,9 @@ class TestIntegrateGMMToPixelsWithSpreadingBackend:
             voltage_in_kilovolts=300.0,
         )
         integrator = cxs.GaussianMixtureProjection(
-            sampling_mode=sampling_mode, n_spread=11
+            sampling_mode=sampling_mode,
+            # `point` spreads on a twice-finer grid
+            n_spread=11 if sampling_mode == "average" else 21,
         )
         projection = jnp.fft.irfftn(integrator.integrate(atomic_volume, image_config))
 
@@ -345,7 +347,9 @@ class TestIntegrateGMMToPixelsWithSpreadingBackend:
             voltage_in_kilovolts=300.0,
         )
         integrator = cxs.GaussianMixtureProjection(
-            sampling_mode=sampling_mode, n_spread=11
+            sampling_mode=sampling_mode,
+            # `point` spreads on a twice-finer grid
+            n_spread=11 if sampling_mode == "average" else 21,
         )
         projection = jnp.fft.irfftn(integrator.integrate(atomic_volume, image_config))
 
@@ -370,7 +374,9 @@ class TestIntegrateGMMToPixelsWithSpreadingBackend:
         )
         dense_integrator = cxs.GaussianMixtureProjection(sampling_mode=sampling_mode)
         spread_integrator = cxs.GaussianMixtureProjection(
-            sampling_mode=sampling_mode, n_spread=13
+            sampling_mode=sampling_mode,
+            # `point` spreads on a twice-finer grid
+            n_spread=13 if sampling_mode == "average" else 25,
         )
         dense_projection = dense_integrator.integrate(
             atomic_volume, image_config, outputs_real_space=True
@@ -394,7 +400,9 @@ class TestIntegrateGMMToPixelsWithSpreadingBackend:
             voltage_in_kilovolts=300.0,
         )
         integrator = cxs.GaussianMixtureProjection(
-            sampling_mode=sampling_mode, n_spread=11
+            sampling_mode=sampling_mode,
+            # `point` spreads on a twice-finer grid
+            n_spread=11 if sampling_mode == "average" else 21,
         )
 
         def loss(positions, amplitudes, variances):
@@ -422,7 +430,9 @@ class TestIntegrateGMMToPixelsWithSpreadingBackend:
         )
         dense_integrator = cxs.GaussianMixtureProjection(sampling_mode=sampling_mode)
         spread_integrator = cxs.GaussianMixtureProjection(
-            sampling_mode=sampling_mode, n_spread=13
+            sampling_mode=sampling_mode,
+            # `point` spreads on a twice-finer grid
+            n_spread=13 if sampling_mode == "average" else 25,
         )
 
         def make_loss(integrator):
@@ -1224,24 +1234,6 @@ def test_suggest_n_spread_output_is_plain_python_not_jax():
     assert all(type(n) is int for n in termwise_n_spread)
 
 
-@pytest.mark.parametrize("shape, shape_ds", [((64, 48), (32, 24)), ((63, 45), (31, 23))])
-def test_build_extraction_mesh_rfft_matches_full(shape, shape_ds):
-    x = jax.random.normal(jax.random.key(0), shape)
-    mesh_full, factor = build_extraction_mesh(shape, shape_ds, modeord=1)
-    mesh_rfft, factor_rfft = build_extraction_mesh(
-        shape, shape_ds, modeord=1, outputs_rfft=True
-    )
-    n_cols = shape_ds[-1] // 2 + 1
-    full = (jnp.fft.fftn(x)[tuple(mesh_full)] * factor)[..., :n_cols]
-    rfft = jnp.fft.rfftn(x)[tuple(mesh_rfft)] * factor_rfft
-    assert rfft.shape[-1] == n_cols
-    if shape_ds[-1] % 2 == 0:
-        full, rfft = full[..., :-1], rfft[..., :-1]
-    np.testing.assert_allclose(rfft, full, atol=1e-4)
-    with pytest.raises(ValueError, match="modeord"):
-        build_extraction_mesh(shape, shape_ds, modeord=0, outputs_rfft=True)
-
-
 def test_make_frequencies_1d_rfft():
     shape_u, p = (12, 10), jnp.asarray(1.3)
     full = make_frequencies_1d(shape_u, p, modeord=1)
@@ -1252,13 +1244,14 @@ def test_make_frequencies_1d_rfft():
         make_frequencies_1d(shape_u, p, modeord=0, outputs_rfft=True)
 
 
-# ── GaussianMixtureProjection: deblurring and upsampling ─────────────────────
+# ── GaussianMixtureProjection: point sampling ────────────────────────────────
 
 
 def _max_shell_relative_error(a, b, image_config):
     """The largest relative L2 error of rfft spectrum `a` against `b` over radial
-    shells, with the corners beyond Nyquist as one shell. An even x Nyquist column is
-    left out: it holds +n/2 in `GaussianMixtureProjection`, -n/2 in the reference."""
+    shells, with the corners beyond Nyquist as one shell. The bin at an even y and x
+    Nyquist is left out: four frequencies share it, and `GaussianFourierProjection`
+    fills it from the opposite corner."""
     n_y, n_x = image_config.padded_shape
     pixel_size = float(image_config.pixel_size)
     frequencies_y = np.fft.fftfreq(n_y, pixel_size)[:, None]
@@ -1267,10 +1260,12 @@ def _max_shell_relative_error(a, b, image_config):
     n_shells = min(n_y, n_x) // 2
     shells = np.minimum(np.floor(radius * n_shells), n_shells)
     a, b = np.asarray(a), np.asarray(b)
-    if n_x % 2 == 0:
-        a, b, shells = a[:, :-1], b[:, :-1], shells[:, :-1]
+    keep = np.ones(a.shape, bool)
+    if n_y % 2 == 0 and n_x % 2 == 0:
+        keep[n_y // 2, -1] = False
     return max(
-        np.linalg.norm((a - b)[shells == s]) / np.linalg.norm(b[shells == s])
+        np.linalg.norm((a - b)[keep & (shells == s)])
+        / np.linalg.norm(b[keep & (shells == s)])
         for s in np.unique(shells)
     )
 
@@ -1281,7 +1276,7 @@ def _blur_variance(p, r):
     return p**2 * np.log(200) / (2 * np.pi**2 * r * (r - 1))
 
 
-def _make_deblur_volumes(positions, variance):
+def _make_gaussian_volumes(positions, variance):
     gaussian_volume = cxs.GaussianMixtureVolume(
         positions, amplitudes=1.0, variances=variance
     )
@@ -1292,53 +1287,30 @@ def _make_deblur_volumes(positions, variance):
     return gaussian_volume, atom_volume
 
 
-class TestGMMDeblurAndUpsampling:
+class TestGMMPointSampling:
     exact_integrator = cxs.GaussianFourierProjection(sampling_mode="point", eps=1e-10)
 
     @pytest.mark.parametrize("n_spread", (None, 11))
     def test_average_ignores_point_only_args(self, pdb_info, n_spread):
-        volume, _ = _make_deblur_volumes(pdb_info[0], 0.5)
+        volume, _ = _make_gaussian_volumes(pdb_info[0], 0.5)
         image_config = cxs.BasicImageConfig((32, 32), 1.0, voltage_in_kilovolts=300.0)
         default = cxs.GaussianMixtureProjection(n_spread=n_spread)
         ignored = cxs.GaussianMixtureProjection(
-            n_spread=n_spread, upsample_factor=2, blur_variance=0.5
+            n_spread=n_spread, upsample_factor=3, blur_variance=0.5
         )
         np.testing.assert_array_equal(
             ignored.integrate(volume, image_config),
             default.integrate(volume, image_config),
         )
 
-    @pytest.mark.parametrize("shape", ((32, 32), (31, 31)))
-    def test_average_deblur_matches_exact(self, pdb_info, shape):
-        gaussian_volume, atom_volume = _make_deblur_volumes(
-            pdb_info[0], 100.0 / (8 * np.pi**2)
-        )
-        image_config = cxs.BasicImageConfig(
-            shape,
-            0.5,
-            voltage_in_kilovolts=300.0,
-            padded_shape=(2 * shape[0] + shape[0] % 2, 2 * shape[1] + shape[1] % 2),
-        )
-        integrator = cxs.GaussianMixtureProjection(deblur=True)
-        projection = integrator.integrate(
-            gaussian_volume, image_config, outputs_real_space=True
-        )
-        exact = self.exact_integrator.integrate(
-            atom_volume, image_config, outputs_real_space=True
-        )
-        np.testing.assert_allclose(projection, exact, atol=1e-6 * np.abs(exact).max())
-
     @pytest.mark.parametrize("variance", (0.05, 0.5))
     @pytest.mark.parametrize("shape", ((32, 32), (31, 31), (31, 32), (32, 30)))
     @pytest.mark.parametrize("upsample_factor", (2, 3))
-    def test_point_deblur_upsampled_matches_exact(
-        self, pdb_info, upsample_factor, shape, variance
-    ):
-        gaussian_volume, atom_volume = _make_deblur_volumes(pdb_info[0], variance)
+    def test_point_matches_exact(self, pdb_info, upsample_factor, shape, variance):
+        gaussian_volume, atom_volume = _make_gaussian_volumes(pdb_info[0], variance)
         image_config = cxs.BasicImageConfig(shape, 1.0, voltage_in_kilovolts=300.0)
         integrator = cxs.GaussianMixtureProjection(
             sampling_mode="point",
-            deblur=True,
             upsample_factor=upsample_factor,
             blur_variance=_blur_variance(1.0, upsample_factor),
         )
@@ -1346,11 +1318,14 @@ class TestGMMDeblurAndUpsampling:
         exact = self.exact_integrator.integrate(atom_volume, image_config)
         assert _max_shell_relative_error(projection, exact, image_config) <= 1e-2
 
-    def test_point_deblur_requires_upsampling(self):
-        with pytest.raises(ValueError, match="upsample_factor"):
-            cxs.GaussianMixtureProjection(
-                sampling_mode="point", deblur=True, upsample_factor=1
-            )
+    def test_point_requires_upsample_factor_2(self):
+        with pytest.raises(
+            ValueError, match="GaussianMixtureProjection.*upsample_factor.*1"
+        ):
+            cxs.GaussianMixtureProjection(sampling_mode="point", upsample_factor=1)
+        integrator = cxs.GaussianMixtureProjection()
+        assert integrator.sampling_mode == "average"
+        assert integrator.upsample_factor == 2
 
     @pytest.mark.parametrize(
         "kwargs, keyword",
@@ -1364,12 +1339,65 @@ class TestGMMDeblurAndUpsampling:
         with pytest.raises(ValueError, match=keyword):
             cxs.GaussianMixtureProjection(sampling_mode="point", **kwargs)
 
+    @pytest.mark.parametrize(
+        "shape, new_shape", (((64, 64), (32, 32)), ((66, 66), (33, 33)))
+    )
+    def test_point_nests_under_fourier_crop(self, shape, new_shape):
+        positions = np.random.default_rng(0).uniform(-8.0, 8.0, size=(20, 3))
+        volume, _ = _make_gaussian_volumes(positions, 0.6)
+        integrator = cxs.GaussianMixtureProjection(
+            sampling_mode="point", upsample_factor=4
+        )
+        fine = integrator.integrate(
+            volume,
+            cxs.BasicImageConfig(shape, 1.0, voltage_in_kilovolts=300.0),
+            outputs_real_space=True,
+        )
+        cropped = im.fourier_crop_to_shape(
+            fine, new_shape, outputs_real_space=False, preserve_mean=True
+        )
+        coarse = integrator.integrate(
+            volume, cxs.BasicImageConfig(new_shape, shape[0] / new_shape[0], 300.0)
+        )
+        np.testing.assert_allclose(cropped, coarse, atol=1e-10 * np.abs(coarse).max())
+
+    def test_average_nests_under_block_mean(self):
+        positions = np.random.default_rng(1).uniform(-6.0, 6.0, size=(20, 3))
+        integrator = cxs.GaussianMixtureProjection(sampling_mode="average")
+
+        def render(positions, shape, pixel_size):
+            volume, _ = _make_gaussian_volumes(positions, 0.3)
+            image_config = cxs.BasicImageConfig(shape, pixel_size, 300.0)
+            return np.asarray(
+                integrator.integrate(volume, image_config, outputs_real_space=True)
+            )
+
+        fine = render(positions, (32, 32), 1.0)
+        # With an even coarse size, each block's center sits half a fine pixel above
+        # its coarse pixel's center on both axes
+        coarse = render(positions - np.array([0.5, 0.5, 0.0]), (16, 16), 2.0)
+        block_mean = fine.reshape(16, 2, 16, 2).mean(axis=(1, 3))
+        np.testing.assert_allclose(block_mean, coarse, atol=1e-10 * np.abs(coarse).max())
+
+    def test_point_traced_pixel_size(self, pdb_info):
+        volume, _ = _make_gaussian_volumes(pdb_info[0], 0.05)
+        integrator = cxs.GaussianMixtureProjection(
+            sampling_mode="point", blur_variance=_blur_variance(1.0, 2)
+        )
+
+        def project(pixel_size):
+            image_config = cxs.BasicImageConfig((31, 32), pixel_size, 300.0)
+            return integrator.integrate(volume, image_config)
+
+        np.testing.assert_allclose(
+            jax.jit(project)(jnp.asarray(1.1)), project(1.1), rtol=1e-10, atol=1e-12
+        )
+
     def test_upsampled_real_space_matches_fourier(self, pdb_info):
-        volume, _ = _make_deblur_volumes(pdb_info[0], 0.05)
+        volume, _ = _make_gaussian_volumes(pdb_info[0], 0.05)
         image_config = cxs.BasicImageConfig((31, 32), 1.0, voltage_in_kilovolts=300.0)
         integrator = cxs.GaussianMixtureProjection(
             sampling_mode="point",
-            deblur=True,
             upsample_factor=2,
             blur_variance=_blur_variance(1.0, 2),
         )
@@ -1382,15 +1410,14 @@ class TestGMMDeblurAndUpsampling:
         )
 
     def test_upsampled_with_shape_field(self, pdb_info):
-        # Even, so the 2n grid's Nyquist corner, one-sided differently in the
-        # reference, falls in the column `_max_shell_relative_error` leaves out
+        # Even, so the 2n grid's corner bin, filled differently by the reference,
+        # crops to the n grid's corner bin, which `_max_shell_relative_error` leaves out
         n = 32
-        gaussian_volume, atom_volume = _make_deblur_volumes(pdb_info[0], 0.05)
+        gaussian_volume, atom_volume = _make_gaussian_volumes(pdb_info[0], 0.05)
         image_config = cxs.BasicImageConfig((n, n), 1.0, voltage_in_kilovolts=300.0)
         integrator = cxs.GaussianMixtureProjection(
             shape=(2 * n, 2 * n),
             sampling_mode="point",
-            deblur=True,
             upsample_factor=2,
             blur_variance=_blur_variance(1.0, 2),
         )
@@ -1404,11 +1431,10 @@ class TestGMMDeblurAndUpsampling:
 
     @pytest.mark.parametrize("n_spread", (None, 11))
     def test_upsampled_n_batches_agree(self, pdb_info, n_spread):
-        volume, _ = _make_deblur_volumes(pdb_info[0], 0.05)
+        volume, _ = _make_gaussian_volumes(pdb_info[0], 0.05)
         image_config = cxs.BasicImageConfig((31, 32), 1.0, voltage_in_kilovolts=300.0)
         kwargs = dict(
             sampling_mode="point",
-            deblur=True,
             upsample_factor=2,
             blur_variance=_blur_variance(1.0, 2),
             n_spread=n_spread,
@@ -1423,11 +1449,10 @@ class TestGMMDeblurAndUpsampling:
             batched, reference, atol=1e-12 * np.abs(reference).max()
         )
 
-    def test_point_deblur_gradients(self, pdb_info):
+    def test_point_gradients(self, pdb_info):
         shape, variance, pixel_size = (31, 32), 0.05, 1.0
         integrator = cxs.GaussianMixtureProjection(
             sampling_mode="point",
-            deblur=True,
             upsample_factor=2,
             blur_variance=_blur_variance(pixel_size, 2),
         )
@@ -1451,7 +1476,7 @@ class TestGMMDeblurAndUpsampling:
 
         def make_grad_fn(volume_index, integrator):
             def loss(positions, variance, pixel_size):
-                volume = _make_deblur_volumes(positions, variance)[volume_index]
+                volume = _make_gaussian_volumes(positions, variance)[volume_index]
                 image_config = cxs.BasicImageConfig(
                     shape, pixel_size, voltage_in_kilovolts=300.0
                 )
@@ -1467,12 +1492,11 @@ class TestGMMDeblurAndUpsampling:
             error = np.linalg.norm(grad - exact_grad) / np.linalg.norm(exact_grad)
             assert error <= 1e-2
 
-    def test_point_deblur_float32(self, pdb_info):
-        gaussian_volume, atom_volume = _make_deblur_volumes(pdb_info[0], 0.05)
+    def test_point_float32(self, pdb_info):
+        gaussian_volume, atom_volume = _make_gaussian_volumes(pdb_info[0], 0.05)
         image_config = cxs.BasicImageConfig((31, 32), 1.0, voltage_in_kilovolts=300.0)
         integrator = cxs.GaussianMixtureProjection(
             sampling_mode="point",
-            deblur=True,
             upsample_factor=2,
             blur_variance=_blur_variance(1.0, 2),
         )
@@ -1506,7 +1530,6 @@ class TestGMMWithCalibration:
             volume,
             image_config,
             sampling_mode="point",
-            deblur=True,
             upsample_factor=2,
         )
         assert integrator.blur_variance == pytest.approx(np.log(200) / (4 * np.pi**2))
@@ -1518,7 +1541,6 @@ class TestGMMWithCalibration:
             volume,
             image_config,
             sampling_mode="point",
-            deblur=True,
             upsample_factor=2,
         )
         blurred = eqx.tree_at(
@@ -1543,7 +1565,6 @@ class TestGMMWithCalibration:
                 volume,
                 image_config,
                 sampling_mode="point",
-                deblur=True,
                 upsample_factor=1,
             )
 
@@ -1557,7 +1578,6 @@ class TestGMMWithCalibration:
                 image_config,
                 tolerance=tolerance,
                 sampling_mode="point",
-                deblur=True,
                 upsample_factor=2,
             )
 
@@ -1573,12 +1593,9 @@ class TestGMMWithCalibration:
             gaussian_volume,
             image_config,
             sampling_mode="point",
-            deblur=True,
             upsample_factor=upsample_factor,
         )
-        exact = TestGMMDeblurAndUpsampling.exact_integrator.integrate(
-            atom_volume, image_config
-        )
+        exact = TestGMMPointSampling.exact_integrator.integrate(atom_volume, image_config)
         with jax.enable_x64(not float32):
             projection = integrator.integrate(gaussian_volume, image_config)
         assert _max_shell_relative_error(projection, exact, image_config) <= 1e-2
@@ -1600,7 +1617,7 @@ def test_fft_projection_average_converges_to_pixel_average(
     shape, b_factor, upsample_factor, rtol
 ):
     positions = np.random.default_rng(0).uniform(-8.0, 8.0, size=(20, 3))
-    gaussian_volume, atom_volume = _make_deblur_volumes(
+    gaussian_volume, atom_volume = _make_gaussian_volumes(
         positions, b_factor / (8 * np.pi**2)
     )
     image_config = cxs.BasicImageConfig(shape, 1.0, voltage_in_kilovolts=300.0)
@@ -1619,7 +1636,9 @@ def test_fft_render_upsampling_converges_to_voxel_average(upsample_factor, rtol)
     shape, voxel_size = (15, 16, 17), 1.0
     # Away from the edges, since the fourier render is periodic and the reference not
     positions = np.random.default_rng(0).uniform(-3.0, 3.0, size=(20, 3))
-    gaussian_volume, atom_volume = _make_deblur_volumes(positions, 20.0 / (8 * np.pi**2))
+    gaussian_volume, atom_volume = _make_gaussian_volumes(
+        positions, 20.0 / (8 * np.pi**2)
+    )
     exact = cxs.GaussianMixtureRenderFn(shape, voxel_size)(gaussian_volume)
     render_fn = cxs.GaussianFourierRenderFn(
         shape,
@@ -1656,7 +1675,7 @@ def _corner_mask(shape):
 )
 def test_fft_point_nests_under_fourier_crop(shape, new_shape):
     positions = np.random.default_rng(0).uniform(-8.0, 8.0, size=(20, 3))
-    _, atom_volume = _make_deblur_volumes(positions, 0.6)
+    _, atom_volume = _make_gaussian_volumes(positions, 0.6)
     integrator = cxs.GaussianFourierProjection(sampling_mode="point", eps=1e-10)
     fine = integrator.integrate(
         atom_volume,
@@ -1685,7 +1704,7 @@ def test_fft_point_nests_under_fourier_crop(shape, new_shape):
 
 def test_fft_point_ignores_upsample_factor():
     positions = np.random.default_rng(0).uniform(-8.0, 8.0, size=(20, 3))
-    _, atom_volume = _make_deblur_volumes(positions, 0.6)
+    _, atom_volume = _make_gaussian_volumes(positions, 0.6)
     image_config = cxs.BasicImageConfig((32, 32), 1.0, voltage_in_kilovolts=300.0)
     projections = [
         cxs.GaussianFourierProjection(
