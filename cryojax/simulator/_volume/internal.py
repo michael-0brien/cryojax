@@ -1,7 +1,5 @@
 """Shared helpers for volume rendering backends."""
 
-import math
-
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
@@ -62,48 +60,6 @@ def center_shift(
             for n_u, n in zip(shape_u[::-1], shape_out[::-1])
         ]
     )
-
-
-def build_extraction_mesh(
-    shape: tuple[int, ...],
-    shape_ds: tuple[int, ...],
-    *,
-    modeord: int,
-    outputs_rfft: bool = False,
-):
-    """Build indices to extract modes from FFT output. If `outputs_rfft`, the input is
-    an `rfftn` and the last axis keeps `0 ... shape_ds[-1] // 2` (needs `modeord=1`)."""
-    if outputs_rfft and modeord != 1:
-        raise ValueError(
-            "`build_extraction_mesh` with `outputs_rfft` requires `modeord=1`. "
-            f"Got `modeord = {modeord}`."
-        )
-    assert len(shape) == len(shape_ds)
-    assert len(shape) in [2, 3]
-    mean_factor = math.prod(shape_ds) / math.prod(shape)
-    indices_1d = tuple(
-        build_extraction_indices_1d(dim, dim_ds, modeord=modeord)
-        for dim, dim_ds in zip(shape, shape_ds)
-    )
-    if outputs_rfft:
-        indices_1d = indices_1d[:-1] + (jnp.arange(shape_ds[-1] // 2 + 1),)
-    return jnp.meshgrid(*indices_1d, indexing="ij"), mean_factor
-
-
-def build_extraction_indices_1d(dim: int, dim_ds: int, *, modeord: int):
-    """Build indices to extract modes from FFT output. Adapted from `nufftax`"""
-    q_min = -(dim_ds // 2)
-    q_max = (dim_ds - 1) // 2
-
-    idx_pos = jnp.arange(q_max + 1)
-    idx_neg = jnp.arange(dim + q_min, dim)
-
-    if modeord == 0:
-        indices = jnp.concatenate([idx_neg, idx_pos])
-    else:
-        indices = jnp.concatenate([idx_pos, idx_neg])
-
-    return indices
 
 
 def check_anisotropy_supported(

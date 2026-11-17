@@ -14,8 +14,7 @@ from ...constants import PengScatteringFactorParameters, b_factor_to_variance
 from ...jax_util import FloatLike, NDArrayLike, filter_bscan
 from ...ndimage import (
     FourierGaussian,
-    FourierSinc,
-    enforce_rfftn_self_conjugates,
+    fourier_crop_to_shape,
     make_1d_coordinate_grid,
     map_coordinates,
     resize_with_crop_or_pad,
@@ -32,12 +31,7 @@ from .base_volume import (
     ProjectionArray,
     VoxelArray,
 )
-from .internal import (
-    build_extraction_mesh,
-    center_shift,
-    eval_separable_impl,
-    make_frequencies_1d,
-)
+from .internal import eval_separable_impl, make_frequencies_1d
 
 
 def _leaf_broadcast_to(x, shape):
@@ -249,7 +243,6 @@ class GaussianMixtureProjection(
     n_batches: int
     n_spread: int | tuple[int, ...] | None
     enable_pallas: bool | Mapping[str, bool] | None
-    deblur: bool
     upsample_factor: int
     blur_variance: float
 
@@ -264,21 +257,26 @@ class GaussianMixtureProjection(
         n_batches: int = 1,
         n_spread: int | tuple[int, ...] | None = None,
         enable_pallas: bool | Mapping[str, bool] | None = None,
-        deblur: bool = False,
-        upsample_factor: int = 1,
+        upsample_factor: int = 2,
         blur_variance: float = 0.0,
     ):
-        """**Arguments:**
+        """**References:**
+
+        - For `sampling_mode = 'average'`, see Section 3.1 of *Himes, Benjamin, and
+          Nikolaus Grigorieff. "Cryo-TEM simulations of amorphous radiation-sensitive
+          samples using multislice wave propagation." IUCrJ 8.6 (2021): 943-953.*
+
+        **Arguments:**
 
         - `shape`:
             The shape of the plane on which projections are computed before padding or
             cropping to the `AbstractImageConfig.padded_shape`. This argument is particularly
             useful if the `AbstractImageConfig.padded_shape` is much larger than the protein.
         - `sampling_mode`:
-            If `'average'`, use error functions to sample the projected volume at
-            a pixel to be the average value using gaussian
-            integrals. If `'point'`, the volume at a pixel will
-            be evaluated by evaluating the gaussian at a point.
+            If `'average'`, the average of the projected volume over each pixel,
+            computed exactly with error functions. If `'point'`, the band-limited
+            image, whose spectrum is the projected volume's at every frequency of
+            the grid.
         - `n_batches`:
             The number of batches over groups of positions
             used to evaluate the projection. By default, `n_batches = 1`,
@@ -308,20 +306,14 @@ class GaussianMixtureProjection(
             advantageous for the *backward* pass -- `{"bwd": True}`. See
             [`cryojax.ndimage.spread_gaussians_2d`][]'s `enable_pallas` for
             the full picture. `None` (default) defers to `CRYOJAX_ENABLE_PALLAS`.
-        - `deblur`:
-            If `True`, divide out the smoothing applied while sampling: the pixel
-            average if `sampling_mode = 'average'`, or `blur_variance` if `'point'`
-            (which then requires `upsample_factor >= 2`). With `'average'`, this
-            removes the pixel average's effective B-factor of about
-            $2\\pi^2 p^2/3$ for pixel size $p$.
         - `upsample_factor`:
-            How much to upsample the grid on which atoms are spread onto.
-            With `upsample_factor > 1`, the spread grid is cropped to the
-            image's band, so the image is band-limited rather than point
-            sampled. Ignored if `sampling_mode = 'average'`.
+            How many times finer the grid that gaussians are spread on is; the image
+            is that grid's Fourier crop. At least 2. Ignored if
+            `sampling_mode = 'average'`.
         - `blur_variance`:
             The variance, in angstroms squared, of a gaussian blur added to every
-            gaussian before spreading. Ignored if `sampling_mode = 'average'`.
+            gaussian before spreading and divided out after the crop. Ignored if
+            `sampling_mode = 'average'`.
         """  # noqa: E501
         if sampling_mode not in ["average", "point"]:
             raise ValueError(
@@ -340,19 +332,17 @@ class GaussianMixtureProjection(
                 "`blur_variance` in `GaussianMixtureProjection` must be "
                 f"non-negative. Got `blur_variance = {blur_variance}`."
             )
-        if sampling_mode == "point" and deblur and upsample_factor < 2:
+        if sampling_mode == "point" and upsample_factor < 2:
             raise ValueError(
-                "`GaussianMixtureProjection` with `sampling_mode = 'point'` and "
-                "`deblur = True` requires `upsample_factor` of at least 2, since on "
-                "the image grid a blur cannot keep folded-in content out. Got "
-                f"`upsample_factor = {upsample_factor}`."
+                "`GaussianMixtureProjection` with `sampling_mode = 'point'` requires "
+                "`upsample_factor` of at least 2, the grid on which gaussians are "
+                f"spread. Got `upsample_factor = {upsample_factor}`."
             )
         self.shape = shape
         self.sampling_mode = sampling_mode
         self.n_batches = n_batches
         self.n_spread = n_spread
         self.enable_pallas = enable_pallas
-        self.deblur = deblur
         self.upsample_factor = upsample_factor
         self.blur_variance = float(blur_variance)
 
@@ -365,8 +355,7 @@ class GaussianMixtureProjection(
         tolerance: float = 1e-2,
         cutoff_sigma: float = 4.0,
         sampling_mode: Literal["average", "point"] = "average",
-        deblur: bool = False,
-        upsample_factor: int = 1,
+        upsample_factor: int = 2,
         shape: tuple[int, int] | None = None,
         n_batches: int = 1,
         enable_pallas: bool | Mapping[str, bool] | None = None,
@@ -380,8 +369,8 @@ class GaussianMixtureProjection(
         - `volume`: The volume to size `n_spread` for, with any B-factor
             already added to its variances.
         - `image_config`: The image configuration, for its pixel size.
-        - `tolerance`: With `sampling_mode = 'point'` and `deblur`, the relative
-            error allowed from content folded into the image's band.
+        - `tolerance`: With `sampling_mode = 'point'`, the relative error allowed
+            from content folded into the image's band.
         - `cutoff_sigma`: Truncation width in standard deviations, for
             [`cryojax.simulator.suggest_n_spread`][].
 
@@ -397,7 +386,6 @@ class GaussianMixtureProjection(
             shape=shape,
             sampling_mode=sampling_mode,
             n_batches=n_batches,
-            deblur=deblur,
             upsample_factor=upsample_factor,
         )
         # Function-local, since `_api_utils` imports this module
@@ -409,10 +397,9 @@ class GaussianMixtureProjection(
         if sampling_mode == "point":
             r = upsample_factor
             spread_pixel_size = pixel_size / r
-            if deblur:
-                blur_variance = (
-                    pixel_size**2 * np.log(2 / tolerance) / (2 * np.pi**2 * r * (r - 1))
-                )
+            blur_variance = (
+                pixel_size**2 * np.log(2 / tolerance) / (2 * np.pi**2 * r * (r - 1))
+            )
         blurred_volume = eqx.tree_at(
             lambda v: v.variances, volume, volume.variances + blur_variance
         )
@@ -425,7 +412,6 @@ class GaussianMixtureProjection(
             n_batches=n_batches,
             n_spread=n_spread,
             enable_pallas=enable_pallas,
-            deblur=deblur,
             upsample_factor=upsample_factor,
             blur_variance=blur_variance,
         )
@@ -465,15 +451,11 @@ class GaussianMixtureProjection(
         context = (
             f"Error during projection using `{type(self).__name__}(..., n_batches=...)`"
         )
-        # Point sampling may spread blurred gaussians on a finer grid
-        upsample_factor = 1 if use_erf else self.upsample_factor
+        # Point sampling spreads blurred gaussians on a finer grid
         shape_u, pixel_size_u = shape, pixel_size
-        if upsample_factor > 1:
-            shape_u = (upsample_factor * shape[0], upsample_factor * shape[1])
-            pixel_size_u = pixel_size / upsample_factor
-            positions = positions.at[:, :2].add(
-                center_shift(shape_u, shape, pixel_size_u)
-            )
+        if not use_erf:
+            r = self.upsample_factor
+            shape_u, pixel_size_u = (r * shape[0], r * shape[1]), pixel_size / r
         if not use_erf and self.blur_variance > 0:
             variances = variances + self.blur_variance
         # Compute the projection
@@ -501,27 +483,17 @@ class GaussianMixtureProjection(
                 context,
                 self.enable_pallas,
             )
-        if upsample_factor > 1 or self.deblur:
-            projection_fft = jnp.fft.rfftn(projection_integral)
-            # Downsample by extracting fourier modes
-            if upsample_factor > 1:
-                (indices_y, indices_x), factor = build_extraction_mesh(
-                    shape_u, shape, modeord=1, outputs_rfft=True
-                )
-                projection_fft = enforce_rfftn_self_conjugates(
-                    factor * projection_fft[indices_y, indices_x], shape, mode="real"
-                )
-            # Divide out the pixel average or the blur
-            if self.deblur and (use_erf or self.blur_variance > 0):
-                kernel_fn = (
-                    FourierSinc(box_width=pixel_size)
-                    if use_erf
-                    else FourierGaussian(b_factor=8 * jnp.pi**2 * self.blur_variance)
-                )
+        if not use_erf:
+            # Crop to the image's band and divide out the blur
+            projection_fft = fourier_crop_to_shape(
+                projection_integral, shape, outputs_real_space=False, preserve_mean=True
+            )
+            if self.blur_variance > 0:
+                blur_fn = FourierGaussian(b_factor=8 * jnp.pi**2 * self.blur_variance)
                 frequencies_1d = make_frequencies_1d(
                     shape, pixel_size, modeord=1, outputs_rfft=True
                 )
-                projection_fft /= eval_separable_impl(kernel_fn, frequencies_1d)
+                projection_fft /= eval_separable_impl(blur_fn, frequencies_1d)
             if (
                 self.shape is None
                 and not outputs_real_space
