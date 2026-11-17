@@ -10,7 +10,7 @@ from jax import lax
 from jaxtyping import Array, Inexact
 
 from ..jax_util import NDArrayLike
-from ._coordinates import make_frequency_grid
+from ._coordinates import make_1d_frequency_grid, make_frequency_grid
 from ._fourier_utils import convert_rfftn_to_fftn
 
 
@@ -192,8 +192,8 @@ def fourier_crop_downsample(
         by. Must be a value greater than `1`.
     - `outputs_real_space`:
         If `False`, the `image_or_volume` is returned in fourier space
-        with the zero-frequency component in the corner. For real signals,
-        hermitian symmetry is assumed.
+        with the zero-frequency component in the corner. For a real signal this is
+        the cropped spectrum itself, whose `irfftn` is the real-space output.
     - `preserve_mean`:
         Preserve the mean of the volume after downsampling, rather
         than the sum.
@@ -227,14 +227,9 @@ def fourier_crop_downsample(
         padded_array = jnp.pad(
             image_or_volume, tuple((0, p) for p in pad_widths), mode="edge"
         )
-        # For a given axis, padding by `p` pixels shifts that axis's center by
-        # `p / 2` in the common case -- except that `crop_to_shape`'s crop
-        # window is asymmetric by one pixel whenever the *padded* length on
-        # that axis is odd, which requires rounding `p / 2` down instead of up
-        # to compensate.
+        # Moves the unpadded array's center pixel onto the padded array's
         shift = tuple(
-            p // 2 if (s + p) % 2 == 1 else (p + 1) // 2
-            for s, p in zip(image_or_volume.shape, pad_widths)
+            (s + p) // 2 - s // 2 for s, p in zip(image_or_volume.shape, pad_widths)
         )
     else:
         padded_array = image_or_volume
@@ -263,8 +258,8 @@ def fourier_crop_to_shape(
     """Downsample an array to a specified shape using fourier cropping.
 
     The modes kept are those of the new shape on cryoJAX's frequency grid: for an even
-    size, `+N/2` on the last axis of a real signal's `rfftn` and `-N/2` on every
-    other axis. The center pixel `N // 2` of each axis stays at the center `n // 2`.
+    new size `n`, `+n/2` on the last axis of a real signal's `rfftn` and `-n/2` on
+    every other axis. The center pixel `N // 2` of each axis stays at `n // 2`.
 
     **Arguments:**
 
@@ -274,7 +269,7 @@ def fourier_crop_to_shape(
     - `outputs_real_space`:
         If `False`, the `image_or_volume` is returned in fourier space
         with the zero-frequency component in the corner. For a real signal this is
-        the cropped spectrum itself, whose inverse `rfftn` is the real-space output.
+        the cropped spectrum itself, whose `irfftn` is the real-space output.
     - `outputs_rfft`:
         Returns the result `fftn` instead of `rfftn` if equal to `False`.
         Only applies to real signals, and ignored if `outputs_real_space` is `True`.
@@ -287,6 +282,15 @@ def fourier_crop_to_shape(
     The downsampled `image_or_volume`, at the new real-space shape
     `shape`.
     """
+    input_shape = tuple(image_or_volume.shape)
+    if len(shape) != len(input_shape) or any(
+        n > n_in for n, n_in in zip(shape, input_shape)
+    ):
+        raise ValueError(
+            "`shape` in `fourier_crop_to_shape` must have one size per axis of "
+            "`image_or_volume`, none larger than its own. Got "
+            f"`shape = {shape}` for `image_or_volume.shape = {input_shape}`."
+        )
     return _fourier_crop_to_shape(
         image_or_volume,
         shape,
@@ -357,11 +361,12 @@ def _centering_phase(
         offset = (n_in // 2 - s) / n_in - (n_out // 2) / n_out
         if offset == 0:
             continue
-        if last_axis_is_rfft and axis == ndim - 1:
-            modes = jnp.arange(n_out // 2 + 1)
-        else:
-            modes = jnp.fft.ifftshift(jnp.arange(-(n_out // 2), (n_out + 1) // 2))
+        frequencies = make_1d_frequency_grid(
+            n_out, outputs_rfftfreqs=last_axis_is_rfft and axis == ndim - 1
+        )
         reshape = [1] * ndim
-        reshape[axis] = modes.shape[0]
-        phase = phase * jnp.exp(2j * jnp.pi * offset * modes).reshape(reshape)
+        reshape[axis] = frequencies.shape[0]
+        phase = phase * jnp.exp(2j * jnp.pi * n_out * offset * frequencies).reshape(
+            reshape
+        )
     return phase

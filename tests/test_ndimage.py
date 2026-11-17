@@ -180,6 +180,14 @@ def test_fourier_crop_to_shape_complex_matches_real_parts(shape, new_shape):
     np.testing.assert_allclose(got, want, atol=1e-10)
 
 
+@pytest.mark.parametrize("is_complex", (False, True))
+@pytest.mark.parametrize("new_shape", ((10, 10), (8, 10), (4, 4, 4)))
+def test_fourier_crop_to_shape_rejects_bad_shapes(is_complex, new_shape):
+    image = jnp.zeros((8, 8), complex if is_complex else float)
+    with pytest.raises(ValueError, match="fourier_crop_to_shape"):
+        im.fourier_crop_to_shape(image, new_shape)
+
+
 #
 # Cropping and padding
 #
@@ -641,6 +649,18 @@ def test_convert_fftn_to_rfftn_nyquist_column_is_positive_frequency(shape):
     # Where a leading frequency is also at -1/2, the column holds the opposite corner
     mask = np.all([q != -0.5 for q in q_leading], axis=0)
     np.testing.assert_allclose(got[..., -1][mask], expected[mask], atol=1e-12)
+
+
+@pytest.mark.parametrize("shape", [(8, 8), (8, 9), (6, 8, 8), (7, 6, 9)])
+def test_convert_rfftn_to_fftn_round_trips_any_rfft(shape):
+    # Not hermitian on the last Nyquist column, as a sampled spectrum is not
+    rng = np.random.default_rng(0)
+    rfft_shape = shape[:-1] + (shape[-1] // 2 + 1,)
+    spectrum = rng.normal(size=rfft_shape) + 1j * rng.normal(size=rfft_shape)
+    got = im.convert_fftn_to_rfftn(
+        im.convert_rfftn_to_fftn(jnp.asarray(spectrum), shape), mode=None
+    )
+    np.testing.assert_allclose(got, spectrum, atol=1e-12)
 
 
 @pytest.mark.parametrize("shape", [(8, 8), (8, 9), (9, 8), (6, 8, 8), (7, 6, 9)])
