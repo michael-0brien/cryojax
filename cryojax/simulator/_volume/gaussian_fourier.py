@@ -235,27 +235,31 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
         shape: tuple[int, int, int],
         voxel_size: FloatLike,
         *,
-        sampling_mode: Literal["average", "point"] = "average",
-        upsample_factor: int = 1,
+        sampling_mode: Literal["average", "point"] = "point",
+        upsample_factor: int = 2,
         eps: float = 1e-6,
         options: dict[str, Any] = {},
     ):
-        """**Arguments:**
+        """**References:**
+
+        - For `sampling_mode = 'average'`, see Section 3.1 of *Himes, Benjamin, and
+          Nikolaus Grigorieff. "Cryo-TEM simulations of amorphous radiation-sensitive
+          samples using multislice wave propagation." IUCrJ 8.6 (2021): 943-953.*
+
+        **Arguments:**
 
         - `shape`:
             The shape of the resulting voxel grid.
         - `voxel_size`:
             The voxel size of the resulting voxel grid.
         - `sampling_mode`:
-            If `'average'`, convolve with a box function to sample the
-            projected volume at a pixel to be the average value of the
-            underlying continuous function. If `'point'`, the volume at
-            a pixel will be point sampled.
+            If `'point'`, the band-limited voxel grid, whose spectrum is the volume's
+            at every frequency of the grid. If `'average'`, the average of the volume
+            over each voxel, aliased frequencies included.
         - `upsample_factor`:
-            The spectrum is computed on a grid this many times finer, then
-            folded onto the voxel grid, so that the voxels converge to point
-            samples (or voxel averages) as it grows. If `1`, the voxel grid
-            is band-limited at Nyquist.
+            The spectrum is computed on a grid this many times finer, then folded
+            onto the voxel grid; the voxel average converges as it grows. At least
+            2. Ignored if `sampling_mode = 'point'`.
         - `eps`:
             The precision of the underlying non-uniform FFT implementation.
             See [`finufft`](https://finufft.readthedocs.io/en/latest/opts.html#options-parameters-cpu)
@@ -275,6 +279,12 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
             raise ValueError(
                 "`upsample_factor` in `GaussianFourierRenderFn` must be an "
                 f"integer of at least 1. Got `upsample_factor = {upsample_factor}`."
+            )
+        if sampling_mode == "average" and upsample_factor < 2:
+            raise ValueError(
+                "`GaussianFourierRenderFn` with `sampling_mode = 'average'` requires "
+                "`upsample_factor` of at least 2, the grid on which aliased "
+                f"frequencies are folded in. Got `upsample_factor = {upsample_factor}`."
             )
         self.shape = shape
         self.voxel_size = leaf_asarray(voxel_size, dtype=float)
@@ -316,7 +326,7 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
             volume_representation.kernel_fns,
         )
         kernel_fns = _standardize_kernel_fns(kernel_fns, spatial_dim=3)
-        upsample_factor = self.upsample_factor
+        upsample_factor = self.upsample_factor if self.sampling_mode == "average" else 1
         shape_u = tuple(upsample_factor * n for n in self.shape)
         voxel_size_u = voxel_size / upsample_factor
         # Compute
@@ -386,24 +396,28 @@ class GaussianFourierProjection(
     def __init__(
         self,
         *,
-        sampling_mode: Literal["average", "point"] = "average",
-        upsample_factor: int = 1,
+        sampling_mode: Literal["average", "point"] = "point",
+        upsample_factor: int = 2,
         eps: float = 1e-6,
         shape: tuple[int, int] | None = None,
         options: dict[str, Any] = {},
     ):
-        """**Arguments:**
+        """**References:**
+
+        - For `sampling_mode = 'average'`, see Section 3.1 of *Himes, Benjamin, and
+          Nikolaus Grigorieff. "Cryo-TEM simulations of amorphous radiation-sensitive
+          samples using multislice wave propagation." IUCrJ 8.6 (2021): 943-953.*
+
+        **Arguments:**
 
         - `sampling_mode`:
-            If `'average'`, convolve with a box function to sample the
-            projected volume at a pixel to be the average value of the
-            underlying continuous function. If `'point'`, the volume at
-            a pixel will be point sampled.
+            If `'point'`, the band-limited image, whose spectrum is the projected
+            volume's at every frequency of the grid. If `'average'`, the average of
+            the projected volume over each pixel, aliased frequencies included.
         - `upsample_factor`:
-            The spectrum is computed on a grid this many times finer, then
-            folded onto the image grid, so that the image converges to point
-            samples (or pixel averages) as it grows. If `1`, the image is
-            band-limited at Nyquist.
+            The spectrum is computed on a grid this many times finer, then folded
+            onto the image grid; the pixel average converges as it grows. At least
+            2. Ignored if `sampling_mode = 'point'`.
         - `eps`:
             The precision of the underlying non-uniform FFT implementation.
             See [`finufft`](https://finufft.readthedocs.io/en/latest/opts.html#options-parameters-cpu)
@@ -426,6 +440,12 @@ class GaussianFourierProjection(
             raise ValueError(
                 "`upsample_factor` in `GaussianFourierProjection` must be an "
                 f"integer of at least 1. Got `upsample_factor = {upsample_factor}`."
+            )
+        if sampling_mode == "average" and upsample_factor < 2:
+            raise ValueError(
+                "`GaussianFourierProjection` with `sampling_mode = 'average'` requires "
+                "`upsample_factor` of at least 2, the grid on which aliased "
+                f"frequencies are folded in. Got `upsample_factor = {upsample_factor}`."
             )
         self.sampling_mode = sampling_mode
         self.shape = shape
@@ -468,7 +488,7 @@ class GaussianFourierProjection(
             volume_representation.kernel_fns,
         )
         kernel_fns = _standardize_kernel_fns(kernel_fns, spatial_dim=2)
-        upsample_factor = self.upsample_factor
+        upsample_factor = self.upsample_factor if self.sampling_mode == "average" else 1
         shape_u = (upsample_factor * shape[0], upsample_factor * shape[1])
         pixel_size_u = pixel_size / upsample_factor
         # Compute projection
@@ -495,7 +515,7 @@ class GaussianFourierProjection(
                 )
                 / upsample_factor**2
             )
-        projection_fft = convert_fftn_to_rfftn(projection_fft, mode="real")
+        projection_fft = convert_fftn_to_rfftn(projection_fft, mode=None)
         if output_shape == shape:
             return (
                 jnp.fft.irfftn(projection_fft, s=output_shape)
@@ -626,7 +646,7 @@ def _eval_kernel_impl(kernel_fn: FourierGaussian, frequencies_1d: tuple[Array, .
 
 def _prepare_fft_to_fft(f: Array, *, outputs_rfft: bool, fftshifted: bool) -> Array:
     if outputs_rfft:
-        f = convert_fftn_to_rfftn(f, mode="real")
+        f = convert_fftn_to_rfftn(f, mode=None)
         return jnp.fft.fftshift(f, axes=(0, 1)) if fftshifted else f
     else:
         return jnp.fft.fftshift(f) if fftshifted else f
