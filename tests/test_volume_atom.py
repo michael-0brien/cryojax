@@ -304,10 +304,14 @@ class TestIntegrateGMMToPixelsWithSpreadingBackend:
     the dense gaussian-integral backend.
     """
 
-    @pytest.mark.parametrize("sampling_mode", ["average", "point"])
+    @pytest.mark.parametrize(
+        "sampling_mode, n_spread",
+        # `point` spreads on a twice-finer grid
+        (("average", 11), ("point", 21)),
+    )
     @pytest.mark.parametrize("largest_atom", range(0, 3))
     def test_maxima_are_in_right_positions(
-        self, toy_gaussian_cloud, largest_atom, sampling_mode
+        self, toy_gaussian_cloud, largest_atom, sampling_mode, n_spread
     ):
         atom_positions, ff_a, ff_b, n_voxels_per_side, voxel_size = toy_gaussian_cloud
         n_pixels_per_side = n_voxels_per_side[:2]
@@ -324,8 +328,7 @@ class TestIntegrateGMMToPixelsWithSpreadingBackend:
         )
         integrator = cxs.GaussianMixtureProjection(
             sampling_mode=sampling_mode,
-            # `point` spreads on a twice-finer grid
-            n_spread=11 if sampling_mode == "average" else 21,
+            n_spread=n_spread,
         )
         projection = jnp.fft.irfftn(integrator.integrate(atomic_volume, image_config))
 
@@ -333,8 +336,12 @@ class TestIntegrateGMMToPixelsWithSpreadingBackend:
         maximum_position = coordinate_grid.reshape(-1, 2)[maximum_index]
         assert jnp.allclose(maximum_position, atom_positions[largest_atom][:2])
 
-    @pytest.mark.parametrize("sampling_mode", ["average", "point"])
-    def test_integral_is_correct(self, toy_gaussian_cloud, sampling_mode):
+    @pytest.mark.parametrize(
+        "sampling_mode, n_spread",
+        # `point` spreads on a twice-finer grid
+        (("average", 11), ("point", 21)),
+    )
+    def test_integral_is_correct(self, toy_gaussian_cloud, sampling_mode, n_spread):
         atom_positions, ff_a, ff_b, n_voxels_per_side, voxel_size = toy_gaussian_cloud
         n_pixels_per_side = n_voxels_per_side[:2]
 
@@ -348,16 +355,19 @@ class TestIntegrateGMMToPixelsWithSpreadingBackend:
         )
         integrator = cxs.GaussianMixtureProjection(
             sampling_mode=sampling_mode,
-            # `point` spreads on a twice-finer grid
-            n_spread=11 if sampling_mode == "average" else 21,
+            n_spread=n_spread,
         )
         projection = jnp.fft.irfftn(integrator.integrate(atomic_volume, image_config))
 
         integral = jnp.sum(projection) * voxel_size**2
         assert jnp.isclose(integral, jnp.sum(ff_a), atol=1e-4)
 
-    @pytest.mark.parametrize("sampling_mode", ["average", "point"])
-    def test_agrees_with_dense_backend(self, toy_gaussian_cloud, sampling_mode):
+    @pytest.mark.parametrize(
+        "sampling_mode, n_spread",
+        # `point` spreads on a twice-finer grid
+        (("average", 13), ("point", 25)),
+    )
+    def test_agrees_with_dense_backend(self, toy_gaussian_cloud, sampling_mode, n_spread):
         """The spreading backend (`n_spread` set) should closely agree with the
         dense gaussian-integral backend (`n_spread=None`) for a high `n_spread`.
         """
@@ -375,8 +385,7 @@ class TestIntegrateGMMToPixelsWithSpreadingBackend:
         dense_integrator = cxs.GaussianMixtureProjection(sampling_mode=sampling_mode)
         spread_integrator = cxs.GaussianMixtureProjection(
             sampling_mode=sampling_mode,
-            # `point` spreads on a twice-finer grid
-            n_spread=13 if sampling_mode == "average" else 25,
+            n_spread=n_spread,
         )
         dense_projection = dense_integrator.integrate(
             atomic_volume, image_config, outputs_real_space=True
@@ -387,8 +396,12 @@ class TestIntegrateGMMToPixelsWithSpreadingBackend:
 
         assert jnp.allclose(dense_projection, spread_projection, atol=1e-4, rtol=1e-4)
 
-    @pytest.mark.parametrize("sampling_mode", ["average", "point"])
-    def test_gradients_are_finite(self, toy_gaussian_cloud, sampling_mode):
+    @pytest.mark.parametrize(
+        "sampling_mode, n_spread",
+        # `point` spreads on a twice-finer grid
+        (("average", 11), ("point", 21)),
+    )
+    def test_gradients_are_finite(self, toy_gaussian_cloud, sampling_mode, n_spread):
         """Gradients through the spreading backend w.r.t. positions,
         amplitudes, and variances must be finite (regression check for the
         custom VJP rule)."""
@@ -401,8 +414,7 @@ class TestIntegrateGMMToPixelsWithSpreadingBackend:
         )
         integrator = cxs.GaussianMixtureProjection(
             sampling_mode=sampling_mode,
-            # `point` spreads on a twice-finer grid
-            n_spread=11 if sampling_mode == "average" else 21,
+            n_spread=n_spread,
         )
 
         def loss(positions, amplitudes, variances):
@@ -416,8 +428,14 @@ class TestIntegrateGMMToPixelsWithSpreadingBackend:
         for g in grads:
             assert jnp.all(jnp.isfinite(g))
 
-    @pytest.mark.parametrize("sampling_mode", ["average", "point"])
-    def test_gradients_agree_with_dense_backend(self, toy_gaussian_cloud, sampling_mode):
+    @pytest.mark.parametrize(
+        "sampling_mode, n_spread",
+        # `point` spreads on a twice-finer grid
+        (("average", 13), ("point", 25)),
+    )
+    def test_gradients_agree_with_dense_backend(
+        self, toy_gaussian_cloud, sampling_mode, n_spread
+    ):
         """Gradients through the spreading backend (`n_spread` set) should
         closely agree with gradients through the dense gaussian-integral
         backend (`n_spread=None`) for a high `n_spread`."""
@@ -431,8 +449,7 @@ class TestIntegrateGMMToPixelsWithSpreadingBackend:
         dense_integrator = cxs.GaussianMixtureProjection(sampling_mode=sampling_mode)
         spread_integrator = cxs.GaussianMixtureProjection(
             sampling_mode=sampling_mode,
-            # `point` spreads on a twice-finer grid
-            n_spread=13 if sampling_mode == "average" else 25,
+            n_spread=n_spread,
         )
 
         def make_loss(integrator):
@@ -1244,14 +1261,22 @@ def test_make_frequencies_1d_rfft():
         make_frequencies_1d(shape_u, p, modeord=0, outputs_rfft=True)
 
 
-# ── GaussianMixtureProjection: point sampling ────────────────────────────────
+# ── GaussianMixtureProjection: sampling modes ────────────────────────────────
+
+
+def _corner_mask(shape):
+    """True except at an rfft's bin where both axes are at an even Nyquist, which four
+    frequencies share and `GaussianFourierProjection` fills from the opposite corner."""
+    mask = np.ones((shape[0], shape[1] // 2 + 1), bool)
+    if shape[0] % 2 == 0 and shape[1] % 2 == 0:
+        mask[shape[0] // 2, -1] = False
+    return mask
 
 
 def _max_shell_relative_error(a, b, image_config):
     """The largest relative L2 error of rfft spectrum `a` against `b` over radial
-    shells, with the corners beyond Nyquist as one shell. The bin at an even y and x
-    Nyquist is left out: four frequencies share it, and `GaussianFourierProjection`
-    fills it from the opposite corner."""
+    shells, with the corners beyond Nyquist as one shell, leaving out the bin
+    `_corner_mask` excludes."""
     n_y, n_x = image_config.padded_shape
     pixel_size = float(image_config.pixel_size)
     frequencies_y = np.fft.fftfreq(n_y, pixel_size)[:, None]
@@ -1260,9 +1285,7 @@ def _max_shell_relative_error(a, b, image_config):
     n_shells = min(n_y, n_x) // 2
     shells = np.minimum(np.floor(radius * n_shells), n_shells)
     a, b = np.asarray(a), np.asarray(b)
-    keep = np.ones(a.shape, bool)
-    if n_y % 2 == 0 and n_x % 2 == 0:
-        keep[n_y // 2, -1] = False
+    keep = _corner_mask((n_y, n_x))
     return max(
         np.linalg.norm((a - b)[keep & (shells == s)])
         / np.linalg.norm(b[keep & (shells == s)])
@@ -1287,7 +1310,7 @@ def _make_gaussian_volumes(positions, variance):
     return gaussian_volume, atom_volume
 
 
-class TestGMMPointSampling:
+class TestGMMSamplingModes:
     exact_integrator = cxs.GaussianFourierProjection(sampling_mode="point", eps=1e-10)
 
     @pytest.mark.parametrize("n_spread", (None, 11))
@@ -1323,6 +1346,8 @@ class TestGMMPointSampling:
             ValueError, match="GaussianMixtureProjection.*upsample_factor.*1"
         ):
             cxs.GaussianMixtureProjection(sampling_mode="point", upsample_factor=1)
+
+    def test_defaults(self):
         integrator = cxs.GaussianMixtureProjection()
         assert integrator.sampling_mode == "average"
         assert integrator.upsample_factor == 2
@@ -1357,7 +1382,10 @@ class TestGMMPointSampling:
             fine, new_shape, outputs_real_space=False, preserve_mean=True
         )
         coarse = integrator.integrate(
-            volume, cxs.BasicImageConfig(new_shape, shape[0] / new_shape[0], 300.0)
+            volume,
+            cxs.BasicImageConfig(
+                new_shape, shape[0] / new_shape[0], voltage_in_kilovolts=300.0
+            ),
         )
         np.testing.assert_allclose(cropped, coarse, atol=1e-10 * np.abs(coarse).max())
 
@@ -1367,7 +1395,9 @@ class TestGMMPointSampling:
 
         def render(positions, shape, pixel_size):
             volume, _ = _make_gaussian_volumes(positions, 0.3)
-            image_config = cxs.BasicImageConfig(shape, pixel_size, 300.0)
+            image_config = cxs.BasicImageConfig(
+                shape, pixel_size, voltage_in_kilovolts=300.0
+            )
             return np.asarray(
                 integrator.integrate(volume, image_config, outputs_real_space=True)
             )
@@ -1386,14 +1416,16 @@ class TestGMMPointSampling:
         )
 
         def project(pixel_size):
-            image_config = cxs.BasicImageConfig((31, 32), pixel_size, 300.0)
+            image_config = cxs.BasicImageConfig(
+                (31, 32), pixel_size, voltage_in_kilovolts=300.0
+            )
             return integrator.integrate(volume, image_config)
 
         np.testing.assert_allclose(
             jax.jit(project)(jnp.asarray(1.1)), project(1.1), rtol=1e-10, atol=1e-12
         )
 
-    def test_upsampled_real_space_matches_fourier(self, pdb_info):
+    def test_point_real_space_matches_fourier(self, pdb_info):
         volume, _ = _make_gaussian_volumes(pdb_info[0], 0.05)
         image_config = cxs.BasicImageConfig((31, 32), 1.0, voltage_in_kilovolts=300.0)
         integrator = cxs.GaussianMixtureProjection(
@@ -1409,7 +1441,7 @@ class TestGMMPointSampling:
             atol=1e-12 * np.abs(real).max(),
         )
 
-    def test_upsampled_with_shape_field(self, pdb_info):
+    def test_point_with_shape_field(self, pdb_info):
         # Even, so the 2n grid's corner bin, filled differently by the reference,
         # crops to the n grid's corner bin, which `_max_shell_relative_error` leaves out
         n = 32
@@ -1430,7 +1462,7 @@ class TestGMMPointSampling:
         assert _max_shell_relative_error(projection, exact, image_config) <= 1e-2
 
     @pytest.mark.parametrize("n_spread", (None, 11))
-    def test_upsampled_n_batches_agree(self, pdb_info, n_spread):
+    def test_point_n_batches_agree(self, pdb_info, n_spread):
         volume, _ = _make_gaussian_volumes(pdb_info[0], 0.05)
         image_config = cxs.BasicImageConfig((31, 32), 1.0, voltage_in_kilovolts=300.0)
         kwargs = dict(
@@ -1447,6 +1479,27 @@ class TestGMMPointSampling:
         )
         np.testing.assert_allclose(
             batched, reference, atol=1e-12 * np.abs(reference).max()
+        )
+
+    def test_point_gradients_agree_between_backends(self, pdb_info):
+        image_config = cxs.BasicImageConfig((31, 32), 1.0, voltage_in_kilovolts=300.0)
+        kwargs = dict(sampling_mode="point", blur_variance=_blur_variance(1.0, 2))
+
+        def make_grad_fn(integrator):
+            def loss(positions):
+                volume = cxs.GaussianMixtureVolume(positions, 1.0, 0.05)
+                projection = integrator.integrate(volume, image_config)
+                return jnp.sum(jnp.abs(projection) ** 2)
+
+            return jax.grad(loss)
+
+        positions = jnp.asarray(pdb_info[0])
+        dense = make_grad_fn(cxs.GaussianMixtureProjection(**kwargs))(positions)
+        spread = make_grad_fn(cxs.GaussianMixtureProjection(n_spread=15, **kwargs))(
+            positions
+        )
+        np.testing.assert_allclose(
+            spread, dense, rtol=1e-6, atol=1e-6 * np.abs(dense).max()
         )
 
     def test_point_gradients(self, pdb_info):
@@ -1605,7 +1658,7 @@ class TestGMMWithCalibration:
             sampling_mode="point",
             upsample_factor=upsample_factor,
         )
-        exact = TestGMMPointSampling.exact_integrator.integrate(atom_volume, image_config)
+        exact = TestGMMSamplingModes.exact_integrator.integrate(atom_volume, image_config)
         with jax.enable_x64(not float32):
             projection = integrator.integrate(gaussian_volume, image_config)
         assert _max_shell_relative_error(projection, exact, image_config) <= 1e-2
@@ -1671,15 +1724,6 @@ def test_fft_upsample_factor_must_be_a_positive_integer(upsample_factor):
 # ── GaussianFourier: sampling modes ───────────────────────────────────────────
 
 
-def _corner_mask(shape):
-    """True except at an rfft's bin where both axes are at an even Nyquist, which four
-    frequencies share and `GaussianFourierProjection` fills from the opposite corner."""
-    mask = np.ones((shape[0], shape[1] // 2 + 1), bool)
-    if shape[0] % 2 == 0 and shape[1] % 2 == 0:
-        mask[shape[0] // 2, -1] = False
-    return mask
-
-
 @pytest.mark.parametrize(
     "shape, new_shape", (((64, 64), (32, 32)), ((66, 66), (33, 33)), ((64, 64), (31, 31)))
 )
@@ -1700,12 +1744,14 @@ def test_fft_point_nests_under_fourier_crop(shape, new_shape):
     coarse = np.asarray(
         integrator.integrate(
             atom_volume,
-            cxs.BasicImageConfig(new_shape, shape[0] / new_shape[0], 300.0),
+            cxs.BasicImageConfig(
+                new_shape, shape[0] / new_shape[0], voltage_in_kilovolts=300.0
+            ),
         )
     )
     mask = _corner_mask(new_shape)
+    # The NUFFT is least accurate at the edge of its band, here the Nyquist lines
     np.testing.assert_allclose(
-        # The NUFFT is least accurate at the edge of its band, the Nyquist lines here
         cropped[mask],
         coarse[mask],
         atol=1e-6 * np.abs(coarse).max(),

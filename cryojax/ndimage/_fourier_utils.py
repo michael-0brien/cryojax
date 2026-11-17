@@ -67,12 +67,16 @@ def convert_fftn_to_rfftn(
 
 
 def convert_rfftn_to_fftn(
-    rfftn_array: Complex[Array, "y_dim x_dim//2+1"]
-    | Complex[Array, "z_dim y_dim x_dim//2+1"],
+    rfftn_array: Complex[Array, "{shape[0]} {shape[1]}//2+1"]
+    | Complex[Array, "{shape[0]} {shape[1]} {shape[2]}//2+1"],
     shape: tuple[int, int] | tuple[int, int, int],
-) -> Complex[Array, "y_dim x_dim"] | Complex[Array, "z_dim y_dim x_dim"]:
+) -> (
+    Complex[Array, "{shape[0]} {shape[1]}"]
+    | Complex[Array, "{shape[0]} {shape[1]} {shape[2]}"]
+):
     """Converts the output of a call to `jax.numpy.fft.rfftn` to that of
-    `jax.numpy.fft.fftn`, completing the spectrum by hermitian symmetry.
+    `jax.numpy.fft.fftn`, completing the spectrum by hermitian symmetry,
+    $F(k, -m) = F^*(-k, m)$. The inverse of `convert_fftn_to_rfftn`.
 
     **Arguments:**
 
@@ -91,10 +95,10 @@ def convert_rfftn_to_fftn(
         )
     n = shape[-1]
     leading = tuple(range(rfftn_array.ndim - 1))
-    # Negative frequencies -1, -2, ... of the last axis, F(k, -m) = F*(-k, m)
-    negative = jnp.conj(_negate_frequencies(rfftn_array[..., 1 : (n + 1) // 2], leading))
+    # Modes -1 ... -n//2 of the last axis, from +1 ... +n//2
+    negative = jnp.conj(_negate_frequencies(rfftn_array[..., 1 : n // 2 + 1], leading))
     return jnp.concatenate(
-        [rfftn_array[..., : n // 2 + 1], jnp.flip(negative, axis=-1)], axis=-1
+        [rfftn_array[..., : (n + 1) // 2], jnp.flip(negative, axis=-1)], axis=-1
     )
 
 
