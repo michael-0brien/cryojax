@@ -305,7 +305,7 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
             component is in the corner. Does nothing if
             `outputs_real_space = True`.
         """
-        # Prepare arguments, casting positions and the voxel size to JAX arrays
+        # Prepare arguments, casting positions, amplitudes and voxel size to JAX arrays
         voxel_size = jnp.asarray(self.voxel_size)
         positions, kernel_fns, amplitudes = (
             jax.tree.map(lambda x: jnp.asarray(x), volume_representation.positions),
