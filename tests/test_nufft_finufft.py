@@ -6,6 +6,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 from cryojax.ndimage._nufft import api as nufft_api
+from cryojax.ndimage._nufft.kernel import resolve_upsample_factor
 
 
 finufft = pytest.importorskip("finufft")
@@ -444,6 +445,54 @@ def test_hvp_runs_and_is_symmetric(shape):
     v1_h_v2, v2_h_v1 = dot(v1, hvp(v2)), dot(v2, hvp(v1))
     assert np.isfinite(v1_h_v2)
     np.testing.assert_allclose(v1_h_v2, v2_h_v1, rtol=1e-8)
+
+
+#
+# upsample_factor="auto"
+#
+@pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
+def test_auto_is_static(monkeypatch, name):
+    """`"auto"` is the default and resolves from static shapes, `eps` and dtype: one
+    trace for new values, no leaked tracers, the kernel of the resolved factor. In
+    float32 at eps 1e-6 this 3D case resolves away from 1.25."""
+    shape = (32, 30, 28)
+    positions = jnp.asarray(_points(shape, NUM_POINTS, seed=0), jnp.float32)
+    if name == "dispatch_nufft1":
+        second = jnp.asarray(
+            np.random.default_rng(1).normal(size=NUM_POINTS), jnp.float32
+        )
+    else:
+        second = jnp.asarray(_random_spectrum(shape, seed=1), jnp.complex64)
+    sigma = resolve_upsample_factor(
+        "auto", n_points=NUM_POINTS, n_batch=1, shape=shape, eps=1e-6, dtype=np.float32
+    )
+    assert sigma != 1.25
+    kernel_factors = []
+
+    def make_pswf_kernel(eps, upsample_factor, ndim):
+        kernel_factors.append(upsample_factor)
+        return make_pswf_kernel_unpatched(eps, upsample_factor, ndim)
+
+    make_pswf_kernel_unpatched = nufft_api.make_pswf_kernel
+    monkeypatch.setattr(nufft_api, "make_pswf_kernel", make_pswf_kernel)
+    transform = getattr(im, name)
+
+    @jax.jit
+    def run(positions, second):
+        return transform(positions, second, shape, pixel_size=PIXEL_SIZE, eps=1e-6)
+
+    with jax.checking_leaks():
+        run(positions, second)
+        run(positions + 0.1, 2 * second)
+    assert kernel_factors == [sigma]
+
+
+@pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
+def test_upsample_factor_other_string_raises(name):
+    shape = (8, 6)
+    second = jnp.ones(3) if name == "dispatch_nufft1" else jnp.ones((8, 4), complex)
+    with pytest.raises(ValueError, match=rf"{name}[\s\S]*upsample_factor[\s\S]*fast"):
+        getattr(im, name)(jnp.zeros((3, 2)), second, shape, upsample_factor="fast")
 
 
 #

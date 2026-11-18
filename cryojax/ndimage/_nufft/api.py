@@ -3,7 +3,7 @@
 import math
 from collections.abc import Mapping
 from functools import partial
-from typing import Any
+from typing import Any, Literal
 
 import jax
 import jax.numpy as jnp
@@ -19,6 +19,7 @@ from .kernel import (
     kernel_fourier_series,
     kernel_width,
     make_pswf_kernel,
+    resolve_upsample_factor,
 )
 from .pallas_spread import make_kernel_key, pallas_nufft_interp, pallas_nufft_spread
 from .spread import interp, interp_bwd, spread, spread_bwd
@@ -41,7 +42,7 @@ def dispatch_nufft1(
     *,
     pixel_size: FloatLike = 1.0,
     eps: float = 1e-6,
-    upsample_factor: float = 1.25,
+    upsample_factor: float | Literal["auto"] = "auto",
     enable_pallas: bool | Mapping[str, bool] | None = None,
     options: dict[str, Any] | None = None,
 ) -> Complex[Array, "..."]:
@@ -72,7 +73,10 @@ def dispatch_nufft1(
         The requested relative accuracy.
     - `upsample_factor`:
         The ratio of the fine grid to `shape` (finufft's `upsampfac`), greater than 1.
-        The kernel widens as it approaches 1, up to 16 fine-grid pixels.
+        The kernel widens as it approaches 1, up to 16 fine-grid pixels. `"auto"`
+        picks the fastest of 1.25, 1.5, 1.75 and 2 that meets `eps` in the dtype's
+        precision, from the point count, `shape`, `eps` and dtype; on `"jax-finufft"`,
+        finufft's own choice.
     - `enable_pallas`:
         Whether the native backend spreads with Pallas kernels, for the forward and
         backward pass, as in [`cryojax.ndimage.spread_gaussians_2d`][].
@@ -100,10 +104,16 @@ def dispatch_nufft1(
             f"point, but got `positions.shape = {jnp.shape(positions)}` and "
             f"`strengths.shape = {strengths.shape}`."
         )
-    _check_kernel(
-        "dispatch_nufft1(..., eps, upsample_factor)", eps, upsample_factor, ndim
-    )
     dtype = jnp.result_type(positions, strengths, pixel_size, 0.0)
+    sigma = _check_kernel(
+        "dispatch_nufft1(..., eps, upsample_factor)",
+        eps,
+        upsample_factor,
+        n_points=jnp.shape(positions)[0],
+        n_batch=strengths.shape[0] if strengths.ndim == 2 else 1,
+        shape=shape,
+        dtype=dtype,
+    )
     positions, c = jnp.asarray(positions, dtype), strengths.astype(dtype)
     c = c if c.ndim == 2 else c[None]
     if CRYOJAX_FINUFFT_BACKEND == "jax-finufft":
@@ -111,10 +121,8 @@ def dispatch_nufft1(
             positions, c, shape, pixel_size, eps, upsample_factor, options
         )
     else:
-        kernel = make_pswf_kernel(eps, upsample_factor, ndim)
-        fine_shape = tuple(
-            fine_grid_size(n, upsample_factor, kernel.width) for n in shape
-        )
+        kernel = make_pswf_kernel(eps, sigma, ndim)
+        fine_shape = tuple(fine_grid_size(n, sigma, kernel.width) for n in shape)
         u = _fine_coordinates(positions, shape, fine_shape, pixel_size)
         use_pallas_fwd, use_pallas_bwd = resolve_enable_pallas(enable_pallas)
         grid = _spread_dispatch(u, c, fine_shape, kernel, use_pallas_fwd, use_pallas_bwd)
@@ -130,7 +138,7 @@ def dispatch_nufft2(
     *,
     pixel_size: FloatLike = 1.0,
     eps: float = 1e-6,
-    upsample_factor: float = 1.25,
+    upsample_factor: float | Literal["auto"] = "auto",
     enable_pallas: bool | Mapping[str, bool] | None = None,
     options: dict[str, Any] | None = None,
 ) -> Float[Array, " M"] | Float[Array, "R M"]:
@@ -174,11 +182,17 @@ def dispatch_nufft2(
             f"`{half_shape}`, with an optional leading batch axis, but got "
             f"`rfftn_array.shape = {rfftn_array.shape}`."
         )
-    _check_kernel(
-        "dispatch_nufft2(..., eps, upsample_factor)", eps, upsample_factor, ndim
-    )
     real_dtype = jnp.finfo(jnp.result_type(rfftn_array, 0j)).dtype
     dtype = jnp.result_type(positions, real_dtype, pixel_size, 0.0)
+    sigma = _check_kernel(
+        "dispatch_nufft2(..., eps, upsample_factor)",
+        eps,
+        upsample_factor,
+        n_points=jnp.shape(positions)[0],
+        n_batch=rfftn_array.shape[0] if rfftn_array.ndim == ndim + 1 else 1,
+        shape=shape,
+        dtype=dtype,
+    )
     positions = jnp.asarray(positions, dtype)
     spectrum = rfftn_array.astype(jnp.result_type(dtype, 1j))
     spectrum = spectrum if rfftn_array.ndim == ndim + 1 else spectrum[None]
@@ -187,10 +201,8 @@ def dispatch_nufft2(
             positions, spectrum, shape, pixel_size, eps, upsample_factor, options
         )
     else:
-        kernel = make_pswf_kernel(eps, upsample_factor, ndim)
-        fine_shape = tuple(
-            fine_grid_size(n, upsample_factor, kernel.width) for n in shape
-        )
+        kernel = make_pswf_kernel(eps, sigma, ndim)
+        fine_shape = tuple(fine_grid_size(n, sigma, kernel.width) for n in shape)
         u = _fine_coordinates(positions, shape, fine_shape, pixel_size)
         # Halving an even last axis's Nyquist column gives it w = 1: the fine grid's
         # `irfftn` doubles every column it holds as interior
@@ -219,25 +231,36 @@ def _check_positions(name, positions, shape) -> int:
     return ndim
 
 
-def _check_kernel(name, eps, upsample_factor, ndim):
-    if not upsample_factor > 1:
-        raise ValueError(
-            f"Found invalid value for `{name}`. The `upsample_factor` must be greater "
-            f"than 1, but got `upsample_factor = {upsample_factor}`."
-        )
+def _check_kernel(name, eps, upsample_factor, *, n_points, n_batch, shape, dtype):
+    """Check `eps` and `upsample_factor`; return the factor with `"auto"` resolved."""
     if not eps > 0:
         raise ValueError(
             f"Found invalid value for `{name}`. The `eps` must be positive, but got "
             f"`eps = {eps}`."
         )
     try:
-        kernel_width(eps, upsample_factor, ndim)
+        sigma = resolve_upsample_factor(
+            upsample_factor,
+            n_points=n_points,
+            n_batch=n_batch,
+            shape=shape,
+            eps=eps,
+            dtype=dtype,
+        )
+    except ValueError as err:
+        raise ValueError(
+            f"Found invalid value for `{name}`. The `upsample_factor` must be "
+            f'`"auto"` or greater than 1, but got `upsample_factor = {upsample_factor}`.'
+        ) from err
+    try:
+        kernel_width(eps, sigma, len(shape))
     except ValueError as err:
         raise ValueError(
             f"Found invalid value for `{name}`. The `eps = {eps}` needs a kernel wider "
             f"than 16 fine-grid pixels at `upsample_factor = {upsample_factor}`; "
             "increase `eps` or `upsample_factor`."
         ) from err
+    return sigma
 
 
 #
@@ -480,6 +503,8 @@ def _is_fft_ordered(opts, finufft_type):
 
 def _make_jax_finufft_opts(upsample_factor):
     assert Opts is not None
+    if upsample_factor == "auto":
+        return Opts(modeord=True)
     return Opts(modeord=True, upsampfac=upsample_factor, gpu_upsampfac=upsample_factor)
 
 

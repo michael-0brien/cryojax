@@ -245,7 +245,7 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
 
     sampling_mode: Literal["point"] = eqx.field(static=True)
     eps: float
-    upsample_factor: float
+    upsample_factor: float | Literal["auto"]
     enable_pallas: bool | Mapping[str, bool] | None
     options: dict[str, Any]
 
@@ -255,7 +255,7 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
         voxel_size: FloatLike,
         *,
         eps: float = 1e-6,
-        upsample_factor: float = 1.25,
+        upsample_factor: float | Literal["auto"] = "auto",
         enable_pallas: bool | Mapping[str, bool] | None = None,
         options: dict[str, Any] = {},
     ):
@@ -269,7 +269,8 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
             The requested relative accuracy of the non-uniform FFT.
         - `upsample_factor`:
             The ratio of the fine grid to the grid (finufft's `upsampfac`), greater
-            than 1. Smaller values use less memory but a wider kernel.
+            than 1. Smaller values use less memory but a wider kernel. `"auto"` picks
+            it from a cost model; see [`cryojax.ndimage.dispatch_nufft1`][].
         - `enable_pallas`:
             Whether the native backend spreads with Pallas kernels. See
             [`cryojax.ndimage.dispatch_nufft1`][].
@@ -362,7 +363,7 @@ class GaussianFourierProjection(
 
     sampling_mode: Literal["point"] = eqx.field(static=True)
     eps: float
-    upsample_factor: float
+    upsample_factor: float | Literal["auto"]
     shape: tuple[int, int] | None
     enable_pallas: bool | Mapping[str, bool] | None
     options: dict[str, Any]
@@ -374,7 +375,7 @@ class GaussianFourierProjection(
         self,
         *,
         eps: float = 1e-6,
-        upsample_factor: float = 1.25,
+        upsample_factor: float | Literal["auto"] = "auto",
         shape: tuple[int, int] | None = None,
         enable_pallas: bool | Mapping[str, bool] | None = None,
         options: dict[str, Any] = {},
@@ -385,7 +386,8 @@ class GaussianFourierProjection(
             The requested relative accuracy of the non-uniform FFT.
         - `upsample_factor`:
             The ratio of the fine grid to the grid (finufft's `upsampfac`), greater
-            than 1. Smaller values use less memory but a wider kernel.
+            than 1. Smaller values use less memory but a wider kernel. `"auto"` picks
+            it from a cost model; see [`cryojax.ndimage.dispatch_nufft1`][].
         - `enable_pallas`:
             Whether the native backend spreads with Pallas kernels. See
             [`cryojax.ndimage.dispatch_nufft1`][].
@@ -504,7 +506,7 @@ def _project_impl(
     shape: tuple[int, int],
     pixel_size: Float[Array, ""],
     eps: float,
-    upsample_factor: float,
+    upsample_factor: float | Literal["auto"],
     enable_pallas: bool | Mapping[str, bool] | None,
     options: dict[str, Any],
 ) -> Array:
@@ -543,7 +545,7 @@ def _render_impl(
     shape: tuple[int, int, int],
     voxel_size: Float[Array, ""],
     eps: float,
-    upsample_factor: float,
+    upsample_factor: float | Literal["auto"],
     enable_pallas: bool | Mapping[str, bool] | None,
     options: dict[str, Any],
 ) -> Array:
@@ -573,11 +575,17 @@ def _render_impl(
     )
 
 
-def _check_upsample_factor(name: str, upsample_factor: float) -> float:
-    if upsample_factor <= 1:
+def _check_upsample_factor(
+    name: str, upsample_factor: float | Literal["auto"]
+) -> float | Literal["auto"]:
+    if isinstance(upsample_factor, str):
+        is_valid = upsample_factor == "auto"
+    else:
+        is_valid = upsample_factor > 1
+    if not is_valid:
         raise ValueError(
-            f"Found invalid value for `{name}.upsample_factor`. It must be greater "
-            f"than 1, but got `upsample_factor = {upsample_factor}`."
+            f'Found invalid value for `{name}.upsample_factor`. It must be `"auto"` or '
+            f"greater than 1, but got `upsample_factor = {upsample_factor}`."
         )
     return upsample_factor
 

@@ -6,6 +6,7 @@ from cryojax.ndimage._nufft.kernel import (
     kernel_fourier_series,
     kernel_width,
     make_pswf_kernel,
+    resolve_upsample_factor,
     tap_weights,
 )
 from scipy.special import pro_ang1
@@ -128,3 +129,48 @@ def test_fine_grid_size():
 
 def test_make_pswf_kernel_is_cached():
     assert make_pswf_kernel(1e-4, 1.25, 2) is make_pswf_kernel(1e-4, 1.25, 2)
+
+
+def _auto(n_points, shape, eps, dtype=np.float32):
+    return resolve_upsample_factor(
+        "auto", n_points=n_points, n_batch=1, shape=shape, eps=eps, dtype=dtype
+    )
+
+
+@pytest.mark.parametrize("dtype", (np.float32, np.float64))
+def test_auto_picks_low_sigma_when_sparse(dtype):
+    assert _auto(10_000, (4096, 4096), 1e-4, dtype) == 1.25
+
+
+def test_auto_picks_high_sigma_when_dense():
+    assert _auto(100_000_000, (4096, 4096), 1e-6) == 2.0
+
+
+@pytest.mark.parametrize("ndim", (2, 3))
+@pytest.mark.parametrize("eps", (1e-9, 1e-10, 1e-11, 1e-12))
+def test_auto_respects_width_cap(eps, ndim):
+    sigma = _auto(10, (256,) * ndim, eps, np.float64)
+    assert kernel_width(eps, sigma, ndim) <= 16
+
+
+def test_auto_rounding_steers_float32_3d_from_low_sigma():
+    """Sparse points favour 1.25, but in float32 its deconvolution amplifies rounding
+    beyond `eps` (the benchmark's 1.4e-3 at eps 1e-6, w = 11)."""
+    shape = (256, 256, 256)
+    assert _auto(10_000, shape, 1e-6, np.float64) == 1.25
+    assert _auto(10_000, shape, 1e-6, np.float32) == 1.5
+    assert _auto(10_000, shape, 1e-4, np.float32) == 1.25
+
+
+def test_auto_takes_most_accurate_when_eps_unreachable():
+    assert _auto(10, (64, 64, 64), 1e-9, np.float32) == 2.0
+
+
+def test_explicit_upsample_factor_passes_through():
+    kwargs = dict(n_points=10, n_batch=1, shape=(8, 8), eps=1e-4, dtype=np.float32)
+    assert resolve_upsample_factor(1.6, **kwargs) == 1.6
+    for bad in (1.0, "fast"):
+        with pytest.raises(
+            ValueError, match=rf"resolve_upsample_factor[\s\S]*upsample_factor.*{bad}"
+        ):
+            resolve_upsample_factor(bad, **kwargs)
