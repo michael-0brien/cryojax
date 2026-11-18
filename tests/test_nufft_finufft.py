@@ -1,5 +1,7 @@
 """The native NUFFT against finufft, the ground truth, and against exact identities."""
 
+import warnings
+
 import cryojax.ndimage as im
 import jax
 import jax.numpy as jnp
@@ -464,7 +466,7 @@ def test_auto_is_static(monkeypatch, name):
     else:
         second = jnp.asarray(_random_spectrum(shape, seed=1), jnp.complex64)
     sigma = resolve_upsample_factor(
-        "auto", n_points=NUM_POINTS, n_batch=1, shape=shape, eps=1e-6, dtype=np.float32
+        "auto", n_points=NUM_POINTS, shape=shape, eps=1e-6, dtype=np.float32, pallas=False
     )
     assert sigma != 1.25
     kernel_factors = []
@@ -479,12 +481,29 @@ def test_auto_is_static(monkeypatch, name):
 
     @jax.jit
     def run(positions, second):
-        return transform(positions, second, shape, pixel_size=PIXEL_SIZE, eps=1e-6)
+        return transform(
+            positions, second, shape, pixel_size=PIXEL_SIZE, eps=1e-6, enable_pallas=False
+        )
 
     with jax.checking_leaks():
         run(positions, second)
         run(positions + 0.1, 2 * second)
     assert kernel_factors == [sigma]
+
+
+@pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
+def test_auto_uses_pure_jax_costs(monkeypatch, name):
+    backends = []
+
+    def resolve_upsample_factor(upsample_factor, **kwargs):
+        backends.append(kwargs["pallas"])
+        return resolve_upsample_factor_unpatched(upsample_factor, **kwargs)
+
+    resolve_upsample_factor_unpatched = nufft_api.resolve_upsample_factor
+    monkeypatch.setattr(nufft_api, "resolve_upsample_factor", resolve_upsample_factor)
+    second = jnp.ones(3) if name == "dispatch_nufft1" else jnp.ones((8, 4), complex)
+    getattr(im, name)(jnp.zeros((3, 2)), second, (8, 6), enable_pallas=False)
+    assert backends == [False]
 
 
 @pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
@@ -506,6 +525,74 @@ def test_eps_too_small_raises(name):
         getattr(im, name)(
             jnp.zeros((3, 2)), second, shape, eps=1e-12, upsample_factor=1.25
         )
+
+
+@pytest.mark.parametrize("upsample_factor", ["auto", 2.0])
+@pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
+def test_eps_below_fit_precision_raises(name, upsample_factor):
+    """Legal widths at sigma 2, but an ill-conditioned or failing tap fit."""
+    shape = (8, 6)
+    second = jnp.ones(3) if name == "dispatch_nufft1" else jnp.ones((8, 4), complex)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        with pytest.raises(ValueError, match=rf"{name}[\s\S]*eps[\s\S]*1e-13"):
+            getattr(im, name)(
+                jnp.zeros((3, 2)),
+                second,
+                shape,
+                eps=1e-13,
+                upsample_factor=upsample_factor,
+            )
+
+
+@pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
+def test_kernel_error_names_dispatch_and_resolved_factor(monkeypatch, name):
+    def make_pswf_kernel(eps, upsample_factor, ndim):
+        raise ValueError("Found invalid value for `make_pswf_kernel(...)`.")
+
+    monkeypatch.setattr(nufft_api, "make_pswf_kernel", make_pswf_kernel)
+    shape = (8, 6)
+    second = jnp.ones(3) if name == "dispatch_nufft1" else jnp.ones((8, 4), complex)
+    sigma = resolve_upsample_factor(
+        "auto", n_points=3, shape=shape, eps=1e-6, dtype=np.float64, pallas=False
+    )
+    with pytest.raises(
+        ValueError, match=rf"{name}[\s\S]*eps = 1e-06[\s\S]*upsample_factor = {sigma}`"
+    ):
+        getattr(im, name)(jnp.zeros((3, 2)), second, shape, enable_pallas=False)
+
+
+@pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
+def test_auto_model_errors_pass_through(monkeypatch, name):
+    def resolve_upsample_factor(upsample_factor, **kwargs):
+        raise np.linalg.LinAlgError("cost model")
+
+    monkeypatch.setattr(nufft_api, "resolve_upsample_factor", resolve_upsample_factor)
+    second = jnp.ones(3) if name == "dispatch_nufft1" else jnp.ones((8, 4), complex)
+    with pytest.raises(np.linalg.LinAlgError, match="cost model"):
+        getattr(im, name)(jnp.zeros((3, 2)), second, (8, 6))
+
+
+@pytest.mark.skipif(jax_finufft is None, reason="jax-finufft not installed")
+@pytest.mark.parametrize("eps, upsample_factor", [(1e-10, 1.25), (1e-13, "auto")])
+def test_jax_finufft_skips_native_kernel_limits(monkeypatch, eps, upsample_factor):
+    """finufft takes widths past the native cap and `eps` below the native fit's."""
+    monkeypatch.setattr(nufft_api, "CRYOJAX_FINUFFT_BACKEND", "jax-finufft")
+    shape = (16, 15)
+    positions = _points(shape, NUM_POINTS, seed=0)
+    strengths = np.random.default_rng(1).normal(size=NUM_POINTS)
+    spectrum = _random_spectrum(shape, seed=2)
+    kwargs = dict(pixel_size=PIXEL_SIZE, eps=eps, upsample_factor=upsample_factor)
+    type1 = im.dispatch_nufft1(
+        jnp.asarray(positions), jnp.asarray(strengths), shape, **kwargs
+    )
+    type2 = im.dispatch_nufft2(
+        jnp.asarray(positions), jnp.asarray(spectrum), shape, **kwargs
+    )
+    reference = _type1_reference(positions, strengths, shape)
+    assert _relative_error(type1, reference) <= 1e-9
+    reference = _type2_reference(positions, spectrum, shape)
+    assert _relative_error(type2, reference) <= 1e-9
 
 
 @pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])

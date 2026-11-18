@@ -17,7 +17,6 @@ from .kernel import (
     PSWFKernel,
     fine_grid_size,
     kernel_fourier_series,
-    kernel_width,
     make_pswf_kernel,
     resolve_upsample_factor,
 )
@@ -33,6 +32,9 @@ try:
 except ModuleNotFoundError as err:
     jax_finufft, Opts = None, None
     JAX_FINUFFT_IMPORT_ERROR = err
+
+# Below this the float64 tap fit turns ill-conditioned, then fails
+_MIN_EPS = 1e-12
 
 
 def dispatch_nufft1(
@@ -55,7 +57,8 @@ def dispatch_nufft1(
     `0 .. n_x // 2` on the last, so a point on the grid gives the `rfftn` of a unit delta
     at that pixel. The backend is set by the `CRYOJAX_FINUFFT_BACKEND` environment
     variable: `"native"` (default) or `"jax-finufft"`. Differentiable in reverse mode,
-    including forward-over-reverse; `jax.jvp` of this function is not supported.
+    including forward-over-reverse (HVPs); on the native backend, `jax.jvp` and
+    `jax.jacfwd` are not supported.
 
     **Arguments:**
 
@@ -70,13 +73,16 @@ def dispatch_nufft1(
     - `pixel_size`:
         The grid spacing.
     - `eps`:
-        The requested relative accuracy.
+        The requested relative accuracy, at least 1e-12 on the native backend. In
+        float32, rounding of the fine-grid coordinates limits the achieved accuracy to
+        about 1e-5 at 256² and 2e-4 at 4096².
     - `upsample_factor`:
         The ratio of the fine grid to `shape` (finufft's `upsampfac`), greater than 1.
         The kernel widens as it approaches 1, up to 16 fine-grid pixels. `"auto"`
-        picks the fastest of 1.25, 1.5, 1.75 and 2 that meets `eps` in the dtype's
-        precision, from the point count, `shape`, `eps` and dtype; on `"jax-finufft"`,
-        finufft's own choice.
+        picks the fastest of 1.25, 1.5, 1.75 and 2 for the point count, `shape`, `eps`,
+        dtype and backend (Pallas or pure JAX) whose predicted error meets `eps`,
+        modelling the deconvolution's rounding only. On `"jax-finufft"`, `"auto"` takes
+        jax-finufft's defaults (in 1.3.1, finufft's own choice on CPU and 2 on GPU).
     - `enable_pallas`:
         Whether the native backend spreads with Pallas kernels, for the forward and
         backward pass, as in [`cryojax.ndimage.spread_gaussians_2d`][].
@@ -105,15 +111,8 @@ def dispatch_nufft1(
             f"`strengths.shape = {strengths.shape}`."
         )
     dtype = jnp.result_type(positions, strengths, pixel_size, 0.0)
-    sigma = _check_kernel(
-        "dispatch_nufft1(..., eps, upsample_factor)",
-        eps,
-        upsample_factor,
-        n_points=jnp.shape(positions)[0],
-        n_batch=strengths.shape[0] if strengths.ndim == 2 else 1,
-        shape=shape,
-        dtype=dtype,
-    )
+    kernel_name = "dispatch_nufft1(..., eps, upsample_factor)"
+    _check_eps_and_upsample_factor(kernel_name, eps, upsample_factor)
     positions, c = jnp.asarray(positions, dtype), strengths.astype(dtype)
     c = c if c.ndim == 2 else c[None]
     if CRYOJAX_FINUFFT_BACKEND == "jax-finufft":
@@ -121,10 +120,18 @@ def dispatch_nufft1(
             positions, c, shape, pixel_size, eps, upsample_factor, options
         )
     else:
-        kernel = make_pswf_kernel(eps, sigma, ndim)
+        use_pallas_fwd, use_pallas_bwd = resolve_enable_pallas(enable_pallas)
+        kernel, sigma = _make_kernel(
+            kernel_name,
+            eps,
+            upsample_factor,
+            n_points=positions.shape[0],
+            shape=shape,
+            dtype=dtype,
+            pallas=use_pallas_fwd or use_pallas_bwd,
+        )
         fine_shape = tuple(fine_grid_size(n, sigma, kernel.width) for n in shape)
         u = _fine_coordinates(positions, shape, fine_shape, pixel_size)
-        use_pallas_fwd, use_pallas_bwd = resolve_enable_pallas(enable_pallas)
         grid = _spread_dispatch(u, c, fine_shape, kernel, use_pallas_fwd, use_pallas_bwd)
         fine_spectrum = jnp.fft.rfftn(grid, axes=tuple(range(1, ndim + 1)))
         spectrum = _deconvolve(_crop(fine_spectrum, shape), kernel, shape, fine_shape)
@@ -184,15 +191,8 @@ def dispatch_nufft2(
         )
     real_dtype = jnp.finfo(jnp.result_type(rfftn_array, 0j)).dtype
     dtype = jnp.result_type(positions, real_dtype, pixel_size, 0.0)
-    sigma = _check_kernel(
-        "dispatch_nufft2(..., eps, upsample_factor)",
-        eps,
-        upsample_factor,
-        n_points=jnp.shape(positions)[0],
-        n_batch=rfftn_array.shape[0] if rfftn_array.ndim == ndim + 1 else 1,
-        shape=shape,
-        dtype=dtype,
-    )
+    kernel_name = "dispatch_nufft2(..., eps, upsample_factor)"
+    _check_eps_and_upsample_factor(kernel_name, eps, upsample_factor)
     positions = jnp.asarray(positions, dtype)
     spectrum = rfftn_array.astype(jnp.result_type(dtype, 1j))
     spectrum = spectrum if rfftn_array.ndim == ndim + 1 else spectrum[None]
@@ -201,7 +201,16 @@ def dispatch_nufft2(
             positions, spectrum, shape, pixel_size, eps, upsample_factor, options
         )
     else:
-        kernel = make_pswf_kernel(eps, sigma, ndim)
+        use_pallas_fwd, use_pallas_bwd = resolve_enable_pallas(enable_pallas)
+        kernel, sigma = _make_kernel(
+            kernel_name,
+            eps,
+            upsample_factor,
+            n_points=positions.shape[0],
+            shape=shape,
+            dtype=dtype,
+            pallas=use_pallas_fwd or use_pallas_bwd,
+        )
         fine_shape = tuple(fine_grid_size(n, sigma, kernel.width) for n in shape)
         u = _fine_coordinates(positions, shape, fine_shape, pixel_size)
         # Halving an even last axis's Nyquist column gives it w = 1: the fine grid's
@@ -212,7 +221,6 @@ def dispatch_nufft2(
             s=fine_shape,
             axes=tuple(range(1, ndim + 1)),
         )
-        use_pallas_fwd, use_pallas_bwd = resolve_enable_pallas(enable_pallas)
         values = _interp_dispatch(u, grid, kernel, use_pallas_fwd, use_pallas_bwd)
     return values if rfftn_array.ndim == ndim + 1 else values[0]
 
@@ -231,36 +239,47 @@ def _check_positions(name, positions, shape) -> int:
     return ndim
 
 
-def _check_kernel(name, eps, upsample_factor, *, n_points, n_batch, shape, dtype):
-    """Check `eps` and `upsample_factor`; return the factor with `"auto"` resolved."""
+def _check_eps_and_upsample_factor(name, eps, upsample_factor):
     if not eps > 0:
         raise ValueError(
             f"Found invalid value for `{name}`. The `eps` must be positive, but got "
             f"`eps = {eps}`."
         )
-    try:
-        sigma = resolve_upsample_factor(
-            upsample_factor,
-            n_points=n_points,
-            n_batch=n_batch,
-            shape=shape,
-            eps=eps,
-            dtype=dtype,
-        )
-    except ValueError as err:
+    if isinstance(upsample_factor, str):
+        is_valid = upsample_factor == "auto"
+    else:
+        is_valid = upsample_factor > 1
+    if not is_valid:
         raise ValueError(
             f"Found invalid value for `{name}`. The `upsample_factor` must be "
             f'`"auto"` or greater than 1, but got `upsample_factor = {upsample_factor}`.'
-        ) from err
+        )
+
+
+def _make_kernel(name, eps, upsample_factor, *, n_points, shape, dtype, pallas):
+    """The native backend's kernel and upsample factor, with `"auto"` resolved."""
+    if eps < _MIN_EPS:
+        raise ValueError(
+            f"Found invalid value for `{name}`. The `eps` must be at least {_MIN_EPS} on "
+            f"the native backend, but got `eps = {eps}`."
+        )
+    sigma = resolve_upsample_factor(
+        upsample_factor,
+        n_points=n_points,
+        shape=shape,
+        eps=eps,
+        dtype=dtype,
+        pallas=pallas,
+    )
     try:
-        kernel_width(eps, sigma, len(shape))
+        kernel = make_pswf_kernel(eps, sigma, len(shape))
     except ValueError as err:
         raise ValueError(
             f"Found invalid value for `{name}`. The `eps = {eps}` needs a kernel wider "
-            f"than 16 fine-grid pixels at `upsample_factor = {upsample_factor}`; "
-            "increase `eps` or `upsample_factor`."
+            f"than 16 fine-grid pixels at `upsample_factor = {sigma}`, or one the tap "
+            "fit cannot reach; increase `eps` or `upsample_factor`."
         ) from err
-    return sigma
+    return kernel, sigma
 
 
 #

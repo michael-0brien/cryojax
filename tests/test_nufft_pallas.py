@@ -17,7 +17,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 from cryojax.ndimage import _pallas_helpers
-from cryojax.ndimage._nufft import pallas_spread as nufft_pallas
+from cryojax.ndimage._nufft import api as nufft_api, pallas_spread as nufft_pallas
 from cryojax.ndimage._nufft.kernel import make_pswf_kernel
 from cryojax.ndimage._nufft.spread import interp, interp_bwd, spread, spread_bwd
 from jax._src import core as jax_core  # jaxpr inspection only
@@ -624,6 +624,34 @@ def test_pallas_empty_points(shape):
     actual, expected = (jax.tree.leaves(vmapped[k](*batched)) for k in (True, False))
     for a, e in zip(actual, expected):
         assert a.shape == e.shape and np.array_equal(a, e)
+
+
+@requires_gpu
+@pytest.mark.parametrize(
+    "enable_pallas, pallas",
+    [
+        (False, False),
+        (True, True),
+        ({"fwd": True, "bwd": False}, True),
+        ({"fwd": False, "bwd": True}, True),
+    ],
+)
+def test_auto_prices_pallas_when_either_pass_uses_it(monkeypatch, enable_pallas, pallas):
+    backends = []
+
+    def resolve_upsample_factor(upsample_factor, **kwargs):
+        backends.append(kwargs["pallas"])
+        return resolve_upsample_factor_unpatched(upsample_factor, **kwargs)
+
+    resolve_upsample_factor_unpatched = nufft_api.resolve_upsample_factor
+    monkeypatch.setattr(nufft_api, "resolve_upsample_factor", resolve_upsample_factor)
+    shape = (16, 15)
+    positions = _points(shape, 20, seed=43, dtype=np.float32)
+    kwargs = dict(pixel_size=PIXEL_SIZE, eps=1e-4, enable_pallas=enable_pallas)
+    im.dispatch_nufft1(positions, jnp.ones(20, np.float32), shape, **kwargs)
+    spectrum = _spectrum(shape, seed=44, dtype=np.float32)
+    im.dispatch_nufft2(positions, spectrum, shape, **kwargs)
+    assert backends == [pallas, pallas]
 
 
 #
