@@ -11,7 +11,6 @@ from jaxtyping import Array, Complex, Float
 
 from ...jax_util import NDArrayLike
 from ...ndimage import (
-    enforce_rfftn_self_conjugates,
     ewald_sphere_from_slice,
     make_frequency_slice,
     prepare_sampling_fft,
@@ -232,13 +231,6 @@ class FourierSliceExtraction(
             boundary=self.boundary,
             unroll=_resolve_unroll(self.unroll, volume_representation.interp),
         )
-        # The extracted half-slice is already rfft-shaped (the query grid
-        # itself was), so only self-conjugate (DC/Nyquist) realness needs
-        # enforcing here -- no crop.
-        fourier_projection = enforce_rfftn_self_conjugates(
-            fourier_projection, (N, N), includes_dc=False, mode="zero"
-        )
-
         # Resize the image to match the AbstractImageConfig.padded_shape
         if image_config.padded_shape != (N, N):
             fourier_projection = jnp.fft.rfftn(
