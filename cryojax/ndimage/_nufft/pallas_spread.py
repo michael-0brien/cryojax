@@ -408,12 +408,12 @@ def _tap_polynomials(kernel_key, order):
     return derivative_coefficients(coefficients, order).tolist()
 
 
-def _horner(coefficients, s):
+def _horner(coefficients, z):
     if len(coefficients) == 1:
-        return 0 * s + coefficients[0]
-    out = coefficients[0] * s + coefficients[1]
+        return 0 * z + coefficients[0]
+    out = coefficients[0] * z + coefficients[1]
     for coefficient in coefficients[2:]:
-        out = out * s + coefficient
+        out = out * z + coefficient
     return out
 
 
@@ -427,14 +427,15 @@ def _select(per_tap, t):
 
 def _axis_taps(u_refs, mask, width, polynomials):
     """Per grid axis (first to last): the first tap's index and every tap's
-    polynomials at the point's offset, each `(block_size,)`. `u_refs` run (x, y, z)."""
+    polynomials at `z = 2s - 1`, `s` the point's offset, each `(block_size,)`. `u_refs`
+    run (x, y, z)."""
     starts, per_axis = [], []
     for u_ref in reversed(u_refs):
         half = pltriton.load(u_ref, mask=mask) - width / 2
         start = jnp.ceil(half)
-        s = start - half
+        z = 2 * (start - half) - 1
         starts.append(start.astype(jnp.int32))
-        per_axis.append([[_horner(p, s) for p in polys] for polys in polynomials])
+        per_axis.append([[_horner(p, z) for p in polys] for polys in polynomials])
     return starts, per_axis
 
 
