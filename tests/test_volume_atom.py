@@ -768,16 +768,16 @@ def test_fft_atom_projection_exact(monkeypatch, pdb_info, pixel_size, shape, bac
 
 
 def test_fourier_projection_upsample_factor_field():
-    assert cxs.GaussianFourierProjection().upsample_factor == 1.25
+    assert cxs.GaussianFourierProjection().upsample_factor == "auto"
     integrator = cxs.GaussianFourierProjection(upsample_factor=2.0)
     assert integrator.upsample_factor == 2.0
-    assert cxs.GaussianFourierRenderFn((8, 8, 8), 1.0).upsample_factor == 1.25
+    assert cxs.GaussianFourierRenderFn((8, 8, 8), 1.0).upsample_factor == "auto"
     assert integrator.enable_pallas is None
     assert cxs.GaussianFourierProjection(enable_pallas=False).enable_pallas is False
 
 
-@pytest.mark.parametrize("upsample_factor", (1.0, 0.5))
-def test_fourier_projection_rejects_upsample_factor_at_most_one(upsample_factor):
+@pytest.mark.parametrize("upsample_factor", (1.0, 0.5, "fast"))
+def test_fourier_projection_rejects_invalid_upsample_factor(upsample_factor):
     with pytest.raises(ValueError, match="GaussianFourierProjection.*upsample_factor"):
         cxs.GaussianFourierProjection(upsample_factor=upsample_factor)
     with pytest.raises(ValueError, match="GaussianFourierRenderFn.*upsample_factor"):
