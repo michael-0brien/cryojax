@@ -1,18 +1,12 @@
-"""Pallas/Triton kernels for the native NUFFT's PSWF spreading and interpolation, with
-the tap convention and Horner coefficients of `spread.py`.
+"""Pallas/Triton kernels for the native NUFFT's PSWF spreading and interpolation, in
+the tap convention of `spread.py`.
 
-Each program takes `block_size` points. It evaluates every axis's `w` tap weights (and
-the derivatives it needs) once per point by Horner, with the coefficients baked in as
-constants from a static `kernel_key`, and keeps them as `w` values per lane; the
-neighbourhood walk then selects an outer axis's weight by its loop index and unrolls the
-innermost axis. The scatter atomically adds into a zeros buffer aliased into its
-output; the gather is a masked load. Masked lanes hold unspecified values and are never
-stored. Pallas-Triton rules as in `_spreading/pallas_spread.py`.
-
-Both wrappers carry a `jax.custom_jvp` whose tangent is a separate tangent-only kernel,
-as in `_spreading/pallas_spread.py`: specialized on which tangents are symbolic zeros,
-and batched over directions, so that a `jax.vmap` over tangents at one primal point is
-one launch.
+A program takes `block_size` points and evaluates their tap weights once by Horner, the
+coefficients baked in from a static `kernel_key`; the neighbourhood walk unrolls the
+innermost axis. The scatter atomically adds into an aliased zeros buffer, the gather is
+a masked load. As in `_spreading/pallas_spread.py`, each wrapper's `jax.custom_jvp`
+tangent is a tangent-only kernel, specialized on symbolic zeros and batched over
+directions.
 """
 
 import itertools
@@ -445,11 +439,8 @@ def _axis_taps(u_refs, mask, width, polynomials):
 
 
 def _gather_jets(loads, orders, starts, per_axis, inner, fine_shape, zero):
-    """Per source `k`, `sum_l x_k[l] prod_a phi_a(l)` over the neighbourhood and its
-    derivatives in `u` up to `orders[k]`, as a dict from sorted grid-axis tuples: `()`
-    the value, `(a,)` the derivative along axis `a`, `(a, b)` along `a` and `b`.
-    `loads[k]` reads source `k` at flat grid indices; `per_axis[a][m]` are the taps'
-    `m`-th derivatives."""
+    """Per source `k`, `sum_l x_k[l] prod_a phi_a(l)` and its `u`-derivatives up to
+    `orders[k]`, keyed by sorted grid-axis tuples (`()` the value)."""
     ndim, width = len(fine_shape), len(inner)
     strides = [math.prod(fine_shape[axis + 1 :]) for axis in range(ndim)]
 
@@ -590,9 +581,8 @@ def _make_interp_kernel(
 def _make_spread_tangent_kernel(
     fine_shape, kernel_key, num_grids, block_size, num_points, nonzero, num_directions
 ):
-    """The tangent of `_make_spread_kernel` in `num_directions` directions. The walk
-    carries `value = c prod phi` over the axes so far and its tangent, moving along an
-    axis by the product rule: `(value, t) -> (value phi, t phi + value tu phi')`."""
+    """The tangent of `_make_spread_kernel` in `num_directions` directions, by the
+    product rule along each axis: `(value, t) -> (value phi, t phi + value tu phi')`."""
     ndim, width = len(fine_shape), kernel_key[0]
     nonzero_u, nonzero_c = nonzero
     strides = [math.prod(fine_shape[axis + 1 :]) for axis in range(ndim)]
@@ -702,11 +692,9 @@ def _make_interp_tangent_kernel(
     nonzero,
     num_directions,
 ):
-    """The tangent of `_make_interp_kernel` (one group) in `num_directions` directions.
-    The gather is linear in `g` and `weights`, so `tg` enters through its own jets and
-    `tweights` through `g`'s gradient; `tu` contracts `g`'s derivatives one order up,
-    once per point and grid: values `interp(tg) + tu . grad`, positions
-    `tweights grad + weights (grad(tg) + hess tu)`."""
+    """The tangent of `_make_interp_kernel` (one group) in `num_directions` directions:
+    values `interp(tg) + tu . grad`, positions `tweights grad + weights (grad(tg) + hess
+    tu)`."""
     ndim, width = len(fine_shape), kernel_key[0]
     nonzero_u, nonzero_g, nonzero_w = nonzero
     out_values, g_order, uses_weights = _interp_tangent_plan(values, positions, nonzero)

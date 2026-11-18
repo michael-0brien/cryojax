@@ -3,8 +3,8 @@
 One configuration per process, so that peak memory is its own; results are appended to
 `--out` as JSON lines. Points are cached as `.npy` in `--cache-dir`, so that the cufinufft
 and CPU finufft references load the same ones; `--prepare` only writes them. The achieved
-error is against `<cache-dir>/ref_*.npy`: the type-1 rfft half grid from CPU finufft in
-double at eps 1e-12 (not written here).
+error is against `<cache-dir>/pts_*_ref.npy`, if present: the type-1 rfft half grid from
+CPU finufft in double at eps 1e-12, from a generator outside this script.
 
 ```
 python benchmark_nufft.py --backend pallas --ndim 2 --n 4096 --M 4000000 \
