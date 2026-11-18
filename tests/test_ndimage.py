@@ -1327,7 +1327,7 @@ def test_dispatch_nufft1_rejects_dimension_mismatch(positions_shape, shape):
 )
 def test_dispatch_nufft1_upsampfac(monkeypatch, kwargs, expected_upsampfac):
     """The default is 1.25, and backend `options` take precedence."""
-    from cryojax.ndimage import _nufft
+    from cryojax.ndimage._nufft import api as _nufft
 
     recorded = {}
     nufft2d1 = _nufft.nufftax.nufft2d1

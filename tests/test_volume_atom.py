@@ -20,7 +20,8 @@ from cryojax.constants import (
     PengScatteringFactorParameters,
     check_atomic_numbers_supported,
 )
-from cryojax.ndimage import _nufft, make_coordinate_grid
+from cryojax.ndimage import make_coordinate_grid
+from cryojax.ndimage._nufft import api as _nufft
 from cryojax.simulator._volume.internal import make_frequencies_1d
 from jaxtyping import Array
 
