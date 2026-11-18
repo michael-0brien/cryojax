@@ -29,9 +29,8 @@ class AbstractPose(Module, strict=True):
     overwriting the `AbstractPose.rotation` property.
     """
 
-    offset_in_angstroms: AbstractVar[
-        Float[NDArrayLike, "... 2"] | Float[NDArrayLike, "... 3"]
-    ]
+    offset_xy_in_angstroms: AbstractVar[Float[NDArrayLike, "... 2"]]
+    offset_z_in_angstroms: AbstractVar[Float[NDArrayLike, "..."] | None]
 
     def rotate_coordinates(
         self, target: (Float[Array, "... 3"]), /, inverse: bool = False
@@ -103,10 +102,10 @@ class AbstractPose(Module, strict=True):
 
         **Returns:**
 
-        From the vector $(t_x, t_y)$ (given by `self.offset_in_angstroms`), returns the
-        grid of in-plane phase shifts $\\exp{(- 2 \\pi i (t_x q_x + t_y q_y))}$.
+        From the vector $(t_x, t_y)$ (given by `self.offset_xy_in_angstroms`), returns
+        the grid of in-plane phase shifts $\\exp{(- 2 \\pi i (t_x q_x + t_y q_y))}$.
         """
-        offset_in_angstroms = jnp.asarray(self.offset_in_angstroms)
+        offset_in_angstroms = jnp.asarray(self.offset_xy_in_angstroms)
         tx, ty = offset_in_angstroms[0], offset_in_angstroms[1]
         q_x, q_y = (
             make_1d_frequency_grid(shape[1], pixel_size, outputs_rfftfreqs=True),
@@ -116,12 +115,20 @@ class AbstractPose(Module, strict=True):
         return phase_y[:, None] * phase_x[None, :]
 
     @cached_property
+    def offset_in_angstroms(
+        self,
+    ) -> Float[NDArrayLike, "... 2"] | Float[NDArrayLike, "... 3"]:
+        """The translation $(t_x, t_y)$, with $t_z$ appended if not `None`."""
+        xy, z = self.offset_xy_in_angstroms, self.offset_z_in_angstroms
+        return xy if z is None else leaf_stack((xy[..., 0], xy[..., 1], z), dtype=None)
+
+    @cached_property
     def offset_x_in_angstroms(self) -> Float[Array, "..."]:
         """The in-plane translation in the x direction."""
         # a[..., i] indexing is for convenience outside of `jax.vmap`
         # regions. Be careful! Will silently cause failures
         # if batch dimensions are not the leading dimensions.
-        return jnp.asarray(self.offset_in_angstroms)[..., 0]
+        return jnp.asarray(self.offset_xy_in_angstroms)[..., 0]
 
     @cached_property
     def offset_y_in_angstroms(self) -> Float[Array, "..."]:
@@ -129,19 +136,7 @@ class AbstractPose(Module, strict=True):
         # a[..., i] indexing is for convenience outside of `jax.vmap`
         # regions. Be careful! Will silently cause failures
         # if batch dimensions are not the leading dimensions.
-        return jnp.asarray(self.offset_in_angstroms)[..., 1]
-
-    @cached_property
-    def offset_z_in_angstroms(self) -> Float[Array, "..."] | None:
-        """The out-of-plane translation in the z direction."""
-        # a[..., i] is for convenience outside of `jax.vmap`
-        # regions. Be careful! Will silently cause failures
-        # if batch dimensions are not the leading dimensions.
-        return (
-            None
-            if self.offset_in_angstroms.shape[-1] == 2
-            else jnp.asarray(self.offset_in_angstroms)[..., 2]
-        )
+        return jnp.asarray(self.offset_xy_in_angstroms)[..., 1]
 
     @cached_property
     @abstractmethod
@@ -174,9 +169,15 @@ class AbstractPose(Module, strict=True):
                 f"`{offset_in_angstroms.shape}`"
             )
         return eqx.tree_at(
-            lambda p: p.offset_in_angstroms,
+            lambda p: (p.offset_xy_in_angstroms, p.offset_z_in_angstroms),
             cls.from_rotation(rotation),
-            offset_in_angstroms,
+            (
+                offset_in_angstroms[..., :2],
+                None
+                if offset_in_angstroms.shape[-1] == 2
+                else offset_in_angstroms[..., 2],
+            ),
+            is_leaf=lambda x: x is None,
         )
 
     @classmethod
@@ -187,9 +188,8 @@ class AbstractPose(Module, strict=True):
         """Construct an `AbstractPose` from a
         translation vector.
         """
-        return eqx.tree_at(
-            lambda p: p.offset_in_angstroms,
-            cls.from_rotation(SO3(wxyz=jnp.asarray((1, 0, 0, 0), dtype=float))),
+        return cls.from_rotation_and_translation(
+            SO3(wxyz=jnp.asarray((1, 0, 0, 0), dtype=float)),
             leaf_asarray(offset_in_angstroms, dtype=float),
         )
 
@@ -216,7 +216,8 @@ class EulerAnglePose(AbstractPose, strict=True):
         simply **negate each euler angle**.
     """
 
-    offset_in_angstroms: Float[NDArrayLike, "... 2"] | Float[NDArrayLike, "... 3"]
+    offset_xy_in_angstroms: Float[NDArrayLike, "... 2"]
+    offset_z_in_angstroms: Float[NDArrayLike, "..."] | None
 
     phi_angle: Float[NDArrayLike, "..."]
     theta_angle: Float[NDArrayLike, "..."]
@@ -241,15 +242,14 @@ class EulerAnglePose(AbstractPose, strict=True):
         - `psi_angle`: Angle to rotate about third rotation axis, which is the z axis.
         - `offset_z_in_angstroms`: Out-of-plane translation in z direction.
         """
-        if offset_z_in_angstroms is None:
-            self.offset_in_angstroms = leaf_stack(
-                (offset_x_in_angstroms, offset_y_in_angstroms), dtype=float
-            )
-        else:
-            self.offset_in_angstroms = leaf_stack(
-                (offset_x_in_angstroms, offset_y_in_angstroms, offset_z_in_angstroms),
-                dtype=float,
-            )
+        self.offset_xy_in_angstroms = leaf_stack(
+            (offset_x_in_angstroms, offset_y_in_angstroms), dtype=float
+        )
+        self.offset_z_in_angstroms = (
+            None
+            if offset_z_in_angstroms is None
+            else leaf_asarray(offset_z_in_angstroms, dtype=float)
+        )
         self.phi_angle = leaf_asarray(phi_angle, dtype=float)
         self.theta_angle = leaf_asarray(theta_angle, dtype=float)
         self.psi_angle = leaf_asarray(psi_angle, dtype=float)
@@ -299,7 +299,8 @@ class EulerAnglePose(AbstractPose, strict=True):
 class QuaternionPose(AbstractPose, strict=True):
     """An `AbstractPose` represented by unit quaternions."""
 
-    offset_in_angstroms: Float[NDArrayLike, "... 2"] | Float[NDArrayLike, "... 3"]
+    offset_xy_in_angstroms: Float[NDArrayLike, "... 2"]
+    offset_z_in_angstroms: Float[NDArrayLike, "..."] | None
 
     wxyz: Float[NDArrayLike, "... 4"]
 
@@ -319,15 +320,14 @@ class QuaternionPose(AbstractPose, strict=True):
             The quaternion, represented as a vector $\\mathbf{q} = (q_w, q_x, q_y, q_z)$.
         - `offset_z_in_angstroms`: Out-of-plane translation in z direction.
         """
-        if offset_z_in_angstroms is None:
-            self.offset_in_angstroms = leaf_stack(
-                (offset_x_in_angstroms, offset_y_in_angstroms), dtype=float
-            )
-        else:
-            self.offset_in_angstroms = leaf_stack(
-                (offset_x_in_angstroms, offset_y_in_angstroms, offset_z_in_angstroms),
-                dtype=float,
-            )
+        self.offset_xy_in_angstroms = leaf_stack(
+            (offset_x_in_angstroms, offset_y_in_angstroms), dtype=float
+        )
+        self.offset_z_in_angstroms = (
+            None
+            if offset_z_in_angstroms is None
+            else leaf_asarray(offset_z_in_angstroms, dtype=float)
+        )
         wxyz = leaf_asarray(wxyz, dtype=float)
         if wxyz.shape[-1] != 4:
             raise ValueError(
@@ -369,7 +369,8 @@ class AxisAnglePose(AbstractPose, strict=True):
     the matrix exponential.
     """
 
-    offset_in_angstroms: Float[NDArrayLike, "... 2"] | Float[NDArrayLike, "... 3"]
+    offset_xy_in_angstroms: Float[NDArrayLike, "... 2"]
+    offset_z_in_angstroms: Float[NDArrayLike, "..."] | None
 
     euler_vector: Float[NDArrayLike, "... 3"]
 
@@ -390,15 +391,14 @@ class AxisAnglePose(AbstractPose, strict=True):
             vector $\\boldsymbol{\\omega}$.
         - `offset_z_in_angstroms`: Out-of-plane translation in z direction.
         """
-        if offset_z_in_angstroms is None:
-            self.offset_in_angstroms = leaf_stack(
-                (offset_x_in_angstroms, offset_y_in_angstroms), dtype=float
-            )
-        else:
-            self.offset_in_angstroms = leaf_stack(
-                (offset_x_in_angstroms, offset_y_in_angstroms, offset_z_in_angstroms),
-                dtype=float,
-            )
+        self.offset_xy_in_angstroms = leaf_stack(
+            (offset_x_in_angstroms, offset_y_in_angstroms), dtype=float
+        )
+        self.offset_z_in_angstroms = (
+            None
+            if offset_z_in_angstroms is None
+            else leaf_asarray(offset_z_in_angstroms, dtype=float)
+        )
         euler_vector = leaf_asarray(euler_vector, dtype=float)
         if euler_vector.shape[-1] != 3:
             raise ValueError(
@@ -427,9 +427,8 @@ class AxisAnglePose(AbstractPose, strict=True):
 
     @override
     def to_inverse_rotation(self) -> Self:
-        return self.from_rotation_and_translation(
-            self.rotation.inverse(), self.offset_in_angstroms
-        )
+        euler_vector = jnp.rad2deg(self.rotation.inverse().log())
+        return eqx.tree_at(lambda p: p.euler_vector, self, euler_vector)
 
 
 def _negate_angle(angle):
