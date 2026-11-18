@@ -14,10 +14,14 @@ _NUM_LEGENDRE = 100
 _MAX_EXTRA_DEGREE = 6
 
 _AUTO_UPSAMPLE_FACTORS = (1.25, 1.5, 1.75, 2.0)
-# Value + gradient ms = a R M w^d + b R prod(m) log2(prod(m)); rounding error
-# k eps_mach r_dyn. Fitted 2026-11-17 on an RTX PRO 5000 (Blackwell), float32, Pallas:
-# benchmarks/benchmark_nufft.py, 2026-11-17-native-nufft.benchmark.json.
-_SPREAD_COST, _FFT_COST, _ROUNDING_FACTOR = 1.331e-8, 3.782e-9, 3e-3
+# Value + gradient ms = a M w^d + b prod(m) log2(prod(m)), relative least squares on
+# `benchmarks/benchmark_nufft.py`'s chain-ordered float32 runs, RTX PRO 5000 (Blackwell),
+# 2026-11-17. Pallas: misfit mean 6%, max 14%. Pure JAX: mean 45%, max 82%, its scatter
+# slowing as points crowd the fine cells. Rounding error k eps_mach r_dyn, k from one
+# point: 3D 256^3, eps 1e-6, sigma 1.25 (w = 11), float32 error 1.4e-3.
+_PALLAS_COSTS = (1.331e-8, 3.782e-9)
+_PURE_JAX_COSTS = (8.584e-8, 2.717e-9)
+_ROUNDING_FACTOR = 3e-3
 
 
 class PSWFKernel(NamedTuple):
@@ -102,6 +106,8 @@ def _pswf(width: int, upsample_factor: float) -> PSWFKernel:
     """The PSWF kernel without its tap coefficients."""
     c = math.pi * width * (1 - 1 / (2 * upsample_factor)) - 0.05
     eigenvalue, nodes, _, node_values = _pswf_at_nodes(c)
+    nodes.setflags(write=False)
+    node_values.setflags(write=False)
     return PSWFKernel(width, c, float(eigenvalue), nodes, node_values, np.empty((0, 0)))
 
 
@@ -170,18 +176,19 @@ def resolve_upsample_factor(
     upsample_factor: float | Literal["auto"],
     *,
     n_points: int,
-    n_batch: int,
     shape: tuple[int, ...],
     eps: float,
     dtype,
+    pallas: bool,
 ) -> float:
-    """`upsample_factor`, or for `"auto"` the cheapest of 1.25, 1.5, 1.75 and 2 with a
-    kernel at most 16 wide whose predicted error `max(eps, k eps_mach r_dyn)` meets
-    `eps`, else the one of least predicted error. `r_dyn` is the deconvolution's dynamic
-    range, `phi_hat(0) / phi_hat(k)` at the corner of the half grid."""
+    """`upsample_factor`, or for `"auto"` the cheapest of 1.25, 1.5, 1.75 and 2 on the
+    Pallas (`pallas`) or pure-JAX backend with a kernel at most 16 wide whose predicted
+    error `max(eps, k eps_mach r_dyn)` meets `eps`, else the one of least predicted
+    error. `r_dyn` is the deconvolution's dynamic range, `phi_hat(0) / phi_hat(k)` at the
+    corner of the half grid."""
     if isinstance(upsample_factor, str) and upsample_factor == "auto":
         return _auto_upsample_factor(
-            n_points, n_batch, tuple(shape), eps, float(jnp.finfo(dtype).eps)
+            n_points, tuple(shape), eps, float(jnp.finfo(dtype).eps), bool(pallas)
         )
     if isinstance(upsample_factor, str) or not upsample_factor > 1:
         raise ValueError(
@@ -193,8 +200,9 @@ def resolve_upsample_factor(
 
 
 @functools.cache
-def _auto_upsample_factor(n_points, n_batch, shape, eps, eps_mach) -> float:
+def _auto_upsample_factor(n_points, shape, eps, eps_mach, pallas) -> float:
     ndim = len(shape)
+    spread_cost, fft_cost = _PALLAS_COSTS if pallas else _PURE_JAX_COSTS
     candidates = []
     for sigma in _AUTO_UPSAMPLE_FACTORS:
         try:
@@ -209,9 +217,7 @@ def _auto_upsample_factor(n_points, n_batch, shape, eps, eps_mach) -> float:
             r_dyn *= phi_hat[0] / phi_hat[-1]
         error = max(eps, _ROUNDING_FACTOR * eps_mach * r_dyn)
         size = math.prod(fine_shape)
-        cost = n_batch * (
-            _SPREAD_COST * n_points * width**ndim + _FFT_COST * size * math.log2(size)
-        )
+        cost = spread_cost * n_points * width**ndim + fft_cost * size * math.log2(size)
         candidates.append((sigma, cost, error))
     if not candidates:
         # No kernel fits: the narrowest, for the caller's width check to report

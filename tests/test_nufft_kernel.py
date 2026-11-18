@@ -128,22 +128,34 @@ def test_fine_grid_size():
 
 
 def test_make_pswf_kernel_is_cached():
-    assert make_pswf_kernel(1e-4, 1.25, 2) is make_pswf_kernel(1e-4, 1.25, 2)
+    kernel = make_pswf_kernel(1e-4, 1.25, 2)
+    assert kernel is make_pswf_kernel(1e-4, 1.25, 2)
+    for array in (kernel.nodes, kernel.node_values, kernel.coefficients):
+        assert not array.flags.writeable
 
 
-def _auto(n_points, shape, eps, dtype=np.float32):
+def _auto(n_points, shape, eps, dtype=np.float32, pallas=True):
     return resolve_upsample_factor(
-        "auto", n_points=n_points, n_batch=1, shape=shape, eps=eps, dtype=dtype
+        "auto", n_points=n_points, shape=shape, eps=eps, dtype=dtype, pallas=pallas
     )
 
 
+@pytest.mark.parametrize("pallas", (True, False))
 @pytest.mark.parametrize("dtype", (np.float32, np.float64))
-def test_auto_picks_low_sigma_when_sparse(dtype):
-    assert _auto(10_000, (4096, 4096), 1e-4, dtype) == 1.25
+def test_auto_picks_low_sigma_when_sparse(dtype, pallas):
+    assert _auto(10_000, (4096, 4096), 1e-4, dtype, pallas) == 1.25
 
 
-def test_auto_picks_high_sigma_when_dense():
-    assert _auto(100_000_000, (4096, 4096), 1e-6) == 2.0
+@pytest.mark.parametrize("pallas", (True, False))
+def test_auto_picks_high_sigma_when_dense(pallas):
+    assert _auto(100_000_000, (4096, 4096), 1e-6, pallas=pallas) == 2.0
+
+
+def test_auto_depends_on_backend():
+    """Pure JAX's scatter costs more per tap than Pallas': at the benchmark's 4M points
+    on 4096^2 it is fastest at sigma 2, Pallas at 1.25."""
+    assert _auto(4_000_000, (4096, 4096), 1e-4, pallas=True) == 1.25
+    assert _auto(4_000_000, (4096, 4096), 1e-4, pallas=False) > 1.5
 
 
 @pytest.mark.parametrize("ndim", (2, 3))
@@ -167,7 +179,7 @@ def test_auto_takes_most_accurate_when_eps_unreachable():
 
 
 def test_explicit_upsample_factor_passes_through():
-    kwargs = dict(n_points=10, n_batch=1, shape=(8, 8), eps=1e-4, dtype=np.float32)
+    kwargs = dict(n_points=10, shape=(8, 8), eps=1e-4, dtype=np.float32, pallas=True)
     assert resolve_upsample_factor(1.6, **kwargs) == 1.6
     for bad in (1.0, "fast"):
         with pytest.raises(
