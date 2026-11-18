@@ -307,15 +307,17 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
         """
         # Prepare arguments, casting positions and the voxel size to JAX arrays
         voxel_size = jnp.asarray(self.voxel_size)
-        positions, kernel_fns = (
+        positions, kernel_fns, amplitudes = (
             jax.tree.map(lambda x: jnp.asarray(x), volume_representation.positions),
             volume_representation.kernel_fns,
+            jax.tree.map(lambda x: jnp.asarray(x), volume_representation.amplitudes),
         )
         kernel_fns = _standardize_kernel_fns(kernel_fns, spatial_dim=3)
         # Compute
         rendering_fft = _render_impl(
             positions,
             kernel_fns,
+            amplitudes,
             shape=self.shape,
             voxel_size=voxel_size,
             eps=self.eps,
@@ -417,15 +419,17 @@ class GaussianFourierProjection(
         pixel_size = jnp.asarray(image_config.pixel_size)
         shape = image_config.padded_shape if self.shape is None else self.shape
         output_shape = image_config.padded_shape
-        positions, kernel_fns = (
+        positions, kernel_fns, amplitudes = (
             volume_representation.positions,
             volume_representation.kernel_fns,
+            volume_representation.amplitudes,
         )
         kernel_fns = _standardize_kernel_fns(kernel_fns, spatial_dim=2)
         # Compute projection
         projection_fft = _project_impl(
             positions,
             kernel_fns,
+            amplitudes,
             shape=cast(tuple[int, int], shape),
             pixel_size=pixel_size,
             eps=self.eps,
@@ -476,6 +480,7 @@ def _standardize_kernel_fns(
 def _project_impl(
     positions: PyTree[Float[Array, "_ 3"]],
     kernel_fns: PyTree[FourierGaussian],
+    amplitudes: PyTree[Float[Array, " _"]],
     *,
     shape: tuple[int, int],
     pixel_size: Float[Array, ""],
@@ -488,12 +493,13 @@ def _project_impl(
     def fourier_impl(
         _positions: Float[Array, "_ 3"],
         _kernel_fn: FourierGaussian,
+        _amplitudes: Float[Array, " _"],
     ) -> Array:
         return (
             _eval_kernel_impl(_kernel_fn, frequencies_1d)
             * dispatch_nufft1(
                 _positions[:, :2],
-                jnp.ones(_positions.shape[0], dtype=complex),
+                jnp.asarray(_amplitudes, dtype=complex),
                 shape,
                 pixel_size=pixel_size,
                 fftshifted=True,
@@ -506,7 +512,7 @@ def _project_impl(
     # Project and sum over kernels
     projection_out = jax.tree.reduce(
         lambda x, y: x + y,
-        jax.tree.map(fourier_impl, positions, kernel_fns, is_leaf=is_leaf),
+        jax.tree.map(fourier_impl, positions, kernel_fns, amplitudes, is_leaf=is_leaf),
     )
     return jnp.fft.ifftshift(projection_out)
 
@@ -514,6 +520,7 @@ def _project_impl(
 def _render_impl(
     positions: PyTree[Float[Array, "_ 3"]],
     kernel_fns: PyTree[FourierGaussian],
+    amplitudes: PyTree[Float[Array, " _"]],
     *,
     shape: tuple[int, int, int],
     voxel_size: Float[Array, ""],
@@ -526,11 +533,12 @@ def _render_impl(
     def fourier_impl(
         _positions: Float[Array, "_ 3"],
         _kernel_fn: FourierGaussian,
+        _amplitudes: Float[Array, " _"],
     ) -> Array:
         return _eval_kernel_impl(_kernel_fn, frequencies_1d) * (
             dispatch_nufft1(
                 _positions,
-                jnp.ones(_positions.shape[0], dtype=complex),
+                jnp.asarray(_amplitudes, dtype=complex),
                 shape,
                 pixel_size=voxel_size,
                 fftshifted=True,
@@ -542,7 +550,7 @@ def _render_impl(
 
     rendering_out = jax.tree.reduce(
         lambda x, y: x + y,
-        jax.tree.map(fourier_impl, positions, kernel_fns, is_leaf=is_leaf),
+        jax.tree.map(fourier_impl, positions, kernel_fns, amplitudes, is_leaf=is_leaf),
     )
     return jnp.fft.ifftshift(rendering_out)
 
