@@ -21,7 +21,6 @@ dependencies = [
     "jax",
     "equinox>=0.11.0",
     "jaxtyping>=0.2.23",
-    "nufftax>=0.6.0",
     "mrcfile",
     "pandas",
     "typing_extensions>=4.5.0",
@@ -54,6 +53,7 @@ docs = [
 tests = [
     "pytest",
     "pytest-cov",
+    "finufft",
     "typeguard==2.13.3"
 ]
 
