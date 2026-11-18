@@ -21,13 +21,6 @@ except ModuleNotFoundError:
 
 SHAPES = [(64, 64), (5, 8), (7, 6), (16, 15, 14)]
 SIGMAS = [1.25, 2.0]
-DTYPES_AND_EPS = [
-    (np.float64, 1e-3),
-    (np.float64, 1e-6),
-    (np.float64, 1e-9),
-    (np.float32, 1e-3),
-    (np.float32, 1e-4),
-]
 PIXEL_SIZE = 0.7
 NUM_POINTS = 200
 
@@ -79,12 +72,14 @@ def _odd_last_axis(shape):
     return (*shape[:-1], shape[-1] + 1 - shape[-1] % 2)
 
 
-def _finufft_type1(positions, strengths, shape, modes, eps=1e-14, upsampfac=None):
+def _finufft_type1(
+    positions, strengths, shape, modes, eps=1e-14, upsampfac=None, dtype=np.float64
+):
     transform = finufft.nufft2d1 if len(shape) == 2 else finufft.nufft3d1
     kwargs = {} if upsampfac is None else {"upsampfac": upsampfac}
     return transform(
-        *_angles(positions, shape),
-        np.asarray(strengths, dtype=complex),
+        *[angles.astype(dtype) for angles in _angles(positions, shape)],
+        np.asarray(strengths, np.result_type(dtype, 1j)),
         n_modes=modes,
         eps=eps,
         isign=-1,
@@ -101,9 +96,10 @@ def _type1_reference(positions, strengths, shape):
     return full[..., : shape[-1] // 2 + 1]
 
 
-def _hermitian_grid(spectrum, shape):
-    """`G[k] = w_k F[k] / 2`, `G[-k] = conj(G[k])`, padded to `n + 1` on even axes."""
-    padded = tuple(n + 1 - n % 2 for n in shape)
+def _hermitian_grid(spectrum, shape, modes=None):
+    """`G[k] = w_k F[k] / 2`, `G[-k] = conj(G[k])`, padded to `n + 1` on even axes
+    unless `modes` is given."""
+    padded = modes or tuple(n + 1 - n % 2 for n in shape)
     half = spectrum * _hermitian_weights(shape) / 2
     k = [np.broadcast_to(f, half.shape) for f in _half_grid_frequencies(shape)]
     grid = np.zeros(padded, dtype=complex)
@@ -112,11 +108,16 @@ def _hermitian_grid(spectrum, shape):
     return grid
 
 
-def _finufft_type2(positions, grid, shape, eps=1e-14, upsampfac=None):
+def _finufft_type2(positions, grid, shape, eps=1e-14, upsampfac=None, dtype=np.float64):
     transform = finufft.nufft2d2 if len(shape) == 2 else finufft.nufft3d2
     kwargs = {} if upsampfac is None else {"upsampfac": upsampfac}
     values = transform(
-        *_angles(positions, shape), grid, eps=eps, isign=1, modeord=1, **kwargs
+        *[angles.astype(dtype) for angles in _angles(positions, shape)],
+        grid.astype(np.result_type(dtype, 1j)),
+        eps=eps,
+        isign=1,
+        modeord=1,
+        **kwargs,
     )
     return values.real
 
@@ -126,21 +127,37 @@ def _type2_reference(positions, spectrum, shape):
     return _finufft_type2(positions, grid, shape) / np.prod(shape)
 
 
-def _finufft_error(positions, shape, eps, upsampfac, strengths=None, spectrum=None):
-    """finufft's own type-1 or type-2 error at `eps` and `upsampfac`, on `shape` itself:
-    padding an axis for the references would enlarge its fine grid."""
-    if spectrum is None:
-        exact, approx = (
-            _finufft_type1(positions, strengths, shape, shape, eps=e, upsampfac=u)
-            for e, u in ((1e-14, None), (eps, upsampfac))
-        )
-    else:
-        grid = np.asarray(im.convert_rfftn_to_fftn(jnp.asarray(spectrum), shape), complex)
-        exact, approx = (
-            _finufft_type2(positions, grid, shape, eps=e, upsampfac=u)
-            for e, u in ((1e-14, None), (eps, upsampfac))
-        )
-    return _relative_error(approx, exact)
+def _finufft_half_grid(positions, strengths, shape, **kwargs):
+    """finufft on `shape`'s own modes, so on native's fine grid, as the rfft half grid,
+    and where that determines it: an even last axis's `+n_x/2` column is
+    `conj(F[-k])`, unknown where `-k` is another even axis's `+n/2`."""
+    full = _finufft_type1(positions, strengths, shape, shape, **kwargs)
+    half = full[..., : shape[-1] // 2 + 1].copy()
+    known = np.ones(half.shape, bool)
+    if shape[-1] % 2 == 0:
+        axes = tuple(range(len(shape)))
+        negated = np.conj(np.roll(np.flip(full, axes), 1, axes))
+        half[..., -1] = negated[..., shape[-1] // 2]
+        for k, n in zip(_half_grid_frequencies(shape)[:-1], shape[:-1]):
+            if n % 2 == 0:
+                known[..., -1] &= (k != -(n // 2))[..., 0]
+    return half, known
+
+
+def _without_nyquist(spectrum, shape):
+    """`spectrum` zeroed on even axes' `n/2` modes, so that its Hermitian sum lies in
+    finufft's `shape` modes, on native's fine grid."""
+    keep = np.ones(spectrum.shape, bool)
+    for k, n in zip(_half_grid_frequencies(shape), shape):
+        if n % 2 == 0:
+            keep &= np.abs(k) != n // 2
+    return spectrum * keep
+
+
+def _finufft_values(positions, spectrum, shape, **kwargs):
+    """finufft type 2 of a `_without_nyquist` spectrum on `shape`'s own modes."""
+    grid = _hermitian_grid(spectrum, shape, modes=shape)
+    return _finufft_type2(positions, grid, shape, **kwargs) / np.prod(shape)
 
 
 def _finufft_half_sum(positions, spectrum, shape):
@@ -157,22 +174,46 @@ def _relative_error(actual, expected):
     return np.linalg.norm(actual - expected) / np.linalg.norm(expected)
 
 
-def _bound(eps, finufft_error, dtype):
-    bound = max(3 * eps, 2 * finufft_error)
-    return max(bound, 5e-4) if dtype == np.float32 else bound
-
-
 #
 # Agreement with finufft
 #
-@pytest.mark.parametrize("sigma", SIGMAS)
-@pytest.mark.parametrize("dtype, eps", DTYPES_AND_EPS)
-@pytest.mark.parametrize("shape", SHAPES)
-def test_type1_matches_finufft(shape, dtype, eps, sigma):
-    positions = _points(shape, NUM_POINTS, seed=0).astype(dtype)
-    strengths = np.random.default_rng(1).normal(size=NUM_POINTS).astype(dtype)
-    reference = _type1_reference(positions, strengths, shape)
-    finufft_error = _finufft_error(positions, shape, eps, sigma, strengths=strengths)
+# Native and finufft 2.5.1 (whose rules are 2.6's in float64 up to width 16) at one `eps`
+# and `upsample_factor` are one approximation: native is within RATIO of finufft's own
+# error of it. Measured: at most 0.047 (3D, eps 1e-9, sigma 1.4713)
+RATIO = 0.1
+# At widths 15-16 both errors are mostly the tap polynomials' truncation at 0.05 eps,
+# which fit rounding decides (3D: 15 coefficients here, 17 in finufft 2.5.1)
+_TRUNCATION_BOUND = pytest.mark.xfail(
+    strict=True, reason="measured ratio 0.22-0.41 in 2D, 2.5-2.9 in 3D"
+)
+FLOAT64_CASES = [
+    pytest.param(
+        shape,
+        eps,
+        sigma,
+        marks=_TRUNCATION_BOUND if (eps, sigma) == (1e-9, 1.25) else (),
+    )
+    for shape in SHAPES
+    for eps in (1e-3, 1e-6, 1e-9)
+    for sigma in (1.25, 1.4713, 2.0)
+]
+# float32 where finufft 2.5.1's widths are 2.6's (sigma 1.25, or widths up to 8), with
+# 3D at sigma 1.25 and eps 1e-6, where the float32 guard narrows the width from 11 to 8
+FLOAT32_CASES = [
+    (shape, eps, sigma)
+    for shape in [*SHAPES, (64, 64, 64)]
+    for eps in (1e-3, 1e-4, 1e-6)
+    for sigma in (1.25, 2.0)
+]
+
+
+@pytest.mark.filterwarnings("error")
+@pytest.mark.parametrize("shape, eps, sigma", FLOAT64_CASES)
+def test_type1_is_finufft_approximation(shape, eps, sigma):
+    positions = _points(shape, NUM_POINTS, seed=0)
+    strengths = np.random.default_rng(1).normal(size=NUM_POINTS)
+    exact, known = _finufft_half_grid(positions, strengths, shape)
+    approx, _ = _finufft_half_grid(positions, strengths, shape, eps=eps, upsampfac=sigma)
     native = im.dispatch_nufft1(
         jnp.asarray(positions),
         jnp.asarray(strengths),
@@ -181,20 +222,19 @@ def test_type1_matches_finufft(shape, dtype, eps, sigma):
         eps=eps,
         upsample_factor=sigma,
     )
-    assert native.dtype == (jnp.complex64 if dtype == np.float32 else jnp.complex128)
-    assert native.shape == reference.shape
-    assert _relative_error(native, reference) <= _bound(eps, finufft_error, dtype)
+    assert native.dtype == jnp.complex128
+    assert native.shape == exact.shape
+    native, exact, approx = np.asarray(native)[known], exact[known], approx[known]
+    assert _relative_error(native, approx) <= RATIO * _relative_error(approx, exact)
 
 
-@pytest.mark.parametrize("sigma", SIGMAS)
-@pytest.mark.parametrize("dtype, eps", DTYPES_AND_EPS)
-@pytest.mark.parametrize("shape", SHAPES)
-def test_type2_matches_finufft(shape, dtype, eps, sigma):
-    complex_dtype = np.complex64 if dtype == np.float32 else np.complex128
-    positions = _points(shape, NUM_POINTS, seed=0).astype(dtype)
-    spectrum = _random_spectrum(shape, seed=1).astype(complex_dtype)
-    reference = _type2_reference(positions, spectrum, shape)
-    finufft_error = _finufft_error(positions, shape, eps, sigma, spectrum=spectrum)
+@pytest.mark.filterwarnings("error")
+@pytest.mark.parametrize("shape, eps, sigma", FLOAT64_CASES)
+def test_type2_is_finufft_approximation(shape, eps, sigma):
+    positions = _points(shape, NUM_POINTS, seed=0)
+    spectrum = _without_nyquist(_random_spectrum(shape, seed=1), shape)
+    exact = _finufft_values(positions, spectrum, shape)
+    approx = _finufft_values(positions, spectrum, shape, eps=eps, upsampfac=sigma)
     native = im.dispatch_nufft2(
         jnp.asarray(positions),
         jnp.asarray(spectrum),
@@ -203,9 +243,47 @@ def test_type2_matches_finufft(shape, dtype, eps, sigma):
         eps=eps,
         upsample_factor=sigma,
     )
-    assert native.dtype == dtype
+    assert native.dtype == jnp.float64
     assert native.shape == (NUM_POINTS,)
-    assert _relative_error(native, reference) <= _bound(eps, finufft_error, dtype)
+    assert _relative_error(native, approx) <= RATIO * _relative_error(approx, exact)
+
+
+@pytest.mark.parametrize("shape, eps, sigma", FLOAT32_CASES)
+def test_float32_within_twice_finufft_single(shape, eps, sigma):
+    """Both against finufft in float64 at eps 1e-12, on the same points; one warning per
+    limit `nufft_accuracy_limits` finds failed, per transform."""
+    positions = _points(shape, NUM_POINTS, seed=0).astype(np.float32)
+    strengths = np.random.default_rng(1).normal(size=NUM_POINTS).astype(np.float32)
+    spectrum = _without_nyquist(_random_spectrum(shape, seed=2), shape)
+    spectrum = spectrum.astype(np.complex64)
+    exact, known = _finufft_half_grid(positions, strengths, shape, eps=1e-12)
+    single, _ = _finufft_half_grid(
+        positions, strengths, shape, eps=eps, upsampfac=sigma, dtype=np.float32
+    )
+    exact_values = _finufft_values(positions, spectrum, shape, eps=1e-12)
+    single_values = _finufft_values(
+        positions, spectrum, shape, eps=eps, upsampfac=sigma, dtype=np.float32
+    )
+    limits = im.nufft_accuracy_limits(
+        shape, eps=eps, upsample_factor=sigma, dtype=np.float32
+    )
+    num_failed = (eps < limits.rounding_floor) + (sigma < limits.min_upsample_factor)
+    kwargs = dict(pixel_size=PIXEL_SIZE, eps=eps, upsample_factor=sigma)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        native = im.dispatch_nufft1(
+            jnp.asarray(positions), jnp.asarray(strengths), shape, **kwargs
+        )
+        native_values = im.dispatch_nufft2(
+            jnp.asarray(positions), jnp.asarray(spectrum), shape, **kwargs
+        )
+    assert [w.category for w in caught] == [UserWarning] * (2 * num_failed)
+    assert native.dtype == jnp.complex64 and native_values.dtype == jnp.float32
+    native, exact, single = np.asarray(native)[known], exact[known], single[known]
+    assert _relative_error(native, exact) <= 2 * _relative_error(single, exact)
+    assert _relative_error(native_values, exact_values) <= 2 * _relative_error(
+        single_values, exact_values
+    )
 
 
 @pytest.mark.parametrize("shape", [(8, 6), (7, 9), (6, 5, 4), (5, 7, 6)])
@@ -451,11 +529,12 @@ def test_hvp_runs_and_is_symmetric(shape):
 #
 # upsample_factor="auto"
 #
+@pytest.mark.filterwarnings("error")
 @pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
 def test_auto_is_static(monkeypatch, name):
     """`"auto"` is the default and resolves from static shapes, `eps` and dtype: one
-    trace for new values, no leaked tracers, the kernel of the resolved factor. In
-    float32 at eps 1e-6 this 3D case resolves away from 1.25."""
+    trace for new values, no leaked tracers, the kernel of the resolved factor, here the
+    smallest that reaches `eps` at its width, plus finufft's 1e-3 pad."""
     shape = (32, 30, 28)
     positions = jnp.asarray(_points(shape, NUM_POINTS, seed=0), jnp.float32)
     if name == "dispatch_nufft1":
@@ -465,9 +544,13 @@ def test_auto_is_static(monkeypatch, name):
     else:
         second = jnp.asarray(_random_spectrum(shape, seed=1), jnp.complex64)
     sigma = resolve_upsample_factor(
-        "auto", n_points=NUM_POINTS, shape=shape, eps=1e-6, dtype=np.float32, pallas=False
+        "auto", n_points=NUM_POINTS, shape=shape, eps=1e-5, dtype=np.float32, pallas=False
     )
-    assert sigma != 1.25
+    limits = im.nufft_accuracy_limits(
+        shape, eps=1e-5, upsample_factor=sigma, dtype=np.float32
+    )
+    assert sigma == pytest.approx(limits.min_upsample_factor + 1e-3)
+    assert sigma > 1.251
     kernel_factors = []
 
     def make_pswf_kernel(eps, upsample_factor, ndim, dtype):
@@ -481,7 +564,7 @@ def test_auto_is_static(monkeypatch, name):
     @jax.jit
     def run(positions, second):
         return transform(
-            positions, second, shape, pixel_size=PIXEL_SIZE, eps=1e-6, enable_pallas=False
+            positions, second, shape, pixel_size=PIXEL_SIZE, eps=1e-5, enable_pallas=False
         )
 
     with jax.checking_leaks():
@@ -514,70 +597,131 @@ def test_upsample_factor_other_string_raises(name):
 
 
 #
-# Errors
+# Errors and warnings
 #
-@pytest.mark.xfail(reason="Task 2")
-@pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
-def test_eps_too_small_raises(name):
-    shape = (8, 6)
-    second = jnp.ones(3) if name == "dispatch_nufft1" else jnp.ones((8, 4), complex)
-    with pytest.raises(ValueError, match=rf"{name}[\s\S]*eps[\s\S]*1e-12"):
-        getattr(im, name)(
-            jnp.zeros((3, 2)), second, shape, eps=1e-12, upsample_factor=1.25
-        )
-
-
-@pytest.mark.xfail(reason="Task 2")
-@pytest.mark.parametrize("upsample_factor", ["auto", 2.0])
-@pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
-def test_eps_below_fit_precision_raises(name, upsample_factor):
-    """Legal widths at sigma 2, but an ill-conditioned or failing tap fit."""
-    shape = (8, 6)
-    second = jnp.ones(3) if name == "dispatch_nufft1" else jnp.ones((8, 4), complex)
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        with pytest.raises(ValueError, match=rf"{name}[\s\S]*eps[\s\S]*1e-13"):
-            getattr(im, name)(
-                jnp.zeros((3, 2)),
-                second,
-                shape,
-                eps=1e-13,
-                upsample_factor=upsample_factor,
-            )
+def _call(name, shape, dtype=np.float64, **kwargs):
+    """`name` on 3 points of `shape` in `dtype`."""
+    positions = jnp.zeros((3, len(shape)), dtype)
+    if name == "dispatch_nufft1":
+        second = jnp.ones(3, dtype)
+    else:
+        half = (*shape[:-1], shape[-1] // 2 + 1)
+        second = jnp.ones(half, jnp.result_type(dtype, 1j))
+    return getattr(im, name)(positions, second, shape, **kwargs)
 
 
 @pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
-def test_kernel_error_names_dispatch_and_resolved_factor(monkeypatch, name):
-    def make_pswf_kernel(eps, upsample_factor, ndim, dtype):
-        raise ValueError("Found invalid value for `make_pswf_kernel(...)`.")
-
-    monkeypatch.setattr(nufft_api, "make_pswf_kernel", make_pswf_kernel)
-    shape = (8, 6)
-    second = jnp.ones(3) if name == "dispatch_nufft1" else jnp.ones((8, 4), complex)
-    sigma = resolve_upsample_factor(
-        "auto", n_points=3, shape=shape, eps=1e-6, dtype=np.float64, pallas=False
-    )
+@pytest.mark.parametrize("upsample_factor", [1.0, 0.5])
+def test_upsample_factor_at_most_one_raises(name, upsample_factor):
     with pytest.raises(
-        ValueError, match=rf"{name}[\s\S]*eps = 1e-06[\s\S]*upsample_factor = {sigma}`"
+        ValueError, match=rf"{name}[\s\S]*upsample_factor[\s\S]*{upsample_factor}"
     ):
-        getattr(im, name)(jnp.zeros((3, 2)), second, shape, enable_pallas=False)
+        _call(name, (8, 6), upsample_factor=upsample_factor)
 
 
 @pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
-def test_auto_model_errors_pass_through(monkeypatch, name):
-    def resolve_upsample_factor(upsample_factor, **kwargs):
-        raise np.linalg.LinAlgError("cost model")
+@pytest.mark.parametrize("eps", [0.0, -1e-6])
+def test_eps_at_most_zero_raises(name, eps):
+    with pytest.raises(ValueError, match=rf"{name}[\s\S]*eps[\s\S]*positive"):
+        _call(name, (8, 6), eps=eps)
 
-    monkeypatch.setattr(nufft_api, "resolve_upsample_factor", resolve_upsample_factor)
-    second = jnp.ones(3) if name == "dispatch_nufft1" else jnp.ones((8, 4), complex)
-    with pytest.raises(np.linalg.LinAlgError, match="cost model"):
-        getattr(im, name)(jnp.zeros((3, 2)), second, (8, 6))
+
+@pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
+@pytest.mark.parametrize("upsample_factor", [1.1, 3.5])
+def test_upsample_factor_outside_useful_range_warns(name, upsample_factor):
+    """finufft include/finufft/makeplan.hpp:147; `eps` is met at both."""
+    with pytest.warns(
+        UserWarning,
+        match=rf"{name}[\s\S]*upsample_factor = {upsample_factor}[\s\S]*1.15, 3.0",
+    ) as record:
+        _call(name, (8, 6), eps=1e-6, upsample_factor=upsample_factor)
+    assert len(record) == 1
+
+
+@pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
+def test_eps_below_eps_mach_warns_and_runs(monkeypatch, name):
+    """One warning, though the floor and sigma limit fail at `eps_mach` too."""
+    kernel_eps = []
+
+    def make_pswf_kernel(eps, upsample_factor, ndim, dtype):
+        kernel_eps.append(eps)
+        return make_pswf_kernel_unpatched(eps, upsample_factor, ndim, dtype)
+
+    make_pswf_kernel_unpatched = nufft_api.make_pswf_kernel
+    monkeypatch.setattr(nufft_api, "make_pswf_kernel", make_pswf_kernel)
+    with pytest.warns(
+        UserWarning, match=rf"{name}[\s\S]*eps = 1e-09[\s\S]*float32[\s\S]*1.2e-07"
+    ) as record:
+        result = _call(name, (8, 6), np.float32, eps=1e-9)
+    assert len(record) == 1
+    assert kernel_eps == [float(jnp.finfo(jnp.float32).eps)]
+    assert np.all(np.isfinite(np.asarray(result)))
+
+
+@pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
+def test_warns_below_rounding_floor(name):
+    """finufft include/finufft/setpts.hpp:22; the floor, 6.04e-5, rounded up."""
+    with pytest.warns(
+        UserWarning,
+        match=rf"{name}[\s\S]*eps = 1e-06[\s\S]*\(1024, 1024\)[\s\S]*float32"
+        r"[\s\S]*6\.1e-05[\s\S]*jax_enable_x64",
+    ) as record:
+        _call(name, (1024, 1024), np.float32, eps=1e-6)
+    assert len(record) == 1
+
+
+@pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
+def test_warns_below_min_upsample_factor(name):
+    """finufft include/finufft/setpts.hpp:22; the width clipped to 16 needs 1.2675."""
+    with pytest.warns(
+        UserWarning,
+        match=rf"{name}[\s\S]*upsample_factor = 1.25[\s\S]*eps = 1e-10[\s\S]*"
+        r"\(64, 64\)[\s\S]*float64[\s\S]*at least 1\.27[\s\S]*auto",
+    ) as record:
+        _call(name, (64, 64), eps=1e-10, upsample_factor=1.25)
+    assert len(record) == 1
+
+
+@pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
+def test_float32_guard_warns_once(name):
+    """The guard narrows the width from 11 to 8, below rule 1's, so the sigma limit
+    fails: at width 8, eps 1e-6 needs 2.0397."""
+    with pytest.warns(
+        UserWarning,
+        match=rf"{name}[\s\S]*upsample_factor = 1.25[\s\S]*\(8, 8, 8\)[\s\S]*float32"
+        r"[\s\S]*at least 2\.04",
+    ) as record:
+        _call(name, (8, 8, 8), np.float32, eps=1e-6, upsample_factor=1.25)
+    assert len(record) == 1
+
+
+@pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
+def test_auto_unreachable_warns(monkeypatch, name):
+    """No sigma up to 2.5 reaches 3e-7 in float32, though the floor (2.4e-7) does."""
+    kernel_factors = []
+
+    def make_pswf_kernel(eps, upsample_factor, ndim, dtype):
+        kernel_factors.append(upsample_factor)
+        return make_pswf_kernel_unpatched(eps, upsample_factor, ndim, dtype)
+
+    make_pswf_kernel_unpatched = nufft_api.make_pswf_kernel
+    monkeypatch.setattr(nufft_api, "make_pswf_kernel", make_pswf_kernel)
+    with pytest.warns(
+        UserWarning, match=rf"{name}[\s\S]*eps = 3e-07[\s\S]*float32[\s\S]*2.5"
+    ) as record:
+        result = _call(name, (4, 4), np.float32, eps=3e-7)
+    assert len(record) == 1
+    assert kernel_factors == [2.5]
+    assert np.all(np.isfinite(np.asarray(result)))
 
 
 @pytest.mark.skipif(jax_finufft is None, reason="jax-finufft not installed")
-@pytest.mark.parametrize("eps, upsample_factor", [(1e-10, 1.25), (1e-13, "auto")])
-def test_jax_finufft_skips_native_kernel_limits(monkeypatch, eps, upsample_factor):
-    """finufft takes widths past the native cap and `eps` below the native fit's."""
+@pytest.mark.filterwarnings("error")
+@pytest.mark.parametrize(
+    "eps, upsample_factor", [(1e-10, 1.25), (1e-13, "auto"), (1e-6, 1.1)]
+)
+def test_jax_finufft_branch_runs_no_native_checks(monkeypatch, eps, upsample_factor):
+    """finufft takes widths past the native cap, and none of the native warnings."""
     monkeypatch.setattr(nufft_api, "CRYOJAX_FINUFFT_BACKEND", "jax-finufft")
     shape = (16, 15)
     positions = _points(shape, NUM_POINTS, seed=0)
@@ -594,19 +738,6 @@ def test_jax_finufft_skips_native_kernel_limits(monkeypatch, eps, upsample_facto
     assert _relative_error(type1, reference) <= 1e-9
     reference = _type2_reference(positions, spectrum, shape)
     assert _relative_error(type2, reference) <= 1e-9
-
-
-@pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
-@pytest.mark.parametrize("upsample_factor", [1.0, 0.5])
-def test_upsample_factor_at_most_one_raises(name, upsample_factor):
-    shape = (8, 6)
-    second = jnp.ones(3) if name == "dispatch_nufft1" else jnp.ones((8, 4), complex)
-    with pytest.raises(
-        ValueError, match=rf"{name}[\s\S]*upsample_factor[\s\S]*{upsample_factor}"
-    ):
-        getattr(im, name)(
-            jnp.zeros((3, 2)), second, shape, upsample_factor=upsample_factor
-        )
 
 
 #

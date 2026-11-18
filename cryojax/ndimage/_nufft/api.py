@@ -1,6 +1,7 @@
 """Non-uniform FFTs of point sources, in cryoJAX conventions."""
 
 import math
+import warnings
 from collections.abc import Mapping
 from functools import partial
 from typing import Any, Literal
@@ -18,6 +19,7 @@ from .kernel import (
     fine_grid_size,
     kernel_fourier_series,
     make_pswf_kernel,
+    nufft_accuracy_limits,
     resolve_upsample_factor,
 )
 from .pallas_spread import make_kernel_key, pallas_nufft_interp, pallas_nufft_spread
@@ -32,6 +34,9 @@ try:
 except ModuleNotFoundError as err:
     jax_finufft, Opts = None, None
     JAX_FINUFFT_IMPORT_ERROR = err
+
+# finufft include/finufft_common/constants.h:39-40
+_MIN_USEFUL_UPSAMPLE_FACTOR, _MAX_USEFUL_UPSAMPLE_FACTOR = 1.15, 3.0
 
 
 def dispatch_nufft1(
@@ -70,16 +75,20 @@ def dispatch_nufft1(
     - `pixel_size`:
         The grid spacing.
     - `eps`:
-        The requested relative accuracy, at least 1e-12 on the native backend. In
-        float32, rounding of the fine-grid coordinates limits the achieved accuracy to
-        about 1e-5 at 256² and 2e-4 at 4096².
+        The requested relative accuracy. On the native backend, a warning names the fix
+        where finufft 2.6's rules predict it out of reach (see
+        [`cryojax.ndimage.nufft_accuracy_limits`][]); below the dtype's machine epsilon
+        it is raised to it. In float32, finufft's rounding floor is 1.5e-5 at 256² and
+        2.4e-4 at 4096².
     - `upsample_factor`:
-        The ratio of the fine grid to `shape` (finufft's `upsampfac`), greater than 1.
-        The kernel widens as it approaches 1, up to 16 fine-grid pixels. `"auto"`
-        picks the fastest of 1.25, 1.5, 1.75 and 2 for the point count, `shape`, `eps`,
-        dtype and backend (Pallas or pure JAX) whose predicted error meets `eps`,
-        modelling the deconvolution's rounding only. On `"jax-finufft"`, `"auto"` takes
-        jax-finufft's defaults (in 1.3.1, finufft's own choice on CPU and 2 on GPU).
+        The ratio of the fine grid to `shape` (finufft's `upsampfac`), greater than 1,
+        and useful in [1.15, 3]. The kernel widens as it approaches 1, up to 16
+        fine-grid pixels (12, and fewer at small factors, in float32). `"auto"` is
+        finufft 2.6's search (src/heuristics.cpp:87): per kernel width, the smallest
+        factor in [1.25, 2.5] reaching `eps`, plus 1e-3; of these, the fastest for the
+        point count, `shape` and backend (Pallas or pure JAX). On `"jax-finufft"`,
+        `"auto"` takes jax-finufft's defaults (in 1.3.1, finufft's own choice on CPU and
+        2 on GPU).
     - `enable_pallas`:
         Whether the native backend spreads with Pallas kernels, for the forward and
         backward pass, as in [`cryojax.ndimage.spread_gaussians_2d`][].
@@ -254,7 +263,38 @@ def _check_eps_and_upsample_factor(name, eps, upsample_factor):
 
 
 def _make_kernel(name, eps, upsample_factor, *, n_points, shape, dtype, pallas):
-    """The native backend's kernel and upsample factor, with `"auto"` resolved."""
+    """The native backend's kernel and upsample factor, with `"auto"` resolved, warning
+    where finufft 2.6 warns or errors."""
+    is_auto = isinstance(upsample_factor, str)
+    # finufft include/finufft/makeplan.hpp:147
+    if not is_auto and not (
+        _MIN_USEFUL_UPSAMPLE_FACTOR <= upsample_factor <= _MAX_USEFUL_UPSAMPLE_FACTOR
+    ):
+        warnings.warn(
+            f"Found `{name}` with `upsample_factor = {upsample_factor}`, outside "
+            f"[{_MIN_USEFUL_UPSAMPLE_FACTOR}, {_MAX_USEFUL_UPSAMPLE_FACTOR}], where "
+            "finufft finds it unlikely to help. To fix, set `upsample_factor` within "
+            'that range or to `"auto"`.',
+            UserWarning,
+            stacklevel=3,
+        )
+    eps_mach = float(jnp.finfo(dtype).eps)
+    x64_fix = (
+        ', or enable 64-bit precision with `jax.config.update("jax_enable_x64", True)`'
+        if dtype == np.float32
+        else ""
+    )
+    # finufft include/finufft/makeplan.hpp:159, as with its `allow_eps_too_small`
+    is_below_eps_mach = eps < eps_mach
+    if is_below_eps_mach:
+        warnings.warn(
+            f"Found `{name}` with `eps = {eps}`, below the machine epsilon of {dtype}, "
+            f"{eps_mach:.2g}; continuing with `eps = {eps_mach:.2g}`, which is out of "
+            f"reach too. To fix, increase `eps`{x64_fix}.",
+            UserWarning,
+            stacklevel=3,
+        )
+        eps = eps_mach
     sigma = resolve_upsample_factor(
         upsample_factor,
         n_points=n_points,
@@ -263,15 +303,51 @@ def _make_kernel(name, eps, upsample_factor, *, n_points, shape, dtype, pallas):
         dtype=dtype,
         pallas=pallas,
     )
-    try:
-        kernel = make_pswf_kernel(eps, sigma, len(shape), dtype)
-    except ValueError as err:
-        raise ValueError(
-            f"Found invalid value for `{name}`. The `eps = {eps}` needs a kernel wider "
-            f"than 16 fine-grid pixels at `upsample_factor = {sigma}`, or one the tap "
-            "fit cannot reach; increase `eps` or `upsample_factor`."
-        ) from err
-    return kernel, sigma
+    # finufft include/finufft/setpts.hpp:22. Both fail at `eps_mach`, warned above
+    limits = nufft_accuracy_limits(shape, eps=eps, upsample_factor=sigma, dtype=dtype)
+    if not is_below_eps_mach and eps < limits.rounding_floor:
+        floor = _round_up(limits.rounding_floor, 2)
+        warnings.warn(
+            f"Found `{name}` with `eps = {eps}`, below finufft's rounding floor for "
+            f"`shape = {shape}` in {dtype}, {floor:.1e}. To fix, set `eps` to at "
+            f"least {floor:.1e}{x64_fix}.",
+            UserWarning,
+            stacklevel=3,
+        )
+    if not is_below_eps_mach and sigma < limits.min_upsample_factor:
+        # "auto" fails only when no factor up to its maximum, 2.5, reaches `eps`
+        if is_auto:
+            message = (
+                f"Found `{name}` with `eps = {eps}`, out of reach for "
+                f"`shape = {shape}` in {dtype}: no `upsample_factor` up to {sigma} "
+                f'reaches it, and `"auto"` uses {sigma}. To fix, increase '
+                f"`eps`{x64_fix}."
+            )
+        elif math.isinf(limits.min_upsample_factor):
+            message = (
+                f"Found `{name}` with `upsample_factor = {sigma}`, too small for "
+                f"`eps = {eps}` with `shape = {shape}` in {dtype}: no "
+                "`upsample_factor` reaches it at the kernel width in use, "
+                f"{limits.width}. To fix, increase `eps`, or set `upsample_factor` to "
+                '`"auto"`.'
+            )
+        else:
+            needed = _round_up(limits.min_upsample_factor, 3)
+            message = (
+                f"Found `{name}` with `upsample_factor = {sigma}`, too small for "
+                f"`eps = {eps}` with `shape = {shape}` in {dtype}: the kernel width in "
+                f"use, {limits.width}, reaches it only for `upsample_factor` of at "
+                f"least {needed:.3g}. To fix, set `upsample_factor` to at least "
+                f'{needed:.3g} or to `"auto"`.'
+            )
+        warnings.warn(message, UserWarning, stacklevel=3)
+    return make_pswf_kernel(eps, sigma, len(shape), dtype), sigma
+
+
+def _round_up(x, digits):
+    """`x` rounded up to `digits` significant figures, so that a fix it names works."""
+    scale = 10.0 ** (math.floor(math.log10(x)) - digits + 1)
+    return math.ceil(x / scale) * scale
 
 
 #

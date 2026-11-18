@@ -12,12 +12,13 @@ import numpy as np
 _NUM_NODES = 256
 _NUM_LEGENDRE = 100
 
-# finufft include/finufft_common/constants.h:10, 15, 28-29, 35-36, 46, 54
+# finufft include/finufft_common/constants.h:10, 15, 28-29, 35-36, 46, 50, 54
 _MIN_WIDTH = 2
 _MAX_WIDTH_SINGLE, _MAX_WIDTH_DOUBLE = 12, 16
 _MIN_NC, _MAX_NC = 4, 19
 _MIN_AUTO_UPSAMPLE_FACTOR, _MAX_AUTO_UPSAMPLE_FACTOR = 1.25, 2.5
 _UPSAMPLE_FACTOR_EDGE_PAD = 1e-3
+_NSOFF = 1
 _ROUND_FAC = 0.35
 
 # "auto"'s FFT cost per fine-grid point and log2 of the grid size, in spread taps: the
@@ -51,10 +52,11 @@ def kernel_width(eps: float, upsample_factor: float, ndim: int, dtype) -> int:
         )
     # finufft src/common/kernel.cpp:72
     width = math.ceil(
-        math.log(_tolfac(ndim) / eps) / (math.pi * math.sqrt(1 - 1 / upsample_factor)) + 1
+        math.log(_tolfac(ndim) / eps) / (math.pi * math.sqrt(1 - 1 / upsample_factor))
+        + _NSOFF
     )
     # finufft src/common/kernel.cpp:98, 106
-    is_single = np.dtype(dtype) != np.float64
+    is_single = jnp.finfo(dtype).dtype != np.float64
     width = max(width, _MIN_WIDTH)
     width = min(width, _MAX_WIDTH_SINGLE if is_single else _MAX_WIDTH_DOUBLE)
     if is_single:
@@ -149,7 +151,7 @@ def _pswf(width: int, upsample_factor: float) -> PSWFKernel:
 def make_pswf_kernel(eps: float, upsample_factor: float, ndim: int, dtype) -> PSWFKernel:
     """Build the PSWF kernel and its per-tap Horner coefficients in the offset `s`
     (highest power first), fitted in `dtype`'s precision as finufft does."""
-    return _make_pswf_kernel(eps, upsample_factor, ndim, np.dtype(dtype))
+    return _make_pswf_kernel(eps, upsample_factor, ndim, jnp.finfo(dtype).dtype)
 
 
 @functools.cache
@@ -236,7 +238,7 @@ def nufft_accuracy_limits(
     - `shape`: The shape of the real-space grid.
     - `eps`: The requested relative accuracy.
     - `upsample_factor`: The ratio of the fine grid to `shape`, greater than 1.
-    - `dtype`: The transform's real dtype, `float32` or `float64`.
+    - `dtype`: The transform's dtype, real or complex, single or double precision.
 
     **Returns:**
 
@@ -256,7 +258,7 @@ def nufft_accuracy_limits(
             f"Found invalid value for `{name}`. The `upsample_factor` must be greater "
             f"than 1, but got `upsample_factor = {upsample_factor}`."
         )
-    ndim = len(shape)
+    ndim, dtype = len(shape), jnp.finfo(dtype).dtype
     eps_mach = float(jnp.finfo(dtype).eps)
     width = kernel_width(eps, upsample_factor, ndim, dtype)
     # finufft include/finufft/setpts.hpp:22, 99-103; src/common/kernel.cpp:284
@@ -269,7 +271,7 @@ def nufft_accuracy_limits(
 def _min_upsample_factor(eps: float, ndim: int, width: int, eps_mach: float) -> float:
     """The smallest `upsample_factor` reaching `eps` at `width`, `inf` if none."""
     # finufft src/common/kernel.cpp:169 (aliasing)
-    u = math.log(_tolfac(ndim) / eps) / ((width - 1.0) * math.pi)
+    u = math.log(_tolfac(ndim) / eps) / ((width - _NSOFF) * math.pi)
     if not u < 1.0:
         aliasing = math.inf
     else:
@@ -297,7 +299,7 @@ def resolve_upsample_factor(
     backend's; 2.5 if none."""
     if isinstance(upsample_factor, str) and upsample_factor == "auto":
         return _auto_upsample_factor(
-            n_points, tuple(shape), eps, np.dtype(dtype), bool(pallas)
+            n_points, tuple(shape), eps, jnp.finfo(dtype).dtype, bool(pallas)
         )
     if isinstance(upsample_factor, str) or not upsample_factor > 1:
         raise ValueError(
