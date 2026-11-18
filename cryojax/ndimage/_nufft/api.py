@@ -6,8 +6,8 @@ import jax.numpy as jnp
 import nufftax
 from jaxtyping import Array, Complex, Float
 
-from .._config import CRYOJAX_FINUFFT_BACKEND
-from ..jax_util import FloatLike
+from ..._config import CRYOJAX_FINUFFT_BACKEND
+from ...jax_util import FloatLike
 
 
 try:
