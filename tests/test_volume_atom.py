@@ -784,6 +784,14 @@ def test_fourier_projection_rejects_invalid_upsample_factor(upsample_factor):
         cxs.GaussianFourierRenderFn((8, 8, 8), 1.0, upsample_factor=upsample_factor)
 
 
+@pytest.mark.parametrize("eps", (0.0, -1e-6))
+def test_fourier_projection_rejects_invalid_eps(eps):
+    with pytest.raises(ValueError, match=r"GaussianFourierProjection.*eps.*must be"):
+        cxs.GaussianFourierProjection(eps=eps)
+    with pytest.raises(ValueError, match=r"GaussianFourierRenderFn.*eps.*must be"):
+        cxs.GaussianFourierRenderFn((8, 8, 8), 1.0, eps=eps)
+
+
 @pytest.mark.parametrize("upsample_factor", (1.25, 2.0))
 def test_fft_atom_projection_exact_upsample_factor(pdb_info, upsample_factor):
     gaussian_volume, gaussian_integrator, atom_volume, image_config = (
