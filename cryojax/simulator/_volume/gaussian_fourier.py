@@ -277,8 +277,8 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
             `ValueError` below that limit; raise `eps` or enable 64-bit precision.
         - `upsample_factor`:
             The ratio of the fine grid to the grid (finufft's `upsampfac`), greater
-            than 1. Smaller values use less memory but a wider kernel. `"auto"` picks
-            it from a cost model; see [`cryojax.ndimage.dispatch_nufft1`][]. On the
+            than 1. Smaller values use less memory but a wider kernel. `"auto"` is the
+            smallest factor reaching `eps`; see [`cryojax.ndimage.dispatch_nufft1`][]. On the
             native backend, raises `ValueError` if too small to reach `eps`; increase
             it or use `"auto"`.
         - `enable_pallas`:
@@ -401,8 +401,8 @@ class GaussianFourierProjection(
             `ValueError` below that limit; raise `eps` or enable 64-bit precision.
         - `upsample_factor`:
             The ratio of the fine grid to the grid (finufft's `upsampfac`), greater
-            than 1. Smaller values use less memory but a wider kernel. `"auto"` picks
-            it from a cost model; see [`cryojax.ndimage.dispatch_nufft1`][]. On the
+            than 1. Smaller values use less memory but a wider kernel. `"auto"` is the
+            smallest factor reaching `eps`; see [`cryojax.ndimage.dispatch_nufft1`][]. On the
             native backend, raises `ValueError` if too small to reach `eps`; increase
             it or use `"auto"`.
         - `shape`:

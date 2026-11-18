@@ -84,9 +84,10 @@ def dispatch_nufft1(
         The ratio of the fine grid to `shape` (finufft's `upsampfac`), greater than 1,
         and useful in [1.15, 3]. The kernel widens as it approaches 1, up to 16
         fine-grid pixels (12, and fewer at small factors, in float32). `"auto"` is
-        finufft 2.6's search (src/heuristics.cpp:87): per kernel width, the smallest
-        factor in [1.25, 2.5] reaching `eps`, plus 1e-3; of these, the fastest for the
-        point count, `shape` and backend (Pallas or pure JAX). On `"jax-finufft"`,
+        the smallest factor in [1.25, 2.5] reaching `eps` (finufft 2.6's search,
+        src/heuristics.cpp:87, without its cost term), plus 1e-3. For dense points
+        and tight `eps`, a larger explicit `upsample_factor` narrows the kernel and
+        can be faster. On `"jax-finufft"`,
         `"auto"` takes jax-finufft's defaults (in 1.3.1, finufft's own choice on CPU and
         2 on GPU).
     - `enable_pallas`:
@@ -131,10 +132,8 @@ def dispatch_nufft1(
             kernel_name,
             eps,
             upsample_factor,
-            n_points=positions.shape[0],
             shape=shape,
             dtype=dtype,
-            pallas=use_pallas_fwd or use_pallas_bwd,
         )
         fine_shape = tuple(fine_grid_size(n, sigma, kernel.width) for n in shape)
         u = _fine_coordinates(positions, shape, fine_shape, pixel_size)
@@ -212,10 +211,8 @@ def dispatch_nufft2(
             kernel_name,
             eps,
             upsample_factor,
-            n_points=positions.shape[0],
             shape=shape,
             dtype=dtype,
-            pallas=use_pallas_fwd or use_pallas_bwd,
         )
         fine_shape = tuple(fine_grid_size(n, sigma, kernel.width) for n in shape)
         u = _fine_coordinates(positions, shape, fine_shape, pixel_size)
@@ -262,7 +259,7 @@ def _check_eps_and_upsample_factor(name, eps, upsample_factor):
         )
 
 
-def _make_kernel(name, eps, upsample_factor, *, n_points, shape, dtype, pallas):
+def _make_kernel(name, eps, upsample_factor, *, shape, dtype):
     """The native backend's kernel and upsample factor, with `"auto"` resolved, warning
     where finufft 2.6 warns or errors."""
     is_auto = isinstance(upsample_factor, str)
@@ -287,49 +284,47 @@ def _make_kernel(name, eps, upsample_factor, *, n_points, shape, dtype, pallas):
     # finufft include/finufft/makeplan.hpp:159, as with its `allow_eps_too_small`
     is_below_eps_mach = eps < eps_mach
     if is_below_eps_mach:
+        reachable = _smallest_reachable_eps(
+            shape, 2.5 if is_auto else upsample_factor, dtype
+        )
         warnings.warn(
             f"Found `{name}` with `eps = {eps}`, below the machine epsilon of {dtype}, "
             f"{eps_mach:.2g}; continuing with `eps = {eps_mach:.2g}`, which is out of "
-            f"reach too. To fix, increase `eps`{x64_fix}.",
+            f"reach too. To fix, set `eps` to at least {reachable:.2e}{x64_fix}.",
             UserWarning,
             stacklevel=3,
         )
         eps = eps_mach
     sigma = resolve_upsample_factor(
-        upsample_factor,
-        n_points=n_points,
-        shape=shape,
-        eps=eps,
-        dtype=dtype,
-        pallas=pallas,
+        upsample_factor, ndim=len(shape), eps=eps, dtype=dtype
     )
     # finufft include/finufft/setpts.hpp:22. Both fail at `eps_mach`, warned above
     limits = nufft_accuracy_limits(shape, eps=eps, upsample_factor=sigma, dtype=dtype)
     if not is_below_eps_mach and eps < limits.rounding_floor:
-        floor = _round_up(limits.rounding_floor, 2)
+        floor = _round_up(limits.rounding_floor, 3)
         warnings.warn(
             f"Found `{name}` with `eps = {eps}`, below finufft's rounding floor for "
-            f"`shape = {shape}` in {dtype}, {floor:.1e}. To fix, set `eps` to at "
-            f"least {floor:.1e}{x64_fix}.",
+            f"`shape = {shape}` in {dtype}, {floor:.2e}. To fix, set `eps` to at "
+            f"least {floor:.2e}{x64_fix}.",
             UserWarning,
             stacklevel=3,
         )
     if not is_below_eps_mach and sigma < limits.min_upsample_factor:
         # "auto" fails only when no factor up to its maximum, 2.5, reaches `eps`
         if is_auto:
+            reachable = _smallest_reachable_eps(shape, sigma, dtype)
             message = (
                 f"Found `{name}` with `eps = {eps}`, out of reach for "
                 f"`shape = {shape}` in {dtype}: no `upsample_factor` up to {sigma} "
-                f'reaches it, and `"auto"` uses {sigma}. To fix, increase '
-                f"`eps`{x64_fix}."
+                f'reaches it, and `"auto"` uses {sigma}. To fix, set `eps` to at '
+                f"least {reachable:.2e}{x64_fix}."
             )
         elif math.isinf(limits.min_upsample_factor):
             message = (
                 f"Found `{name}` with `upsample_factor = {sigma}`, too small for "
                 f"`eps = {eps}` with `shape = {shape}` in {dtype}: no "
                 "`upsample_factor` reaches it at the kernel width in use, "
-                f"{limits.width}. To fix, increase `eps`, or set `upsample_factor` to "
-                '`"auto"`.'
+                f"{limits.width}. To fix, increase `eps`{x64_fix}."
             )
         else:
             needed = _round_up(limits.min_upsample_factor, 3)
@@ -342,6 +337,20 @@ def _make_kernel(name, eps, upsample_factor, *, n_points, shape, dtype, pallas):
             )
         warnings.warn(message, UserWarning, stacklevel=3)
     return make_pswf_kernel(eps, sigma, len(shape), dtype), sigma
+
+
+def _smallest_reachable_eps(shape, sigma, dtype):
+    """The smallest `eps`, to 3 significant figures, that `sigma` reaches on `shape`."""
+    eps_mach = float(jnp.finfo(dtype).eps)
+    low, high = eps_mach, 1.0
+    for _ in range(60):
+        mid = math.sqrt(low * high)
+        limits = nufft_accuracy_limits(shape, eps=mid, upsample_factor=sigma, dtype=dtype)
+        if mid >= limits.rounding_floor and sigma >= limits.min_upsample_factor:
+            high = mid
+        else:
+            low = mid
+    return _round_up(high, 3)
 
 
 def _round_up(x, digits):

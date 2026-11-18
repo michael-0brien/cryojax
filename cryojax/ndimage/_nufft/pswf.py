@@ -138,7 +138,7 @@ def _prolfun0(n, c, eps):  # pswf.cpp:128, top eigenvector by inverse iteration
     return xk[: imax + 1]
 
 
-def _eval_raw(legendre_coefficients, recurrence_coefficients, x):  # pswf.h:31
+def _eval_raw(legendre_coefficients, recurrence_coefficients, x):  # pswf.h:32
     # even Legendre recurrence in x^2
     xsq = x * x
     prev, cur = np.zeros_like(x), np.ones_like(x)
@@ -150,7 +150,7 @@ def _eval_raw(legendre_coefficients, recurrence_coefficients, x):  # pswf.h:31
     return val
 
 
-class PSWF0(eqx.Module):  # pswf.cpp:180, pswf.h:22
+class PSWF0(eqx.Module):  # pswf.cpp:180, pswf.h:25
     legendre_coefficients: np.ndarray  # finufft's `workdata`
     recurrence_coefficients: np.ndarray  # `coef`, shape (K, 3)
     normalization: float  # `xv0`
@@ -176,5 +176,10 @@ class PSWF0(eqx.Module):  # pswf.cpp:180, pswf.h:22
 
     def __call__(self, x):  # pswf.h:59
         x = np.asarray(x, np.float64)
-        raw = _eval_raw(self.legendre_coefficients, self.recurrence_coefficients, x)
-        return np.where(np.abs(x) > 1, 0.0, raw * self.normalization)
+        inside = np.abs(x) <= 1
+        raw = _eval_raw(
+            self.legendre_coefficients,
+            self.recurrence_coefficients,
+            np.where(inside, x, 0.0),
+        )
+        return np.where(inside, raw * self.normalization, 0.0)

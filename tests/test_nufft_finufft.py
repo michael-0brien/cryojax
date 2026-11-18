@@ -1,5 +1,6 @@
 """The native NUFFT against finufft, the ground truth, and against exact identities."""
 
+import re
 import warnings
 
 import cryojax.ndimage as im
@@ -248,6 +249,31 @@ def test_type2_is_finufft_approximation(shape, eps, sigma):
     assert native.dtype == jnp.float64
     assert native.shape == (NUM_POINTS,)
     assert _relative_error(native, approx) <= RATIO * _relative_error(approx, exact)
+
+
+@pytest.mark.filterwarnings("error")
+@pytest.mark.parametrize("transform", [1, 2])
+@pytest.mark.parametrize("shape", SHAPES)
+def test_native_error_meets_eps_where_agreement_is_truncation_bound(shape, transform):
+    """The float64 cases at sigma 1.25 and eps 1e-9 xfail the finufft agreement, yet
+    native's own error against the exact transform is within `eps`; at (64, 64), where
+    finufft's own error exceeds `eps` (2.6e-9), within finufft's."""
+    eps, positions = 1e-9, _points(shape, NUM_POINTS, seed=0)
+    kwargs = dict(pixel_size=PIXEL_SIZE, eps=eps, upsample_factor=1.25)
+    if transform == 1:
+        strengths = np.random.default_rng(1).normal(size=NUM_POINTS)
+        exact, known = _finufft_half_grid(positions, strengths, shape)
+        approx, _ = _finufft_half_grid(
+            positions, strengths, shape, eps=eps, upsampfac=1.25
+        )
+        native = im.dispatch_nufft1(positions, strengths, shape, **kwargs)
+        native, exact, approx = np.asarray(native)[known], exact[known], approx[known]
+    else:
+        spectrum = _without_nyquist(_random_spectrum(shape, seed=1), shape)
+        exact = _finufft_values(positions, spectrum, shape)
+        approx = _finufft_values(positions, spectrum, shape, eps=eps, upsampfac=1.25)
+        native = im.dispatch_nufft2(positions, spectrum, shape, **kwargs)
+    assert _relative_error(native, exact) <= max(eps, _relative_error(approx, exact))
 
 
 @pytest.mark.parametrize("shape, eps, sigma", FLOAT32_CASES)
@@ -545,9 +571,7 @@ def test_auto_is_static(monkeypatch, name):
         )
     else:
         second = jnp.asarray(_random_spectrum(shape, seed=1), jnp.complex64)
-    sigma = resolve_upsample_factor(
-        "auto", n_points=NUM_POINTS, shape=shape, eps=1e-5, dtype=np.float32, pallas=False
-    )
+    sigma = resolve_upsample_factor("auto", ndim=len(shape), eps=1e-5, dtype=np.float32)
     limits = im.nufft_accuracy_limits(
         shape, eps=1e-5, upsample_factor=sigma, dtype=np.float32
     )
@@ -576,18 +600,21 @@ def test_auto_is_static(monkeypatch, name):
 
 
 @pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
-def test_auto_uses_pure_jax_costs(monkeypatch, name):
-    backends = []
+def test_auto_ignores_points(monkeypatch, name):
+    """The resolved factor and kernel depend on `eps`, dtype and dimension only."""
+    picks = []
 
-    def resolve_upsample_factor(upsample_factor, **kwargs):
-        backends.append(kwargs["pallas"])
-        return resolve_upsample_factor_unpatched(upsample_factor, **kwargs)
+    def make_pswf_kernel(eps, upsample_factor, ndim, dtype):
+        kernel = make_pswf_kernel_unpatched(eps, upsample_factor, ndim, dtype)
+        picks.append((upsample_factor, kernel.width))
+        return kernel
 
-    resolve_upsample_factor_unpatched = nufft_api.resolve_upsample_factor
-    monkeypatch.setattr(nufft_api, "resolve_upsample_factor", resolve_upsample_factor)
-    second = jnp.ones(3) if name == "dispatch_nufft1" else jnp.ones((8, 4), complex)
-    getattr(im, name)(jnp.zeros((3, 2)), second, (8, 6), enable_pallas=False)
-    assert backends == [False]
+    make_pswf_kernel_unpatched = nufft_api.make_pswf_kernel
+    monkeypatch.setattr(nufft_api, "make_pswf_kernel", make_pswf_kernel)
+    for num in (10, 10**5):
+        second = jnp.ones(num) if name == "dispatch_nufft1" else jnp.ones((8, 4), complex)
+        getattr(im, name)(jnp.zeros((num, 2)), second, (8, 6), enable_pallas=False)
+    assert len(picks) == 2 and picks[0] == picks[1]
 
 
 @pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
@@ -662,11 +689,11 @@ def test_eps_below_eps_mach_warns_and_runs(monkeypatch, name):
 
 @pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
 def test_warns_below_rounding_floor(name):
-    """finufft include/finufft/setpts.hpp:22; the floor, 6.04e-5, rounded up."""
+    """finufft include/finufft/setpts.hpp:22; the floor, 6.0426e-5, to 3 figures, up."""
     with pytest.warns(
         UserWarning,
         match=rf"{name}[\s\S]*eps = 1e-06[\s\S]*\(1024, 1024\)[\s\S]*float32"
-        r"[\s\S]*6\.1e-05[\s\S]*jax_enable_x64",
+        r"[\s\S]*6\.05e-05[\s\S]*jax_enable_x64",
     ) as record:
         _call(name, (1024, 1024), np.float32, eps=1e-6)
     assert len(record) == 1
@@ -682,6 +709,37 @@ def test_warns_below_min_upsample_factor(name):
     ) as record:
         _call(name, (64, 64), eps=1e-10, upsample_factor=1.25)
     assert len(record) == 1
+
+
+@pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
+def test_no_upsample_factor_reaches_eps_advises_eps_only(name):
+    """Below 2 eps_mach in 2D no factor reaches `eps`: the fix is `eps`, never "auto"."""
+    with pytest.warns(UserWarning) as record:
+        _call(name, (4, 4), np.float32, eps=1.5e-7, upsample_factor=2.0)
+    (message,) = [
+        str(w.message) for w in record if "no `upsample_factor` reaches" in str(w.message)
+    ]
+    assert "increase `eps`" in message and "jax_enable_x64" in message
+    assert "auto" not in message
+
+
+_EPS_FIX = r"set `eps` to at least (\d\.\d+e-\d+)"
+
+
+@pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
+@pytest.mark.parametrize(
+    "eps, upsample_factor", [(1e-9, "auto"), (1e-9, 1.5), (3e-7, "auto")]
+)
+def test_unreachable_eps_warnings_name_a_working_eps(name, eps, upsample_factor):
+    """The `eps` named by the `eps < eps_mach` and auto-unreachable warnings runs
+    silently."""
+    with pytest.warns(UserWarning) as record:
+        _call(name, (4, 4), np.float32, eps=eps, upsample_factor=upsample_factor)
+    found = [re.search(_EPS_FIX, str(w.message)) for w in record]
+    (match,) = [m for m in found if m]
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        _call(name, (4, 4), np.float32, eps=float(match.group(1)), upsample_factor="auto")
 
 
 @pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])

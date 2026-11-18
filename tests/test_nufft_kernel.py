@@ -211,37 +211,32 @@ def test_complex_dtypes_read_as_real():
         assert make_pswf_kernel(1e-6, 1.25, 3, complex_) is make_pswf_kernel(
             1e-6, 1.25, 3, real
         )
-        assert _auto(10, shape, 1e-6, complex_, True) == _auto(
-            10, shape, 1e-6, real, True
-        )
+        assert _auto(3, 1e-6, complex_) == _auto(3, 1e-6, real)
     assert nufft_accuracy_limits(shape, dtype=jnp.complex128, **kwargs).width == 11
 
 
-def _auto(n_points, shape, eps, dtype, pallas):
-    return resolve_upsample_factor(
-        "auto", n_points=n_points, shape=shape, eps=eps, dtype=dtype, pallas=pallas
-    )
+def _auto(ndim, eps, dtype):
+    return resolve_upsample_factor("auto", ndim=ndim, eps=eps, dtype=dtype)
 
 
 @pytest.mark.parametrize(
-    "pallas, shape, eps, dtype, n_points, sigma, width",
+    "ndim, dtype, eps, sigma, width",
     [
-        (True, (1024, 1024), 1e-6, np.float64, 10_000, 1.251, 10),
-        (True, (1024, 1024), 1e-6, np.float64, 104_858, 1.251, 10),
-        (True, (1024, 1024), 1e-6, np.float64, 1_048_576, 1.772, 7),
-        (True, (256, 256, 256), 1e-4, np.float64, 1_677_722, 1.3717, 6),
-        (False, (1024, 1024), 1e-6, np.float64, 104_858, 1.772, 7),
-        (False, (256, 256, 256), 1e-4, np.float64, 1_677_722, 1.7327, 5),
+        (2, np.float64, 1e-6, 1.251, 10),
+        (3, np.float64, 1e-4, 1.251, 7),
+        (2, np.float64, 1e-12, 1.451032, 16),
+        (3, np.float64, 1e-12, 1.468064, 16),
+        (2, np.float64, 1e-14, 1.751684, 16),
+        (2, np.float32, 1e-4, 1.251, 7),
+        (2, np.float32, 1e-6, 1.772019, 7),
+        (3, np.float32, 1e-6, 1.931160, 7),
+        (2, np.float32, 3e-7, 2.5, 7),
     ],
 )
-def test_auto_follows_finufft_search(pallas, shape, eps, dtype, n_points, sigma, width):
-    resolved = _auto(n_points, shape, eps, dtype, pallas)
-    assert resolved == pytest.approx(sigma, abs=1e-3)
-    assert kernel_width(eps, resolved, len(shape), dtype) == width
-
-
-def test_auto_unreachable_returns_upper_limit():
-    assert _auto(10, (4, 4), 3e-7, np.float32, True) == 2.5
+def test_auto_is_finufft_search_without_cost(ndim, dtype, eps, sigma, width):
+    resolved = _auto(ndim, eps, dtype)
+    assert resolved == pytest.approx(sigma, abs=1e-6)
+    assert kernel_width(eps, resolved, ndim, dtype) == width
 
 
 @pytest.mark.parametrize("dtype", (np.float32, np.float64))
@@ -259,23 +254,22 @@ def test_auto_fails_sigma_limit_only_when_none_meets_it(shape, dtype):
             ).min_upsample_factor
             <= 2.5
         )
-        for n_points, pallas in ((10, True), (10_000_000, True), (10_000_000, False)):
-            sigma = _auto(n_points, shape, float(eps), dtype, pallas)
-            limits = nufft_accuracy_limits(shape, upsample_factor=sigma, **kwargs)
-            assert (sigma >= limits.min_upsample_factor) == reachable
-            assert reachable or sigma == 2.5
+        sigma = _auto(len(shape), float(eps), dtype)
+        limits = nufft_accuracy_limits(shape, upsample_factor=sigma, **kwargs)
+        assert (sigma >= limits.min_upsample_factor) == reachable
+        assert reachable or sigma == 2.5
 
 
 def test_auto_is_cached():
-    sigma = _auto(10_000, (64, 64), 1e-6, np.float32, True)
+    sigma = _auto(2, 1e-6, np.float32)
     hits = _auto_upsample_factor.cache_info().hits
     assert type(sigma) is float
-    assert sigma == _auto(10_000, (64, 64), 1e-6, jnp.float32, True)
+    assert sigma == _auto(2, 1e-6, jnp.float32)
     assert _auto_upsample_factor.cache_info().hits == hits + 1
 
 
 def test_explicit_upsample_factor_passes_through():
-    kwargs = dict(n_points=10, shape=(8, 8), eps=1e-4, dtype=np.float32, pallas=True)
+    kwargs = dict(ndim=2, eps=1e-4, dtype=np.float32)
     assert resolve_upsample_factor(1.6, **kwargs) == 1.6
     for bad in (1.0, "fast"):
         with pytest.raises(
