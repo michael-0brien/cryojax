@@ -151,7 +151,7 @@ def kernel_fourier_series(
 ) -> np.ndarray:
     """`phi_hat(k / m)` for `n` modes in `fftfreq` order, or `0..n // 2` if `rfft`, by
     quadrature of the fitted taps in `dtype`."""
-    dtype = np.dtype(dtype)
+    dtype = jnp.finfo(dtype).dtype
     # finufft include/finufft/makeplan.hpp:40, 74-88; its first `q` nodes, on (-w/2, 0)
     half_width = kernel.width / 2.0
     q = int(2 + 3.0 * half_width)
@@ -202,10 +202,10 @@ def nufft_accuracy_limits(
 
     **Returns:**
 
-    A `NUFFTAccuracyLimits` of `rounding_floor`, the smallest `eps` reachable on
-    `shape` in `dtype`; `width`, the kernel width in fine-grid pixels at `eps` and
-    `upsample_factor`; and `min_upsample_factor`, the smallest `upsample_factor`
-    reaching `eps` at that width (`inf` if none).
+    A `NUFFTAccuracyLimits` of `rounding_floor`, finufft's conditioning floor on
+    `shape` in `dtype`: no smaller `eps` is reachable; `width`, the kernel width in
+    fine-grid pixels at `eps` and `upsample_factor`; and `min_upsample_factor`, the
+    smallest `upsample_factor` reaching `eps` at that width (`inf` if none).
     """
     name = "nufft_accuracy_limits(shape, eps, upsample_factor, dtype)"
     if not eps > 0:
