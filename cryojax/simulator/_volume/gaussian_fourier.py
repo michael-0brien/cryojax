@@ -238,6 +238,8 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
         By default, the non-uniform FFT runs on cryoJAX's native backend, in pure JAX or
         Pallas. Setting the environment variable `CRYOJAX_FINUFFT_BACKEND=jax-finufft`
         switches to [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft).
+        On the native backend, `jax.jvp` and `jax.jacfwd` are not supported;
+        forward-over-reverse (HVPs) is.
     """  # noqa: E501
 
     shape: tuple[int, int, int]
@@ -266,7 +268,9 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
         - `voxel_size`:
             The voxel size of the resulting voxel grid.
         - `eps`:
-            The requested relative accuracy of the non-uniform FFT.
+            The requested relative accuracy of the non-uniform FFT. In float32,
+            rounding of the fine-grid coordinates limits the achieved accuracy to
+            about 1e-5 at 256² and 2e-4 at 4096².
         - `upsample_factor`:
             The ratio of the fine grid to the grid (finufft's `upsampfac`), greater
             than 1. Smaller values use less memory but a wider kernel. `"auto"` picks
@@ -280,7 +284,7 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
         self.shape = shape
         self.voxel_size = leaf_asarray(voxel_size, dtype=float)
         self.sampling_mode = "point"
-        self.eps = eps
+        self.eps = _check_eps("GaussianFourierRenderFn", eps)
         self.upsample_factor = _check_upsample_factor(
             "GaussianFourierRenderFn", upsample_factor
         )
@@ -359,6 +363,8 @@ class GaussianFourierProjection(
         By default, the non-uniform FFT runs on cryoJAX's native backend, in pure JAX or
         Pallas. Setting the environment variable `CRYOJAX_FINUFFT_BACKEND=jax-finufft`
         switches to [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft).
+        On the native backend, `jax.jvp` and `jax.jacfwd` are not supported;
+        forward-over-reverse (HVPs) is.
     """  # noqa: E501
 
     sampling_mode: Literal["point"] = eqx.field(static=True)
@@ -383,14 +389,13 @@ class GaussianFourierProjection(
         """**Arguments:**
 
         - `eps`:
-            The requested relative accuracy of the non-uniform FFT.
+            The requested relative accuracy of the non-uniform FFT. In float32,
+            rounding of the fine-grid coordinates limits the achieved accuracy to
+            about 1e-5 at 256² and 2e-4 at 4096².
         - `upsample_factor`:
             The ratio of the fine grid to the grid (finufft's `upsampfac`), greater
             than 1. Smaller values use less memory but a wider kernel. `"auto"` picks
             it from a cost model; see [`cryojax.ndimage.dispatch_nufft1`][].
-        - `enable_pallas`:
-            Whether the native backend spreads with Pallas kernels. See
-            [`cryojax.ndimage.dispatch_nufft1`][].
         - `shape`:
             If given, first compute the image at `shape`, then
             pad or crop to `image_config.padded_shape`.
@@ -402,7 +407,7 @@ class GaussianFourierProjection(
         """  # noqa: E501
         self.sampling_mode = "point"
         self.shape = shape
-        self.eps = eps
+        self.eps = _check_eps("GaussianFourierProjection", eps)
         self.upsample_factor = _check_upsample_factor(
             "GaussianFourierProjection", upsample_factor
         )
@@ -573,6 +578,15 @@ def _render_impl(
         lambda x, y: x + y,
         jax.tree.map(fourier_impl, positions, kernel_fns, amplitudes, is_leaf=is_leaf),
     )
+
+
+def _check_eps(name: str, eps: float) -> float:
+    if not eps > 0:
+        raise ValueError(
+            f"Found invalid value for `{name}.eps`. It must be positive, but got "
+            f"`eps = {eps}`."
+        )
+    return eps
 
 
 def _check_upsample_factor(
