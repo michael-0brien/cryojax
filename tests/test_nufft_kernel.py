@@ -69,6 +69,20 @@ def test_pswf_matches_scipy_pro_ang1(eps, sigma):
 
 
 @pytest.mark.parametrize("sigma", SIGMAS)
+@pytest.mark.parametrize("eps", [10.0 ** (-k) for k in range(2, 12)])
+def test_pswf_is_positive_and_decreasing(eps, sigma):
+    """psi_0 has no zero in [-1, 1]; at large `c` the other even eigenfunctions share its
+    eigenvalue to rounding, and only this tells them apart."""
+    try:
+        kernel = make_pswf_kernel(eps, sigma, 2)
+    except ValueError:
+        pytest.skip("width above 16")
+    values = evaluate_pswf(kernel, np.linspace(0, 1, 401))
+    assert np.all(values > 0)
+    assert np.all(np.diff(values) < 0)
+
+
+@pytest.mark.parametrize("sigma", SIGMAS)
 @pytest.mark.parametrize("eps", (1e-3, 1e-6))
 def test_self_fourier_identity(eps, sigma):
     kernel = make_pswf_kernel(eps, sigma, 3)

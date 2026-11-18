@@ -1275,26 +1275,21 @@ def _grid_points(shape, pixel_size=1.0):
 
 
 @pytest.mark.parametrize("shape", [(8, 6), (7, 9), (6, 5, 4), (5, 7, 6)])
-@pytest.mark.parametrize("fftshifted", [False, True])
-def test_dispatch_nufft1_on_grid_points_equals_fftn(shape, fftshifted):
+def test_dispatch_nufft1_on_grid_points_equals_rfftn(shape):
     image = np.random.default_rng(0).normal(size=shape)
-    strengths = jnp.asarray(image.ravel(), dtype=complex)
     fourier_image = im.dispatch_nufft1(
         jnp.asarray(_grid_points(shape)),
-        strengths,
+        jnp.asarray(image.ravel()),
         shape,
-        fftshifted=fftshifted,
         eps=1e-12,
+        upsample_factor=2.0,
     )
-    expected = np.fft.fftn(image)
-    if fftshifted:
-        expected = np.fft.fftshift(expected)
-    np.testing.assert_allclose(fourier_image, expected, atol=1e-8)
+    np.testing.assert_allclose(fourier_image, np.fft.rfftn(image), atol=1e-8)
 
 
 def test_dispatch_nufft1_positions_are_in_units_of_pixel_size():
     shape, pixel_size = (8, 6), 1.7
-    strengths = jnp.asarray(np.random.default_rng(0).normal(size=48), dtype=complex)
+    strengths = jnp.asarray(np.random.default_rng(0).normal(size=48))
     positions = jnp.asarray(np.random.default_rng(1).uniform(-2.0, 2.0, (48, 2)))
     np.testing.assert_allclose(
         im.dispatch_nufft1(
@@ -1306,11 +1301,9 @@ def test_dispatch_nufft1_positions_are_in_units_of_pixel_size():
 
 
 def test_dispatch_nufft1_does_not_mutate_options():
-    options = {"upsampfac": 2.0}
-    im.dispatch_nufft1(
-        jnp.zeros((3, 2)), jnp.ones(3, dtype=complex), (6, 6), options=options
-    )
-    assert options == {"upsampfac": 2.0}
+    options = {"opts": None}
+    im.dispatch_nufft1(jnp.zeros((3, 2)), jnp.ones(3), (6, 6), options=options)
+    assert options == {"opts": None}
 
 
 @pytest.mark.parametrize(
@@ -1318,41 +1311,20 @@ def test_dispatch_nufft1_does_not_mutate_options():
 )
 def test_dispatch_nufft1_rejects_dimension_mismatch(positions_shape, shape):
     with pytest.raises(ValueError, match="dispatch_nufft1"):
-        im.dispatch_nufft1(jnp.zeros(positions_shape), jnp.ones(3, dtype=complex), shape)
+        im.dispatch_nufft1(jnp.zeros(positions_shape), jnp.ones(3), shape)
 
 
-@pytest.mark.parametrize(
-    "kwargs, expected_upsampfac",
-    [({}, 1.25), ({"upsampfac": 2.0}, 2.0), ({"options": {"upsampfac": 3.0}}, 3.0)],
-)
-def test_dispatch_nufft1_upsampfac(monkeypatch, kwargs, expected_upsampfac):
-    """The default is 1.25, and backend `options` take precedence."""
-    from cryojax.ndimage._nufft import api as _nufft
-
-    recorded = {}
-    nufft2d1 = _nufft.nufftax.nufft2d1
-
-    def recording_nufft2d1(*args, upsampfac, **kw):
-        recorded["upsampfac"] = upsampfac
-        return nufft2d1(*args, upsampfac=upsampfac, **kw)
-
-    monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", "nufftax")
-    monkeypatch.setattr(_nufft.nufftax, "nufft2d1", recording_nufft2d1)
-    im.dispatch_nufft1(jnp.zeros((3, 2)), jnp.ones(3, dtype=complex), (6, 6), **kwargs)
-    assert recorded["upsampfac"] == expected_upsampfac
-
-
-def test_dispatch_nufft1_with_upsampfac_2_reaches_eps_for_broadband_signals():
+def test_dispatch_nufft1_with_upsample_factor_2_reaches_eps_for_broadband_signals():
     shape = (32, 32)
     image = np.random.default_rng(0).normal(size=shape)
     fourier_image = im.dispatch_nufft1(
         jnp.asarray(_grid_points(shape)),
-        jnp.asarray(image.ravel(), dtype=complex),
+        jnp.asarray(image.ravel()),
         shape,
         eps=1e-10,
-        upsampfac=2.0,
+        upsample_factor=2.0,
     )
-    expected = np.fft.fftn(image)
+    expected = np.fft.rfftn(image)
     np.testing.assert_allclose(
         fourier_image, expected, atol=1e-8 * np.abs(expected).max()
     )

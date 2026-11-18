@@ -48,5 +48,5 @@ CRYOJAX_ENABLE_PALLAS: bool = _get_bool_var("CRYOJAX_ENABLE_PALLAS", False)
 CRYOJAX_PALLAS_BLOCK_SIZE: int | None = _get_optional_int_var("CRYOJAX_PALLAS_BLOCK_SIZE")
 # Not public API
 CRYOJAX_FINUFFT_BACKEND: str = _get_str_var(
-    "CRYOJAX_FINUFFT_BACKEND", "nufftax", ("nufftax", "jax-finufft")
+    "CRYOJAX_FINUFFT_BACKEND", "native", ("native", "jax-finufft")
 )

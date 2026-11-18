@@ -9,6 +9,7 @@ import numpy as np
 
 _MAX_WIDTH = 16
 _NUM_NODES = 256
+_NUM_LEGENDRE = 100
 _MAX_EXTRA_DEGREE = 6
 
 
@@ -42,14 +43,24 @@ def kernel_width(eps: float, upsample_factor: float, ndim: int) -> int:
     return max(width, 2)
 
 
-def _pswf_nystrom(c: float) -> tuple[float, np.ndarray, np.ndarray, np.ndarray]:
+def _pswf_at_nodes(c: float) -> tuple[float, np.ndarray, np.ndarray, np.ndarray]:
+    """`psi_0` at Gauss-Legendre nodes and its eigenvalue, from the Legendre expansion
+    of the prolate differential equation (Bouwkamp): the integral operator's top
+    eigenvalues coincide to rounding at large `c`, the differential operator's do not."""
+    k = 2 * np.arange(_NUM_LEGENDRE)
+    diagonal = k * (k + 1) + c**2 * (2 * k * (k + 1) - 1) / ((2 * k + 3) * (2 * k - 1))
+    k = k[:-1]
+    off_diagonal = (
+        c**2 * (k + 2) * (k + 1) / ((2 * k + 3) * np.sqrt((2 * k + 1) * (2 * k + 5)))
+    )
+    matrix = np.diag(diagonal) + np.diag(off_diagonal, 1) + np.diag(off_diagonal, -1)
+    _, vectors = np.linalg.eigh(matrix)
+    legendre = np.zeros(2 * _NUM_LEGENDRE)
+    legendre[::2] = vectors[:, 0] * np.sqrt(2 * np.arange(0, 2 * _NUM_LEGENDRE, 2) + 1)
+    legendre /= np.polynomial.legendre.legval(0.0, legendre)
     nodes, weights = np.polynomial.legendre.leggauss(_NUM_NODES)
-    root = np.sqrt(weights)
-    kernel_matrix = root[:, None] * np.cos(c * np.outer(nodes, nodes)) * root[None, :]
-    eigenvalues, vectors = np.linalg.eigh(kernel_matrix)
-    eigenvalue, at_nodes = eigenvalues[-1], vectors[:, -1] / root
-    norm = (weights @ at_nodes) / eigenvalue  # unnormalized psi(0)
-    return eigenvalue, nodes, weights, at_nodes / norm
+    # psi(0) = 1, so the eigenvalue is the integral of psi
+    return 2 * legendre[0], nodes, weights, np.polynomial.legendre.legval(nodes, legendre)
 
 
 def evaluate_pswf(kernel: PSWFKernel, x) -> np.ndarray:
@@ -84,7 +95,7 @@ def make_pswf_kernel(eps: float, upsample_factor: float, ndim: int) -> PSWFKerne
     """Build the PSWF kernel and its per-tap Horner coefficients (highest power first)."""
     width = kernel_width(eps, upsample_factor, ndim)
     c = math.pi * width * (1 - 1 / (2 * upsample_factor)) - 0.05
-    eigenvalue, nodes, _, node_values = _pswf_nystrom(c)
+    eigenvalue, nodes, _, node_values = _pswf_at_nodes(c)
     kernel = PSWFKernel(width, c, float(eigenvalue), nodes, node_values, np.empty((0, 0)))
     s = np.linspace(0.0, 1.0, 2001)
     exact = np.array(

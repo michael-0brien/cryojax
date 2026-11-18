@@ -17,6 +17,7 @@ from ...ndimage import (
     AbstractFourierOperator,
     FourierGaussian,
     convert_fftn_to_rfftn,
+    convert_rfftn_to_fftn,
     dispatch_nufft1,
     resize_with_crop_or_pad,
 )
@@ -497,14 +498,8 @@ def _project_impl(
     ) -> Array:
         return (
             _eval_kernel_impl(_kernel_fn, frequencies_1d)
-            * dispatch_nufft1(
-                _positions[:, :2],
-                jnp.asarray(_amplitudes, dtype=complex),
-                shape,
-                pixel_size=pixel_size,
-                fftshifted=True,
-                eps=eps,
-                options=options,
+            * _shifted_nufft1(
+                _positions[:, :2], _amplitudes, shape, pixel_size, eps, options
             )
             / pixel_size**2
         )
@@ -536,15 +531,7 @@ def _render_impl(
         _amplitudes: Float[Array, " _"],
     ) -> Array:
         return _eval_kernel_impl(_kernel_fn, frequencies_1d) * (
-            dispatch_nufft1(
-                _positions,
-                jnp.asarray(_amplitudes, dtype=complex),
-                shape,
-                pixel_size=voxel_size,
-                fftshifted=True,
-                eps=eps,
-                options=options,
-            )
+            _shifted_nufft1(_positions, _amplitudes, shape, voxel_size, eps, options)
             / voxel_size**3
         )
 
@@ -553,6 +540,21 @@ def _render_impl(
         jax.tree.map(fourier_impl, positions, kernel_fns, amplitudes, is_leaf=is_leaf),
     )
     return jnp.fft.ifftshift(rendering_out)
+
+
+def _shifted_nufft1(positions, amplitudes, shape, pixel_size, eps, options):
+    # Until the callers take `upsample_factor` and `enable_pallas`: 2 reaches eps 1e-10
+    spectrum = dispatch_nufft1(
+        positions,
+        jnp.asarray(amplitudes, dtype=float),
+        shape,
+        pixel_size=pixel_size,
+        eps=eps,
+        upsample_factor=2.0,
+        enable_pallas=False,
+        options=options,
+    )
+    return jnp.fft.fftshift(convert_rfftn_to_fftn(spectrum, shape))
 
 
 def _eval_kernel_impl(kernel_fn: FourierGaussian, frequencies_1d: tuple[Array, ...]):
