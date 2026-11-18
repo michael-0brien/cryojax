@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any, ClassVar, Literal, Self, TypeVar, cast
 from typing_extensions import override
 
@@ -16,7 +16,6 @@ from ...jax_util import FloatLike, NDArrayLike
 from ...ndimage import (
     AbstractFourierOperator,
     FourierGaussian,
-    convert_fftn_to_rfftn,
     convert_rfftn_to_fftn,
     dispatch_nufft1,
     resize_with_crop_or_pad,
@@ -236,13 +235,9 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
     voxel average.
 
     !!! info
-        By default, the non-uniform FFT runs on a pure-JAX backend using
-        [`nufftax`](https://github.com/GragasLab/nufftax/tree/custom-kernel-spread).
-        Setting the environment variable `CRYOJAX_FINUFFT_BACKEND=jax-finufft` switches to
-        [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft), which
-        can be more computationally efficient and less memory-demanding, at the
-        cost of being trickier to install and having more limited integration
-        with multi-GPU JAX.
+        By default, the non-uniform FFT runs on cryoJAX's native backend, in pure JAX or
+        Pallas. Setting the environment variable `CRYOJAX_FINUFFT_BACKEND=jax-finufft`
+        switches to [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft).
     """  # noqa: E501
 
     shape: tuple[int, int, int]
@@ -250,6 +245,8 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
 
     sampling_mode: Literal["point"] = eqx.field(static=True)
     eps: float
+    upsample_factor: float
+    enable_pallas: bool | Mapping[str, bool] | None
     options: dict[str, Any]
 
     def __init__(
@@ -258,6 +255,8 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
         voxel_size: FloatLike,
         *,
         eps: float = 1e-6,
+        upsample_factor: float = 1.25,
+        enable_pallas: bool | Mapping[str, bool] | None = None,
         options: dict[str, Any] = {},
     ):
         """**Arguments:**
@@ -267,17 +266,24 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
         - `voxel_size`:
             The voxel size of the resulting voxel grid.
         - `eps`:
-            The precision of the underlying non-uniform FFT implementation.
-            See [`finufft`](https://finufft.readthedocs.io/en/latest/opts.html#options-parameters-cpu)
-            for documentation.
+            The requested relative accuracy of the non-uniform FFT.
+        - `upsample_factor`:
+            The ratio of the fine grid to the grid (finufft's `upsampfac`), greater
+            than 1. Smaller values use less memory but a wider kernel.
+        - `enable_pallas`:
+            Whether the native backend spreads with Pallas kernels. See
+            [`cryojax.ndimage.dispatch_nufft1`][].
         - `options`:
-            A dictionary of options for advanced usage, passed directly to
-            the underlying non-uniform FFT implementation.
+            A dictionary of options for the `jax-finufft` backend only.
         """  # noqa: E501
         self.shape = shape
         self.voxel_size = leaf_asarray(voxel_size, dtype=float)
         self.sampling_mode = "point"
         self.eps = eps
+        self.upsample_factor = _check_upsample_factor(
+            "GaussianFourierRenderFn", upsample_factor
+        )
+        self.enable_pallas = enable_pallas
         self.options = options
 
     @override
@@ -315,23 +321,24 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
         )
         kernel_fns = _standardize_kernel_fns(kernel_fns, spatial_dim=3)
         # Compute
-        rendering_fft = _render_impl(
+        rendering_rfft = _render_impl(
             positions,
             kernel_fns,
             amplitudes,
             shape=self.shape,
             voxel_size=voxel_size,
             eps=self.eps,
+            upsample_factor=self.upsample_factor,
+            enable_pallas=self.enable_pallas,
             options=self.options,
         )
-        return (
-            jnp.fft.ifftn(rendering_fft).real
-            if outputs_real_space
-            else _prepare_fft_to_fft(
-                rendering_fft,
-                outputs_rfft=outputs_rfft,
-                fftshifted=fftshifted,
-            )
+        if outputs_real_space:
+            return jnp.fft.irfftn(rendering_rfft, s=self.shape)
+        return _prepare_fft_to_fft(
+            rendering_rfft,
+            self.shape,
+            outputs_rfft=outputs_rfft,
+            fftshifted=fftshifted,
         )
 
 
@@ -348,18 +355,16 @@ class GaussianFourierProjection(
     pixel average.
 
     !!! info
-        By default, the non-uniform FFT runs on a pure-JAX backend using
-        [`nufftax`](https://github.com/GragasLab/nufftax/tree/custom-kernel-spread).
-        Setting the environment variable `CRYOJAX_FINUFFT_BACKEND=jax-finufft` switches to
-        [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft), which
-        can be more computationally efficient and less memory-demanding, at the
-        cost of being trickier to install and having more limited integration
-        with multi-GPU JAX.
+        By default, the non-uniform FFT runs on cryoJAX's native backend, in pure JAX or
+        Pallas. Setting the environment variable `CRYOJAX_FINUFFT_BACKEND=jax-finufft`
+        switches to [`jax-finufft`](https://github.com/flatironinstitute/jax-finufft).
     """  # noqa: E501
 
     sampling_mode: Literal["point"] = eqx.field(static=True)
     eps: float
+    upsample_factor: float
     shape: tuple[int, int] | None
+    enable_pallas: bool | Mapping[str, bool] | None
     options: dict[str, Any]
 
     outputs_ewald_sphere: ClassVar[bool] = False
@@ -369,25 +374,37 @@ class GaussianFourierProjection(
         self,
         *,
         eps: float = 1e-6,
+        upsample_factor: float = 1.25,
         shape: tuple[int, int] | None = None,
+        enable_pallas: bool | Mapping[str, bool] | None = None,
         options: dict[str, Any] = {},
     ):
         """**Arguments:**
 
         - `eps`:
-            The precision of the underlying non-uniform FFT implementation.
-            See [`finufft`](https://finufft.readthedocs.io/en/latest/opts.html#options-parameters-cpu)
-            for documentation.
+            The requested relative accuracy of the non-uniform FFT.
+        - `upsample_factor`:
+            The ratio of the fine grid to the grid (finufft's `upsampfac`), greater
+            than 1. Smaller values use less memory but a wider kernel.
+        - `enable_pallas`:
+            Whether the native backend spreads with Pallas kernels. See
+            [`cryojax.ndimage.dispatch_nufft1`][].
         - `shape`:
             If given, first compute the image at `shape`, then
             pad or crop to `image_config.padded_shape`.
+        - `enable_pallas`:
+            Whether the native backend spreads with Pallas kernels. See
+            [`cryojax.ndimage.dispatch_nufft1`][].
         - `options`:
-            A dictionary of options for advanced usage, passed directly to
-            the underlying non-uniform FFT implementation.
+            A dictionary of options for the `jax-finufft` backend only.
         """  # noqa: E501
         self.sampling_mode = "point"
         self.shape = shape
         self.eps = eps
+        self.upsample_factor = _check_upsample_factor(
+            "GaussianFourierProjection", upsample_factor
+        )
+        self.enable_pallas = enable_pallas
         self.options = options
 
     @override
@@ -427,24 +444,25 @@ class GaussianFourierProjection(
         )
         kernel_fns = _standardize_kernel_fns(kernel_fns, spatial_dim=2)
         # Compute projection
-        projection_fft = _project_impl(
+        projection_rfft = _project_impl(
             positions,
             kernel_fns,
             amplitudes,
             shape=cast(tuple[int, int], shape),
             pixel_size=pixel_size,
             eps=self.eps,
+            upsample_factor=self.upsample_factor,
+            enable_pallas=self.enable_pallas,
             options=self.options,
         )
-        projection_fft = convert_fftn_to_rfftn(projection_fft, mode=None)
         if output_shape == shape:
             return (
-                jnp.fft.irfftn(projection_fft, s=output_shape)
+                jnp.fft.irfftn(projection_rfft, s=output_shape)
                 if outputs_real_space
-                else projection_fft
+                else projection_rfft
             )
         else:
-            projection = jnp.fft.irfftn(projection_fft, s=shape)
+            projection = jnp.fft.irfftn(projection_rfft, s=shape)
             projection = resize_with_crop_or_pad(projection, output_shape)
             return projection if outputs_real_space else jnp.fft.rfftn(projection)
 
@@ -486,30 +504,35 @@ def _project_impl(
     shape: tuple[int, int],
     pixel_size: Float[Array, ""],
     eps: float,
+    upsample_factor: float,
+    enable_pallas: bool | Mapping[str, bool] | None,
     options: dict[str, Any],
 ) -> Array:
     is_leaf = lambda x: isinstance(x, AbstractFourierOperator)  # noqa: E731
-    frequencies_1d = make_frequencies_1d(shape, pixel_size, modeord=0)
+    frequencies_1d = make_frequencies_1d(shape, pixel_size, modeord=1, outputs_rfft=True)
 
     def fourier_impl(
         _positions: Float[Array, "_ 3"],
         _kernel_fn: FourierGaussian,
         _amplitudes: Float[Array, " _"],
     ) -> Array:
-        return (
-            _eval_kernel_impl(_kernel_fn, frequencies_1d)
-            * _shifted_nufft1(
-                _positions[:, :2], _amplitudes, shape, pixel_size, eps, options
-            )
-            / pixel_size**2
+        spectrum = dispatch_nufft1(
+            _positions[:, :2],
+            jnp.asarray(_amplitudes, dtype=float),
+            shape,
+            pixel_size=pixel_size,
+            eps=eps,
+            upsample_factor=upsample_factor,
+            enable_pallas=enable_pallas,
+            options=options,
         )
+        return _eval_kernel_impl(_kernel_fn, frequencies_1d) * spectrum / pixel_size**2
 
     # Project and sum over kernels
-    projection_out = jax.tree.reduce(
+    return jax.tree.reduce(
         lambda x, y: x + y,
         jax.tree.map(fourier_impl, positions, kernel_fns, amplitudes, is_leaf=is_leaf),
     )
-    return jnp.fft.ifftshift(projection_out)
 
 
 def _render_impl(
@@ -520,41 +543,43 @@ def _render_impl(
     shape: tuple[int, int, int],
     voxel_size: Float[Array, ""],
     eps: float,
+    upsample_factor: float,
+    enable_pallas: bool | Mapping[str, bool] | None,
     options: dict[str, Any],
 ) -> Array:
     is_leaf = lambda x: isinstance(x, AbstractFourierOperator)  # noqa: E731
-    frequencies_1d = make_frequencies_1d(shape, voxel_size, modeord=0)
+    frequencies_1d = make_frequencies_1d(shape, voxel_size, modeord=1, outputs_rfft=True)
 
     def fourier_impl(
         _positions: Float[Array, "_ 3"],
         _kernel_fn: FourierGaussian,
         _amplitudes: Float[Array, " _"],
     ) -> Array:
-        return _eval_kernel_impl(_kernel_fn, frequencies_1d) * (
-            _shifted_nufft1(_positions, _amplitudes, shape, voxel_size, eps, options)
-            / voxel_size**3
+        spectrum = dispatch_nufft1(
+            _positions,
+            jnp.asarray(_amplitudes, dtype=float),
+            shape,
+            pixel_size=voxel_size,
+            eps=eps,
+            upsample_factor=upsample_factor,
+            enable_pallas=enable_pallas,
+            options=options,
         )
+        return _eval_kernel_impl(_kernel_fn, frequencies_1d) * spectrum / voxel_size**3
 
-    rendering_out = jax.tree.reduce(
+    return jax.tree.reduce(
         lambda x, y: x + y,
         jax.tree.map(fourier_impl, positions, kernel_fns, amplitudes, is_leaf=is_leaf),
     )
-    return jnp.fft.ifftshift(rendering_out)
 
 
-def _shifted_nufft1(positions, amplitudes, shape, pixel_size, eps, options):
-    # Until the callers take `upsample_factor` and `enable_pallas`: 2 reaches eps 1e-10
-    spectrum = dispatch_nufft1(
-        positions,
-        jnp.asarray(amplitudes, dtype=float),
-        shape,
-        pixel_size=pixel_size,
-        eps=eps,
-        upsample_factor=2.0,
-        enable_pallas=False,
-        options=options,
-    )
-    return jnp.fft.fftshift(convert_rfftn_to_fftn(spectrum, shape))
+def _check_upsample_factor(name: str, upsample_factor: float) -> float:
+    if upsample_factor <= 1:
+        raise ValueError(
+            f"Found invalid value for `{name}.upsample_factor`. It must be greater "
+            f"than 1, but got `upsample_factor = {upsample_factor}`."
+        )
+    return upsample_factor
 
 
 def _eval_kernel_impl(kernel_fn: FourierGaussian, frequencies_1d: tuple[Array, ...]):
@@ -564,9 +589,10 @@ def _eval_kernel_impl(kernel_fn: FourierGaussian, frequencies_1d: tuple[Array, .
     return jnp.sum(eval_gaussians(make_gaussians(a, b), frequencies_1d), axis=0)
 
 
-def _prepare_fft_to_fft(f: Array, *, outputs_rfft: bool, fftshifted: bool) -> Array:
+def _prepare_fft_to_fft(
+    f: Array, shape: tuple[int, ...], *, outputs_rfft: bool, fftshifted: bool
+) -> Array:
     if outputs_rfft:
-        f = convert_fftn_to_rfftn(f, mode=None)
         return jnp.fft.fftshift(f, axes=(0, 1)) if fftshifted else f
-    else:
-        return jnp.fft.fftshift(f) if fftshifted else f
+    f = convert_rfftn_to_fftn(f, shape)
+    return jnp.fft.fftshift(f) if fftshifted else f
