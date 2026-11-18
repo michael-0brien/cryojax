@@ -12,12 +12,12 @@ import numpy as np
 from jaxtyping import Array, Float
 
 from ...jax_util import FloatLike, NDArrayLike
+from .._pallas_helpers import resolve_enable_pallas
 from .pallas_spread import (
     pallas_spread_2d,
     pallas_spread_3d,
     pallas_spread_vjp_2d,
     pallas_spread_vjp_3d,
-    resolve_enable_pallas,
 )
 from .spread import spread_2d_bwd, spread_2d_impl, spread_3d_bwd, spread_3d_impl
 
