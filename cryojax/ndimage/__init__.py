@@ -58,6 +58,7 @@ from ._normalize import (
 from ._nufft import (
     dispatch_nufft1 as dispatch_nufft1,
     dispatch_nufft2 as dispatch_nufft2,
+    nufft_accuracy_limits as nufft_accuracy_limits,
 )
 from ._operators import (
     AbstractFourierOperator as AbstractFourierOperator,

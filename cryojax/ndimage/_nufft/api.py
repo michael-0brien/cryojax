@@ -33,9 +33,6 @@ except ModuleNotFoundError as err:
     jax_finufft, Opts = None, None
     JAX_FINUFFT_IMPORT_ERROR = err
 
-# Below this the float64 tap fit turns ill-conditioned, then fails
-_MIN_EPS = 1e-12
-
 
 def dispatch_nufft1(
     positions: Float[Array, "M d"],
@@ -258,11 +255,6 @@ def _check_eps_and_upsample_factor(name, eps, upsample_factor):
 
 def _make_kernel(name, eps, upsample_factor, *, n_points, shape, dtype, pallas):
     """The native backend's kernel and upsample factor, with `"auto"` resolved."""
-    if eps < _MIN_EPS:
-        raise ValueError(
-            f"Found invalid value for `{name}`. The `eps` must be at least {_MIN_EPS} on "
-            f"the native backend, but got `eps = {eps}`."
-        )
     sigma = resolve_upsample_factor(
         upsample_factor,
         n_points=n_points,
@@ -272,7 +264,7 @@ def _make_kernel(name, eps, upsample_factor, *, n_points, shape, dtype, pallas):
         pallas=pallas,
     )
     try:
-        kernel = make_pswf_kernel(eps, sigma, len(shape))
+        kernel = make_pswf_kernel(eps, sigma, len(shape), dtype)
     except ValueError as err:
         raise ValueError(
             f"Found invalid value for `{name}`. The `eps = {eps}` needs a kernel wider "
@@ -333,7 +325,7 @@ def _deconvolve(spectrum, kernel, shape, fine_shape, *, adjoint=False):
     ndim = len(shape)
     for axis, (n, m) in enumerate(zip(shape, fine_shape)):
         is_last = axis == ndim - 1
-        factor = 1 / kernel_fourier_series(kernel, n, m, rfft=is_last)
+        factor = 1 / kernel_fourier_series(kernel, n, m, rfft=is_last, dtype=real_dtype)
         if adjoint:
             factor = factor * (m / n)
             if is_last and n % 2 == 0:

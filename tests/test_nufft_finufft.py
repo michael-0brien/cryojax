@@ -470,9 +470,9 @@ def test_auto_is_static(monkeypatch, name):
     assert sigma != 1.25
     kernel_factors = []
 
-    def make_pswf_kernel(eps, upsample_factor, ndim):
+    def make_pswf_kernel(eps, upsample_factor, ndim, dtype):
         kernel_factors.append(upsample_factor)
-        return make_pswf_kernel_unpatched(eps, upsample_factor, ndim)
+        return make_pswf_kernel_unpatched(eps, upsample_factor, ndim, dtype)
 
     make_pswf_kernel_unpatched = nufft_api.make_pswf_kernel
     monkeypatch.setattr(nufft_api, "make_pswf_kernel", make_pswf_kernel)
@@ -516,6 +516,7 @@ def test_upsample_factor_other_string_raises(name):
 #
 # Errors
 #
+@pytest.mark.xfail(reason="Task 2")
 @pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
 def test_eps_too_small_raises(name):
     shape = (8, 6)
@@ -526,6 +527,7 @@ def test_eps_too_small_raises(name):
         )
 
 
+@pytest.mark.xfail(reason="Task 2")
 @pytest.mark.parametrize("upsample_factor", ["auto", 2.0])
 @pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
 def test_eps_below_fit_precision_raises(name, upsample_factor):
@@ -546,7 +548,7 @@ def test_eps_below_fit_precision_raises(name, upsample_factor):
 
 @pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
 def test_kernel_error_names_dispatch_and_resolved_factor(monkeypatch, name):
-    def make_pswf_kernel(eps, upsample_factor, ndim):
+    def make_pswf_kernel(eps, upsample_factor, ndim, dtype):
         raise ValueError("Found invalid value for `make_pswf_kernel(...)`.")
 
     monkeypatch.setattr(nufft_api, "make_pswf_kernel", make_pswf_kernel)

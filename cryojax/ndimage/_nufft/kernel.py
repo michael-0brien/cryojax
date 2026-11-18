@@ -1,4 +1,5 @@
-"""Host-side PSWF kernel table for the native NUFFT (numpy, float64)."""
+"""Host-side PSWF kernel table and accuracy rules for the native NUFFT (numpy), as in
+finufft 2.6. Citations are to finufft master `d2c1ed2`."""
 
 import functools
 import math
@@ -8,20 +9,21 @@ import jax.numpy as jnp
 import numpy as np
 
 
-_MAX_WIDTH = 16
 _NUM_NODES = 256
 _NUM_LEGENDRE = 100
-_MAX_EXTRA_DEGREE = 6
 
-_AUTO_UPSAMPLE_FACTORS = (1.25, 1.5, 1.75, 2.0)
-# Value + gradient ms = a M w^d + b prod(m) log2(prod(m)), relative least squares on
-# `benchmarks/benchmark_nufft.py`'s chain-ordered float32 runs, RTX PRO 5000 (Blackwell),
-# 2026-11-17. Pallas: misfit mean 6%, max 14%. Pure JAX: mean 45%, max 82%, its scatter
-# slowing as points crowd the fine cells. Rounding error k eps_mach r_dyn, k from one
-# point: 3D 256^3, eps 1e-6, sigma 1.25 (w = 11), float32 error 1.4e-3.
-_PALLAS_COSTS = (1.331e-8, 3.782e-9)
-_PURE_JAX_COSTS = (8.584e-8, 2.717e-9)
-_ROUNDING_FACTOR = 3e-3
+# finufft include/finufft_common/constants.h:10, 15, 28-29, 35-36, 46, 54
+_MIN_WIDTH = 2
+_MAX_WIDTH_SINGLE, _MAX_WIDTH_DOUBLE = 12, 16
+_MIN_NC, _MAX_NC = 4, 19
+_MIN_AUTO_UPSAMPLE_FACTOR, _MAX_AUTO_UPSAMPLE_FACTOR = 1.25, 2.5
+_UPSAMPLE_FACTOR_EDGE_PAD = 1e-3
+_ROUND_FAC = 0.35
+
+# "auto"'s FFT cost per fine-grid point and log2 of the grid size, in spread taps: the
+# ratio of the fitted constants of the 11-17 benchmark (RTX PRO 5000)
+_PALLAS_FFT_COST = 0.284
+_PURE_JAX_FFT_COST = 0.0317
 
 
 class PSWFKernel(NamedTuple):
@@ -33,31 +35,44 @@ class PSWFKernel(NamedTuple):
     coefficients: np.ndarray
 
 
-def kernel_width(eps: float, upsample_factor: float, ndim: int) -> int:
-    """Kernel width in fine-grid pixels, from finufft's rule."""
+class NUFFTAccuracyLimits(NamedTuple):
+    rounding_floor: float
+    width: int
+    min_upsample_factor: float
+
+
+def kernel_width(eps: float, upsample_factor: float, ndim: int, dtype) -> int:
+    """Kernel width in fine-grid pixels, from finufft's rule and limits."""
     if not upsample_factor > 1:
         raise ValueError(
-            "Found invalid value for `kernel_width(eps, upsample_factor, ndim)`. "
+            "Found invalid value for `kernel_width(eps, upsample_factor, ndim, dtype)`. "
             f"`upsample_factor` must be greater than 1, got upsample_factor="
             f"{upsample_factor}."
         )
-    tolfac = 0.18 * 1.4 ** (ndim - 1)
+    # finufft src/common/kernel.cpp:72
     width = math.ceil(
-        math.log(tolfac / eps) / (math.pi * math.sqrt(1 - 1 / upsample_factor)) + 1
+        math.log(_tolfac(ndim) / eps) / (math.pi * math.sqrt(1 - 1 / upsample_factor)) + 1
     )
-    if width > _MAX_WIDTH:
-        raise ValueError(
-            "Found invalid value for `kernel_width(eps, upsample_factor, ndim)`. "
-            f"`eps`={eps} with `upsample_factor`={upsample_factor} needs width "
-            f"{width}, above the maximum of {_MAX_WIDTH}."
-        )
-    return max(width, 2)
+    # finufft src/common/kernel.cpp:98, 106
+    is_single = np.dtype(dtype) != np.float64
+    width = max(width, _MIN_WIDTH)
+    width = min(width, _MAX_WIDTH_SINGLE if is_single else _MAX_WIDTH_DOUBLE)
+    if is_single:
+        step = (upsample_factor - 0.975 - 0.125 * ndim) * (1.0 / 0.075)
+        width = min(width, 8 + math.floor(max(0.0, step)))
+    return width
+
+
+def _tolfac(ndim: int) -> float:
+    # finufft src/common/kernel.cpp:61
+    return 0.18 * 1.4 ** (ndim - 1)
 
 
 def _pswf_at_nodes(c: float) -> tuple[float, np.ndarray, np.ndarray, np.ndarray]:
     """`psi_0` at Gauss-Legendre nodes and its eigenvalue, from the Legendre expansion
-    of the prolate differential equation (Bouwkamp): the integral operator's top
-    eigenvalues coincide to rounding at large `c`, the differential operator's do not."""
+    of the prolate differential equation (Bouwkamp; finufft src/common/pswf.cpp:180):
+    the integral operator's top eigenvalues coincide to rounding at large `c`, the
+    differential operator's do not."""
     k = 2 * np.arange(_NUM_LEGENDRE)
     diagonal = k * (k + 1) + c**2 * (2 * k * (k + 1) - 1) / ((2 * k + 3) * (2 * k - 1))
     k = k[:-1]
@@ -82,16 +97,35 @@ def evaluate_pswf(kernel: PSWFKernel, x) -> np.ndarray:
     return cos @ (weights * kernel.node_values) / kernel.eigenvalue
 
 
-def _fit_taps(kernel: PSWFKernel, degree: int) -> np.ndarray:
+def _poly_fit(kernel: PSWFKernel, tap: int, num: int, dtype: np.dtype) -> np.ndarray:
+    """`num` coefficients (highest power first) of tap `tap` in `z = 2s - 1`, in
+    `dtype`, the kernel evaluated in float64 (finufft include/finufft/makeplan.hpp:237,
+    `poly_fit` in include/finufft_common/kernel.h:19)."""
     w = kernel.width
-    k = np.arange(4 * degree)
-    s = 0.5 - 0.5 * np.cos(np.pi * (k + 0.5) / (4 * degree))
-    return np.array(
-        [
-            np.polyfit(s, evaluate_pswf(kernel, 2 * (s + j - w / 2) / w), degree)
-            for j in range(w)
-        ]
-    )
+    t = np.cos((2 * np.arange(num) + 1) * math.pi / (2 * num)).astype(dtype)
+    x = (t + dtype.type(2 * tap + 1 - w)) / dtype.type(w)
+    newton = evaluate_pswf(kernel, x.astype(np.float64)).astype(dtype)
+    for j in range(1, num):
+        newton[j:] = (newton[j:] - newton[j - 1 : -1]) / (t[j:] - t[: num - j])
+    monomial = np.zeros(num, dtype)
+    monomial[0] = newton[0]
+    basis = np.ones(1, dtype)
+    for j in range(1, num):
+        shifted, scaled = np.zeros(j + 1, dtype), np.zeros(j + 1, dtype)
+        shifted[1:], scaled[:-1] = basis, -t[j - 1] * basis
+        basis = shifted + scaled
+        monomial[: j + 1] += newton[j] * basis
+    return monomial[::-1]
+
+
+def _in_offset(coefficients: np.ndarray) -> np.ndarray:
+    """Per-tap polynomials in `z = 2s - 1` re-expanded in `s` (highest power first)."""
+    coefficients = np.asarray(coefficients, np.float64)
+    out = np.zeros_like(coefficients)
+    for k in range(coefficients.shape[1]):
+        out = 2 * np.roll(out, -1, axis=1) - out
+        out[:, -1] += coefficients[:, k]
+    return out
 
 
 def _horner(coefficients: np.ndarray, s: np.ndarray) -> np.ndarray:
@@ -104,6 +138,7 @@ def _horner(coefficients: np.ndarray, s: np.ndarray) -> np.ndarray:
 @functools.cache
 def _pswf(width: int, upsample_factor: float) -> PSWFKernel:
     """The PSWF kernel without its tap coefficients."""
+    # finufft src/common/kernel.cpp:126, 143
     c = math.pi * width * (1 - 1 / (2 * upsample_factor)) - 0.05
     eigenvalue, nodes, _, node_values = _pswf_at_nodes(c)
     nodes.setflags(write=False)
@@ -111,26 +146,27 @@ def _pswf(width: int, upsample_factor: float) -> PSWFKernel:
     return PSWFKernel(width, c, float(eigenvalue), nodes, node_values, np.empty((0, 0)))
 
 
+def make_pswf_kernel(eps: float, upsample_factor: float, ndim: int, dtype) -> PSWFKernel:
+    """Build the PSWF kernel and its per-tap Horner coefficients in the offset `s`
+    (highest power first), fitted in `dtype`'s precision as finufft does."""
+    return _make_pswf_kernel(eps, upsample_factor, ndim, np.dtype(dtype))
+
+
 @functools.cache
-def make_pswf_kernel(eps: float, upsample_factor: float, ndim: int) -> PSWFKernel:
-    """Build the PSWF kernel and its per-tap Horner coefficients (highest power first)."""
-    width = kernel_width(eps, upsample_factor, ndim)
+def _make_pswf_kernel(
+    eps: float, upsample_factor: float, ndim: int, dtype: np.dtype
+) -> PSWFKernel:
+    width = kernel_width(eps, upsample_factor, ndim, dtype)
     kernel = _pswf(width, upsample_factor)
-    s = np.linspace(0.0, 1.0, 2001)
-    exact = np.array(
-        [evaluate_pswf(kernel, 2 * (s + j - width / 2) / width) for j in range(width)]
-    )
-    for degree in range(width, width + _MAX_EXTRA_DEGREE + 1):
-        coefficients = _fit_taps(kernel, degree)
-        if np.max(np.abs(_horner(coefficients, s) - exact)) <= eps / 10:
-            coefficients.setflags(write=False)
-            return kernel._replace(coefficients=coefficients)
-    raise ValueError(
-        "Found invalid value for `make_pswf_kernel(eps, upsample_factor, ndim)`. "
-        f"The tap fit did not reach `eps`/10 for eps={eps}, "
-        f"upsample_factor={upsample_factor}, ndim={ndim} with degree up to "
-        f"{width + _MAX_EXTRA_DEGREE}."
-    )
+    # finufft include/finufft/makeplan.hpp:201-271, finufft_common/kernel.h:117, 120
+    num_fit = min(_MAX_NC, width + 3)
+    fitted = np.array([_poly_fit(kernel, j, num_fit, dtype) for j in range(width)])
+    is_large = np.abs(fitted) >= dtype.type(eps) * dtype.type(0.05)
+    needed = np.where(is_large.any(axis=1), num_fit - np.argmax(is_large, axis=1), 0)
+    num = max(_MIN_NC, width - 4, int(needed.max()))
+    coefficients = _in_offset(fitted[:, num_fit - num :])
+    coefficients.setflags(write=False)
+    return kernel._replace(coefficients=coefficients)
 
 
 def derivative_coefficients(coefficients: np.ndarray, order: int) -> np.ndarray:
@@ -149,16 +185,33 @@ def tap_weights(kernel: PSWFKernel, s) -> np.ndarray:
 
 
 def kernel_fourier_series(
-    kernel: PSWFKernel, n: int, m: int, *, rfft: bool
+    kernel: PSWFKernel, n: int, m: int, *, rfft: bool, dtype
 ) -> np.ndarray:
-    """`phi_hat(k / m)` for `n` modes in `fftfreq` order, or `0..n // 2` if `rfft`."""
-    k = np.arange(n // 2 + 1) if rfft else np.fft.fftfreq(n, 1 / n)
-    x = np.clip(math.pi * (k / m) * kernel.width / kernel.shape_parameter, -1, 1)
-    return 0.5 * kernel.width * kernel.eigenvalue * evaluate_pswf(kernel, x)
+    """`phi_hat(k / m)` for `n` modes in `fftfreq` order, or `0..n // 2` if `rfft`, by
+    quadrature of the fitted taps in `dtype`."""
+    dtype = np.dtype(dtype)
+    # finufft include/finufft/makeplan.hpp:40, 74-88; its first `q` nodes, on (-w/2, 0)
+    half_width = kernel.width / 2.0
+    q = int(2 + 3.0 * half_width)
+    nodes, weights = np.polynomial.legendre.leggauss(2 * q)
+    z = dtype.type(half_width) * nodes[:q].astype(dtype)
+    x = z + dtype.type(half_width)
+    tap = np.ceil(x).astype(int) - 1
+    s = x - tap.astype(dtype)
+    values = np.zeros_like(s)
+    for coefficient in kernel.coefficients.astype(dtype)[tap].T:
+        values = values * s + coefficient
+    f = dtype.type(half_width) * weights[:q].astype(dtype) * values
+    # Both integrate in grid units (finufft's 1/h); finufft's `(-1)^k` centres the
+    # kernel at `m / 2`, native's sits at 0
+    k = np.abs(np.arange(n // 2 + 1) if rfft else np.fft.fftfreq(n, 1 / n))
+    phase = dtype.type(2 * math.pi) * z * (k.astype(dtype)[:, None] / dtype.type(m))
+    return np.sum(dtype.type(2) * f * np.cos(phase), axis=1, dtype=dtype)
 
 
 def fine_grid_size(n: int, upsample_factor: float, width: int) -> int:
-    """Smallest even 2,3,5-smooth size >= `max(ceil(upsample_factor n), 2 width)`."""
+    """Smallest even 2,3,5-smooth size >= `max(ceil(upsample_factor n), 2 width)`
+    (finufft include/finufft/makeplan.hpp:19)."""
     candidate = max(math.ceil(upsample_factor * n), 2 * width)
     while candidate % 2 or not _is_smooth(candidate):
         candidate += 1
@@ -172,6 +225,63 @@ def _is_smooth(x: int) -> bool:
     return x == 1
 
 
+def nufft_accuracy_limits(
+    shape: tuple[int, ...], *, eps: float, upsample_factor: float, dtype
+) -> NUFFTAccuracyLimits:
+    """finufft 2.6's accuracy limits for [`cryojax.ndimage.dispatch_nufft1`][] and
+    [`cryojax.ndimage.dispatch_nufft2`][] on the native backend.
+
+    **Arguments:**
+
+    - `shape`: The shape of the real-space grid.
+    - `eps`: The requested relative accuracy.
+    - `upsample_factor`: The ratio of the fine grid to `shape`, greater than 1.
+    - `dtype`: The transform's real dtype, `float32` or `float64`.
+
+    **Returns:**
+
+    A `NUFFTAccuracyLimits` of `rounding_floor`, the smallest `eps` reachable on
+    `shape` in `dtype`; `width`, the kernel width in fine-grid pixels at `eps` and
+    `upsample_factor`; and `min_upsample_factor`, the smallest `upsample_factor`
+    reaching `eps` at that width (`inf` if none).
+    """
+    name = "nufft_accuracy_limits(shape, eps, upsample_factor, dtype)"
+    if not eps > 0:
+        raise ValueError(
+            f"Found invalid value for `{name}`. The `eps` must be positive, but got "
+            f"`eps = {eps}`."
+        )
+    if isinstance(upsample_factor, str) or not upsample_factor > 1:
+        raise ValueError(
+            f"Found invalid value for `{name}`. The `upsample_factor` must be greater "
+            f"than 1, but got `upsample_factor = {upsample_factor}`."
+        )
+    ndim = len(shape)
+    eps_mach = float(jnp.finfo(dtype).eps)
+    width = kernel_width(eps, upsample_factor, ndim, dtype)
+    # finufft include/finufft/setpts.hpp:22, 99-103; src/common/kernel.cpp:284
+    floor = _ROUND_FAC * eps_mach * math.sqrt(sum(float(n) * n for n in shape))
+    return NUFFTAccuracyLimits(
+        floor, width, _min_upsample_factor(eps, ndim, width, eps_mach)
+    )
+
+
+def _min_upsample_factor(eps: float, ndim: int, width: int, eps_mach: float) -> float:
+    """The smallest `upsample_factor` reaching `eps` at `width`, `inf` if none."""
+    # finufft src/common/kernel.cpp:169 (aliasing)
+    u = math.log(_tolfac(ndim) / eps) / ((width - 1.0) * math.pi)
+    if not u < 1.0:
+        aliasing = math.inf
+    else:
+        aliasing = 1.0 if u <= 0.0 else 1.0 / (1.0 - u * u)
+    # finufft src/common/kernel.cpp:181 (deconvolution rounding)
+    v = 2.0 * math.log(eps / (ndim * eps_mach)) / (math.pi * width)
+    if not v > 0.0:
+        return math.inf
+    q = min(math.sqrt(v), 1.0)
+    return max(aliasing, 1.0 / (q * (2.0 - q)))
+
+
 def resolve_upsample_factor(
     upsample_factor: float | Literal["auto"],
     *,
@@ -181,14 +291,13 @@ def resolve_upsample_factor(
     dtype,
     pallas: bool,
 ) -> float:
-    """`upsample_factor`, or for `"auto"` the cheapest of 1.25, 1.5, 1.75 and 2 on the
-    Pallas (`pallas`) or pure-JAX backend with a kernel at most 16 wide whose predicted
-    error `max(eps, k eps_mach r_dyn)` meets `eps`, else the one of least predicted
-    error. `r_dyn` is the deconvolution's dynamic range, `phi_hat(0) / phi_hat(k)` at the
-    corner of the half grid."""
+    """`upsample_factor`, or for `"auto"` finufft 2.6's search: per width, the smallest
+    factor reaching `eps` in [1.25, 2.5], plus 1e-3; the cheapest by `M w^d +
+    c G log2(G)`, `G` the fine grid's size and `c` the Pallas (`pallas`) or pure-JAX
+    backend's; 2.5 if none."""
     if isinstance(upsample_factor, str) and upsample_factor == "auto":
         return _auto_upsample_factor(
-            n_points, tuple(shape), eps, float(jnp.finfo(dtype).eps), bool(pallas)
+            n_points, tuple(shape), eps, np.dtype(dtype), bool(pallas)
         )
     if isinstance(upsample_factor, str) or not upsample_factor > 1:
         raise ValueError(
@@ -200,29 +309,24 @@ def resolve_upsample_factor(
 
 
 @functools.cache
-def _auto_upsample_factor(n_points, shape, eps, eps_mach, pallas) -> float:
+def _auto_upsample_factor(n_points, shape, eps, dtype, pallas) -> float:
+    # finufft src/heuristics.cpp:87 (best_sigma_for_tol) with our cost; 2.5 if none,
+    # include/finufft/setpts.hpp:85
     ndim = len(shape)
-    spread_cost, fft_cost = _PALLAS_COSTS if pallas else _PURE_JAX_COSTS
-    candidates = []
-    for sigma in _AUTO_UPSAMPLE_FACTORS:
-        try:
-            width = kernel_width(eps, sigma, ndim)
-        except ValueError:
+    eps_mach = float(jnp.finfo(dtype).eps)
+    fft_cost = _PALLAS_FFT_COST if pallas else _PURE_JAX_FFT_COST
+    max_width = _MAX_WIDTH_DOUBLE if dtype == np.float64 else _MAX_WIDTH_SINGLE
+    best_cost, best_sigma = math.inf, _MAX_AUTO_UPSAMPLE_FACTOR
+    for ns in range(_MIN_WIDTH, max_width + 1):
+        sigma = max(
+            _min_upsample_factor(eps, ndim, ns, eps_mach), _MIN_AUTO_UPSAMPLE_FACTOR
+        )
+        if sigma > _MAX_AUTO_UPSAMPLE_FACTOR:
             continue
-        kernel = _pswf(width, sigma)
-        fine_shape = tuple(fine_grid_size(n, sigma, width) for n in shape)
-        r_dyn = 1.0
-        for n, m in zip(shape, fine_shape):
-            phi_hat = kernel_fourier_series(kernel, n, m, rfft=True)
-            r_dyn *= phi_hat[0] / phi_hat[-1]
-        error = max(eps, _ROUNDING_FACTOR * eps_mach * r_dyn)
-        size = math.prod(fine_shape)
-        cost = spread_cost * n_points * width**ndim + fft_cost * size * math.log2(size)
-        candidates.append((sigma, cost, error))
-    if not candidates:
-        # No kernel fits: the narrowest, for the caller's width check to report
-        return _AUTO_UPSAMPLE_FACTORS[-1]
-    meeting = [(cost, sigma) for sigma, cost, error in candidates if error <= eps]
-    if meeting:
-        return min(meeting)[1]
-    return min(candidates, key=lambda candidate: candidate[2])[0]
+        sigma += _UPSAMPLE_FACTOR_EDGE_PAD
+        width = kernel_width(eps, sigma, ndim, dtype)
+        size = math.prod(fine_grid_size(n, sigma, width) for n in shape)
+        cost = n_points * width**ndim + fft_cost * size * math.log2(size)
+        if cost < best_cost:
+            best_cost, best_sigma = cost, sigma
+    return best_sigma

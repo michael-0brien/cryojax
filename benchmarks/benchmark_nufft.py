@@ -141,7 +141,7 @@ def run(args):
         device=str(jax.devices()[0]),
     )
     if args.backend in PALLAS:
-        kernel = make_pswf_kernel(args.eps, args.sigma, ndim)
+        kernel = make_pswf_kernel(args.eps, args.sigma, ndim, np.float32)
         fine_shape = tuple(fine_grid_size(s, args.sigma, kernel.width) for s in shape)
         row.update(width=kernel.width, fine_shape=list(fine_shape))
         pallas = PALLAS[args.backend]

@@ -1,6 +1,9 @@
+import jax.numpy as jnp
 import numpy as np
 import pytest
+from cryojax.ndimage import nufft_accuracy_limits
 from cryojax.ndimage._nufft.kernel import (
+    _auto_upsample_factor,
     evaluate_pswf,
     fine_grid_size,
     kernel_fourier_series,
@@ -16,27 +19,29 @@ SIGMAS = (1.25, 1.5, 2.0)
 
 
 @pytest.mark.parametrize(
-    "eps, sigma, ndim, width",
-    [(1e-4, 1.25, 2, 7), (1e-4, 2.0, 2, 5), (1e-6, 1.25, 2, 10), (1e-6, 1.25, 3, 11),
-     (1e-3, 1.25, 3, 6)],
-)  # fmt: skip
-def test_kernel_width_matches_finufft_rule(eps, sigma, ndim, width):
-    assert kernel_width(eps, sigma, ndim) == width
+    "eps, sigma, ndim, dtype, width",
+    [
+        (1e-6, 1.25, 3, np.float32, 8),  # float32 guard: 8 at sigma 1.25
+        (1e-12, 1.5, 2, np.float32, 11),  # guard 8 + floor(0.275 / 0.075)
+        (1e-12, 1.5, 3, np.float32, 10),  # guard 8 + floor(0.15 / 0.075)
+        (1e-12, 2.0, 2, np.float32, 12),  # float32 maximum
+        (1e-15, 2.0, 2, np.float64, 16),  # float64 maximum, clipped not raised
+        (1e-6, 1.25, 2, np.float64, 10),  # rule 1 unchanged
+    ],
+)
+def test_kernel_width_follows_finufft_26(eps, sigma, ndim, dtype, width):
+    assert kernel_width(eps, sigma, ndim, dtype) == width
 
 
-def test_kernel_width_raises():
-    with pytest.raises(
-        ValueError, match=r"kernel_width.*eps.*1e-10.*upsample_factor.*1.25"
-    ):
-        kernel_width(1e-10, 1.25, 2)
+def test_kernel_width_raises_at_most_one():
     with pytest.raises(ValueError, match=r"kernel_width.*upsample_factor.*1.0"):
-        kernel_width(1e-4, 1.0, 2)
+        kernel_width(1e-4, 1.0, 2, np.float64)
 
 
 @pytest.mark.parametrize("width", range(4, 17))
 def test_pswf_eigen_residual(width):
     sigma = 1.25
-    kernel = make_pswf_kernel(*_eps_for_width(width, sigma), 2)
+    kernel = make_pswf_kernel(_eps_for_width(width, sigma), sigma, 2, np.float64)
     assert kernel.width == width
     x = np.linspace(-1, 1, 501)
     t, v = np.polynomial.legendre.leggauss(400)
@@ -47,21 +52,18 @@ def test_pswf_eigen_residual(width):
 
 
 def _eps_for_width(width, sigma):
-    """An `eps` (and `sigma`) whose rule gives exactly `width`."""
-    for exponent in np.arange(1.0, 9.6, 0.05):
+    """An `eps` whose rule gives exactly `width` in 2D, float64."""
+    for exponent in np.arange(1.0, 12.0, 0.05):
         eps = 10.0 ** (-exponent)
-        try:
-            if kernel_width(eps, sigma, 2) == width:
-                return eps, sigma
-        except ValueError:
-            break
+        if kernel_width(eps, sigma, 2, np.float64) == width:
+            return eps
     raise AssertionError(width)
 
 
 @pytest.mark.parametrize("sigma", SIGMAS)
 @pytest.mark.parametrize("eps", (1e-2, 1e-4, 1e-6))
 def test_pswf_matches_scipy_pro_ang1(eps, sigma):
-    kernel = make_pswf_kernel(eps, sigma, 2)
+    kernel = make_pswf_kernel(eps, sigma, 2, np.float64)
     assert kernel.width <= 10
     x = np.linspace(-1, 1, 401)[1:-1]
     c = kernel.shape_parameter
@@ -74,50 +76,69 @@ def test_pswf_matches_scipy_pro_ang1(eps, sigma):
 def test_pswf_is_positive_and_decreasing(eps, sigma):
     """psi_0 has no zero in [-1, 1]; at large `c` the other even eigenfunctions share its
     eigenvalue to rounding, and only this tells them apart."""
-    try:
-        kernel = make_pswf_kernel(eps, sigma, 2)
-    except ValueError:
-        pytest.skip("width above 16")
+    kernel = make_pswf_kernel(eps, sigma, 2, np.float64)
     values = evaluate_pswf(kernel, np.linspace(0, 1, 401))
     assert np.all(values > 0)
     assert np.all(np.diff(values) < 0)
 
 
+@pytest.mark.parametrize("dtype", (np.float32, np.float64))
+@pytest.mark.parametrize("ndim", (2, 3))
 @pytest.mark.parametrize("sigma", SIGMAS)
-@pytest.mark.parametrize("eps", (1e-3, 1e-6))
-def test_self_fourier_identity(eps, sigma):
-    kernel = make_pswf_kernel(eps, sigma, 3)
-    w = kernel.width
-    n, m = 32, int(np.ceil(sigma * 32))
-    got = kernel_fourier_series(kernel, n, m, rfft=False)
-    z, v = np.polynomial.legendre.leggauss(300)
-    z, v = 0.5 * w * z, 0.5 * w * v
-    xi = np.fft.fftfreq(n) * n / m
-    ref = np.cos(2 * np.pi * np.outer(xi, z)) @ (v * evaluate_pswf(kernel, 2 * z / w))
-    assert np.max(np.abs(got - ref) / np.abs(ref)) < 1e-12
-    half = kernel_fourier_series(kernel, n, m, rfft=True)
-    np.testing.assert_allclose(half, got[: n // 2 + 1], rtol=1e-14)
+@pytest.mark.parametrize("eps", (1e-2, 1e-4, 1e-6, 1e-9, 1e-12))
+def test_coefficient_count_within_finufft_bounds(eps, sigma, ndim, dtype):
+    kernel = make_pswf_kernel(eps, sigma, ndim, dtype)
+    w, nc = kernel.coefficients.shape
+    assert w == kernel.width
+    assert max(4, w - 4) <= nc <= min(19, w + 3)
+
+
+def test_coefficient_count_drops_below_width():
+    """finufft keeps the coefficients above `0.05 eps`: wide kernels at low `sigma` need
+    fewer than they have taps."""
+    kernel = make_pswf_kernel(1e-8, 1.25, 2, np.float64)
+    assert kernel.coefficients.shape == (14, 12)
 
 
 @pytest.mark.parametrize("ndim", (2, 3))
 @pytest.mark.parametrize("sigma", SIGMAS)
-@pytest.mark.parametrize("eps", [10.0 ** (-k) for k in range(2, 10)])
-def test_tap_fit_error_below_eps(eps, sigma, ndim):
-    try:
-        kernel = make_pswf_kernel(eps, sigma, ndim)
-    except ValueError:
-        pytest.skip("width above 16")
+@pytest.mark.parametrize("eps", (1e-2, 1e-4, 1e-6, 1e-9))
+def test_tap_polynomials_match_pswf(eps, sigma, ndim):
+    kernel = make_pswf_kernel(eps, sigma, ndim, np.float64)
     w = kernel.width
-    s = np.linspace(0, 1, 1001, endpoint=False)
+    s = np.linspace(0, 1, 1001)
     exact = np.array([evaluate_pswf(kernel, 2 * (s + j - w / 2) / w) for j in range(w)])
     assert tap_weights(kernel, s).shape == (w, 1001)
-    assert np.max(np.abs(tap_weights(kernel, s) - exact)) <= eps / 10
+    assert np.max(np.abs(tap_weights(kernel, s) - exact)) <= eps
+
+
+@pytest.mark.parametrize("sigma", (1.25, 1.4713, 2.0))
+@pytest.mark.parametrize("eps", (1e-3, 1e-6, 1e-9))
+def test_fourier_series_matches_analytic_pswf(eps, sigma):
+    """Rule 6's quadrature of the fitted taps against the PSWF's self-Fourier transform
+    `(w / 2) lambda psi(pi k w / (c m))`, in `fftfreq` order."""
+    kernel = make_pswf_kernel(eps, sigma, 3, np.float64)
+    w, c = kernel.width, kernel.shape_parameter
+    n = 33
+    m = fine_grid_size(n, sigma, w)
+    got = kernel_fourier_series(kernel, n, m, rfft=False, dtype=np.float64)
+    k = np.fft.fftfreq(n, 1 / n)
+    ref = 0.5 * w * kernel.eigenvalue * evaluate_pswf(kernel, np.pi * k * w / (c * m))
+    assert np.max(np.abs(got - ref)) <= eps * ref[0]
+    half = kernel_fourier_series(kernel, n, m, rfft=True, dtype=np.float64)
+    np.testing.assert_array_equal(half, got[: n // 2 + 1])
+
+
+def test_fourier_series_in_transform_precision():
+    kernel = make_pswf_kernel(1e-4, 1.25, 2, np.float32)
+    phi_hat = kernel_fourier_series(kernel, 16, 20, rfft=True, dtype=np.float32)
+    assert phi_hat.dtype == np.float32
 
 
 def test_fine_grid_size():
     assert fine_grid_size(64, 1.25, 7) == 80
     assert fine_grid_size(5, 1.25, 7) == 16
-    for n, sigma, w in [(7, 2.0, 16), (100, 1.5, 9), (33, 1.25, 12)]:
+    for n, sigma, w in [(7, 2.0, 16), (100, 1.5, 9), (33, 1.25, 12), (1024, 1.4713, 9)]:
         m = fine_grid_size(n, sigma, w)
         assert m % 2 == 0 and m >= max(np.ceil(sigma * n), 2 * w)
         r = m
@@ -128,54 +149,81 @@ def test_fine_grid_size():
 
 
 def test_make_pswf_kernel_is_cached():
-    kernel = make_pswf_kernel(1e-4, 1.25, 2)
-    assert kernel is make_pswf_kernel(1e-4, 1.25, 2)
+    kernel = make_pswf_kernel(1e-4, 1.25, 2, np.float32)
+    assert kernel is make_pswf_kernel(1e-4, 1.25, 2, np.dtype("float32"))
+    assert kernel is make_pswf_kernel(1e-4, 1.25, 2, jnp.float32)
+    assert kernel is not make_pswf_kernel(1e-4, 1.25, 2, np.float64)
     for array in (kernel.nodes, kernel.node_values, kernel.coefficients):
         assert not array.flags.writeable
 
 
-def _auto(n_points, shape, eps, dtype=np.float32, pallas=True):
+def test_rounding_floor():
+    limits = nufft_accuracy_limits(
+        (4096, 4096), eps=1e-3, upsample_factor=2.0, dtype=np.float32
+    )
+    assert limits.rounding_floor == pytest.approx(2.4169e-4, rel=1e-3)
+    limits = nufft_accuracy_limits(
+        (1024, 1024), eps=1e-3, upsample_factor=2.0, dtype=np.float32
+    )
+    assert limits.rounding_floor == pytest.approx(6.0422e-5, rel=1e-3)
+
+
+def test_min_upsample_factor():
+    limits = nufft_accuracy_limits(
+        (64, 64), eps=1e-10, upsample_factor=1.25, dtype=np.float64
+    )
+    assert (limits.width, limits.min_upsample_factor) == (
+        16,
+        pytest.approx(1.2675, abs=1e-4),
+    )
+    limits = nufft_accuracy_limits(
+        (32, 32, 32), eps=1e-6, upsample_factor=1.25, dtype=np.float32
+    )
+    assert (limits.width, limits.min_upsample_factor) == (
+        8,
+        pytest.approx(2.0397, abs=1e-4),
+    )
+    # Unreachable at any sigma up to 2.5, though above the floor (2.4e-7)
+    limits = nufft_accuracy_limits(
+        (4, 4), eps=3e-7, upsample_factor=2.5, dtype=np.float32
+    )
+    assert limits.rounding_floor < 3e-7
+    assert limits.min_upsample_factor > 2.5
+
+
+def _auto(n_points, shape, eps, dtype, pallas):
     return resolve_upsample_factor(
         "auto", n_points=n_points, shape=shape, eps=eps, dtype=dtype, pallas=pallas
     )
 
 
-@pytest.mark.parametrize("pallas", (True, False))
-@pytest.mark.parametrize("dtype", (np.float32, np.float64))
-def test_auto_picks_low_sigma_when_sparse(dtype, pallas):
-    assert _auto(10_000, (4096, 4096), 1e-4, dtype, pallas) == 1.25
+@pytest.mark.parametrize(
+    "pallas, shape, eps, dtype, n_points, sigma, width",
+    [
+        (True, (1024, 1024), 1e-6, np.float64, 10_000, 1.251, 10),
+        (True, (1024, 1024), 1e-6, np.float64, 104_858, 1.251, 10),
+        (True, (1024, 1024), 1e-6, np.float64, 1_048_576, 1.772, 7),
+        (True, (256, 256, 256), 1e-4, np.float64, 1_677_722, 1.3717, 6),
+        (False, (1024, 1024), 1e-6, np.float64, 104_858, 1.772, 7),
+        (False, (256, 256, 256), 1e-4, np.float64, 1_677_722, 1.7327, 5),
+    ],
+)
+def test_auto_follows_finufft_search(pallas, shape, eps, dtype, n_points, sigma, width):
+    resolved = _auto(n_points, shape, eps, dtype, pallas)
+    assert resolved == pytest.approx(sigma, abs=1e-3)
+    assert kernel_width(eps, resolved, len(shape), dtype) == width
 
 
-@pytest.mark.parametrize("pallas", (True, False))
-def test_auto_picks_high_sigma_when_dense(pallas):
-    assert _auto(100_000_000, (4096, 4096), 1e-6, pallas=pallas) == 2.0
+def test_auto_unreachable_returns_upper_limit():
+    assert _auto(10, (4, 4), 3e-7, np.float32, True) == 2.5
 
 
-def test_auto_depends_on_backend():
-    """Pure JAX's scatter costs more per tap than Pallas': at the benchmark's 4M points
-    on 4096^2 it is fastest at sigma 2, Pallas at 1.25."""
-    assert _auto(4_000_000, (4096, 4096), 1e-4, pallas=True) == 1.25
-    assert _auto(4_000_000, (4096, 4096), 1e-4, pallas=False) > 1.5
-
-
-@pytest.mark.parametrize("ndim", (2, 3))
-@pytest.mark.parametrize("eps", (1e-9, 1e-10, 1e-11, 1e-12))
-def test_auto_respects_width_cap(eps, ndim):
-    sigma = _auto(10, (256,) * ndim, eps, np.float64)
-    assert kernel_width(eps, sigma, ndim) <= 16
-
-
-def test_auto_rounding_steers_float32_3d_from_low_sigma():
-    """Sparse points favour 1.25, but in float32 its deconvolution amplifies rounding
-    beyond `eps` (the benchmark's 1.4e-3 at eps 1e-6, w = 11)."""
-    shape = (256, 256, 256)
-    assert _auto(10_000, shape, 1e-6, np.float64) == 1.25
-    assert _auto(10_000, shape, 1e-6, np.float32) == 1.5
-    assert _auto(10_000, shape, 1e-4, np.float32) == 1.25
-
-
-def test_auto_takes_most_accurate_when_eps_unreachable():
-    assert _auto(10, (64, 64, 64), 1e-9, np.float32) == 2.0
+def test_auto_is_cached():
+    sigma = _auto(10_000, (64, 64), 1e-6, np.float32, True)
+    hits = _auto_upsample_factor.cache_info().hits
+    assert type(sigma) is float
+    assert sigma == _auto(10_000, (64, 64), 1e-6, jnp.float32, True)
+    assert _auto_upsample_factor.cache_info().hits == hits + 1
 
 
 def test_explicit_upsample_factor_passes_through():
