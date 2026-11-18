@@ -99,7 +99,7 @@ def _fine_problem(fine_shape, num_points, num_grids, seed, batch=()):
 
 
 def _kernel(fine_shape):
-    return make_pswf_kernel(1e-6, 2.0, len(fine_shape))
+    return make_pswf_kernel(1e-6, 2.0, len(fine_shape), np.float64)
 
 
 #
