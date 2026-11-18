@@ -129,6 +129,23 @@ def test_fourier_series_matches_analytic_pswf(eps, sigma):
     np.testing.assert_array_equal(half, got[: n // 2 + 1])
 
 
+@pytest.mark.parametrize("eps", (1e-4, 1e-6))
+def test_float32_taps_fitted_in_float32(eps):
+    """finufft fits float32 taps in float32 (include/finufft/makeplan.hpp:245); in
+    float32 they still reach `eps` (measured: 5.1 eps32 at 1e-4, 1.1 at 1e-6)."""
+    kernel = make_pswf_kernel(eps, 2.0, 2, np.float32)
+    kernel64 = make_pswf_kernel(eps, 2.0, 2, np.float64)
+    assert kernel.coefficients.shape == kernel64.coefficients.shape
+    assert not np.array_equal(kernel.coefficients, kernel64.coefficients)
+    w = kernel.width
+    s = np.linspace(0, 1, 1001, dtype=np.float32)
+    taps = np.zeros((w, s.size), np.float32)
+    for coefficient in kernel.coefficients.astype(np.float32).T:
+        taps = taps * s + coefficient[:, None]
+    exact = np.array([evaluate_pswf(kernel, 2 * (s + j - w / 2) / w) for j in range(w)])
+    assert np.max(np.abs(taps - exact)) <= max(eps, 8 * np.finfo(np.float32).eps)
+
+
 def test_fourier_series_in_transform_precision():
     kernel = make_pswf_kernel(1e-4, 1.25, 2, np.float32)
     phi_hat = kernel_fourier_series(kernel, 16, 20, rfft=True, dtype=np.float32)
@@ -191,6 +208,22 @@ def test_min_upsample_factor():
     assert limits.min_upsample_factor > 2.5
 
 
+def test_complex_dtypes_read_as_real():
+    """At 3D, sigma 1.25 and eps 1e-6 the float32 guard narrows 11 to 8."""
+    shape, kwargs = (32, 32, 32), dict(eps=1e-6, upsample_factor=1.25)
+    for real, complex_ in ((jnp.float32, jnp.complex64), (jnp.float64, jnp.complex128)):
+        assert nufft_accuracy_limits(
+            shape, dtype=complex_, **kwargs
+        ) == nufft_accuracy_limits(shape, dtype=real, **kwargs)
+        assert make_pswf_kernel(1e-6, 1.25, 3, complex_) is make_pswf_kernel(
+            1e-6, 1.25, 3, real
+        )
+        assert _auto(10, shape, 1e-6, complex_, True) == _auto(
+            10, shape, 1e-6, real, True
+        )
+    assert nufft_accuracy_limits(shape, dtype=jnp.complex128, **kwargs).width == 11
+
+
 def _auto(n_points, shape, eps, dtype, pallas):
     return resolve_upsample_factor(
         "auto", n_points=n_points, shape=shape, eps=eps, dtype=dtype, pallas=pallas
@@ -216,6 +249,28 @@ def test_auto_follows_finufft_search(pallas, shape, eps, dtype, n_points, sigma,
 
 def test_auto_unreachable_returns_upper_limit():
     assert _auto(10, (4, 4), 3e-7, np.float32, True) == 2.5
+
+
+@pytest.mark.parametrize("dtype", (np.float32, np.float64))
+@pytest.mark.parametrize("shape", ((8, 8), (1024, 1024), (8, 8, 8), (256, 256, 256)))
+def test_auto_fails_sigma_limit_only_when_none_meets_it(shape, dtype):
+    """The dispatch warnings rely on this: `"auto"` fails the sigma limit only when no
+    factor up to 2.5 meets it, and then it is 2.5."""
+    for eps in np.logspace(-16, -2, 113):
+        if eps < np.finfo(dtype).eps:
+            continue
+        kwargs = dict(eps=float(eps), dtype=dtype)
+        reachable = (
+            nufft_accuracy_limits(
+                shape, upsample_factor=2.5, **kwargs
+            ).min_upsample_factor
+            <= 2.5
+        )
+        for n_points, pallas in ((10, True), (10_000_000, True), (10_000_000, False)):
+            sigma = _auto(n_points, shape, float(eps), dtype, pallas)
+            limits = nufft_accuracy_limits(shape, upsample_factor=sigma, **kwargs)
+            assert (sigma >= limits.min_upsample_factor) == reachable
+            assert reachable or sigma == 2.5
 
 
 def test_auto_is_cached():
