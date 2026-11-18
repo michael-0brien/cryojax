@@ -369,7 +369,16 @@ def test_wave_path_test_is_sensitive_to_the_odd_sign():
 
 def _ewald_spectrum(shape):
     key_re, key_im = jax.random.split(jax.random.key(2))
-    return jax.random.normal(key_re, shape) + 1.0j * jax.random.normal(key_im, shape)
+    parts_shape = (2, shape[0], shape[1] // 2 + 1)
+    return jax.random.normal(key_re, parts_shape) + 1.0j * jax.random.normal(
+        key_im, parts_shape
+    )
+
+
+def _field_parts(field):
+    """The `rfftn` of a field's real and imaginary parts, stacked, as Ewald sphere
+    integrators return them."""
+    return jnp.stack([jnp.fft.rfftn(field.real), jnp.fft.rfftn(field.imag)])
 
 
 def test_ewald_sphere_without_odd_aberrations_matches_astigmatic_ctf():
@@ -453,7 +462,7 @@ def _ewald_contrast_error(shape, ctf, amplitude_contrast_ratio, offset_z_in_angs
     ewald = cxs.ContrastTransferTheory(
         ctf, amplitude_contrast_ratio=amplitude_contrast_ratio
     ).propagate_object(
-        jnp.fft.fftn(field),
+        _field_parts(field),
         config,
         is_ewald_sphere=True,
         offset_z_in_angstroms=offset_z_in_angstroms,
@@ -494,7 +503,7 @@ def test_ewald_real_field_equals_projection(shape, ctf):
     field = jax.random.normal(jax.random.key(1), shape)
     transfer_theory = cxs.ContrastTransferTheory(ctf, amplitude_contrast_ratio=0.1)
     ewald = transfer_theory.propagate_object(
-        jnp.fft.fftn(field), config, is_ewald_sphere=True
+        _field_parts(field), config, is_ewald_sphere=True
     )
     projection = transfer_theory.propagate_object(jnp.fft.rfftn(field), config)
     assert _relative_error(ewald, projection) <= 1e-14

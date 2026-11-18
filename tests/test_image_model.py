@@ -477,6 +477,28 @@ def test_anisotropic_linear_image_applies_the_ctf_at_the_distorted_frequencies(
     )
 
 
+def _ewald_test_volume():
+    return cxs.FourierVoxelGridVolume.from_real_voxel_grid(
+        cxs.GaussianMixtureRenderFn((32, 32, 32), voxel_size=1.0)(
+            cxs.GaussianMixtureVolume(
+                np.array([[0.0, 0.0, 0.0], [3.0, -2.0, 1.0]]),
+                amplitudes=1.0,
+                variances=1.0,
+            )
+        )
+    )
+
+
+def test_projection_image_model_refuses_ewald_sphere_integrators():
+    with pytest.raises(ValueError, match="ProjectionImageModel.*EwaldSphereExtraction"):
+        cxs.ProjectionImageModel(
+            _ewald_test_volume(),
+            cxs.EulerAnglePose(),
+            cxs.BasicImageConfig((32, 32), 1.0),
+            cxs.EwaldSphereExtraction(),
+        )
+
+
 def test_anisotropic_rytov_matches_weak_phase():
     config = cxs.AnisotropicImageConfig(_SHAPE, _PIXEL_SIZE, anisotropy_xy=_ANISOTROPY_XY)
     ctf = cxs.AstigmaticCTF(defocus_in_angstroms=2500.0)

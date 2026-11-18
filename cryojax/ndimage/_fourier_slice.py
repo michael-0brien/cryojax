@@ -14,7 +14,6 @@ import jax.numpy as jnp
 from jaxtyping import Array, Complex, Float
 
 from ..jax_util import FloatLike, NDArrayLike
-from ._coordinates import make_1d_frequency_grid
 from ._edges import pad_to_shape
 from ._fourier_utils import make_fftshift_phase, query_efficient_grid_size
 from ._interpolation import (
@@ -26,12 +25,12 @@ from ._interpolation import (
 
 def sample_fft_slice(
     sampling_fft: Complex[NDArrayLike, "dim dim dim//2+1"],
-    frequency_slice: Float[NDArrayLike, "1 dim dim//2+1 3"] | Float[Array, "1 dim dim 3"],
+    frequency_slice: Float[NDArrayLike, "1 dim dim//2+1 3"],
     *,
     interp: Literal["linear", "cubic"] = "linear",
     boundary: str = "fill",
     unroll: bool = True,
-) -> Complex[Array, "dim _"]:
+) -> Complex[Array, "dim dim//2+1"]:
     """Extract a surface from a fourier-space voxel grid using the
     Fourier projection-slice theorem.
 
@@ -43,8 +42,7 @@ def sample_fft_slice(
     `cryojax.simulator.FourierVoxelGridVolume`).
 
     The output is returned in the rfft/DC-in-corner convention, so it can be
-    passed directly to `jax.numpy.fft.irfftn` (for a half slice) or
-    `jax.numpy.fft.ifftn` (for a full Ewald sphere surface).
+    passed directly to `jax.numpy.fft.irfftn`.
 
     !!! example "Preparing the voxel grid and extracting a central slice"
 
@@ -94,11 +92,9 @@ def sample_fft_slice(
         `(dim, dim, dim // 2 + 1)` and prepared as described above, i.e. by
         `cryojax.ndimage.prepare_sampling_fft`.
     - `frequency_slice`:
-        The 3D frequency coordinates to interpolate onto, in pixel units.
-        This can either be a half (rfft) central slice of shape
-        `(1, dim, dim // 2 + 1, 3)`, as returned by
-        `cryojax.ndimage.make_frequency_slice`, or a full Ewald sphere
-        surface of shape `(1, dim, dim, 3)`, as returned by
+        The 3D frequency coordinates to interpolate onto, in pixel units, of shape
+        `(1, dim, dim // 2 + 1, 3)`: a half (rfft) central slice, as returned by
+        `cryojax.ndimage.make_frequency_slice`, or that slice curved by
         `cryojax.ndimage.ewald_sphere_from_slice`.
     - `interp`:
         The interpolation method, either `"linear"` or `"cubic"`. This **must**
@@ -115,9 +111,8 @@ def sample_fft_slice(
 
     **Returns:**
 
-    The extracted surface in the rfft/DC-in-corner convention. Shape
-    `(dim, dim // 2 + 1)` for a half central slice, or `(dim, dim)` for a
-    full Ewald sphere surface.
+    The extracted surface in the rfft/DC-in-corner convention, of shape
+    `(dim, dim // 2 + 1)`.
     """
     order, _ = parse_interp(interp)
     # Convert to logical coordinates
@@ -151,24 +146,16 @@ def sample_fft_slice(
         mode=boundary,
         unroll=unroll,
     )[0, :, :]
-    # FFT shift and multiply by (-1)^k phase factors. `surface` is itself
-    # rfft-shaped only when `frequency_slice` was (i.e. only for the
-    # half in-plane slice -- an Ewald sphere surface is always a full grid),
-    # in which case only the first axis is shifted, mirroring the same
-    # convention used for the 3D volume storage.
+    # FFT shift the first axis, the only full one, as in the 3D volume storage, and
+    # multiply by (-1)^k phase factors.
     #
     # The phase is `(-1)^k` in the *frequency* index `k`, so it must be applied
     # only once `surface` is in the corner (DC-at-zero) convention, i.e. after
     # the shift. Applying it to a centered axis instead reads index `k + N // 2`
     # and contributes a spurious global `(-1)^(N // 2)` per centered axis.
-    if surface.shape[0] == surface.shape[1]:
-        surface = make_fftshift_phase(surface.shape) * jnp.fft.ifftshift(surface)
-    else:
-        surface = make_fftshift_phase((N, N), outputs_rfft=True) * jnp.fft.ifftshift(
-            surface, axes=(0,)
-        )
-
-    return surface
+    return make_fftshift_phase((N, N), outputs_rfft=True) * jnp.fft.ifftshift(
+        surface, axes=(0,)
+    )
 
 
 def prepare_sampling_fft(
@@ -269,13 +256,10 @@ def ewald_sphere_from_slice(
     frequency_slice: Float[Array, "1 dim dim//2+1 3"],
     voxel_size: FloatLike,
     wavelength: FloatLike,
-) -> Float[Array, "1 dim dim 3"]:
-    """Curve a central slice onto the Ewald sphere surface.
-
-    Take a half (rfft) central-slice coordinate system, reconstruct the full
-    in-plane grid, and displace each in-plane frequency out of the plane onto
-    the curved Ewald sphere surface. The result can be passed as the
-    `frequency_slice` argument of
+) -> Float[Array, "1 dim dim//2+1 3"]:
+    """Curve a half (rfft) central slice onto the Ewald sphere surface, displacing
+    each in-plane frequency `q` by `-(wavelength / voxel_size) * |q|**2 / 2` along the
+    slice normal. The result can be passed as the `frequency_slice` argument of
     `cryojax.ndimage.sample_fft_slice`.
 
     !!! example
@@ -306,69 +290,19 @@ def ewald_sphere_from_slice(
 
     **Returns:**
 
-    The Ewald sphere surface coordinates of shape `(1, dim, dim, 3)`.
+    The Ewald sphere surface coordinates of shape `(1, dim, dim // 2 + 1, 3)`.
     """
-    # The Ewald sphere surface curves the in-plane slice out of its own plane,
-    # so its output isn't Hermitian-symmetric as a whole and every output
-    # pixel is queried independently -- reconstruct the full in-plane grid
-    # from the stored half one before curving.
-    full_frequency_slice = _full_slice_from_half_slice(frequency_slice)
-    return _ewald_sphere_from_slice(
-        full_frequency_slice,
-        jnp.asarray(voxel_size, dtype=float),
-        jnp.asarray(wavelength, dtype=float),
-    )
-
-
-def _full_slice_from_half_slice(
-    half_slice: Float[Array, "1 dim dim//2+1 3"],
-) -> Float[Array, "1 dim dim 3"]:
-    """Reconstruct the full in-plane frequency grid from the half (rfft) one
-    stored on the volume, for `EwaldSphereExtraction`, which needs the full
-    grid to compute its local `xhat`/`yhat`/`zhat` basis and to produce its
-    curved, non-Hermitian-symmetric-as-a-whole output surface.
-
-    A rotated in-plane grid is an exactly linear function of the (unrotated)
-    local x-coordinate, for any fixed y: `slice(x, y) = x * xhat_rot +
-    slice(0, y)`, where `xhat_rot` is a single constant vector (the rotated
-    local x unit vector). `xhat_rot` is recovered from any two adjacent
-    columns of the half grid, then used to extrapolate every column of the
-    full grid. This is exact (no interpolation, and no reflection of array
-    indices, so no boundary case at the row-Nyquist frequency -- unlike a
-    literal point-reflection, this only ever reads columns that are already
-    stored in `half_slice`).
-    """
-    N = half_slice.shape[1]
-    xhat_rot = N * (half_slice[:, :, 1, :] - half_slice[:, :, 0, :])
-    x_full = make_1d_frequency_grid(N, outputs_rfftfreqs=False, fftshifted=True)
-    x_term = x_full[None, None, :, None] * xhat_rot[:, :, None, :]
-    return half_slice[:, :, 0:1, :] + x_term
-
-
-def _ewald_sphere_from_slice(
-    frequency_slice: Array, voxel_size: Array, wavelength: Array
-) -> Float[Array, "1 dim dim 3"]:
-    frequency_slice_with_zero_in_corner = jnp.fft.ifftshift(
-        frequency_slice, axes=(0, 1, 2)
-    )
-    # Get zhat unit vector of the frequency slice
+    voxel_size = jnp.asarray(voxel_size, dtype=float)
+    wavelength = jnp.asarray(wavelength, dtype=float)
+    # The slice normal, from the slice's steps along x and y at zero frequency
+    frequency_slice_with_zero_in_corner = jnp.fft.ifftshift(frequency_slice, axes=(1,))
     xhat, yhat = (
         frequency_slice_with_zero_in_corner[0, 0, 1, :],
         frequency_slice_with_zero_in_corner[0, 1, 0, :],
     )
-    xhat, yhat = xhat / jnp.linalg.norm(xhat), yhat / jnp.linalg.norm(yhat)
-    zhat = jnp.cross(xhat, yhat)
-    # Compute the ewald sphere surface, assuming the frequency slice is
-    # in a rotated frame
-    q_at_slice = frequency_slice
-    q_squared = jnp.sum(q_at_slice**2, axis=-1)
-    q_at_surface = (
-        q_at_slice
-        - (wavelength / voxel_size)
-        * (q_squared[..., None] * zhat[None, None, None, :])
-        / 2
-    )
-    return q_at_surface
+    zhat = jnp.cross(xhat / jnp.linalg.norm(xhat), yhat / jnp.linalg.norm(yhat))
+    q_squared = jnp.sum(frequency_slice**2, axis=-1, keepdims=True)
+    return frequency_slice - (wavelength / voxel_size) * q_squared * zhat / 2
 
 
 def _fftshift_sampling_fft(
