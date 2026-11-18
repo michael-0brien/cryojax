@@ -4,7 +4,6 @@ import pytest
 from cryojax.ndimage import nufft_accuracy_limits
 from cryojax.ndimage._nufft.kernel import (
     _auto_upsample_factor,
-    evaluate_pswf,
     fine_grid_size,
     kernel_fourier_series,
     kernel_width,
@@ -38,19 +37,6 @@ def test_kernel_width_raises_at_most_one():
         kernel_width(1e-4, 1.0, 2, np.float64)
 
 
-@pytest.mark.parametrize("width", range(4, 17))
-def test_pswf_eigen_residual(width):
-    sigma = 1.25
-    kernel = make_pswf_kernel(_eps_for_width(width, sigma), sigma, 2, np.float64)
-    assert kernel.width == width
-    x = np.linspace(-1, 1, 501)
-    t, v = np.polynomial.legendre.leggauss(400)
-    values = evaluate_pswf(kernel, t)
-    lhs = np.cos(kernel.shape_parameter * np.outer(x, t)) @ (v * values)
-    rhs = kernel.eigenvalue * evaluate_pswf(kernel, x)
-    assert np.max(np.abs(lhs - rhs)) / kernel.eigenvalue < 1e-12
-
-
 def _eps_for_width(width, sigma):
     """An `eps` whose rule gives exactly `width` in 2D, float64."""
     for exponent in np.arange(1.0, 12.0, 0.05):
@@ -68,7 +54,7 @@ def test_pswf_matches_scipy_pro_ang1(eps, sigma):
     x = np.linspace(-1, 1, 401)[1:-1]
     c = kernel.shape_parameter
     ref = pro_ang1(0, 0, c, x)[0] / pro_ang1(0, 0, c, 0.0)[0]
-    assert np.max(np.abs(evaluate_pswf(kernel, x) - ref)) < 1e-6
+    assert np.max(np.abs(kernel.pswf(x) - ref)) < 1e-6
 
 
 @pytest.mark.parametrize("sigma", SIGMAS)
@@ -77,7 +63,7 @@ def test_pswf_is_positive_and_decreasing(eps, sigma):
     """psi_0 has no zero in [-1, 1]; at large `c` the other even eigenfunctions share its
     eigenvalue to rounding, and only this tells them apart."""
     kernel = make_pswf_kernel(eps, sigma, 2, np.float64)
-    values = evaluate_pswf(kernel, np.linspace(0, 1, 401))
+    values = kernel.pswf(np.linspace(0, 1, 401))
     assert np.all(values > 0)
     assert np.all(np.diff(values) < 0)
 
@@ -107,7 +93,7 @@ def test_tap_polynomials_match_pswf(eps, sigma, ndim):
     kernel = make_pswf_kernel(eps, sigma, ndim, np.float64)
     w = kernel.width
     s = np.linspace(0, 1, 1001)
-    exact = np.array([evaluate_pswf(kernel, 2 * (s + j - w / 2) / w) for j in range(w)])
+    exact = np.array([kernel.pswf(2 * (s + j - w / 2) / w) for j in range(w)])
     assert tap_weights(kernel, s).shape == (w, 1001)
     assert np.max(np.abs(tap_weights(kernel, s) - exact)) <= eps
 
@@ -123,7 +109,10 @@ def test_fourier_series_matches_analytic_pswf(eps, sigma):
     m = fine_grid_size(n, sigma, w)
     got = kernel_fourier_series(kernel, n, m, rfft=False, dtype=np.float64)
     k = np.fft.fftfreq(n, 1 / n)
-    ref = 0.5 * w * kernel.eigenvalue * evaluate_pswf(kernel, np.pi * k * w / (c * m))
+    # finufft include/finufft_common/kernel.h:104 (`pswf_selfft_params`): the integral
+    # of the taps' polynomials over their unit panels
+    prefac = np.sum(kernel.coefficients / np.arange(kernel.coefficients.shape[1], 0, -1))
+    ref = prefac * kernel.pswf(np.pi * k * w / (c * m))
     assert np.max(np.abs(got - ref)) <= eps * ref[0]
     half = kernel_fourier_series(kernel, n, m, rfft=True, dtype=np.float64)
     np.testing.assert_array_equal(half, got[: n // 2 + 1])
@@ -142,7 +131,7 @@ def test_float32_taps_fitted_in_float32(eps):
     taps = np.zeros((w, s.size), np.float32)
     for coefficient in kernel.coefficients.astype(np.float32).T:
         taps = taps * s + coefficient[:, None]
-    exact = np.array([evaluate_pswf(kernel, 2 * (s + j - w / 2) / w) for j in range(w)])
+    exact = np.array([kernel.pswf(2 * (s + j - w / 2) / w) for j in range(w)])
     assert np.max(np.abs(taps - exact)) <= max(eps, 8 * np.finfo(np.float32).eps)
 
 
@@ -170,7 +159,11 @@ def test_make_pswf_kernel_is_cached():
     assert kernel is make_pswf_kernel(1e-4, 1.25, 2, np.dtype("float32"))
     assert kernel is make_pswf_kernel(1e-4, 1.25, 2, jnp.float32)
     assert kernel is not make_pswf_kernel(1e-4, 1.25, 2, np.float64)
-    for array in (kernel.nodes, kernel.node_values, kernel.coefficients):
+    for array in (
+        kernel.pswf.legendre_coefficients,
+        kernel.pswf.recurrence_coefficients,
+        kernel.coefficients,
+    ):
         assert not array.flags.writeable
 
 

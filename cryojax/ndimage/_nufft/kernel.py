@@ -8,9 +8,8 @@ from typing import Literal, NamedTuple
 import jax.numpy as jnp
 import numpy as np
 
+from .pswf import PSWF0
 
-_NUM_NODES = 256
-_NUM_LEGENDRE = 100
 
 # finufft include/finufft_common/constants.h:10, 15, 28-29, 35-36, 46, 50, 54
 _MIN_WIDTH = 2
@@ -30,9 +29,7 @@ _PURE_JAX_FFT_COST = 0.0317
 class PSWFKernel(NamedTuple):
     width: int
     shape_parameter: float
-    eigenvalue: float
-    nodes: np.ndarray
-    node_values: np.ndarray
+    pswf: PSWF0
     coefficients: np.ndarray
 
 
@@ -70,35 +67,6 @@ def _tolfac(ndim: int) -> float:
     return 0.18 * 1.4 ** (ndim - 1)
 
 
-def _pswf_at_nodes(c: float) -> tuple[float, np.ndarray, np.ndarray, np.ndarray]:
-    """`psi_0` at Gauss-Legendre nodes and its eigenvalue, from the Legendre expansion
-    of the prolate differential equation (Bouwkamp; finufft src/common/pswf.cpp:180):
-    the integral operator's top eigenvalues coincide to rounding at large `c`, the
-    differential operator's do not."""
-    k = 2 * np.arange(_NUM_LEGENDRE)
-    diagonal = k * (k + 1) + c**2 * (2 * k * (k + 1) - 1) / ((2 * k + 3) * (2 * k - 1))
-    k = k[:-1]
-    off_diagonal = (
-        c**2 * (k + 2) * (k + 1) / ((2 * k + 3) * np.sqrt((2 * k + 1) * (2 * k + 5)))
-    )
-    matrix = np.diag(diagonal) + np.diag(off_diagonal, 1) + np.diag(off_diagonal, -1)
-    _, vectors = np.linalg.eigh(matrix)
-    legendre = np.zeros(2 * _NUM_LEGENDRE)
-    legendre[::2] = vectors[:, 0] * np.sqrt(2 * np.arange(0, 2 * _NUM_LEGENDRE, 2) + 1)
-    legendre /= np.polynomial.legendre.legval(0.0, legendre)
-    nodes, weights = np.polynomial.legendre.leggauss(_NUM_NODES)
-    # psi(0) = 1, so the eigenvalue is the integral of psi
-    return 2 * legendre[0], nodes, weights, np.polynomial.legendre.legval(nodes, legendre)
-
-
-def evaluate_pswf(kernel: PSWFKernel, x) -> np.ndarray:
-    """PSWF `psi(x)` with `psi(0) = 1` for `|x| <= 1`, by Nyström interpolation."""
-    x = np.asarray(x, dtype=np.float64)
-    _, weights = np.polynomial.legendre.leggauss(_NUM_NODES)
-    cos = np.cos(kernel.shape_parameter * x[..., None] * kernel.nodes)
-    return cos @ (weights * kernel.node_values) / kernel.eigenvalue
-
-
 def _poly_fit(kernel: PSWFKernel, tap: int, num: int, dtype: np.dtype) -> np.ndarray:
     """`num` coefficients (highest power first) of tap `tap` in `z = 2s - 1`, in
     `dtype`, the kernel evaluated in float64 (finufft include/finufft/makeplan.hpp:237,
@@ -106,7 +74,7 @@ def _poly_fit(kernel: PSWFKernel, tap: int, num: int, dtype: np.dtype) -> np.nda
     w = kernel.width
     t = np.cos((2 * np.arange(num) + 1) * math.pi / (2 * num)).astype(dtype)
     x = (t + dtype.type(2 * tap + 1 - w)) / dtype.type(w)
-    newton = evaluate_pswf(kernel, x.astype(np.float64)).astype(dtype)
+    newton = kernel.pswf(x.astype(np.float64)).astype(dtype)
     for j in range(1, num):
         newton[j:] = (newton[j:] - newton[j - 1 : -1]) / (t[j:] - t[: num - j])
     monomial = np.zeros(num, dtype)
@@ -142,10 +110,7 @@ def _pswf(width: int, upsample_factor: float) -> PSWFKernel:
     """The PSWF kernel without its tap coefficients."""
     # finufft src/common/kernel.cpp:126, 143
     c = math.pi * width * (1 - 1 / (2 * upsample_factor)) - 0.05
-    eigenvalue, nodes, _, node_values = _pswf_at_nodes(c)
-    nodes.setflags(write=False)
-    node_values.setflags(write=False)
-    return PSWFKernel(width, c, float(eigenvalue), nodes, node_values, np.empty((0, 0)))
+    return PSWFKernel(width, c, PSWF0(c), np.empty((0, 0)))
 
 
 def make_pswf_kernel(eps: float, upsample_factor: float, ndim: int, dtype) -> PSWFKernel:
