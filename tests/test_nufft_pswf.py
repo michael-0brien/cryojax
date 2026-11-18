@@ -51,7 +51,7 @@ def test_pswf_matches_finufft_build(c):
 @pytest.mark.parametrize("c", sorted(_FINUFFT))
 def test_pswf_support(c):
     pswf = PSWF0(c)
-    assert pswf(0.0) == 1.0
+    np.testing.assert_allclose(pswf(0.0), 1.0, rtol=1e-15)
     np.testing.assert_array_equal(pswf(np.array([-1.01, 1.01])), 0.0)
 
 

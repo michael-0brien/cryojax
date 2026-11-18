@@ -20,11 +20,6 @@ _UPSAMPLE_FACTOR_EDGE_PAD = 1e-3
 _NSOFF = 1
 _ROUND_FAC = 0.35
 
-# "auto"'s FFT cost per fine-grid point and log2 of the grid size, in spread taps: the
-# ratio of the fitted constants of the 11-17 benchmark (RTX PRO 5000)
-_PALLAS_FFT_COST = 0.284
-_PURE_JAX_FFT_COST = 0.0317
-
 
 class PSWFKernel(NamedTuple):
     width: int
@@ -250,22 +245,13 @@ def _min_upsample_factor(eps: float, ndim: int, width: int, eps_mach: float) -> 
 
 
 def resolve_upsample_factor(
-    upsample_factor: float | Literal["auto"],
-    *,
-    n_points: int,
-    shape: tuple[int, ...],
-    eps: float,
-    dtype,
-    pallas: bool,
+    upsample_factor: float | Literal["auto"], *, ndim: int, eps: float, dtype
 ) -> float:
-    """`upsample_factor`, or for `"auto"` finufft 2.6's search: per width, the smallest
-    factor reaching `eps` in [1.25, 2.5], plus 1e-3; the cheapest by `M w^d +
-    c G log2(G)`, `G` the fine grid's size and `c` the Pallas (`pallas`) or pure-JAX
-    backend's; 2.5 if none."""
+    """`upsample_factor`, or for `"auto"` finufft 2.6's search without its cost term:
+    per width, the smallest factor reaching `eps` in [1.25, 2.5]; the smallest of
+    these, plus 1e-3; 2.5 if none."""
     if isinstance(upsample_factor, str) and upsample_factor == "auto":
-        return _auto_upsample_factor(
-            n_points, tuple(shape), eps, jnp.finfo(dtype).dtype, bool(pallas)
-        )
+        return _auto_upsample_factor(ndim, eps, jnp.finfo(dtype).dtype)
     if isinstance(upsample_factor, str) or not upsample_factor > 1:
         raise ValueError(
             "Found invalid value for `resolve_upsample_factor(upsample_factor, ...)`. "
@@ -276,24 +262,16 @@ def resolve_upsample_factor(
 
 
 @functools.cache
-def _auto_upsample_factor(n_points, shape, eps, dtype, pallas) -> float:
-    # finufft src/heuristics.cpp:87 (best_sigma_for_tol) with our cost; 2.5 if none,
-    # include/finufft/setpts.hpp:85
-    ndim = len(shape)
+def _auto_upsample_factor(ndim, eps, dtype) -> float:
+    # finufft src/heuristics.cpp:87 (best_sigma_for_tol), whose cost term picks among the
+    # candidates; here the smallest wins. 2.5 if none, include/finufft/setpts.hpp:85
     eps_mach = float(jnp.finfo(dtype).eps)
-    fft_cost = _PALLAS_FFT_COST if pallas else _PURE_JAX_FFT_COST
     max_width = _MAX_WIDTH_DOUBLE if dtype == np.float64 else _MAX_WIDTH_SINGLE
-    best_cost, best_sigma = math.inf, _MAX_AUTO_UPSAMPLE_FACTOR
-    for ns in range(_MIN_WIDTH, max_width + 1):
-        sigma = max(
-            _min_upsample_factor(eps, ndim, ns, eps_mach), _MIN_AUTO_UPSAMPLE_FACTOR
-        )
-        if sigma > _MAX_AUTO_UPSAMPLE_FACTOR:
-            continue
-        sigma += _UPSAMPLE_FACTOR_EDGE_PAD
-        width = kernel_width(eps, sigma, ndim, dtype)
-        size = math.prod(fine_grid_size(n, sigma, width) for n in shape)
-        cost = n_points * width**ndim + fft_cost * size * math.log2(size)
-        if cost < best_cost:
-            best_cost, best_sigma = cost, sigma
-    return best_sigma
+    sigmas = [
+        max(_min_upsample_factor(eps, ndim, ns, eps_mach), _MIN_AUTO_UPSAMPLE_FACTOR)
+        for ns in range(_MIN_WIDTH, max_width + 1)
+    ]
+    reachable = [sigma for sigma in sigmas if sigma <= _MAX_AUTO_UPSAMPLE_FACTOR]
+    if not reachable:
+        return _MAX_AUTO_UPSAMPLE_FACTOR
+    return min(reachable) + _UPSAMPLE_FACTOR_EDGE_PAD

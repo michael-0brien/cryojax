@@ -627,31 +627,29 @@ def test_pallas_empty_points(shape):
 
 
 @requires_gpu
-@pytest.mark.parametrize(
-    "enable_pallas, pallas",
-    [
-        (False, False),
-        (True, True),
-        ({"fwd": True, "bwd": False}, True),
-        ({"fwd": False, "bwd": True}, True),
-    ],
-)
-def test_auto_prices_pallas_when_either_pass_uses_it(monkeypatch, enable_pallas, pallas):
-    backends = []
+def test_auto_ignores_backend_and_points(monkeypatch):
+    picks = []
 
-    def resolve_upsample_factor(upsample_factor, **kwargs):
-        backends.append(kwargs["pallas"])
-        return resolve_upsample_factor_unpatched(upsample_factor, **kwargs)
+    def make_pswf_kernel(eps, upsample_factor, ndim, dtype):
+        kernel = make_pswf_kernel_unpatched(eps, upsample_factor, ndim, dtype)
+        picks.append((upsample_factor, kernel.width))
+        return kernel
 
-    resolve_upsample_factor_unpatched = nufft_api.resolve_upsample_factor
-    monkeypatch.setattr(nufft_api, "resolve_upsample_factor", resolve_upsample_factor)
+    make_pswf_kernel_unpatched = nufft_api.make_pswf_kernel
+    monkeypatch.setattr(nufft_api, "make_pswf_kernel", make_pswf_kernel)
     shape = (16, 15)
-    positions = _points(shape, 20, seed=43, dtype=np.float32)
-    kwargs = dict(pixel_size=PIXEL_SIZE, eps=1e-4, enable_pallas=enable_pallas)
-    im.dispatch_nufft1(positions, jnp.ones(20, np.float32), shape, **kwargs)
-    spectrum = _spectrum(shape, seed=44, dtype=np.float32)
-    im.dispatch_nufft2(positions, spectrum, shape, **kwargs)
-    assert backends == [pallas, pallas]
+    for num in (10, 10**5):
+        positions = _points(shape, num, seed=43, dtype=np.float32)
+        for enable_pallas in (False, True, {"fwd": True, "bwd": False}):
+            im.dispatch_nufft1(
+                positions,
+                jnp.ones(num, np.float32),
+                shape,
+                pixel_size=PIXEL_SIZE,
+                eps=1e-4,
+                enable_pallas=enable_pallas,
+            )
+    assert len(picks) == 6 and len(set(picks)) == 1
 
 
 #
