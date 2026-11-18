@@ -1,3 +1,4 @@
+import math
 from collections.abc import Mapping, Sequence
 from typing import Any, ClassVar, Literal, Self, TypeVar, cast
 from typing_extensions import override
@@ -8,6 +9,7 @@ import jax.numpy as jnp
 import numpy as np
 from jaxtyping import Array, Float, PyTree
 
+from ..._config import CRYOJAX_FINUFFT_BACKEND
 from ..._internal import leaf_asarray
 from ...constants import (
     PengScatteringFactorParameters,
@@ -18,6 +20,7 @@ from ...ndimage import (
     FourierGaussian,
     convert_rfftn_to_fftn,
     dispatch_nufft1,
+    nufft_accuracy_limits,
     resize_with_crop_or_pad,
 )
 from .._image_config import AbstractImageConfig
@@ -270,11 +273,14 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
         - `eps`:
             The requested relative accuracy of the non-uniform FFT. In float32,
             rounding of the fine-grid coordinates limits the achieved accuracy to
-            about 1e-5 at 256² and 2e-4 at 4096².
+            about 1e-5 at 256² and 2e-4 at 4096². On the native backend, raises
+            `ValueError` below that limit; raise `eps` or enable 64-bit precision.
         - `upsample_factor`:
             The ratio of the fine grid to the grid (finufft's `upsampfac`), greater
             than 1. Smaller values use less memory but a wider kernel. `"auto"` picks
-            it from a cost model; see [`cryojax.ndimage.dispatch_nufft1`][].
+            it from a cost model; see [`cryojax.ndimage.dispatch_nufft1`][]. On the
+            native backend, raises `ValueError` if too small to reach `eps`; increase
+            it or use `"auto"`.
         - `enable_pallas`:
             Whether the native backend spreads with Pallas kernels. See
             [`cryojax.ndimage.dispatch_nufft1`][].
@@ -391,11 +397,14 @@ class GaussianFourierProjection(
         - `eps`:
             The requested relative accuracy of the non-uniform FFT. In float32,
             rounding of the fine-grid coordinates limits the achieved accuracy to
-            about 1e-5 at 256² and 2e-4 at 4096².
+            about 1e-5 at 256² and 2e-4 at 4096². On the native backend, raises
+            `ValueError` below that limit; raise `eps` or enable 64-bit precision.
         - `upsample_factor`:
             The ratio of the fine grid to the grid (finufft's `upsampfac`), greater
             than 1. Smaller values use less memory but a wider kernel. `"auto"` picks
-            it from a cost model; see [`cryojax.ndimage.dispatch_nufft1`][].
+            it from a cost model; see [`cryojax.ndimage.dispatch_nufft1`][]. On the
+            native backend, raises `ValueError` if too small to reach `eps`; increase
+            it or use `"auto"`.
         - `shape`:
             If given, first compute the image at `shape`, then
             pad or crop to `image_config.padded_shape`.
@@ -515,6 +524,9 @@ def _project_impl(
     enable_pallas: bool | Mapping[str, bool] | None,
     options: dict[str, Any],
 ) -> Array:
+    _check_nufft_reaches_eps(
+        "GaussianFourierProjection", positions, pixel_size, shape, eps, upsample_factor
+    )
     is_leaf = lambda x: isinstance(x, AbstractFourierOperator)  # noqa: E731
     frequencies_1d = make_frequencies_1d(shape, pixel_size, modeord=1, outputs_rfft=True)
 
@@ -554,6 +566,9 @@ def _render_impl(
     enable_pallas: bool | Mapping[str, bool] | None,
     options: dict[str, Any],
 ) -> Array:
+    _check_nufft_reaches_eps(
+        "GaussianFourierRenderFn", positions, voxel_size, shape, eps, upsample_factor
+    )
     is_leaf = lambda x: isinstance(x, AbstractFourierOperator)  # noqa: E731
     frequencies_1d = make_frequencies_1d(shape, voxel_size, modeord=1, outputs_rfft=True)
 
@@ -578,6 +593,56 @@ def _render_impl(
         lambda x, y: x + y,
         jax.tree.map(fourier_impl, positions, kernel_fns, amplitudes, is_leaf=is_leaf),
     )
+
+
+def _round_up(x: float, digits: int) -> float:
+    scale = 10.0 ** (math.floor(math.log10(x)) - digits + 1)
+    return math.ceil(x / scale) * scale
+
+
+def _check_nufft_reaches_eps(
+    name: str,
+    positions: PyTree[Float[Array, "_ 3"]],
+    pixel_size: Float[Array, ""],
+    shape: tuple[int, ...],
+    eps: float,
+    upsample_factor: float | Literal["auto"],
+) -> None:
+    if CRYOJAX_FINUFFT_BACKEND == "jax-finufft":
+        return
+    # The dtype of `dispatch_nufft1(positions, jnp.ones(...), ...)`
+    dtype = jnp.result_type(*jax.tree.leaves(positions), jnp.ones(()), pixel_size, 0.0)
+    is_auto = upsample_factor == "auto"
+    # "auto" fails only when no factor up to its maximum, 2.5, reaches `eps`
+    sigma = 2.5 if is_auto else upsample_factor
+    limits = nufft_accuracy_limits(shape, eps=eps, upsample_factor=sigma, dtype=dtype)
+    size = " x ".join(str(n) for n in shape)
+    x64_fix = (
+        ', or enable 64-bit precision with `jax.config.update("jax_enable_x64", True)`'
+        if dtype == jnp.float32
+        else ""
+    )
+    fields = f"eps={eps}" + ("" if is_auto else f", upsample_factor={upsample_factor}")
+    if eps < limits.rounding_floor:
+        floor = _round_up(limits.rounding_floor, 2)
+        raise ValueError(
+            f"Found `{name}({fields})` unreachable for a {size} image in {dtype}: "
+            f"finufft's rounding floor there is {limits.rounding_floor:.2e}. To fix, "
+            f"set `eps` to at least {floor:.1e}{x64_fix}."
+        )
+    if sigma < limits.min_upsample_factor:
+        if is_auto or math.isinf(limits.min_upsample_factor):
+            raise ValueError(
+                f"Found `{name}({fields})` unreachable for a {size} image in {dtype}: "
+                f"no `upsample_factor` {'up to 2.5 ' if is_auto else ''}reaches "
+                f"`eps={eps}`. To fix, increase `eps`{x64_fix}."
+            )
+        needed = _round_up(limits.min_upsample_factor, 3)
+        raise ValueError(
+            f"Found `{name}({fields})` unreachable: the widest supported kernel "
+            f"reaches `eps={eps}` only for `upsample_factor` of at least {needed:.3g}. "
+            f'To fix, set `upsample_factor` to at least {needed:.3g} or to `"auto"`.'
+        )
 
 
 def _check_eps(name: str, eps: float) -> float:

@@ -8,6 +8,8 @@ Tests demand precise numerical agreement between implementations and between
 the two NUFFT backends (native and jax-finufft).
 """
 
+import warnings
+
 import cryojax.ndimage as im
 import cryojax.simulator as cxs
 import equinox as eqx
@@ -1830,3 +1832,104 @@ def test_fft_is_point_only(make):
     assert "sampling_mode='point'" in repr(make())
     with pytest.raises(TypeError):
         make(sampling_mode="average")
+
+
+def _fourier_gaussian_volume(dtype, n_atoms=4):
+    positions = np.zeros((n_atoms, 3), dtype=dtype)
+    return cxs.GaussianFourierVolume(
+        positions=positions, kernel_fns=im.FourierGaussian(b_factor=1.0)
+    )
+
+
+def _projection_config(shape, dtype=np.float32):
+    return cxs.BasicImageConfig(shape, dtype(1.0), voltage_in_kilovolts=300.0)
+
+
+def test_fourier_projection_raises_below_rounding_floor():
+    volume = _fourier_gaussian_volume(np.float32)
+    integrator = cxs.GaussianFourierProjection(eps=1e-6)
+    config = _projection_config((1024, 1024))
+    with jax.enable_x64(False):
+        with pytest.raises(
+            ValueError,
+            match=(
+                r"GaussianFourierProjection\(eps=1e-06\)[\s\S]*1024 x 1024[\s\S]*"
+                r"float32[\s\S]*6\.04e-05[\s\S]*at least 6\.1e-05[\s\S]*jax_enable_x64"
+            ),
+        ):
+            integrator.integrate(volume, config)
+
+
+def test_fourier_projection_raises_below_min_upsample_factor():
+    volume = _fourier_gaussian_volume(np.float64)
+    integrator = cxs.GaussianFourierProjection(eps=1e-10, upsample_factor=1.25)
+    with pytest.raises(
+        ValueError, match=r"upsample_factor=1\.25[\s\S]*at least 1\.27[\s\S]*\"auto\""
+    ):
+        integrator.integrate(volume, _projection_config((32, 32), np.float64))
+
+
+def test_fourier_projection_auto_unreachable_raises():
+    volume = _fourier_gaussian_volume(np.float32)
+    integrator = cxs.GaussianFourierProjection(eps=3e-7)
+    with jax.enable_x64(False):
+        with pytest.raises(
+            ValueError, match=r"4 x 4[\s\S]*float32[\s\S]*up to 2\.5[\s\S]*increase `eps`"
+        ):
+            integrator.integrate(volume, _projection_config((4, 4)))
+
+
+def test_fourier_projection_no_upsample_factor_reaches_eps():
+    volume = _fourier_gaussian_volume(np.float64)
+    integrator = cxs.GaussianFourierProjection(eps=4e-16, upsample_factor=2.0)
+    with pytest.raises(
+        ValueError, match=r"no `upsample_factor`[\s\S]*increase `eps`"
+    ) as e:
+        integrator.integrate(volume, _projection_config((2, 2), np.float64))
+    assert '"auto"' not in str(e.value)
+
+
+def test_render_fn_raises_below_rounding_floor():
+    volume = _fourier_gaussian_volume(np.float32)
+    render_fn = cxs.GaussianFourierRenderFn((64, 64, 64), np.float32(1.0), eps=1e-6)
+    with jax.enable_x64(False):
+        with pytest.raises(
+            ValueError,
+            match=(
+                r"GaussianFourierRenderFn\(eps=1e-06\)[\s\S]*64 x 64 x 64[\s\S]*"
+                r"float32[\s\S]*4\.6[0-9]e-06[\s\S]*jax_enable_x64"
+            ),
+        ):
+            render_fn(volume)
+
+
+@_skip_without_jax_finufft
+def test_fourier_projection_jax_finufft_skips_checks(monkeypatch):
+    from cryojax.simulator._volume import gaussian_fourier
+
+    monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", "jax-finufft")
+    monkeypatch.setattr(gaussian_fourier, "CRYOJAX_FINUFFT_BACKEND", "jax-finufft")
+    volume = _fourier_gaussian_volume(np.float64)
+    # Native: float64 at eps 1e-10, sigma 1.25 raises; jax-finufft does not check
+    integrator = cxs.GaussianFourierProjection(eps=1e-10, upsample_factor=1.25)
+    integrator.integrate(volume, _projection_config((32, 32), np.float64))
+
+
+def test_fourier_projection_passing_check_emits_no_warning():
+    volume = _fourier_gaussian_volume(np.float64)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        cxs.GaussianFourierProjection().integrate(
+            volume, _projection_config((32, 32), np.float64)
+        )
+        cxs.GaussianFourierRenderFn((16, 16, 16), 1.0)(volume)
+
+
+def test_fourier_projection_advised_numbers_pass():
+    volume = _fourier_gaussian_volume(np.float64)
+    config = _projection_config((32, 32), np.float64)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        cxs.GaussianFourierProjection(eps=1e-10, upsample_factor=1.27).integrate(
+            volume, config
+        )
