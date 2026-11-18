@@ -271,16 +271,18 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
         - `voxel_size`:
             The voxel size of the resulting voxel grid.
         - `eps`:
-            The requested relative accuracy of the non-uniform FFT. In float32,
-            rounding of the fine-grid coordinates limits the achieved accuracy to
-            about 1e-5 at 256² and 2e-4 at 4096². On the native backend, raises
-            `ValueError` below that limit; raise `eps` or enable 64-bit precision.
+            The requested relative accuracy of the non-uniform FFT. On the native
+            backend, raises `ValueError` where finufft 2.6's rules predict it out of
+            reach (see [`cryojax.ndimage.nufft_accuracy_limits`][]); raise `eps` or
+            enable 64-bit precision. In float32, finufft's rounding floor is 1.5e-5
+            at 256² and 2.4e-4 at 4096².
         - `upsample_factor`:
             The ratio of the fine grid to the grid (finufft's `upsampfac`), greater
             than 1. Smaller values use less memory but a wider kernel. `"auto"` is the
             smallest factor reaching `eps`; see [`cryojax.ndimage.dispatch_nufft1`][]. On the
             native backend, raises `ValueError` if too small to reach `eps`; increase
-            it or use `"auto"`.
+            it or use `"auto"`. For dense points and tight `eps`, a larger explicit
+            factor narrows the kernel and can be faster.
         - `enable_pallas`:
             Whether the native backend spreads with Pallas kernels. See
             [`cryojax.ndimage.dispatch_nufft1`][].
@@ -395,16 +397,18 @@ class GaussianFourierProjection(
         """**Arguments:**
 
         - `eps`:
-            The requested relative accuracy of the non-uniform FFT. In float32,
-            rounding of the fine-grid coordinates limits the achieved accuracy to
-            about 1e-5 at 256² and 2e-4 at 4096². On the native backend, raises
-            `ValueError` below that limit; raise `eps` or enable 64-bit precision.
+            The requested relative accuracy of the non-uniform FFT. On the native
+            backend, raises `ValueError` where finufft 2.6's rules predict it out of
+            reach (see [`cryojax.ndimage.nufft_accuracy_limits`][]); raise `eps` or
+            enable 64-bit precision. In float32, finufft's rounding floor is 1.85e-5
+            at 256³.
         - `upsample_factor`:
             The ratio of the fine grid to the grid (finufft's `upsampfac`), greater
             than 1. Smaller values use less memory but a wider kernel. `"auto"` is the
             smallest factor reaching `eps`; see [`cryojax.ndimage.dispatch_nufft1`][]. On the
             native backend, raises `ValueError` if too small to reach `eps`; increase
-            it or use `"auto"`.
+            it or use `"auto"`. For dense points and tight `eps`, a larger explicit
+            factor narrows the kernel and can be faster.
         - `shape`:
             If given, first compute the image at `shape`, then
             pad or crop to `image_config.padded_shape`.
@@ -638,10 +642,12 @@ def _check_nufft_reaches_eps(
                 f"`eps={eps}`. To fix, increase `eps`{x64_fix}."
             )
         needed = _round_up(limits.min_upsample_factor, 3)
+        auto = ' or to `"auto"`' if needed <= 2.5 else ""
         raise ValueError(
-            f"Found `{name}({fields})` unreachable: the widest supported kernel "
-            f"reaches `eps={eps}` only for `upsample_factor` of at least {needed:.3g}. "
-            f'To fix, set `upsample_factor` to at least {needed:.3g} or to `"auto"`.'
+            f"Found `{name}({fields})` unreachable: the kernel width in use, "
+            f"{limits.width}, reaches `eps={eps}` only for `upsample_factor` of at "
+            f"least {needed:.3g}. To fix, set `upsample_factor` to at least "
+            f"{needed:.3g}{auto}."
         )
 
 

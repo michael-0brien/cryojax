@@ -1879,6 +1879,15 @@ def test_fourier_projection_auto_unreachable_raises():
             integrator.integrate(volume, _projection_config((4, 4)))
 
 
+def test_fourier_projection_min_upsample_factor_above_auto_range():
+    volume = _fourier_gaussian_volume(np.float32)
+    integrator = cxs.GaussianFourierProjection(eps=3e-7, upsample_factor=2.0)
+    with jax.enable_x64(False):
+        with pytest.raises(ValueError, match=r"at least 3\.97") as e:
+            integrator.integrate(volume, _projection_config((4, 4)))
+    assert "auto" not in str(e.value)
+
+
 def test_fourier_projection_no_upsample_factor_reaches_eps():
     volume = _fourier_gaussian_volume(np.float64)
     integrator = cxs.GaussianFourierProjection(eps=4e-16, upsample_factor=2.0)
@@ -1903,6 +1912,19 @@ def test_render_fn_raises_below_rounding_floor():
             render_fn(volume)
 
 
+def test_render_fn_raises_below_min_upsample_factor():
+    volume = _fourier_gaussian_volume(np.float64)
+    render_fn = cxs.GaussianFourierRenderFn(
+        (16, 16, 16), 1.0, eps=1e-10, upsample_factor=1.25
+    )
+    with pytest.raises(
+        ValueError,
+        match=r"upsample_factor=1\.25[\s\S]*kernel width in use, 16[\s\S]*at least "
+        r"1\.28[\s\S]*\"auto\"",
+    ):
+        render_fn(volume)
+
+
 @_skip_without_jax_finufft
 def test_fourier_projection_jax_finufft_skips_checks(monkeypatch):
     from cryojax.simulator._volume import gaussian_fourier
@@ -1923,6 +1945,15 @@ def test_fourier_projection_passing_check_emits_no_warning():
             volume, _projection_config((32, 32), np.float64)
         )
         cxs.GaussianFourierRenderFn((16, 16, 16), 1.0)(volume)
+
+
+def test_fourier_projection_passing_check_emits_no_warning_float32():
+    volume = _fourier_gaussian_volume(np.float32)
+    with jax.enable_x64(False), warnings.catch_warnings():
+        warnings.simplefilter("error")
+        cxs.GaussianFourierProjection(eps=1e-4).integrate(
+            volume, _projection_config((64, 64))
+        )
 
 
 def test_fourier_projection_advised_numbers_pass():

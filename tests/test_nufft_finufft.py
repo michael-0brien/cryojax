@@ -1,6 +1,5 @@
 """The native NUFFT against finufft, the ground truth, and against exact identities."""
 
-import re
 import warnings
 
 import cryojax.ndimage as im
@@ -689,11 +688,12 @@ def test_eps_below_eps_mach_warns_and_runs(monkeypatch, name):
 
 @pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
 def test_warns_below_rounding_floor(name):
-    """finufft include/finufft/setpts.hpp:22; the floor, 6.0426e-5, to 3 figures, up."""
+    """finufft include/finufft/setpts.hpp:22; floor 6.0422e-5, printed to 3 figures;
+    the advised `eps` is rounded up to 2."""
     with pytest.warns(
         UserWarning,
         match=rf"{name}[\s\S]*eps = 1e-06[\s\S]*\(1024, 1024\)[\s\S]*float32"
-        r"[\s\S]*6\.05e-05[\s\S]*jax_enable_x64",
+        r"[\s\S]*6\.04e-05[\s\S]*6\.1e-05[\s\S]*jax_enable_x64",
     ) as record:
         _call(name, (1024, 1024), np.float32, eps=1e-6)
     assert len(record) == 1
@@ -723,23 +723,13 @@ def test_no_upsample_factor_reaches_eps_advises_eps_only(name):
     assert "auto" not in message
 
 
-_EPS_FIX = r"set `eps` to at least (\d\.\d+e-\d+)"
-
-
 @pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
-@pytest.mark.parametrize(
-    "eps, upsample_factor", [(1e-9, "auto"), (1e-9, 1.5), (3e-7, "auto")]
-)
-def test_unreachable_eps_warnings_name_a_working_eps(name, eps, upsample_factor):
-    """The `eps` named by the `eps < eps_mach` and auto-unreachable warnings runs
-    silently."""
-    with pytest.warns(UserWarning) as record:
-        _call(name, (4, 4), np.float32, eps=eps, upsample_factor=upsample_factor)
-    found = [re.search(_EPS_FIX, str(w.message)) for w in record]
-    (match,) = [m for m in found if m]
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        _call(name, (4, 4), np.float32, eps=float(match.group(1)), upsample_factor="auto")
+def test_min_upsample_factor_above_auto_range_does_not_advise_auto(name):
+    """Needed 3.97 at width 8 in float32: `"auto"` stops at 2.5 and cannot reach it."""
+    with pytest.warns(UserWarning, match=r"at least 3\.97") as record:
+        _call(name, (4, 4), np.float32, eps=3e-7, upsample_factor=2.0)
+    (message,) = [str(w.message) for w in record if "too small" in str(w.message)]
+    assert "auto" not in message
 
 
 @pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])

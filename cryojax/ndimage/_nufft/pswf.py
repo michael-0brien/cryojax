@@ -174,7 +174,7 @@ class PSWF0(eqx.Module):  # pswf.cpp:180, pswf.h:25
         self.recurrence_coefficients = coef
         self.normalization = float(1.0 / _eval_raw(work, coef, np.zeros(())))
 
-    def __call__(self, x):  # pswf.h:59
+    def __call__(self, x):  # pswf.h:57
         x = np.asarray(x, np.float64)
         inside = np.abs(x) <= 1
         raw = _eval_raw(
