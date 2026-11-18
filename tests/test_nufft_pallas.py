@@ -207,6 +207,28 @@ def test_vmap_over_grids_matches_unbatched_interpret(interpret, monkeypatch):
         assert _relative_error(grids[b], expected) <= 1e-12
 
 
+def test_empty_points_under_vmap():
+    """A vmap over strengths or grids with no points launches nothing and gives zeros."""
+    fine_shape = FINE_SHAPES[0]
+    key = nufft_pallas.make_kernel_key(_kernel(fine_shape))
+    u, c, g = _fine_problem(fine_shape, 0, 2, seed=7, batch=(3,))
+
+    def spread_fn(c):
+        return nufft_pallas.pallas_nufft_spread(u[0], c, fine_shape, key)
+
+    def interp_fn(g, weights):
+        return nufft_pallas.pallas_nufft_interp(
+            u[0], g, weights, fine_shape, key, True, True
+        )
+
+    assert _pallas_calls(jax.vmap(spread_fn), c) == []
+    assert _pallas_calls(jax.vmap(interp_fn), g, c) == []
+    grids = jax.vmap(spread_fn)(c)
+    values, u_bar = jax.vmap(interp_fn)(g, c)
+    assert grids.shape == (3, 2, *fine_shape) and not np.any(np.asarray(grids))
+    assert values.shape == (3, 2, 0) and u_bar.shape == (3, 0, 2)
+
+
 #
 # Dispatch, compiled
 #
@@ -382,3 +404,14 @@ def test_pallas_empty_points(shape):
     assert _relative_error(actual, expected) <= 1e-12
     for a, e in zip(actual_grads, expected_grads):
         assert _relative_error(a, e) <= 1e-12
+
+    # Under a vmap over strengths and spectra, the positions shared
+    batched = (empty[0], jnp.zeros((3, 0)), jnp.stack([spectrum] * 3), empty[3])
+    vmapped = {
+        enable_pallas: jax.vmap(fn, in_axes=(None, 0, 0, None))
+        for enable_pallas, fn in value_and_grad.items()
+    }
+    assert _pallas_calls(vmapped[True], *batched) == []
+    actual, expected = (jax.tree.leaves(vmapped[k](*batched)) for k in (True, False))
+    for a, e in zip(actual, expected):
+        assert a.shape == e.shape and np.array_equal(a, e)

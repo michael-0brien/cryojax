@@ -50,8 +50,10 @@ def pallas_nufft_spread(
         if in_batched[0]:
             in_axes = (0, 0 if in_batched[1] else None)
             return jax.vmap(spread_one, in_axes=in_axes)(u, c), True
-        grids = spread_one(u, c.reshape(-1, c.shape[-1]))
-        return grids.reshape(axis_size, -1, *fine_shape), True
+        # Explicit sizes, not -1: any of them may be 0
+        _, num_grids, num_points = c.shape
+        grids = spread_one(u, c.reshape(axis_size * num_grids, num_points))
+        return grids.reshape(axis_size, num_grids, *fine_shape), True
 
     return batchable(u, c)
 
@@ -82,14 +84,15 @@ def pallas_nufft_interp(
         if in_batched[0]:
             in_axes = tuple(0 if b else None for b in in_batched)
             return jax.vmap(interp_one, in_axes=in_axes)(u, g, *weights), out_batched
-        flat = []
+        # Explicit sizes, not -1: any of them may be 0
+        num_grids, flat = (g.shape[1] if in_batched[1] else g.shape[0]), []
         for x, b in zip((g, *weights), in_batched[1:]):
             x = x if b else jnp.broadcast_to(x, (axis_size, *x.shape))
-            flat.append(x.reshape(-1, *x.shape[2:]))
+            flat.append(x.reshape(axis_size * num_grids, *x.shape[2:]))
         g, *weights = flat
         out = _interp(u, g, weights, fine_shape, kernel_key, values, positions, axis_size)
         if values:
-            out = (out[0].reshape(axis_size, -1, u.shape[0]), *out[1:])
+            out = (out[0].reshape(axis_size, num_grids, u.shape[0]), *out[1:])
         return out, out_batched
 
     out = list(batchable(u, g, *weights))
