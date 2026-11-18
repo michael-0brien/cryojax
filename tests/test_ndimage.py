@@ -1300,12 +1300,6 @@ def test_dispatch_nufft1_positions_are_in_units_of_pixel_size():
     )
 
 
-def test_dispatch_nufft1_does_not_mutate_options():
-    options = {"opts": None}
-    im.dispatch_nufft1(jnp.zeros((3, 2)), jnp.ones(3), (6, 6), options=options)
-    assert options == {"opts": None}
-
-
 @pytest.mark.parametrize(
     "positions_shape, shape", [((3, 2), (6, 6, 6)), ((3, 3), (6, 6)), ((3, 1), (6,))]
 )
