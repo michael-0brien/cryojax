@@ -14,7 +14,7 @@ import jax.numpy as jnp
 import numpy as np
 from jaxtyping import Array, Float
 
-from .kernel import PSWFKernel
+from .kernel import PSWFKernel, derivative_coefficients
 
 
 def spread(
@@ -122,12 +122,9 @@ def _gather(g, indices):
 def _interp_and_gradient(u, g, weights_r, kernel):
     """`interp(u, g)` and `sum_r weights_r grad_u interp(u, g_r)`, shape `(M, d)`."""
     indices, offsets = _taps(u, g.shape[1:], kernel.width)
-    coefficients = kernel.coefficients
-    degree = coefficients.shape[1] - 1
-    # d/du = -d/ds
-    derivative_coefficients = -coefficients[:, :-1] * np.arange(degree, 0, -1)
-    weights = [_horner(coefficients, s) for s in offsets]
-    derivatives = [_horner(derivative_coefficients, s) for s in offsets]
+    weights = [_horner(kernel.coefficients, s) for s in offsets]
+    first_derivative = derivative_coefficients(kernel.coefficients, 1)
+    derivatives = [_horner(first_derivative, s) for s in offsets]
     gathered = _gather(g, indices)
     axes = _AXES[-len(weights) :]
     gradient = []
