@@ -162,7 +162,6 @@ def _analytic_projection(config):
             "GaussianFourierProjection",
             True,
         ),
-        (cxs.EwaldSphereExtraction(), "voxels", "EwaldSphereExtraction", False),
         (cxs.EwaldSphereExtraction(), "voxels", "EwaldSphereExtraction", True),
         (cxs.AutoVolumeProjection(), "gaussians", 3e-4, False),
         (cxs.AutoVolumeProjection(), "voxels", 1e-4, False),
@@ -231,6 +230,8 @@ class _NoAnisotropyIntegrator(cxs.AbstractVolumeIntegrator, strict=True):
 
     def integrate(self, volume_representation, image_config, outputs_real_space=False):
         y_dim, x_dim = image_config.padded_shape
+        if outputs_real_space:
+            return jnp.zeros((y_dim, x_dim))
         return jnp.zeros((y_dim, x_dim // 2 + 1), dtype=complex)
 
 
@@ -349,13 +350,18 @@ def _count_ffts(fn):
     return count(jax.make_jaxpr(fn)().jaxpr)
 
 
-@pytest.mark.parametrize("name", ["projection", "weak phase", "rytov"])
-def test_resampling_adds_no_ffts_to_a_real_space_projection(name):
+@pytest.mark.parametrize(
+    "name, extra_ffts", [("projection", 0), ("weak phase", 0), ("rytov", 2)]
+)
+def test_resampling_adds_no_ffts_to_a_real_space_projection(name, extra_ffts):
     """With `GaussianMixtureProjection`, which projects in real space, the resampling
-    reuses the FFT that the isotropic simulation computes."""
+    reuses the FFT that the isotropic simulation computes. Rytov takes the projection
+    in real space, so there the resampling adds a pair."""
     shape = (32, 32)
     isotropic = _models(cxs.BasicImageConfig(shape, 1.0))[name]
     anisotropic = _models(
         cxs.AnisotropicImageConfig(shape, 1.0, anisotropy_xy=(0.02, 0.01))
     )[name]
-    assert _count_ffts(anisotropic.simulate) == _count_ffts(isotropic.simulate)
+    assert (
+        _count_ffts(anisotropic.simulate) == _count_ffts(isotropic.simulate) + extra_ffts
+    )

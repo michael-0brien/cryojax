@@ -19,8 +19,11 @@ ProjectionOrEwaldSphereArray = (
         Array,
         "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}",
     ]
-    | Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
-    | Float[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
+    | Complex[
+        Array,
+        "2 {image_config.padded_y_dim} {image_config.padded_x_dim//2+1}",
+    ]
+    | Inexact[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
 )
 ProjectionArray = (
     Complex[
@@ -30,8 +33,11 @@ ProjectionArray = (
     | Float[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
 )
 EwaldSphereArray = (
-    Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
-    | Float[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
+    Complex[
+        Array,
+        "2 {image_config.padded_y_dim} {image_config.padded_x_dim//2+1}",
+    ]
+    | Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
 )
 
 VoxelArray = (
@@ -200,7 +206,8 @@ class AbstractVolumeIntegrator(eqx.Module, Generic[VolRep], strict=True):
     the exit plane.
 
     Integrators with `outputs_ewald_sphere = True` return the field at the volume
-    origin for a beam along +z.
+    origin for a beam along +z: in fourier space, the `rfftn` of its real and imaginary
+    parts, stacked.
     """
 
     outputs_ewald_sphere: eqx.AbstractClassVar[bool]

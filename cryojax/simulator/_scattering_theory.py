@@ -247,19 +247,11 @@ class RytovScatteringTheory(AbstractWaveScatteringTheory, strict=True):
         del rng_key
         # Compute the integrated potential in the exit plane
         check_anisotropy_supported(self.volume_integrator, image_config)
-        fourier_in_plane_potential = self.volume_integrator.integrate(
-            volume_representation, image_config, outputs_real_space=False
-        )
-        # Back to real-space; need to be careful if the object spectrum is not an
-        # rfftn
-        is_proj = not self.volume_integrator.outputs_ewald_sphere
-        do_ifft = lambda ft: (
-            jnp.fft.irfftn(ft, s=image_config.padded_shape)
-            if is_proj
-            else jnp.fft.ifftn(ft, s=image_config.padded_shape)
+        in_plane_potential = self.volume_integrator.integrate(
+            volume_representation, image_config, outputs_real_space=True
         )
         integrated_potential = _compute_complex_potential(
-            do_ifft(fourier_in_plane_potential),
+            in_plane_potential,
             error_if_not_fractional(jnp.asarray(self.amplitude_contrast_ratio)),
         )
         object = image_config.interaction_constant * integrated_potential

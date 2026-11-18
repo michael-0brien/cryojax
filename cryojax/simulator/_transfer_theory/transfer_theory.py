@@ -73,7 +73,7 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
             ]
             | Complex[
                 Array,
-                "{image_config.padded_y_dim} {image_config.padded_x_dim}",
+                "2 {image_config.padded_y_dim} {image_config.padded_x_dim//2+1}",
             ]
         ),
         image_config: AbstractImageConfig,
@@ -93,9 +93,9 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
         - `is_ewald_sphere`:
             If `False`, the `object_spectrum` is a projection
             approximation and is therefore the fourier transform of a real-valued
-            array. If `True`, `object_spectrum` is extracted from
-            the ewald sphere and is therefore the fourier transform of a complex-valued
-            array. `object_spectrum` is used as given (not conjugated).
+            array. If `True`, `object_spectrum` is extracted from the ewald sphere, a
+            complex-valued array, and holds the `rfftn` of its real and imaginary
+            parts, stacked.
         - `offset_z_in_angstroms`:
             An optional offset in Angstroms of the specimen along z, added to the
             defocus at runtime, e.g. the `offset_z_in_angstroms` of an `AbstractPose`.
@@ -119,15 +119,9 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
             # phase shifts
             contrast_spectrum = ctf_array * object_spectrum
         else:
-            # ... split the spectrum into those of the real and imaginary parts of
-            # the exit plane phase shifts, on the half plane
-            x_dim = image_config.padded_x_dim
-            spectrum_at_q = object_spectrum[:, : x_dim // 2 + 1]
-            spectrum_at_minus_q = jnp.roll(
-                jnp.flip(object_spectrum, axis=(0, 1)), 1, axis=(0, 1)
-            )[:, : x_dim // 2 + 1]
-            real_spectrum = (spectrum_at_q + jnp.conj(spectrum_at_minus_q)) / 2
-            imaginary_spectrum = (spectrum_at_q - jnp.conj(spectrum_at_minus_q)) / 2j
+            # ... the spectra of the real and imaginary parts of the exit plane
+            # phase shifts
+            real_spectrum, imaginary_spectrum = object_spectrum
             # ... and transfer the imaginary part with the CTF at a phase shift
             # lowered by 90 degrees
             imaginary_ctf_array = self.ctf(

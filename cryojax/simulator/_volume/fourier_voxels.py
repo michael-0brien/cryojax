@@ -272,6 +272,11 @@ class EwaldSphereExtraction(
     """Integrate points to the exit plane by extracting a surface of
     the ewald sphere in fourier space.
 
+    For a real volume, the exit-plane field's real and imaginary parts at a frequency
+    `q` are the half sum and half difference over `2i` of the volume's spectrum on the
+    sphere, `q - c ẑ`, and on its mirror image, `q + c ẑ`, with
+    `c = wavelength |q|² / 2`: both are sampled on the volume's own half slice.
+
     The interpolation method is read from `FourierVoxelGridVolume.interp`.
     """
 
@@ -315,13 +320,12 @@ class EwaldSphereExtraction(
         - `image_config`:
             The image configuration.
         - `outputs_real_space`:
-            If `True`, return the Ewald sphere surface in
-            real space. Otherwise, return in Fourier.
+            If `True`, return the complex field in real space. Otherwise, return the
+            `rfftn` of its real and imaginary parts, stacked.
 
         **Returns:**
 
-        The Ewald sphere surface in the real-space or fourier-space at the
-        `image_config.padded_shape`, `image_config.pixel_size`,
+        The field at the `image_config.padded_shape`, `image_config.pixel_size`,
         and `image_config.voltage_in_kilovolts`.
         """
         check_anisotropy_supported(self, image_config)
@@ -338,40 +342,41 @@ class EwaldSphereExtraction(
             raise AttributeError(
                 "Only cubic boxes are supported for fourier slice extraction."
             )
-        # The Ewald sphere surface curves the in-plane slice out of its own
-        # plane, so unlike `FourierSliceExtraction`, its output isn't
-        # Hermitian-symmetric as a whole and every output pixel is queried
-        # independently. `ewald_sphere_from_slice` reconstructs the full
-        # in-plane grid from the stored half one before curving.
-        ewald_sphere_frequencies = ewald_sphere_from_slice(
+        surface = ewald_sphere_from_slice(
             frequency_slice,
             image_config.pixel_size,
             image_config.wavelength_in_angstroms,
         )
-        # Compute the fourier projection
-        ewald_sphere_surface = sample_fft_slice(
-            volume_representation.values,
-            ewald_sphere_frequencies,
-            interp=volume_representation.interp,
-            boundary=self.boundary,
-            unroll=_resolve_unroll(self.unroll, volume_representation.interp),
-        )
 
+        def sample(surface):
+            return sample_fft_slice(
+                volume_representation.values,
+                surface,
+                interp=volume_representation.interp,
+                boundary=self.boundary,
+                unroll=_resolve_unroll(self.unroll, volume_representation.interp),
+            )
+
+        # The sphere's mirror image through the slice is the sphere at `-q`, conjugated
+        on_sphere, on_mirror = sample(surface), sample(2 * frequency_slice - surface)
+        spectra = jnp.stack([on_sphere + on_mirror, (on_sphere - on_mirror) / 1j]) / 2
         # Resize the image to match the AbstractImageConfig.padded_shape
         if image_config.padded_shape != (N, N):
-            ewald_sphere_surface = jnp.fft.fftn(
-                resize_with_crop_or_pad(
-                    jnp.fft.ifftn(ewald_sphere_surface, s=(N, N)),
-                    image_config.padded_shape,
-                )
+            spectra = jnp.fft.rfftn(
+                jnp.stack(
+                    [
+                        resize_with_crop_or_pad(part, image_config.padded_shape)
+                        for part in jnp.fft.irfftn(spectra, s=(N, N))
+                    ]
+                ),
+                axes=(1, 2),
             )
         # Scale by voxel size to convert from projection to integral
-        ewald_sphere_surface *= image_config.pixel_size
-        return (
-            jnp.fft.ifftn(ewald_sphere_surface)
-            if outputs_real_space
-            else ewald_sphere_surface
-        )
+        spectra *= image_config.pixel_size
+        if outputs_real_space:
+            real, imaginary = jnp.fft.irfftn(spectra, s=image_config.padded_shape)
+            return real + 1j * imaginary
+        return spectra
 
 
 def _resolve_unroll(unroll: bool | Literal["auto"], interp: str) -> bool:
