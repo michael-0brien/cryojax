@@ -37,7 +37,7 @@ def convert_quaternion_to_euler_angles(
     k = 3 - i - j
     sign = jnp.array((i - j) * (j - k) * (k - i) // 2, dtype=xyzw.dtype)
     a, b, c, d = (xyzw[3], xyzw[i], xyzw[j], xyzw[k] * sign)
-    angles = jnp.empty(3, dtype=xyzw.dtype)
+    angles = jnp.zeros(3, dtype=xyzw.dtype)
     angles = angles.at[1].set(2 * jnp.arctan2(jnp.hypot(c, d), jnp.hypot(a, b)))
     case = jnp.where(jnp.abs(angles[1] - jnp.pi) <= eps, 2, 0)
     case = jnp.where(jnp.abs(angles[1]) <= eps, 1, case)
