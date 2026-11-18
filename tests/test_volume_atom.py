@@ -791,6 +791,100 @@ def test_fft_atom_projection_exact_backends_agree(
     np.testing.assert_allclose(proj_nufftax, proj_jax_finufft, atol=1e-6)
 
 
+def _amplitudes_for(n_atoms):
+    return np.random.default_rng(0).uniform(0.5, 1.5, n_atoms)
+
+
+_amplitudes_image_config = dict(
+    shape=(64, 64), pixel_size=0.5, voltage_in_kilovolts=300.0, padded_shape=(128, 128)
+)
+
+
+@_backends
+def test_fft_atom_projection_amplitudes(monkeypatch, pdb_info, backend):
+    monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", backend)
+    positions = pdb_info[0]
+    amplitudes, b_factor = _amplitudes_for(positions.shape[0]), 100.0
+    image_config = cxs.BasicImageConfig(**_amplitudes_image_config)
+    expected = compute_projection(
+        cxs.GaussianMixtureVolume(positions, amplitudes, b_factor / (8 * np.pi**2)),
+        cxs.GaussianMixtureProjection(sampling_mode="point"),
+        image_config,
+    )
+    actual = compute_projection(
+        cxs.GaussianFourierVolume(
+            positions, im.FourierGaussian(amplitude=1.0, b_factor=b_factor), amplitudes
+        ),
+        cxs.GaussianFourierProjection(eps=1e-10),
+        image_config,
+    )
+    np.testing.assert_allclose(actual, expected, atol=1e-8)
+
+
+@_backends
+def test_fft_atom_projection_amplitudes_by_type(monkeypatch, pdb_info, backend):
+    monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", backend)
+    positions = pdb_info[0]
+    n_atoms = positions.shape[0]
+    amplitudes, b_factors = _amplitudes_for(n_atoms), (100.0, 150.0)
+    image_config = cxs.BasicImageConfig(**_amplitudes_image_config)
+    variances = np.where(np.arange(n_atoms) < n_atoms // 2, *b_factors) / (8 * np.pi**2)
+    expected = compute_projection(
+        cxs.GaussianMixtureVolume(positions, amplitudes, variances),
+        cxs.GaussianMixtureProjection(sampling_mode="point"),
+        image_config,
+    )
+    actual = compute_projection(
+        cxs.GaussianFourierVolume(
+            (positions[: n_atoms // 2], positions[n_atoms // 2 :]),
+            tuple(im.FourierGaussian(amplitude=1.0, b_factor=b) for b in b_factors),
+            (amplitudes[: n_atoms // 2], amplitudes[n_atoms // 2 :]),
+        ),
+        cxs.GaussianFourierProjection(eps=1e-10),
+        image_config,
+    )
+    np.testing.assert_allclose(actual, expected, atol=1e-8)
+
+
+@_backends
+def test_fft_atom_projection_amplitudes_grad_and_hvp(monkeypatch, pdb_info, backend):
+    monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", backend)
+    positions = pdb_info[0]
+    amplitudes, b_factor = _amplitudes_for(positions.shape[0]), 100.0
+    direction = np.random.default_rng(1).normal(size=positions.shape[0])
+    image_config = cxs.BasicImageConfig(**_amplitudes_image_config)
+
+    def fourier_loss(a):
+        volume = cxs.GaussianFourierVolume(
+            positions, im.FourierGaussian(amplitude=1.0, b_factor=b_factor), a
+        )
+        proj = compute_projection(
+            volume, cxs.GaussianFourierProjection(eps=1e-10), image_config
+        )
+        return 0.5 * jnp.sum(proj**2)
+
+    def mixture_loss(a):
+        volume = cxs.GaussianMixtureVolume(positions, a, b_factor / (8 * np.pi**2))
+        proj = compute_projection(
+            volume, cxs.GaussianMixtureProjection(sampling_mode="point"), image_config
+        )
+        return 0.5 * jnp.sum(proj**2)
+
+    for loss_derivative in (
+        lambda loss: jax.grad(loss)(jnp.asarray(amplitudes)),
+        lambda loss: jax.jvp(
+            jax.grad(loss), (jnp.asarray(amplitudes),), (jnp.asarray(direction),)
+        )[1],
+    ):
+        expected = loss_derivative(mixture_loss)
+        np.testing.assert_allclose(
+            loss_derivative(fourier_loss),
+            expected,
+            rtol=1e-6,
+            atol=1e-8 * np.abs(expected).max(),
+        )
+
+
 def _make_peng_volumes(pdb_info):
     atom_positions, atom_ids, _ = pdb_info
     positions_by_id, unique_atom_ids = split_atoms_by_element(atom_ids, atom_positions)
@@ -921,7 +1015,7 @@ def _make_render_volumes(pdb_info, width):
     return gaussian_volume, atom_volume
 
 
-def _sample_gaussians_3d(positions, variance, shape, voxel_size):
+def _sample_gaussians_3d(positions, variance, shape, voxel_size, weights=None):
     # Normalized isotropic gaussians at the voxel centers, the center at index N//2
     x, y, z = (
         np.exp(
@@ -930,7 +1024,11 @@ def _sample_gaussians_3d(positions, variance, shape, voxel_size):
         )
         for n, r in zip(shape[::-1], positions.T)
     )
-    return np.einsum("az, ay, ax -> zyx", z, y, x) / (2 * np.pi * variance) ** 1.5
+    weights = np.ones(positions.shape[0]) if weights is None else weights
+    return (
+        np.einsum("a, az, ay, ax -> zyx", weights, z, y, x)
+        / (2 * np.pi * variance) ** 1.5
+    )
 
 
 @pytest.mark.parametrize(
@@ -971,6 +1069,24 @@ def test_fft_atom_render_backends_agree(monkeypatch, pdb_info, width, voxel_size
         atom_volume
     )
     np.testing.assert_allclose(voxels_nufftax, voxels_jax_finufft, atol=1e-6)
+
+
+@_backends
+def test_fft_atom_render_amplitudes(monkeypatch, pdb_info, backend):
+    monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", backend)
+    width, voxel_size, shape = 1.0, 0.5, (64, 64, 64)
+    positions = pdb_info[0]
+    amplitudes = _amplitudes_for(positions.shape[0])
+    atom_volume = cxs.GaussianFourierVolume(
+        positions,
+        im.FourierGaussian(amplitude=1.0, b_factor=width**2 * 8 * np.pi**2),
+        amplitudes,
+    )
+    actual = cxs.GaussianFourierRenderFn(shape, voxel_size, eps=1e-10)(atom_volume)
+    expected = _sample_gaussians_3d(
+        positions, width**2, shape, voxel_size, weights=amplitudes
+    )
+    np.testing.assert_allclose(actual, expected, atol=1e-8)
 
 
 def test_render_options(pdb_info):
