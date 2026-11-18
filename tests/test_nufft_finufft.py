@@ -184,7 +184,9 @@ RATIO = 0.1
 # At widths 15-16 both errors are mostly the tap polynomials' truncation at 0.05 eps,
 # which fit rounding decides (3D: 15 coefficients here, 17 in finufft 2.5.1)
 _TRUNCATION_BOUND = pytest.mark.xfail(
-    strict=True, reason="measured ratio 0.22-0.41 in 2D, 2.5-2.9 in 3D"
+    strict=True,
+    raises=AssertionError,
+    reason="measured ratio 0.21-0.70 in 2D, 2.5-3.4 in 3D",
 )
 FLOAT64_CASES = [
     pytest.param(
