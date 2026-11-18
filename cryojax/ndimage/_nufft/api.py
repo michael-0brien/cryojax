@@ -20,6 +20,7 @@ from .kernel import (
     kernel_width,
     make_pswf_kernel,
 )
+from .pallas_spread import make_kernel_key, pallas_nufft_interp, pallas_nufft_spread
 from .spread import interp, interp_bwd, spread, spread_bwd
 
 
@@ -370,10 +371,7 @@ def _pallas_spread(
     fine_shape: tuple[int, ...],
     kernel: PSWFKernel,
 ) -> Float[Array, "R ..."]:
-    raise NotImplementedError(
-        "The Pallas backend of the native NUFFT is not implemented yet. Pass "
-        "`enable_pallas=False`."
-    )
+    return pallas_nufft_spread(u, c, fine_shape, make_kernel_key(kernel))
 
 
 def _pallas_interp(
@@ -387,9 +385,8 @@ def _pallas_interp(
     positions: bool,
 ) -> tuple[Float[Array, "R M"] | None, Float[Array, "M d"] | None]:
     """Values `(R, M)` and/or `sum_r weights_r grad_u interp(u, g_r)`, `(M, d)`."""
-    raise NotImplementedError(
-        "The Pallas backend of the native NUFFT is not implemented yet. Pass "
-        "`enable_pallas=False`."
+    return pallas_nufft_interp(
+        u, g, weights, fine_shape, make_kernel_key(kernel), values, positions
     )
 
 
