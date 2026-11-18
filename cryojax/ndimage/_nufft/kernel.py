@@ -83,20 +83,10 @@ def _poly_fit(kernel: PSWFKernel, tap: int, num: int, dtype: np.dtype) -> np.nda
     return monomial[::-1]
 
 
-def _in_offset(coefficients: np.ndarray) -> np.ndarray:
-    """Per-tap polynomials in `z = 2s - 1` re-expanded in `s` (highest power first)."""
-    coefficients = np.asarray(coefficients, np.float64)
-    out = np.zeros_like(coefficients)
+def _horner(coefficients: np.ndarray, z: np.ndarray) -> np.ndarray:
+    out = np.zeros(coefficients.shape[:1] + z.shape)
     for k in range(coefficients.shape[1]):
-        out = 2 * np.roll(out, -1, axis=1) - out
-        out[:, -1] += coefficients[:, k]
-    return out
-
-
-def _horner(coefficients: np.ndarray, s: np.ndarray) -> np.ndarray:
-    out = np.zeros(coefficients.shape[:1] + s.shape)
-    for k in range(coefficients.shape[1]):
-        out = out * s + coefficients[:, k].reshape((-1,) + (1,) * s.ndim)
+        out = out * z + coefficients[:, k].reshape((-1,) + (1,) * z.ndim)
     return out
 
 
@@ -109,8 +99,8 @@ def _pswf(width: int, upsample_factor: float) -> PSWFKernel:
 
 
 def make_pswf_kernel(eps: float, upsample_factor: float, ndim: int, dtype) -> PSWFKernel:
-    """Build the PSWF kernel and its per-tap Horner coefficients in the offset `s`
-    (highest power first), fitted in `dtype`'s precision as finufft does."""
+    """Build the PSWF kernel and finufft's per-tap Horner coefficients in
+    `z = 2s - 1` (highest power first), as fitted in `dtype`."""
     return _make_pswf_kernel(eps, upsample_factor, ndim, jnp.finfo(dtype).dtype)
 
 
@@ -126,24 +116,23 @@ def _make_pswf_kernel(
     is_large = np.abs(fitted) >= dtype.type(eps) * dtype.type(0.05)
     needed = np.where(is_large.any(axis=1), num_fit - np.argmax(is_large, axis=1), 0)
     num = max(_MIN_NC, width - 4, int(needed.max()))
-    coefficients = _in_offset(fitted[:, num_fit - num :])
+    coefficients = fitted[:, num_fit - num :]
     coefficients.setflags(write=False)
     return kernel._replace(coefficients=coefficients)
 
 
 def derivative_coefficients(coefficients: np.ndarray, order: int) -> np.ndarray:
     """The per-tap Horner coefficients (highest power first) of the `order`-th
-    derivative in `u`. The offset `s` falls as `u` rises, so each order flips the
-    sign."""
+    derivative in `u`. `s` falls as `u` rises, so `dz/du = -2`."""
     for _ in range(order):
         degree = coefficients.shape[1] - 1
-        coefficients = -coefficients[:, :-1] * np.arange(degree, 0, -1)
+        coefficients = -2 * coefficients[:, :-1] * np.arange(degree, 0, -1)
     return coefficients
 
 
 def tap_weights(kernel: PSWFKernel, s) -> np.ndarray:
     """Tap weights for fractional offsets `s`, shape `(width, *s.shape)`."""
-    return _horner(kernel.coefficients, np.asarray(s, dtype=np.float64))
+    return _horner(kernel.coefficients, 2 * np.asarray(s, dtype=np.float64) - 1)
 
 
 def kernel_fourier_series(
@@ -156,18 +145,18 @@ def kernel_fourier_series(
     half_width = kernel.width / 2.0
     q = int(2 + 3.0 * half_width)
     nodes, weights = np.polynomial.legendre.leggauss(2 * q)
-    z = dtype.type(half_width) * nodes[:q].astype(dtype)
-    x = z + dtype.type(half_width)
-    tap = np.ceil(x).astype(int) - 1
-    s = x - tap.astype(dtype)
-    values = np.zeros_like(s)
+    x = dtype.type(half_width) * nodes[:q].astype(dtype)
+    tap = np.ceil(x + dtype.type(half_width)).astype(int) - 1
+    # finufft include/finufft/spreadinterp.hpp:87: `z = 2s - 1`
+    z = dtype.type(2) * (x - tap.astype(dtype)) + dtype.type(kernel.width - 1)
+    values = np.zeros_like(z)
     for coefficient in kernel.coefficients.astype(dtype)[tap].T:
-        values = values * s + coefficient
+        values = values * z + coefficient
     f = dtype.type(half_width) * weights[:q].astype(dtype) * values
     # Both integrate in grid units (finufft's 1/h); finufft's `(-1)^k` centres the
     # kernel at `m / 2`, native's sits at 0
     k = np.abs(np.arange(n // 2 + 1) if rfft else np.fft.fftfreq(n, 1 / n))
-    phase = dtype.type(2 * math.pi) * z * (k.astype(dtype)[:, None] / dtype.type(m))
+    phase = dtype.type(2 * math.pi) * x * (k.astype(dtype)[:, None] / dtype.type(m))
     return np.sum(dtype.type(2) * f * np.cos(phase), axis=1, dtype=dtype)
 
 

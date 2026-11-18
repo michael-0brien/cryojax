@@ -2,8 +2,9 @@
 
 Coordinates `u` are `(x, y[, z])` in fine-grid pixels, matching the last, ..., first grid
 axis. A point touches `l = ceil(u - w/2) + j`, `j = 0..w-1`, weighted by per-tap Horner
-polynomials in `s = ceil(u - w/2) - (u - w/2)` (see `kernel.py`), evaluated per axis once
-per point. All functions are plain JAX, so forward mode through the VJPs gives HVPs.
+polynomials in finufft's `z = 2s - 1`, `s = ceil(u - w/2) - (u - w/2)` (see `kernel.py`),
+evaluated per axis once per point. All functions are plain JAX, so forward mode through
+the VJPs gives HVPs.
 """
 
 import functools
@@ -92,11 +93,12 @@ def _taps(u, fine_shape, width):
 
 
 def _horner(coefficients: np.ndarray, s: Array) -> Array:
-    """Every tap's polynomial (highest power first) at `s`, shape `(M, w)`."""
+    """Every tap's polynomial (highest power first) at `z = 2s - 1`, shape `(M, w)`."""
     coefficients = jnp.asarray(coefficients, dtype=s.dtype)
+    z = 2 * s[:, None] - 1
     out = jnp.broadcast_to(coefficients[:, 0], s.shape + coefficients.shape[:1])
     for k in range(1, coefficients.shape[1]):
-        out = out * s[:, None] + coefficients[:, k]
+        out = out * z + coefficients[:, k]
     return out
 
 

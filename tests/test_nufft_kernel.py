@@ -4,6 +4,8 @@ import pytest
 from cryojax.ndimage import nufft_accuracy_limits
 from cryojax.ndimage._nufft.kernel import (
     _auto_upsample_factor,
+    _poly_fit,
+    derivative_coefficients,
     fine_grid_size,
     kernel_fourier_series,
     kernel_width,
@@ -86,6 +88,37 @@ def test_coefficient_count_drops_below_width():
     assert kernel.coefficients.shape == (14, 12)
 
 
+@pytest.mark.parametrize(
+    "eps, sigma, ndim, dtype",
+    [
+        (1e-4, 2.0, 2, np.float32),
+        (1e-4, 2.0, 2, np.float64),
+        (1e-6, 1.25, 3, np.float32),
+        (1e-12, 2.0, 2, np.float64),
+    ],
+)
+def test_coefficients_are_finufft_table(eps, sigma, ndim, dtype):
+    """finufft's Horner table in `z`, as fitted (include/finufft/makeplan.hpp:237-271)."""
+    kernel = make_pswf_kernel(eps, sigma, ndim, dtype)
+    w, dtype = kernel.width, np.dtype(dtype)
+    fitted = [_poly_fit(kernel, j, min(19, w + 3), dtype) for j in range(w)]
+    nc = max(4, w - 4)
+    for coeffs in fitted:
+        large = np.flatnonzero(np.abs(coeffs) >= dtype.type(eps) * dtype.type(0.05))
+        nc = max(nc, coeffs.size - large[0]) if large.size else nc
+    assert kernel.coefficients.dtype == dtype
+    np.testing.assert_array_equal(kernel.coefficients, np.array(fitted)[:, -nc:])
+
+
+def test_derivative_coefficients_in_u():
+    """`d/du = -2 d/dz`: `z = 2s - 1` and `s` falls as `u` rises."""
+    coefficients = np.array([[1.0, 2.0, 3.0, 4.0], [0.0, 0.0, 1.0, 0.0]])
+    first = derivative_coefficients(coefficients, 1)
+    second = derivative_coefficients(coefficients, 2)
+    np.testing.assert_array_equal(first, [[-6.0, -8.0, -6.0], [0.0, 0.0, -2.0]])
+    np.testing.assert_array_equal(second, [[24.0, 16.0], [0.0, 0.0]])
+
+
 @pytest.mark.parametrize("ndim", (2, 3))
 @pytest.mark.parametrize("sigma", SIGMAS)
 @pytest.mark.parametrize("eps", (1e-2, 1e-4, 1e-6, 1e-9))
@@ -109,9 +142,11 @@ def test_fourier_series_matches_analytic_pswf(eps, sigma):
     m = fine_grid_size(n, sigma, w)
     got = kernel_fourier_series(kernel, n, m, rfft=False, dtype=np.float64)
     k = np.fft.fftfreq(n, 1 / n)
-    # finufft include/finufft_common/kernel.h:104 (`pswf_selfft_params`): the integral
-    # of the taps' polynomials over their unit panels
-    prefac = np.sum(kernel.coefficients / np.arange(kernel.coefficients.shape[1], 0, -1))
+    # finufft include/finufft_common/kernel.h:104 (`pswf_selfft_params`)
+    nc = kernel.coefficients.shape[1]
+    prefac = sum(
+        kernel.coefficients[:, j].sum() / (nc - j) for j in range(nc - 1, -1, -2)
+    )
     ref = prefac * kernel.pswf(np.pi * k * w / (c * m))
     assert np.max(np.abs(got - ref)) <= eps * ref[0]
     half = kernel_fourier_series(kernel, n, m, rfft=True, dtype=np.float64)
@@ -121,16 +156,17 @@ def test_fourier_series_matches_analytic_pswf(eps, sigma):
 @pytest.mark.parametrize("eps", (1e-4, 1e-6))
 def test_float32_taps_fitted_in_float32(eps):
     """finufft fits float32 taps in float32 (include/finufft/makeplan.hpp:245); in
-    float32 they still reach `eps` (measured: 5.1 eps32 at 1e-4, 1.1 at 1e-6)."""
+    float32 they still reach `eps` (measured: 4.9 eps32 at 1e-4, 2.0 at 1e-6)."""
     kernel = make_pswf_kernel(eps, 2.0, 2, np.float32)
     kernel64 = make_pswf_kernel(eps, 2.0, 2, np.float64)
     assert kernel.coefficients.shape == kernel64.coefficients.shape
     assert not np.array_equal(kernel.coefficients, kernel64.coefficients)
     w = kernel.width
     s = np.linspace(0, 1, 1001, dtype=np.float32)
+    z = 2 * s - 1
     taps = np.zeros((w, s.size), np.float32)
-    for coefficient in kernel.coefficients.astype(np.float32).T:
-        taps = taps * s + coefficient[:, None]
+    for coefficient in kernel.coefficients.T:
+        taps = taps * z + coefficient[:, None]
     exact = np.array([kernel.pswf(2 * (s + j - w / 2) / w) for j in range(w)])
     assert np.max(np.abs(taps - exact)) <= max(eps, 8 * np.finfo(np.float32).eps)
 
