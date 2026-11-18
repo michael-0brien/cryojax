@@ -5,6 +5,7 @@ from typing_extensions import override
 import equinox as eqx
 import jax
 import jax.numpy as jnp
+import numpy as np
 from jaxtyping import Array, Float, PyTree
 
 from ..._internal import leaf_asarray
@@ -53,7 +54,7 @@ class GaussianFourierVolume(AbstractAtomVolume, strict=True):
         )
         ```
 
-    The arguments `positions` and `kernel_fns` may also be
+    The arguments `positions`, `kernel_fns` and `amplitudes` may also be
     pytrees of arrays and scattering factors, where each tree leaf represents
     a different atom type.
 
@@ -76,6 +77,7 @@ class GaussianFourierVolume(AbstractAtomVolume, strict=True):
 
     positions: PyTree[Float[NDArrayLike, "_ 3"]]
     kernel_fns: PyTree[FourierGaussian]
+    amplitudes: PyTree[Float[NDArrayLike, " _"]]
 
     is_frame_rotation: ClassVar[bool] = False
 
@@ -83,6 +85,7 @@ class GaussianFourierVolume(AbstractAtomVolume, strict=True):
         self,
         positions: PyTree[Float[NDArrayLike, "_ 3"], "T"],
         kernel_fns: PyTree[FourierGaussian, "T"],
+        amplitudes: PyTree[Float[NDArrayLike, " _"], "T"] | None = None,
     ):
         """**Arguments:**
 
@@ -93,9 +96,11 @@ class GaussianFourierVolume(AbstractAtomVolume, strict=True):
             as `positions`, where each leaf is a
             [`cryojax.ndimage.FourierGaussian`][] representing the atom
             type's scattering factor. These may have amplitudes and
-            b-factors with a batch dimension to simulate form factors. To
-            use a different amplitude for each atom position, use
-            [`cryojax.simulator.GaussianMixtureVolume`][] instead.
+            b-factors with a batch dimension to simulate form factors.
+        - `amplitudes`:
+            A pytree with the same tree structure as `positions`, each leaf
+            of shape `(M,)`: one amplitude per atom, scaling its type's
+            scattering factor. Ones if not given.
         """  # noqa: E501
         if jax.tree.structure(positions) != jax.tree.structure(
             kernel_fns,
@@ -106,10 +111,31 @@ class GaussianFourierVolume(AbstractAtomVolume, strict=True):
                 "that the pytree structures of `positions` and "
                 "`kernel_fns` were not equal."
             )
+        if amplitudes is not None and (
+            jax.tree.structure(positions) != jax.tree.structure(amplitudes)
+        ):
+            raise ValueError(
+                "When instantiating a `GaussianFourierVolume`, found "
+                "that the pytree structures of `positions` and "
+                "`amplitudes` were not equal."
+            )
         # Convert positions to array leaves, preserving their backend (JAX
         # arrays stay on-device, NumPy arrays stay on the host).
         self.positions = jax.tree.map(lambda x: leaf_asarray(x, dtype=float), positions)
         self.kernel_fns = kernel_fns
+        if amplitudes is None:
+            amplitudes = jax.tree.map(lambda x: np.ones(x.shape[0]), self.positions)
+        self.amplitudes = jax.tree.map(lambda x: leaf_asarray(x, dtype=float), amplitudes)
+        for pos, amp in zip(
+            jax.tree.leaves(self.positions), jax.tree.leaves(self.amplitudes)
+        ):
+            if amp.shape != (pos.shape[0],):
+                raise ValueError(
+                    "When instantiating a `GaussianFourierVolume`, found an "
+                    f"`amplitudes` leaf of shape {amp.shape} for {pos.shape[0]} "
+                    "positions. Each leaf must have shape `(M,)`, where `M` is "
+                    "the number of positions in the matching leaf of `positions`."
+                )
 
     @override
     def rotate_to_pose(self, pose: AbstractPose) -> Self:
