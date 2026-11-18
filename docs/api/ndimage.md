@@ -290,6 +290,8 @@ This documentation is a collection of functions used to work with coordinate sys
 
 ::: cryojax.ndimage.dispatch_nufft2
 
+::: cryojax.ndimage.nufft_accuracy_limits
+
 ### Fourier projection-slice extraction
 
 ::: cryojax.ndimage.prepare_sampling_fft
