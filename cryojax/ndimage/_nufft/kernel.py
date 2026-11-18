@@ -114,6 +114,16 @@ def make_pswf_kernel(eps: float, upsample_factor: float, ndim: int) -> PSWFKerne
     )
 
 
+def derivative_coefficients(coefficients: np.ndarray, order: int) -> np.ndarray:
+    """The per-tap Horner coefficients (highest power first) of the `order`-th
+    derivative in `u`. The offset `s` falls as `u` rises, so each order flips the
+    sign."""
+    for _ in range(order):
+        degree = coefficients.shape[1] - 1
+        coefficients = -coefficients[:, :-1] * np.arange(degree, 0, -1)
+    return coefficients
+
+
 def tap_weights(kernel: PSWFKernel, s) -> np.ndarray:
     """Tap weights for fractional offsets `s`, shape `(width, *s.shape)`."""
     return _horner(kernel.coefficients, np.asarray(s, dtype=np.float64))

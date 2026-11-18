@@ -6,6 +6,8 @@ non-accumulating set and refuses a mask, so a program must hold one point and no
 ragged lanes. The dispatch tests compile the kernels and need a GPU.
 """
 
+import itertools
+import math
 from functools import partial
 
 import cryojax.ndimage as im
@@ -38,6 +40,18 @@ def _relative_error(actual, expected):
 
 def _pallas_calls(fn, *args):
     """Every `pallas_call` in `fn`'s traced program, as `(out_shapes, n_grid_axes)`."""
+    return [
+        ([v.aval.shape for v in eqn.outvars], len(eqn.params["grid_mapping"].grid))
+        for eqn in _pallas_eqns(fn, *args)
+    ]
+
+
+def _pallas_names(fn, *args):
+    return sorted(eqn.params["name"] for eqn in _pallas_eqns(fn, *args))
+
+
+def _pallas_eqns(fn, *args):
+    """Every `pallas_call` equation in `fn`'s traced program."""
     found = []
 
     def walk(v):
@@ -55,8 +69,7 @@ def _pallas_calls(fn, *args):
     def visit(jaxpr):
         for eqn in jaxpr.eqns:
             if eqn.primitive.name == "pallas_call":
-                grid = eqn.params["grid_mapping"].grid
-                found.append(([v.aval.shape for v in eqn.outvars], len(grid)))
+                found.append(eqn)
             for v in eqn.params.values():
                 walk(v)
 
@@ -230,6 +243,194 @@ def test_empty_points_under_vmap():
 
 
 #
+# Forward mode, interpret mode
+#
+def _directions(primals, n_directions, seed):
+    rng = np.random.default_rng(seed)
+    return tuple(jnp.asarray(rng.normal(size=(n_directions, *p.shape))) for p in primals)
+
+
+def _jvp_in(fn, primals, moving, directions):
+    """`jax.vmap` over directions of `jax.jvp(fn)` in the `moving` primals; the others
+    are closed over, so their tangents are symbolic zeros."""
+
+    def fn_of_moving(*args):
+        args = iter(args)
+        return fn(*(next(args) if m else p for p, m in zip(primals, moving)))
+
+    def pick(xs):
+        return tuple(x for x, m in zip(xs, moving) if m)
+
+    return jax.vmap(lambda *t: jax.jvp(fn_of_moving, pick(primals), t))(*pick(directions))
+
+
+def _assert_trees_close(actual, expected, tolerance):
+    actual, expected = jax.tree.leaves(actual), jax.tree.leaves(expected)
+    assert len(actual) == len(expected)
+    for a, e in zip(actual, expected):
+        assert a.shape == e.shape and a.dtype == e.dtype
+        if np.any(np.asarray(e)):
+            assert _relative_error(a, e) <= tolerance
+        else:
+            assert not np.any(np.asarray(a))
+
+
+@pytest.mark.parametrize("moving", [(True, True), (True, False), (False, True)])
+@pytest.mark.parametrize("fine_shape", FINE_SHAPES)
+def test_spread_jvp_matches_pure_jax_interpret(
+    interpret, monkeypatch, fine_shape, moving
+):
+    monkeypatch.setattr(_pallas_helpers, "CRYOJAX_PALLAS_BLOCK_SIZE", 1)
+    kernel = _kernel(fine_shape)
+    key = nufft_pallas.make_kernel_key(kernel)
+    u, c, _ = _fine_problem(fine_shape, 30, 2, seed=12)
+    directions = _directions((u, c), 3, seed=13)
+    actual = _jvp_in(
+        lambda u, c: nufft_pallas.pallas_nufft_spread(u, c, fine_shape, key),
+        (u, c),
+        moving,
+        directions,
+    )
+    expected = _jvp_in(
+        lambda u, c: spread(u, c, fine_shape, kernel), (u, c), moving, directions
+    )
+    _assert_trees_close(actual, expected, 1e-12)
+
+
+INTERP_JVP_CASES = [
+    (values, positions, moving)
+    for values, positions in [(True, False), (True, True), (False, True)]
+    for moving in itertools.product((True, False), repeat=2 + positions)
+    if any(moving)
+]
+
+
+@pytest.mark.parametrize("values, positions, moving", INTERP_JVP_CASES)
+@pytest.mark.parametrize("fine_shape", FINE_SHAPES)
+def test_interp_jvp_matches_pure_jax_interpret(
+    interpret, fine_shape, values, positions, moving
+):
+    kernel = _kernel(fine_shape)
+    key = nufft_pallas.make_kernel_key(kernel)
+    # Not a multiple of the block size: the last program has masked lanes
+    u, weights, g = _fine_problem(fine_shape, 150, 2, seed=14)
+    primals = (u, g, weights) if positions else (u, g)
+    directions = _directions(primals, 3, seed=15)
+
+    def reference(u, g, weights=None):
+        if not positions:
+            return interp(u, g, kernel), None
+        u_bar, values_out = spread_bwd(u, weights, g, kernel)
+        return (values_out if values else None), u_bar
+
+    def pallas(u, g, weights=None):
+        return nufft_pallas.pallas_nufft_interp(
+            u, g, weights, fine_shape, key, values, positions
+        )
+
+    actual = _jvp_in(pallas, primals, moving, directions)
+    expected = _jvp_in(reference, primals, moving, directions)
+    _assert_trees_close(actual, expected, 1e-12)
+
+
+def test_tangent_kernels_specialized_on_symbolic_zeros():
+    """A symbolic-zero tangent never reaches a tangent kernel, nor does a primal operand
+    that only it would multiply."""
+    fine_shape, ndim = FINE_SHAPES[0], 2
+    key = nufft_pallas.make_kernel_key(_kernel(fine_shape))
+    u, c, g = _fine_problem(fine_shape, 150, 2, seed=16)
+
+    def tangent_inputs(fn, primals, moving):
+        directions = _directions(primals, 1, seed=17)
+        (eqn,) = [
+            eqn
+            for eqn in _pallas_eqns(lambda: _jvp_in(fn, primals, moving, directions))
+            if eqn.params["name"].endswith("_tangent")
+        ]
+        return len(eqn.invars)
+
+    def spread_fn(u, c):
+        return nufft_pallas.pallas_nufft_spread(u, c, fine_shape, key)
+
+    def interp_fn(u, g, weights):
+        return nufft_pallas.pallas_nufft_interp(
+            u, g, weights, fine_shape, key, True, True
+        )
+
+    # Per axis u and tu; c, tc and the output buffer
+    assert tangent_inputs(spread_fn, (u, c), (True, True)) == 2 * ndim + 3
+    assert tangent_inputs(spread_fn, (u, c), (True, False)) == 2 * ndim + 2
+    assert tangent_inputs(spread_fn, (u, c), (False, True)) == ndim + 2
+    # Per axis u and tu; g, weights, tg, tw
+    assert tangent_inputs(interp_fn, (u, g, c), (True, True, True)) == 2 * ndim + 4
+    assert tangent_inputs(interp_fn, (u, g, c), (False, True, False)) == ndim + 2
+    assert tangent_inputs(interp_fn, (u, g, c), (False, False, True)) == ndim + 2
+
+
+def test_jvp_and_vmap_over_strengths_compose_interpret(interpret, monkeypatch):
+    """With the positions shared, a `jax.vmap` over strengths and grids still folds the
+    primal into one launch inside `jax.jvp`, and a `jax.jvp` inside `jax.vmap` matches
+    pure JAX."""
+    monkeypatch.setattr(_pallas_helpers, "CRYOJAX_PALLAS_BLOCK_SIZE", 1)
+    fine_shape = FINE_SHAPES[0]
+    kernel = _kernel(fine_shape)
+    key = nufft_pallas.make_kernel_key(kernel)
+    u, c, g = _fine_problem(fine_shape, 30, 2, seed=18, batch=(3,))
+    u = u[0]
+    (tu,) = _directions((u,), 1, seed=19)
+    tu = tu[0]
+    tc, tg = _directions((c, g), 1, seed=20)
+    tc, tg = tc[0], tg[0]
+
+    pallas_spread = partial(nufft_pallas.pallas_nufft_spread, fine_shape=fine_shape)
+
+    def spread_fns(spread_fn):
+        jvp_of_vmap = jax.jvp(jax.vmap(spread_fn, in_axes=(None, 0)), (u, c), (tu, tc))
+        vmap_of_jvp = jax.vmap(
+            lambda c, tc: jax.jvp(spread_fn, (u, c), (tu, tc)), in_axes=(0, 0)
+        )(c, tc)
+        return jvp_of_vmap, vmap_of_jvp
+
+    actual = spread_fns(lambda u, c: pallas_spread(u, c, kernel_key=key))
+    expected = spread_fns(lambda u, c: spread(u, c, fine_shape, kernel))
+    _assert_trees_close(actual, expected, 1e-12)
+    size = int(np.prod(fine_shape))
+    primal_calls = [
+        [v.aval.shape for v in eqn.outvars]
+        for eqn in _pallas_eqns(
+            lambda: jax.jvp(
+                jax.vmap(
+                    lambda u, c: pallas_spread(u, c, kernel_key=key), in_axes=(None, 0)
+                ),
+                (u, c),
+                (tu, tc),
+            )
+        )
+        if eqn.params["name"] == "nufft_spread"
+    ]
+    assert primal_calls == [[(6, size)]]
+
+    def interp_fns(interp_fn):
+        jvp_of_vmap = jax.jvp(
+            jax.vmap(interp_fn, in_axes=(None, 0, 0)), (u, g, c), (tu, tg, tc)
+        )
+        vmap_of_jvp = jax.vmap(
+            lambda g, c, tg, tc: jax.jvp(interp_fn, (u, g, c), (tu, tg, tc))
+        )(g, c, tg, tc)
+        return jvp_of_vmap, vmap_of_jvp
+
+    def reference(u, g, weights):
+        return spread_bwd(u, weights, g, kernel)[::-1]
+
+    def pallas(u, g, weights):
+        return nufft_pallas.pallas_nufft_interp(
+            u, g, weights, fine_shape, key, True, True
+        )
+
+    _assert_trees_close(interp_fns(pallas), interp_fns(reference), 1e-12)
+
+
+#
 # Dispatch, compiled
 #
 # At eps 1e-9 and sigma 1.25 in 2D the deconvolution lifts summation-order rounding to
@@ -398,6 +599,14 @@ def test_pallas_empty_points(shape):
     assert [g.shape for g in grads] == [(0, ndim), (0,), spectrum.shape, ()]
     assert all(np.all(np.asarray(g) == 0) for g in grads)
 
+    def hvp(*args):
+        grad = lambda *p: value_and_grad[True](*p)[1]
+        return jax.jvp(grad, args, args)
+
+    assert _pallas_calls(hvp, *empty) == []
+    for g in jax.tree.leaves(hvp(*empty)):
+        assert not np.any(np.asarray(g))
+
     one = (jnp.asarray([[0.3, -1.2, 0.7][:ndim]]), jnp.asarray([2.5]), *empty[2:])
     (actual, _), actual_grads = value_and_grad[True](*one)
     (expected, _), expected_grads = value_and_grad[False](*one)
@@ -415,3 +624,217 @@ def test_pallas_empty_points(shape):
     actual, expected = (jax.tree.leaves(vmapped[k](*batched)) for k in (True, False))
     for a, e in zip(actual, expected):
         assert a.shape == e.shape and np.array_equal(a, e)
+
+
+#
+# Forward-over-reverse, compiled
+#
+HVP_CASES = [
+    ((64, 64), np.float64, 1e-9, 2.0),
+    ((16, 15, 14), np.float64, 1e-9, 1.25),
+    ((64, 64), np.float32, 1e-4, 1.25),
+    ((16, 15, 14), np.float32, 1e-4, 1.25),
+]
+# One HVP: per `custom_vjp`, each primal kernel and its tangent kernel
+HVP_KERNELS = {
+    1: ["nufft_interp", "nufft_interp_tangent", "nufft_spread", "nufft_spread_tangent"],
+    2: ["nufft_interp"] * 2
+    + ["nufft_interp_tangent"] * 2
+    + ["nufft_spread", "nufft_spread_tangent"],
+}
+
+
+def _hvp_problem(transform, shape, dtype, seed, batch=()):
+    """Positions, strengths (type 1) or spectrum (type 2), and pixel size; and the
+    target of `_hvp_loss`."""
+    positions = _points(shape, 300, seed=seed, dtype=dtype)
+    rng = np.random.default_rng(seed + 1)
+    strengths = jnp.asarray(rng.normal(size=(*batch, 300)), dtype)
+    spectrum = _spectrum(shape, seed=seed + 2, dtype=dtype, batch=batch)
+    data, target = (strengths, spectrum) if transform == 1 else (spectrum, strengths)
+    return (positions, data, jnp.asarray(PIXEL_SIZE, dtype)), target
+
+
+def _hvp_directions(primals, seed, n_directions=None):
+    rng = np.random.default_rng(seed)
+    lead = () if n_directions is None else (n_directions,)
+
+    def draw(p):
+        t = rng.normal(size=(*lead, *p.shape))
+        if jnp.iscomplexobj(p):
+            t = t + 1j * rng.normal(size=t.shape)
+        return jnp.asarray(t).astype(p.dtype)
+
+    return tuple(draw(p) for p in primals)
+
+
+def _hvp_loss(transform, shape, eps, sigma, target, enable_pallas):
+    dispatch = im.dispatch_nufft1 if transform == 1 else im.dispatch_nufft2
+
+    def loss(positions, data, pixel_size):
+        out = dispatch(
+            positions,
+            data,
+            shape,
+            pixel_size=pixel_size,
+            eps=eps,
+            upsample_factor=sigma,
+            enable_pallas=enable_pallas,
+        )
+        return jnp.vdot(out - target, out - target).real
+
+    return loss
+
+
+@partial(jax.jit, static_argnames=("transform", "shape", "eps", "sigma", "enable_pallas"))
+def _hvp(primals, directions, target, transform, shape, eps, sigma, enable_pallas):
+    loss = _hvp_loss(transform, shape, eps, sigma, target, enable_pallas)
+    return jax.jvp(jax.grad(loss, argnums=(0, 1, 2)), primals, directions)
+
+
+@requires_gpu
+@pytest.mark.parametrize("batch", [(), (2,)])
+@pytest.mark.parametrize("transform", [1, 2])
+@pytest.mark.parametrize("shape, dtype, eps, sigma", HVP_CASES)
+def test_pallas_hvp_matches_pure_jax(shape, dtype, eps, sigma, transform, batch):
+    primals, target = _hvp_problem(transform, shape, dtype, seed=30, batch=batch)
+    directions = _hvp_directions(primals, seed=31)
+    kwargs = dict(transform=transform, shape=shape, eps=eps, sigma=sigma)
+    expected = _hvp(primals, directions, target, **kwargs, enable_pallas=False)
+    actual = _hvp(primals, directions, target, **kwargs, enable_pallas=True)
+    tolerance = 1e-4 if dtype == np.float32 else 1e-10
+    (grads, hvps), (expected_grads, expected_hvps) = actual, expected
+    _assert_trees_close(
+        (grads[:2], hvps[:2]), (expected_grads[:2], expected_hvps[:2]), tolerance
+    )
+    # The pixel-size entries sum cancelling per-point terms (`u` is linear in
+    # `positions / pixel_size`), so they are measured against those terms' size
+    (positions, _, pixel_size), (t_positions, _, t_pixel_size) = primals, directions
+    norm = lambda x: np.linalg.norm(np.asarray(x))
+    grad_terms = norm(positions * expected_grads[0]) / pixel_size
+    hvp_terms = (
+        norm(t_positions * expected_grads[0]) + norm(positions * expected_hvps[0])
+    ) / pixel_size + abs(t_pixel_size) * grad_terms / pixel_size
+    assert abs(grads[2] - expected_grads[2]) <= tolerance * grad_terms
+    assert abs(hvps[2] - expected_hvps[2]) <= tolerance * hvp_terms
+
+
+@requires_gpu
+@pytest.mark.parametrize("transform", [1, 2])
+@pytest.mark.parametrize("argnum", [0, 1, 2])
+def test_pallas_hvp_in_one_argument(transform, argnum):
+    """The other arguments are constants: their tangents reach the rules as symbolic
+    zeros."""
+    shape, dtype, eps, sigma = HVP_CASES[0]
+    primals, target = _hvp_problem(transform, shape, dtype, seed=32)
+    (direction,) = _hvp_directions(primals[argnum : argnum + 1], seed=33)
+
+    def hvp(enable_pallas):
+        loss = _hvp_loss(transform, shape, eps, sigma, target, enable_pallas)
+
+        def loss_in_one(x):
+            return loss(*primals[:argnum], x, *primals[argnum + 1 :])
+
+        return jax.jit(jax.jvp, static_argnums=0)(
+            jax.grad(loss_in_one), (primals[argnum],), (direction,)
+        )
+
+    _assert_trees_close(hvp(True), hvp(False), 1e-10)
+
+
+@requires_gpu
+@pytest.mark.parametrize("transform", [1, 2])
+def test_pallas_linearize_value_and_grad(transform):
+    """`jax.linearize` keeps the primal: its tangent map runs the tangent kernels only."""
+    shape, dtype, eps, sigma = HVP_CASES[0]
+    primals, target = _hvp_problem(transform, shape, dtype, seed=34)
+    directions = _hvp_directions(primals, seed=35)
+    results = {}
+    for enable_pallas in (False, True):
+        loss = _hvp_loss(transform, shape, eps, sigma, target, enable_pallas)
+        value_and_grad = jax.value_and_grad(loss, argnums=(0, 1, 2))
+        out, tangent_map = jax.linearize(value_and_grad, *primals)
+        results[enable_pallas] = (out, tangent_map(*directions))
+    names = _pallas_names(tangent_map, *directions)
+    assert names == [n for n in HVP_KERNELS[transform] if n.endswith("_tangent")]
+    _assert_trees_close(results[True], results[False], 1e-10)
+
+
+@requires_gpu
+@pytest.mark.parametrize("transform", [1, 2])
+def test_pallas_vmap_hvp_one_launch(transform):
+    """Five HVPs at one point: each tangent kernel launches once with all five
+    directions, on one grid axis."""
+    shape, dtype, eps, sigma = HVP_CASES[0]
+    primals, target = _hvp_problem(transform, shape, dtype, seed=36)
+    directions = _hvp_directions(primals, seed=37, n_directions=5)
+
+    def hvp(enable_pallas):
+        loss = _hvp_loss(transform, shape, eps, sigma, target, enable_pallas)
+        grad = jax.grad(loss, argnums=(0, 1, 2))
+        return lambda v: jax.jvp(grad, primals, v)[1]
+
+    def tangent_sizes(fn, *args):
+        return sorted(
+            (eqn.params["name"], sum(math.prod(v.aval.shape) for v in eqn.outvars))
+            for eqn in _pallas_eqns(fn, *args)
+            if eqn.params["name"].endswith("_tangent")
+        )
+
+    eqns = _pallas_eqns(jax.vmap(hvp(True)), directions)
+    assert sorted(eqn.params["name"] for eqn in eqns) == HVP_KERNELS[transform]
+    assert all(len(eqn.params["grid_mapping"].grid) == 1 for eqn in eqns)
+    one = jax.tree.map(lambda t: t[0], directions)
+    assert tangent_sizes(jax.vmap(hvp(True)), directions) == [
+        (name, 5 * size) for name, size in tangent_sizes(hvp(True), one)
+    ]
+    actual = jax.jit(jax.vmap(hvp(True)))(directions)
+    expected = jax.jit(jax.vmap(hvp(False)))(directions)
+    _assert_trees_close(actual, expected, 1e-10)
+
+
+@requires_gpu
+@pytest.mark.parametrize("transform", [1, 2])
+@pytest.mark.parametrize("n_directions, n_chunks", [(None, 1), (12, 1), (13, 2)])
+def test_pallas_hvp_launch_count(transform, n_directions, n_chunks):
+    """One HVP launches each primal kernel and its tangent kernel once; a batch of
+    directions beyond `_MAX_JVP_DIRECTIONS` splits into chunks."""
+    assert _pallas_helpers._MAX_JVP_DIRECTIONS == 12
+    shape, dtype, eps, sigma = HVP_CASES[0]
+    primals, target = _hvp_problem(transform, shape, dtype, seed=38)
+    directions = _hvp_directions(primals, seed=39, n_directions=n_directions)
+    loss = _hvp_loss(transform, shape, eps, sigma, target, True)
+    grad = jax.grad(loss, argnums=(0, 1, 2))
+    hvp = lambda v: jax.jvp(grad, primals, v)[1]
+    names = _pallas_names(hvp if n_directions is None else jax.vmap(hvp), directions)
+    expected = [
+        name
+        for name in HVP_KERNELS[transform]
+        for _ in range(n_chunks if name.endswith("_tangent") else 1)
+    ]
+    assert names == sorted(expected)
+
+
+@requires_gpu
+@pytest.mark.parametrize("transform", [1, 2])
+def test_pallas_hvp_under_vmap(transform):
+    """HVPs under a `jax.vmap` over point sets, and over data with the positions
+    shared."""
+    shape, dtype, eps, sigma = HVP_CASES[0]
+    primals, target = _hvp_problem(transform, shape, dtype, seed=40, batch=(3,))
+    positions = _points(shape, 300, seed=41, dtype=dtype, batch=(3,))
+    directions = _hvp_directions((positions, *primals[1:]), seed=42)
+
+    def hvps(enable_pallas):
+        loss = _hvp_loss(transform, shape, eps, sigma, target[0], enable_pallas)
+        grad = jax.grad(loss, argnums=(0, 1, 2))
+        hvp = lambda p, v: jax.jvp(grad, p, v)
+        point_sets = jax.vmap(hvp, in_axes=((0, 0, None), (0, 0, None)))(
+            (positions, *primals[1:]), directions
+        )
+        shared = jax.vmap(hvp, in_axes=((None, 0, None), (None, 0, None)))(
+            primals, (directions[0][0], *directions[1:])
+        )
+        return point_sets, shared
+
+    _assert_trees_close(jax.jit(hvps, static_argnums=0)(True), hvps(False), 1e-10)
