@@ -627,7 +627,7 @@ def test_pallas_empty_points(shape):
 
 
 @requires_gpu
-def test_auto_ignores_backend_and_points(monkeypatch):
+def test_auto_ignores_backend(monkeypatch):
     picks = []
 
     def make_pswf_kernel(eps, upsample_factor, ndim, dtype):
@@ -637,19 +637,18 @@ def test_auto_ignores_backend_and_points(monkeypatch):
 
     make_pswf_kernel_unpatched = nufft_api.make_pswf_kernel
     monkeypatch.setattr(nufft_api, "make_pswf_kernel", make_pswf_kernel)
-    shape = (16, 15)
-    for num in (10, 10**5):
-        positions = _points(shape, num, seed=43, dtype=np.float32)
-        for enable_pallas in (False, True, {"fwd": True, "bwd": False}):
-            im.dispatch_nufft1(
-                positions,
-                jnp.ones(num, np.float32),
-                shape,
-                pixel_size=PIXEL_SIZE,
-                eps=1e-4,
-                enable_pallas=enable_pallas,
-            )
-    assert len(picks) == 6 and len(set(picks)) == 1
+    shape, num = (16, 15), 10
+    positions = _points(shape, num, seed=43, dtype=np.float32)
+    for enable_pallas in (False, True, {"fwd": True, "bwd": False}):
+        im.dispatch_nufft1(
+            positions,
+            jnp.ones(num, np.float32),
+            shape,
+            pixel_size=PIXEL_SIZE,
+            eps=1e-4,
+            enable_pallas=enable_pallas,
+        )
+    assert len(picks) == 3 and len(set(picks)) == 1
 
 
 #

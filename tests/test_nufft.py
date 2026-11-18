@@ -1,17 +1,37 @@
-"""The native NUFFT against finufft, the ground truth, and against exact identities."""
+"""The native NUFFT on CPU: against finufft, finufft's rules, and its own behaviour.
 
+Only the first section needs `finufft` (finufft 2.5.1); the rest runs without it.
+"""
+
+import re
 import warnings
 
 import cryojax.ndimage as im
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
+from cryojax.ndimage import nufft_accuracy_limits
 from cryojax.ndimage._nufft import api as nufft_api
-from cryojax.ndimage._nufft.kernel import resolve_upsample_factor
+from cryojax.ndimage._nufft.kernel import (
+    _auto_upsample_factor,
+    _poly_fit,
+    derivative_coefficients,
+    fine_grid_size,
+    kernel_fourier_series,
+    kernel_width,
+    make_pswf_kernel,
+    resolve_upsample_factor,
+    tap_weights,
+)
+from cryojax.ndimage._nufft.pswf import PSWF0
 
 
-finufft = pytest.importorskip("finufft")
+try:
+    import finufft
+except ModuleNotFoundError:
+    finufft = None
 
 try:
     import jax_finufft
@@ -19,10 +39,14 @@ except ModuleNotFoundError:
     jax_finufft = None
 
 
+needs_finufft = pytest.mark.skipif(finufft is None, reason="finufft not installed")
+
 SHAPES = [(64, 64), (5, 8), (7, 6), (16, 15, 14)]
 SIGMAS = [1.25, 2.0]
+KERNEL_SIGMAS = (1.25, 1.5, 2.0)
 PIXEL_SIZE = 0.7
 NUM_POINTS = 200
+NAMES = ["dispatch_nufft1", "dispatch_nufft2"]
 
 
 #
@@ -175,8 +199,10 @@ def _relative_error(actual, expected):
 
 
 #
-# Agreement with finufft
+# 1. Agreement with finufft 2.5.1
 #
+
+
 # Native and finufft 2.5.1 (whose rules are 2.6's in float64 up to width 16) at one `eps`
 # and `upsample_factor` are one approximation: native is within RATIO of finufft's own
 # error of it. Measured: at most 0.047 (3D, eps 1e-9, sigma 1.4713)
@@ -209,6 +235,7 @@ FLOAT32_CASES = [
 ]
 
 
+@needs_finufft
 @pytest.mark.filterwarnings("error")
 @pytest.mark.parametrize("shape, eps, sigma", FLOAT64_CASES)
 def test_type1_is_finufft_approximation(shape, eps, sigma):
@@ -230,6 +257,7 @@ def test_type1_is_finufft_approximation(shape, eps, sigma):
     assert _relative_error(native, approx) <= RATIO * _relative_error(approx, exact)
 
 
+@needs_finufft
 @pytest.mark.filterwarnings("error")
 @pytest.mark.parametrize("shape, eps, sigma", FLOAT64_CASES)
 def test_type2_is_finufft_approximation(shape, eps, sigma):
@@ -250,6 +278,7 @@ def test_type2_is_finufft_approximation(shape, eps, sigma):
     assert _relative_error(native, approx) <= RATIO * _relative_error(approx, exact)
 
 
+@needs_finufft
 @pytest.mark.filterwarnings("error")
 @pytest.mark.parametrize("transform", [1, 2])
 @pytest.mark.parametrize("shape", SHAPES)
@@ -275,6 +304,7 @@ def test_native_error_meets_eps_where_agreement_is_truncation_bound(shape, trans
     assert _relative_error(native, exact) <= max(eps, _relative_error(approx, exact))
 
 
+@needs_finufft
 @pytest.mark.parametrize("shape, eps, sigma", FLOAT32_CASES)
 def test_float32_within_twice_finufft_single(shape, eps, sigma):
     """Both against finufft in float64 at eps 1e-12, on the same points; one warning per
@@ -313,6 +343,346 @@ def test_float32_within_twice_finufft_single(shape, eps, sigma):
     )
 
 
+#
+# 2. finufft's rules: kernel, coefficients, Fourier series, limits, PSWF
+#
+
+
+@pytest.mark.parametrize(
+    "eps, sigma, ndim, dtype, width",
+    [
+        (1e-6, 1.25, 3, np.float32, 8),  # float32 guard: 8 at sigma 1.25
+        (1e-12, 1.5, 2, np.float32, 11),  # guard 8 + floor(0.275 / 0.075)
+        (1e-12, 1.5, 3, np.float32, 10),  # guard 8 + floor(0.15 / 0.075)
+        (1e-12, 2.0, 2, np.float32, 12),  # float32 maximum
+        (1e-15, 2.0, 2, np.float64, 16),  # float64 maximum, clipped not raised
+        (1e-6, 1.25, 2, np.float64, 10),  # rule 1 unchanged
+    ],
+)
+def test_kernel_width_follows_finufft_26(eps, sigma, ndim, dtype, width):
+    assert kernel_width(eps, sigma, ndim, dtype) == width
+
+
+@pytest.mark.parametrize("sigma", KERNEL_SIGMAS)
+@pytest.mark.parametrize("eps", [10.0 ** (-k) for k in range(2, 12)])
+def test_pswf_is_positive_and_decreasing(eps, sigma):
+    """psi_0 has no zero in [-1, 1]; at large `c` the other even eigenfunctions share its
+    eigenvalue to rounding, and only this tells them apart."""
+    kernel = make_pswf_kernel(eps, sigma, 2, np.float64)
+    values = kernel.pswf(np.linspace(0, 1, 401))
+    assert np.all(values > 0)
+    assert np.all(np.diff(values) < 0)
+
+
+@pytest.mark.parametrize("dtype", (np.float32, np.float64))
+@pytest.mark.parametrize("ndim", (2, 3))
+@pytest.mark.parametrize("sigma", KERNEL_SIGMAS)
+@pytest.mark.parametrize("eps", (1e-2, 1e-4, 1e-6, 1e-9, 1e-12))
+def test_coefficient_count_within_finufft_bounds(eps, sigma, ndim, dtype):
+    kernel = make_pswf_kernel(eps, sigma, ndim, dtype)
+    w, nc = kernel.coefficients.shape
+    assert w == kernel.width
+    assert max(4, w - 4) <= nc <= min(19, w + 3)
+
+
+def test_coefficient_count_drops_below_width():
+    """finufft keeps the coefficients above `0.05 eps`: wide kernels at low `sigma` need
+    fewer than they have taps."""
+    kernel = make_pswf_kernel(1e-8, 1.25, 2, np.float64)
+    assert kernel.coefficients.shape == (14, 12)
+
+
+@pytest.mark.parametrize(
+    "eps, sigma, ndim, dtype",
+    [
+        (1e-4, 2.0, 2, np.float32),
+        (1e-4, 2.0, 2, np.float64),
+        (1e-6, 1.25, 3, np.float32),
+        (1e-12, 2.0, 2, np.float64),
+    ],
+)
+def test_coefficients_are_finufft_table(eps, sigma, ndim, dtype):
+    """finufft's Horner table in `z`, as fitted (include/finufft/makeplan.hpp:237-271)."""
+    kernel = make_pswf_kernel(eps, sigma, ndim, dtype)
+    w, dtype = kernel.width, np.dtype(dtype)
+    fitted = [_poly_fit(kernel, j, min(19, w + 3), dtype) for j in range(w)]
+    nc = max(4, w - 4)
+    for coeffs in fitted:
+        large = np.flatnonzero(np.abs(coeffs) >= dtype.type(eps) * dtype.type(0.05))
+        nc = max(nc, coeffs.size - large[0]) if large.size else nc
+    assert kernel.coefficients.dtype == dtype
+    np.testing.assert_array_equal(kernel.coefficients, np.array(fitted)[:, -nc:])
+
+
+def test_derivative_coefficients_in_u():
+    """`d/du = -2 d/dz`: `z = 2s - 1` and `s` falls as `u` rises."""
+    coefficients = np.array([[1.0, 2.0, 3.0, 4.0], [0.0, 0.0, 1.0, 0.0]])
+    first = derivative_coefficients(coefficients, 1)
+    second = derivative_coefficients(coefficients, 2)
+    np.testing.assert_array_equal(first, [[-6.0, -8.0, -6.0], [0.0, 0.0, -2.0]])
+    np.testing.assert_array_equal(second, [[24.0, 16.0], [0.0, 0.0]])
+
+
+@pytest.mark.parametrize("ndim", (2, 3))
+@pytest.mark.parametrize("sigma", KERNEL_SIGMAS)
+@pytest.mark.parametrize("eps", (1e-2, 1e-4, 1e-6, 1e-9))
+def test_tap_polynomials_match_pswf(eps, sigma, ndim):
+    kernel = make_pswf_kernel(eps, sigma, ndim, np.float64)
+    w = kernel.width
+    s = np.linspace(0, 1, 1001)
+    exact = np.array([kernel.pswf(2 * (s + j - w / 2) / w) for j in range(w)])
+    assert tap_weights(kernel, s).shape == (w, 1001)
+    assert np.max(np.abs(tap_weights(kernel, s) - exact)) <= eps
+
+
+@pytest.mark.parametrize("sigma", (1.25, 1.4713, 2.0))
+@pytest.mark.parametrize("eps", (1e-3, 1e-6, 1e-9))
+def test_fourier_series_matches_analytic_pswf(eps, sigma):
+    """Rule 6's quadrature of the fitted taps against the PSWF's self-Fourier transform
+    `(w / 2) lambda psi(pi k w / (c m))`, in `fftfreq` order."""
+    kernel = make_pswf_kernel(eps, sigma, 3, np.float64)
+    w, c = kernel.width, kernel.shape_parameter
+    n = 33
+    m = fine_grid_size(n, sigma, w)
+    got = kernel_fourier_series(kernel, n, m, rfft=False, dtype=np.float64)
+    k = np.fft.fftfreq(n, 1 / n)
+    # finufft include/finufft_common/kernel.h:104 (`pswf_selfft_params`)
+    nc = kernel.coefficients.shape[1]
+    prefac = sum(
+        kernel.coefficients[:, j].sum() / (nc - j) for j in range(nc - 1, -1, -2)
+    )
+    ref = prefac * kernel.pswf(np.pi * k * w / (c * m))
+    assert np.max(np.abs(got - ref)) <= eps * ref[0]
+    half = kernel_fourier_series(kernel, n, m, rfft=True, dtype=np.float64)
+    np.testing.assert_array_equal(half, got[: n // 2 + 1])
+
+
+@pytest.mark.parametrize("eps", (1e-4, 1e-6))
+def test_float32_taps_fitted_in_float32(eps):
+    """finufft fits float32 taps in float32 (include/finufft/makeplan.hpp:245); in
+    float32 they still reach `eps` (measured: 4.9 eps32 at 1e-4, 2.0 at 1e-6)."""
+    kernel = make_pswf_kernel(eps, 2.0, 2, np.float32)
+    kernel64 = make_pswf_kernel(eps, 2.0, 2, np.float64)
+    assert kernel.coefficients.shape == kernel64.coefficients.shape
+    assert not np.array_equal(kernel.coefficients, kernel64.coefficients)
+    w = kernel.width
+    s = np.linspace(0, 1, 1001, dtype=np.float32)
+    z = 2 * s - 1
+    taps = np.zeros((w, s.size), np.float32)
+    for coefficient in kernel.coefficients.T:
+        taps = taps * z + coefficient[:, None]
+    exact = np.array([kernel.pswf(2 * (s + j - w / 2) / w) for j in range(w)])
+    assert np.max(np.abs(taps - exact)) <= max(eps, 8 * np.finfo(np.float32).eps)
+
+
+def test_fourier_series_in_transform_precision():
+    kernel = make_pswf_kernel(1e-4, 1.25, 2, np.float32)
+    phi_hat = kernel_fourier_series(kernel, 16, 20, rfft=True, dtype=np.float32)
+    assert phi_hat.dtype == np.float32
+
+
+def test_fine_grid_size():
+    assert fine_grid_size(64, 1.25, 7) == 80
+    assert fine_grid_size(5, 1.25, 7) == 16
+    for n, sigma, w in [(7, 2.0, 16), (100, 1.5, 9), (33, 1.25, 12), (1024, 1.4713, 9)]:
+        m = fine_grid_size(n, sigma, w)
+        assert m % 2 == 0 and m >= max(np.ceil(sigma * n), 2 * w)
+        r = m
+        for p in (2, 3, 5):
+            while r % p == 0:
+                r //= p
+        assert r == 1
+
+
+def test_make_pswf_kernel_is_cached():
+    kernel = make_pswf_kernel(1e-4, 1.25, 2, np.float32)
+    assert kernel is make_pswf_kernel(1e-4, 1.25, 2, np.dtype("float32"))
+    assert kernel is make_pswf_kernel(1e-4, 1.25, 2, jnp.float32)
+    assert kernel is not make_pswf_kernel(1e-4, 1.25, 2, np.float64)
+    for array in (
+        kernel.pswf.legendre_coefficients,
+        kernel.pswf.recurrence_coefficients,
+        kernel.coefficients,
+    ):
+        assert not array.flags.writeable
+
+
+def test_rounding_floor():
+    limits = nufft_accuracy_limits(
+        (4096, 4096), eps=1e-3, upsample_factor=2.0, dtype=np.float32
+    )
+    assert limits.rounding_floor == pytest.approx(2.4169e-4, rel=1e-3)
+    limits = nufft_accuracy_limits(
+        (1024, 1024), eps=1e-3, upsample_factor=2.0, dtype=np.float32
+    )
+    assert limits.rounding_floor == pytest.approx(6.0422e-5, rel=1e-3)
+
+
+def test_min_upsample_factor():
+    limits = nufft_accuracy_limits(
+        (64, 64), eps=1e-10, upsample_factor=1.25, dtype=np.float64
+    )
+    assert (limits.width, limits.min_upsample_factor) == (
+        16,
+        pytest.approx(1.2675, abs=1e-4),
+    )
+    limits = nufft_accuracy_limits(
+        (32, 32, 32), eps=1e-6, upsample_factor=1.25, dtype=np.float32
+    )
+    assert (limits.width, limits.min_upsample_factor) == (
+        8,
+        pytest.approx(2.0397, abs=1e-4),
+    )
+    # Unreachable at any sigma up to 2.5, though above the floor (2.4e-7)
+    limits = nufft_accuracy_limits(
+        (4, 4), eps=3e-7, upsample_factor=2.5, dtype=np.float32
+    )
+    assert limits.rounding_floor < 3e-7
+    assert limits.min_upsample_factor > 2.5
+
+
+def test_complex_dtypes_read_as_real():
+    """At 3D, sigma 1.25 and eps 1e-6 the float32 guard narrows 11 to 8."""
+    shape, kwargs = (32, 32, 32), dict(eps=1e-6, upsample_factor=1.25)
+    for real, complex_ in ((jnp.float32, jnp.complex64), (jnp.float64, jnp.complex128)):
+        assert nufft_accuracy_limits(
+            shape, dtype=complex_, **kwargs
+        ) == nufft_accuracy_limits(shape, dtype=real, **kwargs)
+        assert make_pswf_kernel(1e-6, 1.25, 3, complex_) is make_pswf_kernel(
+            1e-6, 1.25, 3, real
+        )
+        assert _auto(3, 1e-6, complex_) == _auto(3, 1e-6, real)
+    assert nufft_accuracy_limits(shape, dtype=jnp.complex128, **kwargs).width == 11
+
+
+def _auto(ndim, eps, dtype):
+    return resolve_upsample_factor("auto", ndim=ndim, eps=eps, dtype=dtype)
+
+
+@pytest.mark.parametrize(
+    "ndim, dtype, eps, sigma, width",
+    [
+        (2, np.float64, 1e-6, 1.251, 10),
+        (3, np.float64, 1e-4, 1.251, 7),
+        (2, np.float64, 1e-12, 1.451032, 16),
+        (3, np.float64, 1e-12, 1.468064, 16),
+        (2, np.float64, 1e-14, 1.751684, 16),
+        (2, np.float32, 1e-4, 1.251, 7),
+        (2, np.float32, 1e-6, 1.772019, 7),
+        (3, np.float32, 1e-6, 1.931160, 7),
+        (2, np.float32, 3e-7, 2.5, 7),
+    ],
+)
+def test_auto_is_finufft_search_without_cost(ndim, dtype, eps, sigma, width):
+    resolved = _auto(ndim, eps, dtype)
+    assert resolved == pytest.approx(sigma, abs=1e-6)
+    assert kernel_width(eps, resolved, ndim, dtype) == width
+
+
+@pytest.mark.parametrize("dtype", (np.float32, np.float64))
+@pytest.mark.parametrize("shape", ((8, 8), (1024, 1024), (8, 8, 8), (256, 256, 256)))
+def test_auto_fails_sigma_limit_only_when_none_meets_it(shape, dtype):
+    """The dispatch warnings rely on this: `"auto"` fails the sigma limit only when no
+    factor up to 2.5 meets it, and then it is 2.5."""
+    for eps in np.logspace(-16, -2, 113):
+        if eps < np.finfo(dtype).eps:
+            continue
+        kwargs = dict(eps=float(eps), dtype=dtype)
+        reachable = (
+            nufft_accuracy_limits(
+                shape, upsample_factor=2.5, **kwargs
+            ).min_upsample_factor
+            <= 2.5
+        )
+        sigma = _auto(len(shape), float(eps), dtype)
+        limits = nufft_accuracy_limits(shape, upsample_factor=sigma, **kwargs)
+        assert (sigma >= limits.min_upsample_factor) == reachable
+        assert reachable or sigma == 2.5
+
+
+def test_auto_is_cached():
+    sigma = _auto(2, 1e-6, np.float32)
+    hits = _auto_upsample_factor.cache_info().hits
+    assert type(sigma) is float
+    assert sigma == _auto(2, 1e-6, jnp.float32)
+    assert _auto_upsample_factor.cache_info().hits == hits + 1
+
+
+# From a standalone build of finufft master d2c1ed2's src/common/pswf.cpp
+# (g++ -O0 -ffp-contract=off)
+_XS = (0.0, 0.3, -0.55, 0.8, 0.95, 0.999)
+_FINUFFT = {
+    3.72: (
+        1.0,
+        0.87640853168171728,
+        0.62939051128030676,
+        0.34451712435352316,
+        0.19404889423631588,
+        0.15159537189213187,
+    ),
+    15.03: (
+        1.0,
+        0.51871004928765496,
+        0.096157414281318271,
+        0.0035655385643075313,
+        7.3616189683903304e-05,
+        4.4444045059050546e-06,
+    ),
+    30.11: (
+        1.0,
+        0.25889018504941319,
+        0.0079955249977655962,
+        8.5208413960958134e-06,
+        2.2707106595677278e-09,
+        2.4075530579433822e-12,
+    ),
+    41.84: (
+        1.0,
+        0.15080996543626898,
+        0.0011560407699966479,
+        7.8030311216629213e-08,
+        7.0960935185898601e-13,
+        1.9322390564576006e-16,
+    ),
+}
+
+
+@pytest.mark.parametrize("c", sorted(_FINUFFT))
+def test_pswf_matches_finufft_build(c):
+    np.testing.assert_allclose(PSWF0(c)(np.array(_XS)), _FINUFFT[c], rtol=1e-13, atol=0)
+
+
+@pytest.mark.parametrize("c", sorted(_FINUFFT))
+def test_pswf_support(c):
+    pswf = PSWF0(c)
+    np.testing.assert_allclose(pswf(0.0), 1.0, rtol=1e-15)
+    np.testing.assert_array_equal(pswf(np.array([-1.01, 1.01])), 0.0)
+
+
+@pytest.mark.parametrize("c", sorted(_FINUFFT))
+def test_pswf_integral_equation(c):
+    """`int cos(c x t) psi(t) dt = lambda psi(x)`, with lambda the integral of psi."""
+    pswf = PSWF0(c)
+    t, v = np.polynomial.legendre.leggauss(256)
+    values = pswf(t)
+    eigenvalue = np.sum(v * values)
+    x = np.linspace(-1, 1, 501)
+    residual = np.cos(c * np.outer(x, t)) @ (v * values) - eigenvalue * pswf(x)
+    assert np.max(np.abs(residual)) / eigenvalue < 1e-12
+
+
+def test_pswf_is_module_and_read_only():
+    pswf = PSWF0(15.03)
+    assert isinstance(pswf, eqx.Module)
+    assert not pswf.legendre_coefficients.flags.writeable
+    assert not pswf.recurrence_coefficients.flags.writeable
+
+
+#
+# 3. Dispatch behaviour
+#
+
+
 @pytest.mark.parametrize("shape", [(8, 6), (7, 9), (6, 5, 4), (5, 7, 6)])
 def test_type2_on_grid_equals_irfftn(shape):
     spectrum = _random_spectrum(shape, seed=0)
@@ -344,9 +714,6 @@ def test_type2_is_weighted_adjoint(shape, sigma):
     np.testing.assert_allclose(lhs, rhs / np.prod(shape), rtol=1e-10)
 
 
-#
-# Edge cases
-#
 @pytest.mark.parametrize("shape", [(5, 8), (16, 15, 14)])
 def test_type1_periodic_in_positions(shape):
     positions = _points(shape, NUM_POINTS, seed=0)
@@ -433,9 +800,6 @@ def test_batched_strengths_equal_unbatched(shape):
         assert _relative_error(batched[r], unbatched) <= 1e-12
 
 
-#
-# Derivatives
-#
 # A derivative of the approximation: its aliased terms oscillate faster than the signal,
 # and measure 5-13 eps at sigma = 2
 VJP_CASES = [
@@ -457,6 +821,7 @@ def _frequency_factors(shape):
     ]
 
 
+@needs_finufft
 @pytest.mark.parametrize("shape, sigma, eps", VJP_CASES)
 def test_type1_position_vjp_identity(shape, sigma, eps):
     positions = _points(shape, NUM_POINTS, seed=0)
@@ -489,6 +854,7 @@ def test_type1_position_vjp_identity(shape, sigma, eps):
     assert _relative_error(strengths_bar, expected_strengths_bar) <= 3 * eps
 
 
+@needs_finufft
 @pytest.mark.parametrize("shape, sigma, eps", VJP_CASES)
 def test_type2_position_vjp_identity(shape, sigma, eps):
     positions = _points(shape, NUM_POINTS, seed=0)
@@ -553,9 +919,6 @@ def test_hvp_runs_and_is_symmetric(shape):
     np.testing.assert_allclose(v1_h_v2, v2_h_v1, rtol=1e-8)
 
 
-#
-# upsample_factor="auto"
-#
 @pytest.mark.filterwarnings("error")
 @pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
 def test_auto_is_static(monkeypatch, name):
@@ -624,9 +987,6 @@ def test_upsample_factor_other_string_raises(name):
         getattr(im, name)(jnp.zeros((3, 2)), second, shape, upsample_factor="fast")
 
 
-#
-# Errors and warnings
-#
 def _call(name, shape, dtype=np.float64, **kwargs):
     """`name` on 3 points of `shape` in `dtype`."""
     positions = jnp.zeros((3, len(shape)), dtype)
@@ -654,117 +1014,209 @@ def test_eps_at_most_zero_raises(name, eps):
         _call(name, (8, 6), eps=eps)
 
 
-@pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
-@pytest.mark.parametrize("upsample_factor", [1.1, 3.5])
-def test_upsample_factor_outside_useful_range_warns(name, upsample_factor):
-    """finufft include/finufft/makeplan.hpp:147; `eps` is met at both."""
-    with pytest.warns(
-        UserWarning,
-        match=rf"{name}[\s\S]*upsample_factor = {upsample_factor}[\s\S]*1.15, 3.0",
-    ) as record:
-        _call(name, (8, 6), eps=1e-6, upsample_factor=upsample_factor)
-    assert len(record) == 1
+@pytest.mark.parametrize("shape", [(8, 6), (7, 9), (6, 5, 4), (5, 7, 6)])
+def test_dispatch_nufft1_on_grid_points_equals_rfftn(shape):
+    image = np.random.default_rng(0).normal(size=shape)
+    fourier_image = im.dispatch_nufft1(
+        jnp.asarray(_grid_points(shape)),
+        jnp.asarray(image.ravel()),
+        shape,
+        eps=1e-12,
+        upsample_factor=2.0,
+    )
+    np.testing.assert_allclose(fourier_image, np.fft.rfftn(image), atol=1e-8)
 
 
-@pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
-def test_eps_below_eps_mach_warns_and_runs(monkeypatch, name):
-    """One warning, though the floor and sigma limit fail at `eps_mach` too."""
-    kernel_eps = []
-
-    def make_pswf_kernel(eps, upsample_factor, ndim, dtype):
-        kernel_eps.append(eps)
-        return make_pswf_kernel_unpatched(eps, upsample_factor, ndim, dtype)
-
-    make_pswf_kernel_unpatched = nufft_api.make_pswf_kernel
-    monkeypatch.setattr(nufft_api, "make_pswf_kernel", make_pswf_kernel)
-    with pytest.warns(
-        UserWarning, match=rf"{name}[\s\S]*eps = 1e-09[\s\S]*float32[\s\S]*1.2e-07"
-    ) as record:
-        result = _call(name, (8, 6), np.float32, eps=1e-9)
-    assert len(record) == 1
-    assert kernel_eps == [float(jnp.finfo(jnp.float32).eps)]
-    assert np.all(np.isfinite(np.asarray(result)))
+def test_dispatch_nufft1_positions_are_in_units_of_pixel_size():
+    shape, pixel_size = (8, 6), 1.7
+    strengths = jnp.asarray(np.random.default_rng(0).normal(size=48))
+    positions = jnp.asarray(np.random.default_rng(1).uniform(-2.0, 2.0, (48, 2)))
+    np.testing.assert_allclose(
+        im.dispatch_nufft1(
+            positions * pixel_size, strengths, shape, pixel_size=pixel_size
+        ),
+        im.dispatch_nufft1(positions, strengths, shape),
+        atol=1e-10,
+    )
 
 
-@pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
-def test_warns_below_rounding_floor(name):
-    """finufft include/finufft/setpts.hpp:22; floor 6.0422e-5, printed to 3 figures;
-    the advised `eps` is rounded up to 2."""
-    with pytest.warns(
-        UserWarning,
-        match=rf"{name}[\s\S]*eps = 1e-06[\s\S]*\(1024, 1024\)[\s\S]*float32"
-        r"[\s\S]*6\.04e-05[\s\S]*6\.1e-05[\s\S]*jax_enable_x64",
-    ) as record:
-        _call(name, (1024, 1024), np.float32, eps=1e-6)
-    assert len(record) == 1
+@pytest.mark.parametrize(
+    "positions_shape, shape", [((3, 2), (6, 6, 6)), ((3, 3), (6, 6)), ((3, 1), (6,))]
+)
+def test_dispatch_nufft1_rejects_dimension_mismatch(positions_shape, shape):
+    with pytest.raises(ValueError, match="dispatch_nufft1"):
+        im.dispatch_nufft1(jnp.zeros(positions_shape), jnp.ones(3), shape)
 
 
-@pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
-def test_warns_below_min_upsample_factor(name):
-    """finufft include/finufft/setpts.hpp:22; the width clipped to 16 needs 1.2675."""
-    with pytest.warns(
-        UserWarning,
-        match=rf"{name}[\s\S]*upsample_factor = 1.25[\s\S]*eps = 1e-10[\s\S]*"
-        r"\(64, 64\)[\s\S]*float64[\s\S]*at least 1\.27[\s\S]*auto",
-    ) as record:
-        _call(name, (64, 64), eps=1e-10, upsample_factor=1.25)
-    assert len(record) == 1
+#
+# 4. Warnings
+#
+# Per case: the one warning `scope` selects must match every `patterns` regex and none
+# of `forbidden`; `count` is the number of warnings in all, if the case fixes it.
+# `{name}` is the transform.
+WARNING_CASES = [
+    # finufft include/finufft/makeplan.hpp:147; `eps` is met at both
+    pytest.param(
+        (8, 6),
+        np.float64,
+        dict(eps=1e-6, upsample_factor=1.1),
+        None,
+        (r"{name}[\s\S]*upsample_factor = 1.1[\s\S]*1.15, 3.0",),
+        (),
+        1,
+        id="upsample-factor-below-useful-range",
+    ),
+    pytest.param(
+        (8, 6),
+        np.float64,
+        dict(eps=1e-6, upsample_factor=3.5),
+        None,
+        (r"{name}[\s\S]*upsample_factor = 3.5[\s\S]*1.15, 3.0",),
+        (),
+        1,
+        id="upsample-factor-above-useful-range",
+    ),
+    # One warning, though the floor and sigma limit fail at `eps_mach` too
+    pytest.param(
+        (8, 6),
+        np.float32,
+        dict(eps=1e-9),
+        None,
+        (r"{name}[\s\S]*eps = 1e-09[\s\S]*float32[\s\S]*1.2e-07",),
+        (),
+        1,
+        id="eps-below-eps-mach",
+    ),
+    # finufft include/finufft/setpts.hpp:22; floor 6.0422e-5, printed to 3 figures; the
+    # advised `eps` is rounded up to 2
+    pytest.param(
+        (1024, 1024),
+        np.float32,
+        dict(eps=1e-6),
+        None,
+        (
+            r"{name}[\s\S]*eps = 1e-06[\s\S]*\(1024, 1024\)[\s\S]*float32"
+            r"[\s\S]*6\.04e-05[\s\S]*6\.1e-05[\s\S]*jax_enable_x64",
+        ),
+        (),
+        1,
+        id="below-rounding-floor",
+    ),
+    # finufft include/finufft/setpts.hpp:22; the width clipped to 16 needs 1.2675
+    pytest.param(
+        (64, 64),
+        np.float64,
+        dict(eps=1e-10, upsample_factor=1.25),
+        None,
+        (
+            r"{name}[\s\S]*upsample_factor = 1.25[\s\S]*eps = 1e-10[\s\S]*"
+            r"\(64, 64\)[\s\S]*float64[\s\S]*at least 1\.27[\s\S]*auto",
+        ),
+        (),
+        1,
+        id="below-min-upsample-factor",
+    ),
+    # Below 2 eps_mach in 2D no factor reaches `eps`: the fix is `eps`, never "auto"
+    pytest.param(
+        (4, 4),
+        np.float32,
+        dict(eps=1.5e-7, upsample_factor=2.0),
+        r"no `upsample_factor` reaches",
+        (r"no `upsample_factor` reaches", r"increase `eps`", r"jax_enable_x64"),
+        ("auto",),
+        None,
+        id="no-upsample-factor-reaches-eps-advises-eps-only",
+    ),
+    # Needed 3.97 at width 8 in float32: `"auto"` stops at 2.5 and cannot reach it
+    pytest.param(
+        (4, 4),
+        np.float32,
+        dict(eps=3e-7, upsample_factor=2.0),
+        r"too small",
+        (r"too small", r"at least 3\.97"),
+        ("auto",),
+        None,
+        id="min-upsample-factor-above-auto-range-does-not-advise-auto",
+    ),
+    # The guard narrows the width from 11 to 8, below rule 1's, so the sigma limit
+    # fails: at width 8, eps 1e-6 needs 2.0397
+    pytest.param(
+        (8, 8, 8),
+        np.float32,
+        dict(eps=1e-6, upsample_factor=1.25),
+        None,
+        (
+            r"{name}[\s\S]*upsample_factor = 1.25[\s\S]*\(8, 8, 8\)[\s\S]*float32"
+            r"[\s\S]*at least 2\.04",
+        ),
+        (),
+        1,
+        id="float32-guard-warns-once",
+    ),
+    # No sigma up to 2.5 reaches 3e-7 in float32, though the floor (2.4e-7) does
+    pytest.param(
+        (4, 4),
+        np.float32,
+        dict(eps=3e-7),
+        None,
+        (r"{name}[\s\S]*eps = 3e-07[\s\S]*float32[\s\S]*2.5",),
+        (),
+        1,
+        id="auto-unreachable",
+    ),
+]
 
 
-@pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
-def test_no_upsample_factor_reaches_eps_advises_eps_only(name):
-    """Below 2 eps_mach in 2D no factor reaches `eps`: the fix is `eps`, never "auto"."""
+@pytest.mark.parametrize("name", NAMES)
+@pytest.mark.parametrize(
+    "shape, dtype, kwargs, scope, patterns, forbidden, count", WARNING_CASES
+)
+def test_warnings(name, shape, dtype, kwargs, scope, patterns, forbidden, count):
+    patterns = [pattern.format(name=name) for pattern in patterns]
     with pytest.warns(UserWarning) as record:
-        _call(name, (4, 4), np.float32, eps=1.5e-7, upsample_factor=2.0)
+        _call(name, shape, dtype, **kwargs)
+    if count is not None:
+        assert len(record) == count
     (message,) = [
-        str(w.message) for w in record if "no `upsample_factor` reaches" in str(w.message)
+        str(w.message) for w in record if re.search(scope or patterns[0], str(w.message))
     ]
-    assert "increase `eps`" in message and "jax_enable_x64" in message
-    assert "auto" not in message
+    for pattern in patterns:
+        assert re.search(pattern, message)
+    for pattern in forbidden:
+        assert not re.search(pattern, message)
 
 
-@pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
-def test_min_upsample_factor_above_auto_range_does_not_advise_auto(name):
-    """Needed 3.97 at width 8 in float32: `"auto"` stops at 2.5 and cannot reach it."""
-    with pytest.warns(UserWarning, match=r"at least 3\.97") as record:
-        _call(name, (4, 4), np.float32, eps=3e-7, upsample_factor=2.0)
-    (message,) = [str(w.message) for w in record if "too small" in str(w.message)]
-    assert "auto" not in message
-
-
-@pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
-def test_float32_guard_warns_once(name):
-    """The guard narrows the width from 11 to 8, below rule 1's, so the sigma limit
-    fails: at width 8, eps 1e-6 needs 2.0397."""
-    with pytest.warns(
-        UserWarning,
-        match=rf"{name}[\s\S]*upsample_factor = 1.25[\s\S]*\(8, 8, 8\)[\s\S]*float32"
-        r"[\s\S]*at least 2\.04",
-    ) as record:
-        _call(name, (8, 8, 8), np.float32, eps=1e-6, upsample_factor=1.25)
-    assert len(record) == 1
-
-
-@pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
-def test_auto_unreachable_warns(monkeypatch, name):
-    """No sigma up to 2.5 reaches 3e-7 in float32, though the floor (2.4e-7) does."""
-    kernel_factors = []
+# Kernel built at the one `eps` or `upsample_factor`, and the output finite
+@pytest.mark.parametrize("name", NAMES)
+@pytest.mark.parametrize(
+    "shape, kwargs, argument, expected",
+    [
+        ((8, 6), dict(eps=1e-9), 0, float(jnp.finfo(jnp.float32).eps)),
+        ((4, 4), dict(eps=3e-7), 1, 2.5),
+    ],
+    ids=["eps-below-eps-mach", "auto-unreachable"],
+)
+def test_warned_call_runs_with_expected_kernel(
+    monkeypatch, name, shape, kwargs, argument, expected
+):
+    kernel_arguments = []
 
     def make_pswf_kernel(eps, upsample_factor, ndim, dtype):
-        kernel_factors.append(upsample_factor)
+        kernel_arguments.append((eps, upsample_factor)[argument])
         return make_pswf_kernel_unpatched(eps, upsample_factor, ndim, dtype)
 
     make_pswf_kernel_unpatched = nufft_api.make_pswf_kernel
     monkeypatch.setattr(nufft_api, "make_pswf_kernel", make_pswf_kernel)
-    with pytest.warns(
-        UserWarning, match=rf"{name}[\s\S]*eps = 3e-07[\s\S]*float32[\s\S]*2.5"
-    ) as record:
-        result = _call(name, (4, 4), np.float32, eps=3e-7)
-    assert len(record) == 1
-    assert kernel_factors == [2.5]
+    with pytest.warns(UserWarning):
+        result = _call(name, shape, np.float32, **kwargs)
+    assert kernel_arguments == [expected]
     assert np.all(np.isfinite(np.asarray(result)))
 
 
+#
+# 5. jax-finufft backend
+#
+@needs_finufft
 @pytest.mark.skipif(jax_finufft is None, reason="jax-finufft not installed")
 @pytest.mark.filterwarnings("error")
 @pytest.mark.parametrize(
@@ -790,9 +1242,6 @@ def test_jax_finufft_branch_runs_no_native_checks(monkeypatch, eps, upsample_fac
     assert _relative_error(type2, reference) <= 1e-9
 
 
-#
-# jax-finufft backend
-#
 @pytest.mark.skipif(jax_finufft is None, reason="jax-finufft not installed")
 @pytest.mark.parametrize("fft_ordered", [True, False])
 @pytest.mark.parametrize("shape", [(64, 64), (7, 6), (16, 15, 14)])
