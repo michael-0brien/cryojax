@@ -13,8 +13,6 @@ from cryojax.ndimage._nufft.kernel import resolve_upsample_factor
 
 finufft = pytest.importorskip("finufft")
 
-jax.config.update("jax_enable_x64", True)
-
 try:
     import jax_finufft
 except ModuleNotFoundError:
@@ -333,9 +331,12 @@ def test_batched_strengths_equal_unbatched(shape):
 #
 # Derivatives
 #
+# A derivative of the approximation: its aliased terms oscillate faster than the signal,
+# and measure 5-13 eps at sigma = 2
 VJP_CASES = [
     ((64, 64), 1.25, 1e-6),
     ((5, 8), 1.25, 1e-9),
+    ((5, 8), 2.0, 1e-9),
     ((7, 6), 2.0, 1e-9),
     ((16, 15, 14), 1.25, 1e-6),
     ((16, 15, 14), 2.0, 1e-9),
@@ -379,7 +380,7 @@ def test_type1_position_vjp_identity(shape, sigma, eps):
         axis=-1,
     )
     expected_strengths_bar = _finufft_half_sum(positions, cotangent, shape)
-    assert _relative_error(positions_bar, expected_positions_bar) <= 10 * eps
+    assert _relative_error(positions_bar, expected_positions_bar) <= 20 * eps
     assert _relative_error(strengths_bar, expected_strengths_bar) <= 3 * eps
 
 
@@ -408,8 +409,6 @@ def test_type2_position_vjp_identity(shape, sigma, eps):
         ],
         axis=-1,
     )
-    # A derivative of the approximation: its aliased terms oscillate faster than the
-    # signal, and measure 5-13 eps at sigma = 2
     assert _relative_error(positions_bar, expected) <= 20 * eps
 
 
@@ -612,26 +611,48 @@ def test_upsample_factor_at_most_one_raises(name, upsample_factor):
 # jax-finufft backend
 #
 @pytest.mark.skipif(jax_finufft is None, reason="jax-finufft not installed")
+@pytest.mark.parametrize("fft_ordered", [True, False])
 @pytest.mark.parametrize("shape", [(64, 64), (7, 6), (16, 15, 14)])
-def test_jax_finufft_branch_agrees(monkeypatch, shape):
+def test_jax_finufft_branch_agrees(monkeypatch, shape, fft_ordered):
+    """Values and every gradient, with cryoJAX's `Opts(modeord=True)` or user `opts`
+    in finufft's centred order."""
+    from jax_finufft.options import NestedOpts, Opts
+
     positions = jnp.asarray(_points(shape, NUM_POINTS, seed=0))
     strengths = jnp.asarray(np.random.default_rng(1).normal(size=(2, NUM_POINTS)))
     spectrum = jnp.asarray(_random_spectrum(shape, seed=2, batch=(2,)))
     kwargs = dict(pixel_size=PIXEL_SIZE, eps=1e-9, upsample_factor=2.0)
+    if not fft_ordered:
+        opts = Opts(upsampfac=2.0)
+        kwargs["options"] = {"opts": NestedOpts(forward=opts, backward=opts)}
 
-    def run():
+    def loss(positions, strengths, spectrum):
         type1 = im.dispatch_nufft1(positions, strengths, shape, **kwargs)
         type2 = im.dispatch_nufft2(positions, spectrum, shape, **kwargs)
-        positions_bar = jax.grad(
-            lambda p: (
-                jnp.sum(jnp.abs(im.dispatch_nufft1(p, strengths, shape, **kwargs)) ** 2)
-                + jnp.sum(im.dispatch_nufft2(p, spectrum, shape, **kwargs) ** 2)
-            )
-        )(positions)
-        return type1, type2, positions_bar
+        value = jnp.sum(jnp.abs(type1) ** 2) + jnp.sum(type2**2)
+        return value, (type1, type2)
+
+    def run():
+        grads, outputs = jax.grad(loss, argnums=(0, 1, 2), has_aux=True)(
+            positions, strengths, spectrum
+        )
+        return (*outputs, *grads)
 
     monkeypatch.setattr(nufft_api, "CRYOJAX_FINUFFT_BACKEND", "native")
     native = run()
     monkeypatch.setattr(nufft_api, "CRYOJAX_FINUFFT_BACKEND", "jax-finufft")
     for expected, actual in zip(native, run()):
         assert _relative_error(actual, expected) <= 1e-7
+
+
+@pytest.mark.skipif(jax_finufft is None, reason="jax-finufft not installed")
+@pytest.mark.parametrize("name", ["dispatch_nufft1", "dispatch_nufft2"])
+def test_jax_finufft_does_not_mutate_options(monkeypatch, name):
+    from jax_finufft.options import Opts
+
+    monkeypatch.setattr(nufft_api, "CRYOJAX_FINUFFT_BACKEND", "jax-finufft")
+    opts = Opts(modeord=True)
+    options = {"opts": opts}
+    second = jnp.ones(3) if name == "dispatch_nufft1" else jnp.ones((6, 4), complex)
+    getattr(im, name)(jnp.zeros((3, 2)), second, (6, 6), options=options)
+    assert options == {"opts": opts}

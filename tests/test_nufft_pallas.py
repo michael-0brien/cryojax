@@ -826,21 +826,28 @@ def test_pallas_vmap_hvp_one_launch(transform):
 @pytest.mark.parametrize("n_directions, n_chunks", [(None, 1), (12, 1), (13, 2)])
 def test_pallas_hvp_launch_count(transform, n_directions, n_chunks):
     """One HVP launches each primal kernel and its tangent kernel once; a batch of
-    directions beyond `_MAX_JVP_DIRECTIONS` splits into chunks."""
+    directions beyond `_MAX_JVP_DIRECTIONS` splits into chunks. Values as pure JAX."""
     assert _pallas_helpers._MAX_JVP_DIRECTIONS == 12
     shape, dtype, eps, sigma = HVP_CASES[0]
     primals, target = _hvp_problem(transform, shape, dtype, seed=38)
     directions = _hvp_directions(primals, seed=39, n_directions=n_directions)
-    loss = _hvp_loss(transform, shape, eps, sigma, target, True)
-    grad = jax.grad(loss, argnums=(0, 1, 2))
-    hvp = lambda v: jax.jvp(grad, primals, v)[1]
-    names = _pallas_names(hvp if n_directions is None else jax.vmap(hvp), directions)
+
+    def hvp(enable_pallas):
+        loss = _hvp_loss(transform, shape, eps, sigma, target, enable_pallas)
+        grad = jax.grad(loss, argnums=(0, 1, 2))
+        one = lambda v: jax.jvp(grad, primals, v)[1]
+        return one if n_directions is None else jax.vmap(one)
+
+    names = _pallas_names(hvp(True), directions)
     expected = [
         name
         for name in HVP_KERNELS[transform]
         for _ in range(n_chunks if name.endswith("_tangent") else 1)
     ]
     assert names == sorted(expected)
+    _assert_trees_close(
+        jax.jit(hvp(True))(directions), jax.jit(hvp(False))(directions), 1e-10
+    )
 
 
 @requires_gpu

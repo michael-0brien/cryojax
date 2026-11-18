@@ -1136,15 +1136,12 @@ def test_render_options(pdb_info):
     )
     gaussian_render_fn = cxs.GaussianMixtureRenderFn(shape, voxel_size)
     volumes, render_fns = [gaussian_volume], [gaussian_render_fn]
-    if jnufft is not None:
-        atom_volume = cxs.GaussianFourierVolume(
-            positions=atom_positions,
-            kernel_fns=im.FourierGaussian(
-                amplitude=1.0, b_factor=width**2 * (8 * np.pi**2)
-            ),
-        )
-        volumes.append(atom_volume)  # type: ignore
-        render_fns.append(cxs.GaussianFourierRenderFn(shape, voxel_size, eps=1e-9))  # type: ignore
+    atom_volume = cxs.GaussianFourierVolume(
+        positions=atom_positions,
+        kernel_fns=im.FourierGaussian(amplitude=1.0, b_factor=width**2 * (8 * np.pi**2)),
+    )
+    volumes.append(atom_volume)  # type: ignore
+    render_fns.append(cxs.GaussianFourierRenderFn(shape, voxel_size, eps=1e-9))  # type: ignore
     for volume, render_fn in zip(volumes, render_fns):
         real_voxel_grid = render_fn(volume, outputs_real_space=True)
         assert real_voxel_grid.shape == shape
