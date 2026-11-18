@@ -699,6 +699,32 @@ def test_fft_atom_bad_instantiation():
         )
 
 
+def test_fft_atom_amplitudes_default_to_ones():
+    positions = (np.zeros((3, 3)), np.zeros((2, 3)))
+    volume = cxs.GaussianFourierVolume(
+        positions, (im.FourierGaussian(), im.FourierGaussian())
+    )
+    assert [a.shape for a in volume.amplitudes] == [(3,), (2,)]
+    assert all(isinstance(a, np.ndarray) and np.all(a == 1.0) for a in volume.amplitudes)
+
+
+@pytest.mark.parametrize(
+    "amplitudes",
+    (
+        (np.ones(3),),  # tree structure differs from positions
+        (np.ones(3), np.ones(3)),  # second type has 2 positions
+        (np.ones((3, 1)), np.ones(2)),  # not (M,)
+        (1.0, np.ones(2)),  # no scalar broadcasting
+    ),
+)
+def test_fft_atom_amplitudes_bad_instantiation(amplitudes):
+    positions = (np.zeros((3, 3)), np.zeros((2, 3)))
+    with pytest.raises(ValueError, match="amplitudes"):
+        cxs.GaussianFourierVolume(
+            positions, (im.FourierGaussian(), im.FourierGaussian()), amplitudes
+        )
+
+
 # ── GaussianFourierProjection: each backend vs GaussianMixtureProjection ─────
 
 
