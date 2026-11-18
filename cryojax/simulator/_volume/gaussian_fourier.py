@@ -614,7 +614,7 @@ def _check_nufft_reaches_eps(
 ) -> None:
     if CRYOJAX_FINUFFT_BACKEND == "jax-finufft":
         return
-    # The dtype of `dispatch_nufft1(positions, jnp.ones(...), ...)`
+    # The dtype of `dispatch_nufft1(positions, jnp.asarray(amplitudes, dtype=float), ...)`
     dtype = jnp.result_type(*jax.tree.leaves(positions), jnp.ones(()), pixel_size, 0.0)
     is_auto = upsample_factor == "auto"
     # "auto" fails only when no factor up to its maximum, 2.5, reaches `eps`
