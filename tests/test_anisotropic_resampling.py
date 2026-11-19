@@ -9,6 +9,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
+from cryojax.ndimage._nufft import api as _nufft
 from cryojax.simulator._multislice import (
     FFTMultisliceIntegrator,
     MultisliceScatteringTheory,
@@ -17,6 +18,14 @@ from cryojax.simulator._volume.gaussian_mixture import _resample_with_anisotropy
 from jax.scipy.special import erf
 
 
+try:
+    import jax_finufft
+except ModuleNotFoundError:
+    jax_finufft = None
+
+_skip_without_jax_finufft = pytest.mark.skipif(
+    jax_finufft is None, reason="jax-finufft not installed"
+)
 _ANISOTROPY_XY = (0.02 * np.cos(np.deg2rad(60.0)), 0.02 * np.sin(np.deg2rad(60.0)))
 
 
@@ -111,7 +120,9 @@ def volumes():
             interp="cubic",
             pad_scale=2.0,
         ),
-        "fourier gaussians": cxs.GaussianFourierVolume(_POSITIONS, im.FourierGaussian()),
+        "fourier gaussians": cxs.GaussianFourierVolume(
+            _POSITIONS, im.FourierGaussian(b_factor=8 * np.pi**2 * _SIGMA**2)
+        ),
     }
 
 
@@ -147,21 +158,25 @@ def _models(
     return models
 
 
-def _analytic_projection(config, is_translated=True, sampling_mode="average"):
-    """The projection of the gaussians `_POSITIONS` (unit amplitude, standard deviation
-    `_SIGMA`) in `_POSE`, translated if `is_translated`, at the points `D⁻¹x`, averaged
-    over each pixel or, for `sampling_mode = 'point'`, sampled."""
+def _analytic_projection(
+    config, is_translated=True, sampling_mode="average", amplitudes=1.0, sigma=_SIGMA
+):
+    """The projection of the gaussians `_POSITIONS` (standard deviation `sigma`, of
+    `amplitudes`) in `_POSE`, translated if `is_translated`, at the points `D⁻¹x`,
+    averaged over each pixel or, for `sampling_mode = 'point'`, sampled."""
     volume = _gaussian_volume(variance=_SIGMA**2).rotate_to_pose(_POSE)
     centers = np.asarray(volume.positions)[:, :2]
     if is_translated:
         centers = centers + np.asarray(_POSE.offset_in_angstroms)
     x = np.asarray(config.get_coordinate_grid(padding=True))[..., None, :] - centers
     if sampling_mode == "point":
-        density = np.exp(-np.sum(x**2, axis=-1) / (2 * _SIGMA**2))
-        return np.sum(density, axis=-1) / (2 * np.pi * _SIGMA**2)
-    d, s = float(config.pixel_size), np.sqrt(2) * _SIGMA
-    box = np.asarray(erf((x + d / 2) / s) - erf((x - d / 2) / s))
-    return np.sum(np.prod(box, axis=-1), axis=-1) / (2 * d) ** 2
+        r_squared = np.sum(x**2, axis=-1)
+        gaussians = np.exp(-r_squared / (2 * sigma**2)) / (2 * np.pi * sigma**2)
+    else:
+        d, s = float(config.pixel_size), np.sqrt(2) * sigma
+        box = np.asarray(erf((x + d / 2) / s) - erf((x - d / 2) / s))
+        gaussians = np.prod(box, axis=-1) / (2 * d) ** 2
+    return np.sum(amplitudes * gaussians, axis=-1)
 
 
 @pytest.mark.parametrize("anisotropy_xy", [_ANISOTROPY_XY, (-0.05, 0.03)])
@@ -195,70 +210,97 @@ def _analytic_projection(config, is_translated=True, sampling_mode="average"):
         ),
         # Isotropically 5e-6 to 1e-4 over poses, 7e-6 at `_POSE`
         (cxs.FourierSliceExtraction(), "voxels", 1e-4, False),
-        (
-            cxs.GaussianFourierProjection(),
-            "fourier gaussians",
-            "GaussianFourierProjection",
-            False,
-        ),
-        (
-            cxs.GaussianFourierProjection(),
-            "fourier gaussians",
-            "GaussianFourierProjection",
-            True,
-        ),
+        # Exact to its `eps`, 1e-6; 2.2e-8 and 3.0e-8
+        (cxs.GaussianFourierProjection(), "fourier gaussians", 1e-6, False),
+        (cxs.GaussianFourierProjection(), "fourier gaussians", 1e-6, True),
         # The real part of its field; 7e-6 to 1.3e-5, as `FourierSliceExtraction`
         (cxs.EwaldSphereExtraction(), "voxels", 1e-4, True),
         (cxs.AutoVolumeProjection(), "gaussians", 3e-4, False),
         (cxs.AutoVolumeProjection(), "voxels", 1e-4, False),
-        (
-            cxs.AutoVolumeProjection(),
-            "fourier gaussians",
-            "GaussianFourierProjection",
-            False,
-        ),
+        (cxs.AutoVolumeProjection(), "fourier gaussians", 1e-6, False),
     ],
 )
 def test_integrators_apply_the_anisotropic_magnification(
     volumes, integrator, volume, outcome, is_direct, anisotropy_xy
 ):
     """Each integrator matches the analytic `p(D⁻¹x)` (Ewald by the real part of its
-    field) to `outcome` of its peak, with its real-space output the `irfftn` of its
-    fourier-space output, or raises for the integrator named by `outcome`, through an
-    image model or when `integrate`, which does not translate, is called directly."""
+    field; point-sampled for the band-limited fourier gaussians) to `outcome` of its
+    peak, through an image model or when `integrate`, which does not translate, is
+    called directly, with its real-space output the `irfftn` of its fourier-space
+    output."""
     config = cxs.AnisotropicImageConfig((64, 64), 1.0, anisotropy_xy=anisotropy_xy)
     volume_representation = volumes[volume].rotate_to_pose(_POSE)
     if is_direct:
-        simulate = lambda: integrator.integrate(
+        image = integrator.integrate(
             volume_representation, config, outputs_real_space=True
         )
     else:
         model = cxs.ProjectionImageModel(volumes[volume], _POSE, config, integrator)
-        simulate = model.simulate
-    if isinstance(outcome, str):
-        with pytest.raises(NotImplementedError, match=f"`{outcome}` does not support"):
-            simulate()
-    else:
-        expected = _analytic_projection(
+        image = model.simulate()
+    expected = _analytic_projection(
+        config,
+        is_translated=not is_direct,
+        sampling_mode=(
+            "point"
+            if volume == "fourier gaussians"
+            else getattr(integrator, "sampling_mode", "average")
+        ),
+    )
+    np.testing.assert_allclose(np.real(image), expected, atol=outcome * expected.max())
+    parts = np.fft.irfftn(
+        integrator.integrate(volume_representation, config),
+        s=config.padded_shape,
+        axes=(-2, -1),
+    )
+    if integrator.outputs_ewald_sphere:
+        parts = parts[0] + 1j * parts[1]
+    np.testing.assert_allclose(
+        integrator.integrate(volume_representation, config, outputs_real_space=True),
+        parts,
+        atol=1e-12 * expected.max(),
+    )
+
+
+@pytest.mark.parametrize(
+    "backend",
+    ["native", pytest.param("jax-finufft", marks=_skip_without_jax_finufft)],
+)
+@pytest.mark.parametrize(
+    "shape, projection_shape", [((64, 64), None), ((63, 58), None), ((63, 58), (80, 75))]
+)
+def test_gaussian_fourier_projection_is_exact(
+    monkeypatch, backend, shape, projection_shape
+):
+    """The band-limited `p(D⁻¹x)` to the NUFFT's `eps`, about the center of odd grids
+    and of a larger `shape` cropped to the image, with each gaussian of a kernel at its
+    own width and amplitude, and the atoms' amplitudes, each applied once."""
+    monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", backend)
+    amplitudes, sigmas = np.array([0.5, 1.0, 1.5]), (_SIGMA, 4.0)
+    kernel_fn = im.FourierGaussian(
+        amplitude=np.array([1.5, 0.5]), b_factor=8 * np.pi**2 * np.square(sigmas)
+    )
+    volume = cxs.GaussianFourierVolume(_POSITIONS, kernel_fn, amplitudes)
+    config = cxs.AnisotropicImageConfig(shape, 1.3, anisotropy_xy=(-0.05, 0.03))
+    integrator = cxs.GaussianFourierProjection(eps=1e-9, shape=projection_shape)
+    expected = sum(
+        _analytic_projection(
             config,
-            is_translated=not is_direct,
-            sampling_mode=getattr(integrator, "sampling_mode", "average"),
+            is_translated=False,
+            sampling_mode="point",
+            amplitudes=a * amplitudes,
+            sigma=sigma,
         )
-        np.testing.assert_allclose(
-            np.real(simulate()), expected, atol=outcome * expected.max()
-        )
-        parts = np.fft.irfftn(
-            integrator.integrate(volume_representation, config),
-            s=config.padded_shape,
-            axes=(-2, -1),
-        )
-        if integrator.outputs_ewald_sphere:
-            parts = parts[0] + 1j * parts[1]
-        np.testing.assert_allclose(
-            integrator.integrate(volume_representation, config, outputs_real_space=True),
-            parts,
-            atol=1e-12 * expected.max(),
-        )
+        for a, sigma in zip((1.5, 0.5), sigmas)
+    )
+    # Measured 4.4e-12 to 6.8e-12 (native) and 2.8e-10 to 3.8e-10 (jax-finufft); one
+    # width for both gaussians would give 1.2e-1
+    np.testing.assert_allclose(
+        integrator.integrate(
+            volume.rotate_to_pose(_POSE), config, outputs_real_space=True
+        ),
+        expected,
+        atol=1e-9 * expected.max(),
+    )
 
 
 @pytest.mark.parametrize("anisotropy_xy", [_ANISOTROPY_XY, (-0.05, 0.03)])
@@ -310,6 +352,7 @@ def test_point_sampling_resamples_odd_grids_about_their_center(
                 None,
             ),
             (cxs.FourierSliceExtraction(), "voxels"),
+            (cxs.GaussianFourierProjection(), "fourier gaussians"),
         ]
         for name in ["projection", "weak phase", "weak phase theory", "rytov"]
     ]
@@ -461,22 +504,32 @@ def _loss(
 
 @pytest.mark.parametrize("anisotropy_xy", [(0.0, 0.0), (0.03, -0.02)])
 @pytest.mark.parametrize(
-    "integrator, volume",
+    "integrator, volume, backend",
     [
-        (cxs.GaussianMixtureProjection(sampling_mode="point"), None),
+        (cxs.GaussianMixtureProjection(sampling_mode="point"), None, None),
         (
             cxs.GaussianMixtureProjection(
                 sampling_mode="point", upsample_factor=2, blur_variance=0.5
             ),
             None,
+            None,
         ),
-        (cxs.FourierSliceExtraction(), "voxels"),
-        (cxs.EwaldSphereExtraction(), "voxels"),
+        (cxs.FourierSliceExtraction(), "voxels", None),
+        (cxs.EwaldSphereExtraction(), "voxels", None),
+        (cxs.GaussianFourierProjection(eps=1e-9), "fourier gaussians", "native"),
+        pytest.param(
+            cxs.GaussianFourierProjection(eps=1e-9),
+            "fourier gaussians",
+            "jax-finufft",
+            marks=_skip_without_jax_finufft,
+        ),
     ],
 )
 def test_anisotropy_gradients_match_finite_differences(
-    volumes, integrator, volume, anisotropy_xy
+    monkeypatch, volumes, integrator, volume, backend, anisotropy_xy
 ):
+    if backend is not None:
+        monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", backend)
     loss = lambda a: _loss(a, None if volume is None else volumes[volume], integrator)
     anisotropy_xy = jnp.asarray(anisotropy_xy)
     gradient = jax.grad(loss)(anisotropy_xy)

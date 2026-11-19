@@ -20,6 +20,7 @@ from ...ndimage import (
     FourierGaussian,
     convert_rfftn_to_fftn,
     dispatch_nufft1,
+    make_frequency_grid,
     nufft_accuracy_limits,
     resize_with_crop_or_pad,
 )
@@ -32,7 +33,7 @@ from .base_volume import (
     ProjectionArray,
     VoxelArray,
 )
-from .internal import check_anisotropy_supported, eval_separable_impl, make_frequencies_1d
+from .internal import eval_separable_impl, make_frequencies_1d
 
 
 T = TypeVar("T")
@@ -362,10 +363,11 @@ class GaussianFourierProjection(
     """Integrate atomic parametrization of a volume onto the exit plane from
     a `GaussianFourierVolume` using non-uniform FFTs and Fourier-domain
     convolution. Computes the band-limited image, whose spectrum is the projected
-    volume's at every frequency of the grid. Good when kernels span at least a
-    couple pixels; see `cryojax.simulator.GaussianMixtureProjection` for an
-    alternative that directly spreads narrow kernels onto the grid, and for the
-    pixel average.
+    volume's at every frequency of the grid. With an `AnisotropicImageConfig`, it
+    computes the band-limited `p(D⁻¹x)` from the positions `D r` and the gaussians at
+    `Dᵀk`. Good when kernels span at least a couple pixels; see
+    `cryojax.simulator.GaussianMixtureProjection` for an alternative that directly
+    spreads narrow kernels onto the grid, and for the pixel average.
 
     !!! info
         By default, the non-uniform FFT runs on cryoJAX's native backend, in pure JAX or
@@ -383,7 +385,7 @@ class GaussianFourierProjection(
     options: dict[str, Any]
 
     outputs_ewald_sphere: ClassVar[bool] = False
-    supports_anisotropy: ClassVar[bool] = False
+    supports_anisotropy: ClassVar[bool] = True
 
     def __init__(
         self,
@@ -452,7 +454,6 @@ class GaussianFourierProjection(
         The volume projection in real or Fourier space at the
         `AbstractImageConfig.padded_shape` and the `image_config.pixel_size`.
         """  # noqa: E501
-        check_anisotropy_supported(self, image_config)
         # Prepare arguments
         pixel_size = jnp.asarray(image_config.pixel_size)
         shape = image_config.padded_shape if self.shape is None else self.shape
@@ -462,7 +463,9 @@ class GaussianFourierProjection(
             volume_representation.kernel_fns,
             volume_representation.amplitudes,
         )
-        kernel_fns = _standardize_kernel_fns(kernel_fns, spatial_dim=2)
+        kernel_fns = _standardize_kernel_fns(
+            kernel_fns, spatial_dim=2, is_separable=not image_config.is_anisotropic
+        )
         # Compute projection
         projection_rfft = _project_impl(
             positions,
@@ -470,6 +473,9 @@ class GaussianFourierProjection(
             amplitudes,
             shape=cast(tuple[int, int], shape),
             pixel_size=pixel_size,
+            anisotropy_matrix=(
+                image_config.anisotropy_matrix if image_config.is_anisotropic else None
+            ),
             eps=self.eps,
             upsample_factor=self.upsample_factor,
             enable_pallas=self.enable_pallas,
@@ -488,7 +494,7 @@ class GaussianFourierProjection(
 
 
 def _standardize_kernel_fns(
-    kernel_pytree: PyTree[FourierGaussian], *, spatial_dim: int
+    kernel_pytree: PyTree[FourierGaussian], *, spatial_dim: int, is_separable: bool = True
 ) -> PyTree[FourierGaussian]:
     kernel_list = jax.tree.leaves(
         kernel_pytree,
@@ -502,6 +508,8 @@ def _standardize_kernel_fns(
     # Standardize gaussian kernels for computation
     # ... pytree leaves have a batch dim
     kernel_pytree = jax.tree.map(lambda x: jnp.atleast_1d(x), kernel_pytree)
+    if not is_separable:
+        return kernel_pytree
     # ... `eval_separable_impl` embeds the kernel's amplitude once per axis
     # (outer product), so it must be pre-split by the `spatial_dim`-th root
     # to recover the correct total amplitude.
@@ -523,6 +531,7 @@ def _project_impl(
     *,
     shape: tuple[int, int],
     pixel_size: Float[Array, ""],
+    anisotropy_matrix: Float[Array, "2 2"] | None,
     eps: float,
     upsample_factor: float | Literal["auto"],
     enable_pallas: bool | Mapping[str, bool] | None,
@@ -532,15 +541,29 @@ def _project_impl(
         "GaussianFourierProjection", positions, pixel_size, shape, eps, upsample_factor
     )
     is_leaf = lambda x: isinstance(x, AbstractFourierOperator)  # noqa: E731
-    frequencies_1d = make_frequencies_1d(shape, pixel_size, modeord=1, outputs_rfft=True)
+    highest = jax.lax.Precision.HIGHEST
+    if anisotropy_matrix is None:
+        frequencies_1d = make_frequencies_1d(
+            shape, pixel_size, modeord=1, outputs_rfft=True
+        )
+    else:
+        # The spectrum of `p(D⁻¹x)` is `|det D|` times that of the positions `D r`,
+        # with each gaussian at `Dᵀk` and its full amplitude
+        frequencies = jnp.matmul(
+            make_frequency_grid(shape, pixel_size), anisotropy_matrix, precision=highest
+        )
+        det = jnp.abs(jnp.linalg.det(anisotropy_matrix))
 
     def fourier_impl(
         _positions: Float[Array, "_ 3"],
         _kernel_fn: FourierGaussian,
         _amplitudes: Float[Array, " _"],
     ) -> Array:
+        _positions = _positions[:, :2]
+        if anisotropy_matrix is not None:
+            _positions = jnp.matmul(_positions, anisotropy_matrix.T, precision=highest)
         spectrum = dispatch_nufft1(
-            _positions[:, :2],
+            _positions,
             jnp.asarray(_amplitudes, dtype=float),
             shape,
             pixel_size=pixel_size,
@@ -549,7 +572,12 @@ def _project_impl(
             enable_pallas=enable_pallas,
             options=options,
         )
-        return _eval_kernel_impl(_kernel_fn, frequencies_1d) * spectrum / pixel_size**2
+        if anisotropy_matrix is None:
+            return (
+                _eval_kernel_impl(_kernel_fn, frequencies_1d) * spectrum / pixel_size**2
+            )
+        kernel = jnp.sum(jax.vmap(lambda fn: fn(frequencies))(_kernel_fn), axis=0)
+        return det * kernel * spectrum / pixel_size**2
 
     # Project and sum over kernels
     return jax.tree.reduce(

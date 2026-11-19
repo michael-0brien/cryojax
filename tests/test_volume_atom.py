@@ -770,6 +770,30 @@ def test_fft_atom_projection_exact(monkeypatch, pdb_info, pixel_size, shape, bac
     np.testing.assert_allclose(proj_by_gaussians, proj_by_atom, atol=1e-8)
 
 
+@pytest.mark.parametrize("anisotropy_xy", ((0.01, 0.0173), (-0.05, 0.03)))
+def test_fft_atom_projection_anisotropic(pdb_info, anisotropy_xy):
+    gaussian_volume, _, atom_volume, image_config = _make_fft_projection_exact_volumes(
+        pdb_info
+    )
+    image_config = cxs.AnisotropicImageConfig(
+        image_config.shape,
+        image_config.pixel_size,
+        padded_shape=image_config.padded_shape,
+        anisotropy_xy=anisotropy_xy,
+    )
+    expected = compute_projection(
+        gaussian_volume,
+        cxs.GaussianMixtureProjection(sampling_mode="point", upsample_factor=2),
+        image_config,
+    )
+    actual = compute_projection(
+        atom_volume, cxs.GaussianFourierProjection(eps=1e-9), image_config
+    )
+    # `GaussianMixtureProjection`'s cubic resampling of the grid twice as fine: measured
+    # 8.1e-6 for both (7.1e-5 and 1.7e-4 at the image's pixels)
+    np.testing.assert_allclose(actual, expected, atol=2e-5 * np.abs(expected).max())
+
+
 def test_fourier_projection_upsample_factor_field():
     assert cxs.GaussianFourierProjection().upsample_factor == "auto"
     integrator = cxs.GaussianFourierProjection(upsample_factor=2.0)
