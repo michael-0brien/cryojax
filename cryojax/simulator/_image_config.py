@@ -3,7 +3,6 @@
 import math
 from abc import abstractmethod
 from collections.abc import Sequence
-from functools import cached_property
 from typing import ClassVar, Literal, cast
 
 import equinox as eqx
@@ -349,7 +348,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
         """Convenience property for `math.prod(padded_shape)`"""
         return math.prod(self.padded_shape)
 
-    @cached_property
+    @property
     def _coordinate_grid(
         self,
     ) -> Float[Array, "{self.y_dim} {self.x_dim} 2"]:
@@ -359,7 +358,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
         else:
             return self.precomputed_grids.get(real_space=True)
 
-    @cached_property
+    @property
     def _frequency_grid(
         self,
     ) -> Float[Array, "{self.y_dim} {self.x_dim//2+1} 2"]:
@@ -371,7 +370,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
         else:
             return self.precomputed_grids.get(real_space=False)
 
-    @cached_property
+    @property
     def _full_frequency_grid(
         self,
     ) -> Float[Array, "{self.y_dim} {self.x_dim} 2"]:
@@ -383,7 +382,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
         else:
             return self.precomputed_grids.get(real_space=False, full=True)
 
-    @cached_property
+    @property
     def _padded_coordinate_grid(
         self,
     ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim} 2"]:
@@ -393,7 +392,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
         else:
             return self.precomputed_grids.get(real_space=True, padding=True)
 
-    @cached_property
+    @property
     def _padded_frequency_grid(
         self,
     ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim//2+1} 2"]:
@@ -405,7 +404,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
         else:
             return self.precomputed_grids.get(real_space=False, padding=True)
 
-    @cached_property
+    @property
     def _padded_full_frequency_grid(
         self,
     ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim} 2"]:

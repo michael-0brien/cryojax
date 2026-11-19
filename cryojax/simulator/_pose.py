@@ -4,7 +4,6 @@ Representations of rigid body rotations and translations of 3D coordinate system
 
 from abc import abstractmethod
 from collections.abc import Sequence
-from functools import cached_property
 from typing import Self
 from typing_extensions import override
 
@@ -125,7 +124,7 @@ class AbstractPose(Module, strict=True):
         phase_x, phase_y = (FourierPhaseShifts(tx)(q_x), FourierPhaseShifts(ty)(q_y))
         return phase_y[:, None] * phase_x[None, :]
 
-    @cached_property
+    @property
     def offset_in_angstroms(
         self,
     ) -> Float[NDArrayLike, "... 2"] | Float[NDArrayLike, "... 3"]:
@@ -133,7 +132,7 @@ class AbstractPose(Module, strict=True):
         xy, z = self.offset_xy_in_angstroms, self.offset_z_in_angstroms
         return xy if z is None else leaf_stack((xy[..., 0], xy[..., 1], z), dtype=None)
 
-    @cached_property
+    @property
     def offset_x_in_angstroms(self) -> Float[Array, "..."]:
         """The in-plane translation in the x direction."""
         # a[..., i] indexing is for convenience outside of `jax.vmap`
@@ -141,7 +140,7 @@ class AbstractPose(Module, strict=True):
         # if batch dimensions are not the leading dimensions.
         return jnp.asarray(self.offset_xy_in_angstroms)[..., 0]
 
-    @cached_property
+    @property
     def offset_y_in_angstroms(self) -> Float[Array, "..."]:
         """The in-plane translation in the y direction."""
         # a[..., i] indexing is for convenience outside of `jax.vmap`
@@ -149,7 +148,7 @@ class AbstractPose(Module, strict=True):
         # if batch dimensions are not the leading dimensions.
         return jnp.asarray(self.offset_xy_in_angstroms)[..., 1]
 
-    @cached_property
+    @property
     @abstractmethod
     def rotation(self) -> SO3:
         """Generate an `SO3` object from a particular angular
@@ -265,7 +264,7 @@ class EulerAnglePose(AbstractPose, strict=True):
         self.theta_angle = leaf_asarray(theta_angle, dtype=float)
         self.psi_angle = leaf_asarray(psi_angle, dtype=float)
 
-    @cached_property
+    @property
     @override
     def rotation(self) -> SO3:
         """Generate a `SO3` object from a set of Euler angles."""
@@ -347,7 +346,7 @@ class QuaternionPose(AbstractPose, strict=True):
             )
         self.wxyz = wxyz
 
-    @cached_property
+    @property
     @override
     def rotation(self) -> SO3:
         """Generate rotation from the unit quaternion
@@ -418,7 +417,7 @@ class AxisAnglePose(AbstractPose, strict=True):
             )
         self.euler_vector = euler_vector
 
-    @cached_property
+    @property
     @override
     def rotation(self) -> SO3:
         """Generate rotation from an euler vector using the exponential map."""
