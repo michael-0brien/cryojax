@@ -620,8 +620,9 @@ class AnisotropicImageConfig(AbstractImageConfig, strict=True):
         `GaussianMixtureProjection` resamples its projection by cubic interpolation,
         whose error is aliasing that grows towards the Nyquist of the grid resampled:
         the image's, or with `sampling_mode = 'point'` the grid `upsample_factor` times
-        finer, before its crop to the image's band. `GaussianFourierProjection`
-        and `MultisliceScatteringTheory` raise a `NotImplementedError`.
+        finer, before its crop to the image's band. `GaussianFourierProjection` takes
+        the atom positions `D r` and its gaussians at `Dᵀk`, to the accuracy of its
+        non-uniform FFT. `MultisliceScatteringTheory` raises a `NotImplementedError`.
     """
 
     shape: tuple[int, int]
