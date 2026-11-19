@@ -31,9 +31,8 @@ from .base_volume import (
     AbstractVolumeRenderFn,
     ProjectionArray,
     VoxelArray,
-    error_if_anisotropy_unsupported,
 )
-from .common import make_frequencies_1d
+from .common import check_anisotropy_supported, make_frequencies_1d
 
 
 T = TypeVar("T")
@@ -440,7 +439,7 @@ class GaussianFourierProjection(
         The volume projection in real or Fourier space at the
         `AbstractImageConfig.padded_shape` and the `image_config.pixel_size`.
         """  # noqa: E501
-        error_if_anisotropy_unsupported(self, image_config)
+        check_anisotropy_supported(self, image_config)
         # Prepare arguments
         pixel_size = jnp.asarray(image_config.pixel_size)
         shape = image_config.padded_shape if self.shape is None else self.shape

@@ -32,8 +32,8 @@ from ._volume import (
     AbstractVolumeParametrization,
     AbstractVolumeRepresentation,
     AutoVolumeProjection,
-    error_if_anisotropy_unsupported,
 )
+from ._volume.common import check_anisotropy_supported
 
 
 RealImageArray = Float[Array, "{self.image_config.y_dim} {self.image_config.x_dim}"]
@@ -366,7 +366,7 @@ class LinearImageModel(AbstractImageModel, strict=True):
         if self.translate_mode == "atom":
             volume_representation = self._atom_translate(volume_representation)
         # Compute the projection image
-        error_if_anisotropy_unsupported(self.volume_integrator, self.image_config)
+        check_anisotropy_supported(self.volume_integrator, self.image_config)
         fourier_image = self.volume_integrator.integrate(
             volume_representation, self.image_config, outputs_real_space=False
         )
@@ -494,7 +494,7 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
         if self.translate_mode == "atom":
             volume_representation = self._atom_translate(volume_representation)
         # Compute the projection image
-        error_if_anisotropy_unsupported(self.volume_integrator, self.image_config)
+        check_anisotropy_supported(self.volume_integrator, self.image_config)
         fourier_image = self.volume_integrator.integrate(
             volume_representation, self.image_config, outputs_real_space=False
         )

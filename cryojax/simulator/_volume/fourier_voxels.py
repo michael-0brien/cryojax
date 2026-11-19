@@ -25,8 +25,8 @@ from .base_volume import (
     AbstractVoxelVolume,
     EwaldSphereArray,
     ProjectionArray,
-    error_if_anisotropy_unsupported,
 )
+from .common import check_anisotropy_supported
 
 
 def _check_voxel_array_shape(shape: tuple[int, ...], cls_name: str) -> None:
@@ -324,7 +324,7 @@ class EwaldSphereExtraction(
         `image_config.padded_shape`, `image_config.pixel_size`,
         and `image_config.voltage_in_kilovolts`.
         """
-        error_if_anisotropy_unsupported(self, image_config)
+        check_anisotropy_supported(self, image_config)
         if not isinstance(volume_representation, FourierVoxelGridVolume):
             raise ValueError(
                 "Got unsupported type for `volume_representation` in "

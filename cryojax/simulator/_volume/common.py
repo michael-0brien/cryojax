@@ -7,6 +7,8 @@ import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from ...ndimage import make_1d_frequency_grid
+from .._image_config import AbstractImageConfig
+from .base_volume import AbstractVolumeIntegrator
 
 
 def make_frequencies_1d(
@@ -83,3 +85,15 @@ def spread_and_sum_gaussian_components(
     for group_total in group_totals[1:]:
         total = total + group_total
     return total
+
+
+def check_anisotropy_supported(
+    volume_integrator: AbstractVolumeIntegrator, image_config: AbstractImageConfig
+) -> None:
+    if image_config.is_anisotropic and not volume_integrator.supports_anisotropy:
+        raise NotImplementedError(
+            f"`{type(volume_integrator).__name__}` does not support "
+            "`AnisotropicImageConfig`. Use a volume integrator that supports it, "
+            "e.g. `GaussianMixtureProjection` or `FourierSliceExtraction`, or a "
+            "`BasicImageConfig`."
+        )

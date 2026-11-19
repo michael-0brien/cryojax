@@ -217,18 +217,6 @@ class AbstractVolumeIntegrator(eqx.Module, Generic[VolRep], strict=True):
         raise NotImplementedError
 
 
-def error_if_anisotropy_unsupported(
-    volume_integrator: AbstractVolumeIntegrator, image_config: AbstractImageConfig
-) -> None:
-    if image_config.is_anisotropic and not volume_integrator.supports_anisotropy:
-        raise NotImplementedError(
-            f"`{type(volume_integrator).__name__}` does not support "
-            "`AnisotropicImageConfig`. Use a volume integrator that supports it, "
-            "e.g. `GaussianMixtureProjection` or `FourierSliceExtraction`, or a "
-            "`BasicImageConfig`."
-        )
-
-
 class AbstractVolumeRenderFn(eqx.Module, Generic[VolRep], strict=True):
     """Base class for rendering a volume onto voxels."""
 

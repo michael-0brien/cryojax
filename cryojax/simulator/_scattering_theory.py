@@ -9,11 +9,8 @@ from .._internal import error_if_not_fractional, leaf_asarray
 from ..jax_util import FloatLike, NDArrayLike
 from ._image_config import AbstractImageConfig
 from ._transfer_theory import ContrastTransferTheory, WaveTransferTheory
-from ._volume import (
-    AbstractVolumeIntegrator,
-    AbstractVolumeRepresentation,
-    error_if_anisotropy_unsupported,
-)
+from ._volume import AbstractVolumeIntegrator, AbstractVolumeRepresentation
+from ._volume.common import check_anisotropy_supported
 
 
 class AbstractScatteringTheory(eqx.Module, strict=True):
@@ -138,7 +135,7 @@ class WeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         del rng_key
         # Compute the integrated potential
-        error_if_anisotropy_unsupported(self.volume_integrator, image_config)
+        check_anisotropy_supported(self.volume_integrator, image_config)
         fourier_in_plane_potential = self.volume_integrator.integrate(
             volume_representation, image_config, outputs_real_space=False
         )
@@ -249,7 +246,7 @@ class RytovScatteringTheory(AbstractWaveScatteringTheory, strict=True):
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]:
         del rng_key
         # Compute the integrated potential in the exit plane
-        error_if_anisotropy_unsupported(self.volume_integrator, image_config)
+        check_anisotropy_supported(self.volume_integrator, image_config)
         fourier_in_plane_potential = self.volume_integrator.integrate(
             volume_representation, image_config, outputs_real_space=False
         )

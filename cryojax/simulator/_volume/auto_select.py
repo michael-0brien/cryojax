@@ -12,8 +12,8 @@ from .base_volume import (
     AbstractVolumeRepresentation,
     ProjectionArray,
     VoxelArray,
-    error_if_anisotropy_unsupported,
 )
+from .common import check_anisotropy_supported
 from .fourier_voxels import (
     FourierSliceExtraction,
     FourierVoxelGridVolume,
@@ -100,7 +100,7 @@ class AutoVolumeProjection(
         `AbstractImageConfig.padded_shape` and the `image_config.pixel_size`.
         """
         volume_integrator = self._select_projection_method(volume_representation)
-        error_if_anisotropy_unsupported(volume_integrator, image_config)
+        check_anisotropy_supported(volume_integrator, image_config)
         return volume_integrator.integrate(
             volume_representation, image_config, outputs_real_space=outputs_real_space
         )

@@ -9,7 +9,6 @@ from .base_volume import (
     AbstractVolumeRenderFn as AbstractVolumeRenderFn,
     AbstractVolumeRepresentation as AbstractVolumeRepresentation,
     AbstractVoxelVolume as AbstractVoxelVolume,
-    error_if_anisotropy_unsupported as error_if_anisotropy_unsupported,
 )
 from .fourier_voxels import (
     EwaldSphereExtraction as EwaldSphereExtraction,
