@@ -1,3 +1,5 @@
+import math
+
 import cryojax.ndimage as im
 import jax
 import jax.numpy as jnp
@@ -707,6 +709,32 @@ def test_spread_3d_custom_vjp(points_3d, use_erf, scalar_variance):
         atol=1e-4,
         rtol=1e-4,
     )
+
+
+@pytest.mark.parametrize("n_sigma", [3.0, 4.0])
+@pytest.mark.parametrize("width", [0.99, 1.49, 2.49])
+def test_variance_to_nspread_truncates_beyond_n_sigma(n_sigma, width):
+    # sigma = width / n_sigma pixels: just inside n_spread 2, 3 and 5 when sized
+    # by the window's width alone
+    pixel_size = 1.0
+    variance = jnp.asarray((width * pixel_size / n_sigma) ** 2)
+    n_spread = im.variance_to_nspread(variance, pixel_size, n_sigma)
+    # The window moves a pixel where x / pixel_size - n_spread / 2 is an integer
+    switch = (n_spread / 2) % 1 * pixel_size
+    left, right = (
+        spread_gaussians_2d(
+            jnp.asarray([switch + dx]),
+            jnp.zeros(1),
+            jnp.ones(1),
+            variance,
+            (16, 16),
+            pixel_size=jnp.asarray(pixel_size),
+            n_spread=n_spread,
+        )
+        for dx in (-1e-9, 1e-9)
+    )
+    tail = 0.5 * math.erfc(n_sigma / math.sqrt(2))
+    assert jnp.max(jnp.abs(right - left)) <= tail * jnp.sum(left)
 
 
 #

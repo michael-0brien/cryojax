@@ -13,10 +13,10 @@ from jaxtyping import Array, Float
 
 from ...jax_util import FloatLike, NDArrayLike
 from .pallas_spread import (
-    pallas_interp_bwd_2d,
-    pallas_interp_bwd_3d,
-    pallas_spread_fwd_2d,
-    pallas_spread_fwd_3d,
+    pallas_spread_2d,
+    pallas_spread_3d,
+    pallas_spread_vjp_2d,
+    pallas_spread_vjp_3d,
     resolve_enable_pallas,
 )
 from .spread import spread_2d_bwd, spread_2d_impl, spread_3d_bwd, spread_3d_impl
@@ -293,15 +293,18 @@ def variance_to_nspread(
     - `pixel_size`:
         The pixel/voxel size of the grid `variance` will be spread onto.
     - `n_sigma`:
-        The number of standard deviations of the Gaussian to truncate at.
+        The number of standard deviations of the Gaussian to truncate at,
+        wherever a point falls on the grid.
 
     **Returns:**
 
-    An integer `n_spread`, at least `2`.
+    An integer `n_spread`, at least `2` for a nonzero `variance`.
     """
     max_variance = float(np.max(np.asarray(variance)))
     n_spread = 2.0 * n_sigma * math.sqrt(max_variance) / float(pixel_size)
-    return max(2, math.ceil(n_spread))
+    # The window moves a whole pixel at a time, so its nearer edge can sit half a
+    # pixel closer to the point than `n_spread / 2`.
+    return math.ceil(n_spread) + 1
 
 
 # ============================================================================
@@ -326,7 +329,7 @@ def _spread_2d_dispatch(
     use_pallas_bwd,
 ):
     if use_pallas_fwd:
-        return pallas_spread_fwd_2d(
+        return pallas_spread_2d(
             i,
             j,
             amplitude,
@@ -364,7 +367,7 @@ def _spread_2d_dispatch_fwd(
     use_pallas_bwd,
 ):
     if use_pallas_fwd:
-        out = pallas_spread_fwd_2d(
+        out = pallas_spread_2d(
             i,
             j,
             amplitude,
@@ -395,7 +398,7 @@ def _spread_2d_dispatch_bwd(
 ):
     del use_pallas_fwd
     if use_pallas_bwd:
-        return pallas_interp_bwd_2d(ny, nx, n_spread, use_erf, res, g)
+        return pallas_spread_vjp_2d(ny, nx, n_spread, use_erf, res, g)
     return spread_2d_bwd(ny, nx, n_spread, use_erf, res, g)
 
 
@@ -419,7 +422,7 @@ def _spread_3d_dispatch(
     use_pallas_bwd,
 ):
     if use_pallas_fwd:
-        return pallas_spread_fwd_3d(
+        return pallas_spread_3d(
             i,
             j,
             k,
@@ -463,7 +466,7 @@ def _spread_3d_dispatch_fwd(
     use_pallas_bwd,
 ):
     if use_pallas_fwd:
-        out = pallas_spread_fwd_3d(
+        out = pallas_spread_3d(
             i,
             j,
             k,
@@ -498,7 +501,7 @@ def _spread_3d_dispatch_bwd(
 ):
     del use_pallas_fwd
     if use_pallas_bwd:
-        return pallas_interp_bwd_3d(nz, ny, nx, n_spread, use_erf, res, g)
+        return pallas_spread_vjp_3d(nz, ny, nx, n_spread, use_erf, res, g)
     return spread_3d_bwd(nz, ny, nx, n_spread, use_erf, res, g)
 
 

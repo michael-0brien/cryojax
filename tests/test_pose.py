@@ -1,4 +1,5 @@
 import cryojax.simulator as cxs
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -142,6 +143,40 @@ def test_invert_pose():
     np.testing.assert_allclose(quat.offset_in_angstroms, quat_inverse.offset_in_angstroms)
 
 
+@pytest.mark.parametrize(
+    "cls", [cxs.EulerAnglePose, cxs.QuaternionPose, cxs.AxisAnglePose]
+)
+def test_offset_leaves(cls):
+    planar = cls(1.0, -2.0)
+    assert planar.offset_z_in_angstroms is None
+    np.testing.assert_allclose(planar.offset_xy_in_angstroms, (1.0, -2.0))
+    np.testing.assert_allclose(planar.offset_in_angstroms, (1.0, -2.0))
+    assert cls.from_translation(jnp.asarray((1.0, -2.0))).offset_z_in_angstroms is None
+
+    pose = cls(1.0, -2.0, offset_z_in_angstroms=3.0)
+    np.testing.assert_allclose(pose.offset_in_angstroms, (1.0, -2.0, 3.0))
+    rotation = SO3(jnp.asarray((1.0, 0.0, 0.0, 0.0)))
+    offset = jnp.asarray((1.0, -2.0, 3.0))
+    for converted in (
+        pose,
+        cls.from_rotation_and_translation(rotation, offset),
+        cls.from_translation(offset),
+        pose.to_inverse_rotation(),
+    ):
+        np.testing.assert_allclose(converted.offset_xy_in_angstroms, (1.0, -2.0))
+        np.testing.assert_allclose(converted.offset_z_in_angstroms, 3.0)
+
+
+def test_batched_offset_leaves():
+    x, y, z = np.arange(4.0), -np.arange(4.0), np.full(4, 3.0)
+    pose = eqx.filter_vmap(
+        lambda x, y, z: cxs.EulerAnglePose(x, y, offset_z_in_angstroms=z)
+    )(x, y, z)
+    np.testing.assert_allclose(pose.offset_x_in_angstroms, x)
+    np.testing.assert_allclose(pose.offset_y_in_angstroms, y)
+    np.testing.assert_allclose(pose.offset_in_angstroms, np.stack((x, y, z), axis=-1))
+
+
 def test_axis_angle_euler_agreement():
     angle = 2.0
     angle_in_radians = jnp.deg2rad(angle)
@@ -178,6 +213,21 @@ def test_euler_angle_conversion(phi, theta, psi):
             )
         ),
     )
+
+
+@pytest.mark.parametrize("theta", [0.0, 180.0])
+def test_euler_angle_conversion_at_gimbal_lock(theta):
+    """At theta 0 or 180 degrees phi and psi turn about one axis: the conversion
+    puts the whole turn in phi and psi at exactly 0, call after call."""
+    rotation = cxs.EulerAnglePose(
+        phi_angle=30.0, theta_angle=theta, psi_angle=25.0
+    ).rotation
+    for _ in range(3):
+        pose = cxs.EulerAnglePose.from_rotation(rotation)
+        assert float(pose.psi_angle) == 0.0
+        np.testing.assert_allclose(
+            pose.rotation.as_matrix(), rotation.as_matrix(), atol=1e-6
+        )
 
 
 @pytest.mark.parametrize(
