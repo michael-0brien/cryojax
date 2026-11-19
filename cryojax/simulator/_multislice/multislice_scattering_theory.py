@@ -36,6 +36,11 @@ class MultisliceScatteringTheory(AbstractWaveScatteringTheory, strict=True):
         rng_key: PRNGKeyArray | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]:
         del rng_key
+        if image_config.is_anisotropic:
+            raise NotImplementedError(
+                "`MultisliceScatteringTheory` does not support `AnisotropicImageConfig`. "
+                "Use a `BasicImageConfig`."
+            )
         # Compute the wavefunction in the exit plane
         wavefunction = self.volume_integrator.integrate(
             volume_representation, image_config

@@ -9,7 +9,11 @@ from .._internal import error_if_not_fractional, leaf_asarray
 from ..jax_util import FloatLike, NDArrayLike
 from ._image_config import AbstractImageConfig
 from ._transfer_theory import ContrastTransferTheory, WaveTransferTheory
-from ._volume import AbstractVolumeIntegrator, AbstractVolumeRepresentation
+from ._volume import (
+    AbstractVolumeIntegrator,
+    AbstractVolumeRepresentation,
+    error_if_anisotropy_unsupported,
+)
 
 
 class AbstractScatteringTheory(eqx.Module, strict=True):
@@ -48,6 +52,8 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
         image_config: AbstractImageConfig,
         rng_key: PRNGKeyArray | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]:
+        """With `image_config.is_anisotropic`, return the exit wave with the anisotropic
+        magnification applied, `ψ(D⁻¹x)`."""
         raise NotImplementedError
 
     @override
@@ -58,18 +64,15 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
         rng_key: PRNGKeyArray | None = None,
         offset_z_in_angstroms: FloatLike | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
-        # ... compute the exit wave, resampled from real space with an anisotropic
-        # magnification
-        wavefunction = self.compute_exit_wave(
-            volume_representation, image_config, rng_key
+        # ... compute the exit wave
+        fourier_wavefunction = jnp.fft.fftn(
+            self.compute_exit_wave(volume_representation, image_config, rng_key)
         )
-        is_real_space = image_config.is_anisotropic
         # ... propagate to the detector plane
         fourier_wavefunction = self.transfer_theory.propagate_exit_wave(
-            wavefunction if is_real_space else jnp.fft.fftn(wavefunction),
+            fourier_wavefunction,
             image_config,
             offset_z_in_angstroms=offset_z_in_angstroms,
-            is_real_space=is_real_space,
         )
         wavefunction = jnp.fft.ifftn(fourier_wavefunction)
         # ... get the squared wavefunction and return to fourier space
@@ -86,18 +89,15 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
         offset_z_in_angstroms: FloatLike | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         """Compute the contrast at the detector plane, given the squared wavefunction."""
-        # ... compute the exit wave, resampled from real space with an anisotropic
-        # magnification
-        wavefunction = self.compute_exit_wave(
-            volume_representation, image_config, rng_key
+        # ... compute the exit wave
+        fourier_wavefunction = jnp.fft.fftn(
+            self.compute_exit_wave(volume_representation, image_config, rng_key)
         )
-        is_real_space = image_config.is_anisotropic
         # ... propagate to the detector plane
         fourier_wavefunction = self.transfer_theory.propagate_exit_wave(
-            wavefunction if is_real_space else jnp.fft.fftn(wavefunction),
+            fourier_wavefunction,
             image_config,
             offset_z_in_angstroms=offset_z_in_angstroms,
-            is_real_space=is_real_space,
         )
         wavefunction = jnp.fft.ifftn(fourier_wavefunction)
         # ... get the squared wavefunction
@@ -135,18 +135,17 @@ class WeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
         volume_representation: AbstractVolumeRepresentation,
         image_config: AbstractImageConfig,
         rng_key: PRNGKeyArray | None = None,
-        outputs_real_space: bool = False,
-    ) -> (
-        Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]
-        | Inexact[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]
-    ):
+    ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         del rng_key
         # Compute the integrated potential
-        in_plane_potential = self.volume_integrator.integrate(
-            volume_representation, image_config, outputs_real_space=outputs_real_space
+        error_if_anisotropy_unsupported(self.volume_integrator, image_config)
+        fourier_in_plane_potential = self.volume_integrator.integrate(
+            volume_representation, image_config, outputs_real_space=False
         )
 
-        return image_config.interaction_constant * in_plane_potential
+        object_spectrum = image_config.interaction_constant * fourier_in_plane_potential
+
+        return object_spectrum
 
     @override
     def compute_contrast_spectrum(
@@ -156,17 +155,14 @@ class WeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
         rng_key: PRNGKeyArray | None = None,
         offset_z_in_angstroms: FloatLike | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
-        # With an anisotropic magnification, the object is resampled from real space
-        is_real_space = image_config.is_anisotropic
         object_spectrum = self.compute_object_spectrum(
-            volume_representation, image_config, rng_key, outputs_real_space=is_real_space
+            volume_representation, image_config, rng_key
         )
         contrast_spectrum = self.transfer_theory.propagate_object(  # noqa: E501
             object_spectrum,
             image_config,
             is_ewald_sphere=self.volume_integrator.outputs_ewald_sphere,
             offset_z_in_angstroms=offset_z_in_angstroms,
-            is_real_space=is_real_space,
         )
 
         return contrast_spectrum
@@ -253,6 +249,7 @@ class RytovScatteringTheory(AbstractWaveScatteringTheory, strict=True):
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]:
         del rng_key
         # Compute the integrated potential in the exit plane
+        error_if_anisotropy_unsupported(self.volume_integrator, image_config)
         fourier_in_plane_potential = self.volume_integrator.integrate(
             volume_representation, image_config, outputs_real_space=False
         )

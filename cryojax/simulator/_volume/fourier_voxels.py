@@ -25,6 +25,7 @@ from .base_volume import (
     AbstractVoxelVolume,
     EwaldSphereArray,
     ProjectionArray,
+    error_if_anisotropy_unsupported,
 )
 
 
@@ -155,7 +156,8 @@ class FourierSliceExtraction(
     strict=True,
 ):
     """Integrate points to the exit plane using the Fourier
-    projection-slice theorem.
+    projection-slice theorem. With an `AnisotropicImageConfig`, it samples the slice at
+    `Dᵀk`.
 
     The interpolation method is read from `FourierVoxelGridVolume.interp`.
     """
@@ -164,6 +166,7 @@ class FourierSliceExtraction(
     unroll: bool | Literal["auto"]
 
     outputs_ewald_sphere: ClassVar[bool] = False
+    supports_anisotropy: ClassVar[bool] = True
 
     def __init__(
         self,
@@ -218,6 +221,15 @@ class FourierSliceExtraction(
             )
         frequency_slice = volume_representation.frequency_slice
         N = frequency_slice.shape[1]
+        if image_config.is_anisotropic:
+            # The rotated slice is linear in the in-plane frequencies `k`: read its
+            # steps along x and y at zero frequency and evaluate it at `q = Dᵀk`,
+            # elementwise so that XLA fuses it into the sampling
+            steps = N * jnp.fft.ifftshift(frequency_slice, axes=(1,))[0]
+            k = make_frequency_slice((N, N), fftshifted=True)
+            D = image_config.anisotropy_matrix
+            q = k[..., 0:1] * D[0] + k[..., 1:2] * D[1]
+            frequency_slice = q[..., 0:1] * steps[0, 1] + q[..., 1:2] * steps[1, 0]
         # Compute the fourier projection
         fourier_projection = sample_fft_slice(
             volume_representation.values,
@@ -243,6 +255,9 @@ class FourierSliceExtraction(
             )
         # Scale by voxel size to convert from projection to integral
         fourier_projection *= image_config.pixel_size
+        if image_config.is_anisotropic:
+            # The spectrum of `p(D⁻¹x)` is `|det D| P(Dᵀk)`
+            fourier_projection *= jnp.abs(jnp.linalg.det(image_config.anisotropy_matrix))
         return (
             jnp.fft.irfftn(fourier_projection, s=image_config.padded_shape)
             if outputs_real_space
@@ -264,6 +279,7 @@ class EwaldSphereExtraction(
     unroll: bool | Literal["auto"]
 
     outputs_ewald_sphere: ClassVar[bool] = True
+    supports_anisotropy: ClassVar[bool] = False
 
     def __init__(
         self,
@@ -308,6 +324,7 @@ class EwaldSphereExtraction(
         `image_config.padded_shape`, `image_config.pixel_size`,
         and `image_config.voltage_in_kilovolts`.
         """
+        error_if_anisotropy_unsupported(self, image_config)
         if not isinstance(volume_representation, FourierVoxelGridVolume):
             raise ValueError(
                 "Got unsupported type for `volume_representation` in "

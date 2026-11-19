@@ -11,6 +11,7 @@ from cryojax.ndimage import (
     crop_to_shape,
     pad_to_shape,
 )
+from jax.scipy.special import erf
 
 
 jax.config.update("jax_enable_x64", True)
@@ -387,8 +388,8 @@ def test_bg_normalization_scales_about_the_background(voxel_volume, voxel_size):
 # ── Anisotropic magnification ────────────────────────────────────────────────
 
 _SHAPE, _PIXEL_SIZE, _SIGMA = (64, 64), 1.0, 3.0
-# Cubic resampling to the detector is accurate to ~1e-3 of the spectrum at 0.1-0.2
-# cycles/pixel, where a `_SIGMA = 3` pixel gaussian has the last of its power
+# Cubic resampling is accurate to ~1e-3 of the spectrum at 0.1-0.2 cycles/pixel,
+# where a `_SIGMA = 3` pixel gaussian has the last of its power
 _RESAMPLING_RTOL = 3e-4
 _ANISOTROPY_XY = (0.05 * np.cos(np.deg2rad(60.0)), 0.05 * np.sin(np.deg2rad(60.0)))
 
@@ -399,12 +400,17 @@ def _gaussian_volume(position):
     )
 
 
-def _analytic_anisotropic_projection(config, center):
+def _analytic_anisotropic_projection(config, center, is_pixel_averaged=False):
     """The projection of an isotropic gaussian at `center` (in the specimen frame),
-    seen through the magnification: `p(D⁻¹x)` on the detector pixels."""
+    with the magnification applied: `p(D⁻¹x)` on the image pixels, with `p` averaged
+    over a pixel if `is_pixel_averaged`."""
     D = np.asarray(config.anisotropy_matrix)
     x = np.asarray(config.get_coordinate_grid(anisotropy=False))
     r = x @ np.linalg.inv(D).T - np.asarray(center)[:2]
+    if is_pixel_averaged:
+        d, s = _PIXEL_SIZE, np.sqrt(2) * _SIGMA
+        box = np.asarray(erf((r + d / 2) / s) - erf((r - d / 2) / s))
+        return np.prod(box, axis=-1) / (2 * d) ** 2
     return np.exp(-0.5 * np.sum(r**2, axis=-1) / _SIGMA**2) / (2 * np.pi * _SIGMA**2)
 
 
@@ -426,94 +432,48 @@ def test_anisotropic_projection_is_the_analytic_projection(translate_mode):
     )
 
 
-def test_anisotropic_linear_image_applies_the_ctf_at_the_distorted_frequencies():
+@pytest.mark.parametrize(
+    "integrator, is_voxel_volume, rtol",
+    [
+        # Measured 3.9e-5
+        (cxs.GaussianMixtureProjection(sampling_mode="point"), False, _RESAMPLING_RTOL),
+        # Measured 6.9e-6, and 1.2e-5 isotropically
+        (cxs.FourierSliceExtraction(), True, 3e-5),
+    ],
+)
+def test_anisotropic_linear_image_applies_the_ctf_at_the_distorted_frequencies(
+    integrator, is_voxel_volume, rtol
+):
     config = cxs.AnisotropicImageConfig(_SHAPE, _PIXEL_SIZE, anisotropy_xy=_ANISOTROPY_XY)
     position, offset = np.array([3.5, -2.2, 0.0]), np.array([4.0, 1.5])
+    volume = _gaussian_volume(position)
+    if is_voxel_volume:
+        volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(
+            cxs.GaussianMixtureRenderFn((64, 64, 64), _PIXEL_SIZE)(volume),
+            interp="cubic",
+            pad_scale=2.0,
+        )
     ctf = cxs.AberratedCTF(defocus_in_um=0.5, coma_xy_in_um=(0.5, 0.2))
     model = cxs.LinearImageModel(
-        _gaussian_volume(position),
+        volume,
         cxs.EulerAnglePose(*offset),
         config,
         cxs.ContrastTransferTheory(ctf, amplitude_contrast_ratio=0.1),
-        cxs.GaussianMixtureProjection(sampling_mode="point"),
+        integrator,
     )
     ctf_array = ctf(
         config.get_frequency_grid(padding=True),
         config.wavelength_in_angstroms,
         amplitude_contrast_ratio=0.1,
     )
-    projection = _analytic_anisotropic_projection(config, position[:2] + offset)
+    projection = _analytic_anisotropic_projection(
+        config, position[:2] + offset, is_pixel_averaged=is_voxel_volume
+    )
     expected = np.fft.irfftn(
         np.asarray(ctf_array) * np.fft.rfftn(projection), s=_SHAPE, axes=(0, 1)
     )
     np.testing.assert_allclose(
-        model.simulate(), expected, atol=_RESAMPLING_RTOL * np.abs(expected).max()
-    )
-
-
-@pytest.mark.parametrize("anisotropy_xy", [None, _ANISOTROPY_XY])
-@pytest.mark.parametrize("is_ewald_sphere", [False, True])
-def test_propagate_object_accepts_real_space_objects(anisotropy_xy, is_ewald_sphere):
-    config = (
-        cxs.BasicImageConfig(_SHAPE, _PIXEL_SIZE)
-        if anisotropy_xy is None
-        else cxs.AnisotropicImageConfig(_SHAPE, _PIXEL_SIZE, anisotropy_xy=anisotropy_xy)
-    )
-    rng = np.random.default_rng(0)
-    real_object = rng.normal(size=_SHAPE)
-    if is_ewald_sphere:
-        real_object = real_object + 1j * rng.normal(size=_SHAPE)
-    fourier_object = (
-        np.fft.fftn(real_object) if is_ewald_sphere else np.fft.rfftn(real_object)
-    )
-    transfer_theory = cxs.ContrastTransferTheory(cxs.AstigmaticCTF())
-    kwargs = dict(is_ewald_sphere=is_ewald_sphere)
-    np.testing.assert_allclose(
-        transfer_theory.propagate_object(
-            jax.numpy.asarray(real_object), config, is_real_space=True, **kwargs
-        ),
-        transfer_theory.propagate_object(
-            jax.numpy.asarray(fourier_object), config, **kwargs
-        ),
-        atol=1e-8,
-    )
-
-
-def _ewald_test_volume():
-    return cxs.FourierVoxelGridVolume.from_real_voxel_grid(
-        cxs.GaussianMixtureRenderFn((32, 32, 32), voxel_size=1.0)(
-            cxs.GaussianMixtureVolume(
-                np.array([[0.0, 0.0, 0.0], [3.0, -2.0, 1.0]]),
-                amplitudes=1.0,
-                variances=1.0,
-            )
-        )
-    )
-
-
-def test_anisotropic_ewald_sphere_matches_fourier_slice_at_high_voltage():
-    config = cxs.AnisotropicImageConfig(
-        (32, 32), 1.0, voltage_in_kilovolts=1e6, anisotropy_xy=_ANISOTROPY_XY
-    )
-
-    def simulate(integrator):
-        return cxs.IntensityImageModel(
-            _ewald_test_volume(),
-            cxs.EulerAnglePose(),
-            config,
-            cxs.WeakPhaseScatteringTheory(
-                integrator,
-                cxs.ContrastTransferTheory(
-                    cxs.AstigmaticCTF(defocus_in_angstroms=2500.0),
-                    amplitude_contrast_ratio=0.1,
-                ),
-            ),
-        ).simulate()
-
-    np.testing.assert_allclose(
-        simulate(cxs.EwaldSphereExtraction()),
-        simulate(cxs.FourierSliceExtraction()),
-        atol=1e-5,
+        model.simulate(), expected, atol=rtol * np.abs(expected).max()
     )
 
 

@@ -201,6 +201,7 @@ class AbstractVolumeIntegrator(eqx.Module, Generic[VolRep], strict=True):
     """
 
     outputs_ewald_sphere: eqx.AbstractClassVar[bool]
+    supports_anisotropy: eqx.AbstractClassVar[bool]
 
     @abc.abstractmethod
     def integrate(
@@ -209,7 +210,23 @@ class AbstractVolumeIntegrator(eqx.Module, Generic[VolRep], strict=True):
         image_config: AbstractImageConfig,
         outputs_real_space: bool = False,
     ) -> ProjectionOrEwaldSphereArray:
+        """Integrate the volume onto the exit plane. If `supports_anisotropy` and
+        `image_config.is_anisotropic`, return the projection with the anisotropic
+        magnification applied, `p(D⁻¹x)` for `D = image_config.anisotropy_matrix`.
+        """
         raise NotImplementedError
+
+
+def error_if_anisotropy_unsupported(
+    volume_integrator: AbstractVolumeIntegrator, image_config: AbstractImageConfig
+) -> None:
+    if image_config.is_anisotropic and not volume_integrator.supports_anisotropy:
+        raise NotImplementedError(
+            f"`{type(volume_integrator).__name__}` does not support "
+            "`AnisotropicImageConfig`. Use a volume integrator that supports it, "
+            "e.g. `GaussianMixtureProjection` or `FourierSliceExtraction`, or a "
+            "`BasicImageConfig`."
+        )
 
 
 class AbstractVolumeRenderFn(eqx.Module, Generic[VolRep], strict=True):

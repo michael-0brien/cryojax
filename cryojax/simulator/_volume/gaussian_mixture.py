@@ -20,6 +20,7 @@ from ...ndimage import (
 )
 from .._image_config import AbstractImageConfig
 from .._pose import AbstractPose
+from .._resample import resample_with_anisotropy_matrix
 from .base_volume import (
     AbstractAtomVolume,
     AbstractVolumeIntegrator,
@@ -241,6 +242,7 @@ class GaussianMixtureProjection(
     enable_pallas: bool | Mapping[str, bool] | None
 
     outputs_ewald_sphere: ClassVar[bool] = False
+    supports_anisotropy: ClassVar[bool] = True
 
     def __init__(
         self,
@@ -365,21 +367,24 @@ class GaussianMixtureProjection(
                 context,
                 self.enable_pallas,
             )
-        if self.shape is None:
-            return (
-                projection_integral
-                if outputs_real_space
-                else jnp.fft.rfftn(projection_integral)
-            )
-        else:
+        if self.shape is not None:
             projection_integral = resize_with_crop_or_pad(
                 projection_integral, image_config.padded_shape
             )
-            return (
-                projection_integral
-                if outputs_real_space
-                else jnp.fft.rfftn(projection_integral)
+        if image_config.is_anisotropic:
+            fourier_projection = resample_with_anisotropy_matrix(
+                projection_integral, image_config
             )
+            return (
+                jnp.fft.irfftn(fourier_projection, s=image_config.padded_shape)
+                if outputs_real_space
+                else fourier_projection
+            )
+        return (
+            projection_integral
+            if outputs_real_space
+            else jnp.fft.rfftn(projection_integral)
+        )
 
 
 class GaussianMixtureRenderFn(AbstractVolumeRenderFn[GaussianMixtureVolume], strict=True):

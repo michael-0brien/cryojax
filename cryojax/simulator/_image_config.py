@@ -143,9 +143,9 @@ class AbstractImageConfig(eqx.Module, strict=True):
     @property
     @abstractmethod
     def anisotropy_matrix(self) -> Float[Array, "2 2"]:
-        """The 2x2 matrix `D` with which a projected image `p(x)` is resampled as
-        `p(D⁻¹x)`, for coordinates `x` about the image center. The identity if the
-        magnification is isotropic."""
+        """The 2x2 matrix `D` of the anisotropic magnification, which takes a
+        projection `p(x)` to `p(D⁻¹x)`, for coordinates `x` about the image center.
+        The identity if the magnification is isotropic."""
         raise NotImplementedError
 
     def __check_init__(self):
@@ -610,20 +610,15 @@ class AnisotropicImageConfig(AbstractImageConfig, strict=True):
     `AstigmaticCTF.astigmatism_angle`. It is parametrized by the vector
     `anisotropy_xy = a * (cos(2 * angle), sin(2 * angle))`.
 
-    !!! info "Resampling with the anisotropy matrix"
+    !!! info "Applying the anisotropic magnification"
 
-        The volume integrator's output `p(x)` (a projection, or an exit wave minus
-        the incident plane wave) is resampled as `p(D⁻¹x)` on the same pixel grid,
-        before the CTF is applied at frequencies `Dᵀk`. The resampling interpolates
-        `p` at `D⁻¹x` with a cubic B-spline, takes the FFT, and divides the spectrum
-        by the B-spline's response at `Dᵀk`. Its cost is 16 interpolation taps and
-        one elementwise division per pixel; the FFT is the one the simulation
-        computes regardless when the integrator outputs real space, as
-        `GaussianMixtureProjection` does, and one round trip of FFTs otherwise.
-
-        It is exact for `anisotropy_xy = (0, 0)`. Otherwise, its error is aliasing
-        that grows towards Nyquist, and is smallest for images whose spectrum decays
-        well before Nyquist.
+        The volume integrator returns the projection with the magnification applied,
+        `p(D⁻¹x)` for the `anisotropy_matrix` `D`, and the CTF is evaluated at
+        frequencies `Dᵀk`. `FourierSliceExtraction` samples its slice at `Dᵀk`, with
+        the accuracy of an isotropic slice. `GaussianMixtureProjection` resamples its
+        projection by cubic interpolation, whose error is aliasing that grows towards
+        Nyquist. `GaussianFourierProjection`, `EwaldSphereExtraction` and
+        `MultisliceScatteringTheory` raise a `NotImplementedError`.
     """
 
     shape: tuple[int, int]
@@ -741,7 +736,11 @@ def _safe_matrix_multiply(
         is_origin = (row_idx == 0)[:, None] & (col_idx == 0)[None, :]
     else:
         is_origin = (row_idx == y_dim // 2)[:, None] & (col_idx == x_dim // 2)[None, :]
-    return jnp.where(is_origin[..., None], grid, grid @ matrix)
+    return jnp.where(
+        is_origin[..., None],
+        grid,
+        jnp.matmul(grid, matrix, precision=jax.lax.Precision.HIGHEST),
+    )
 
 
 def _inverse_2x2(matrix: Float[Array, "2 2"]) -> Float[Array, "2 2"]:

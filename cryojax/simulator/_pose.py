@@ -9,6 +9,7 @@ from typing import Self
 from typing_extensions import override
 
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 from equinox import AbstractVar, Module
 from jaxtyping import Array, Complex, Float
@@ -116,7 +117,11 @@ class AbstractPose(Module, strict=True):
         """
         offset_in_angstroms = jnp.asarray(self.offset_in_angstroms)[:2]
         if anisotropy_matrix is not None:
-            offset_in_angstroms = anisotropy_matrix @ offset_in_angstroms
+            offset_in_angstroms = jnp.matmul(
+                anisotropy_matrix,
+                offset_in_angstroms,
+                precision=jax.lax.Precision.HIGHEST,
+            )
         q_x, q_y = (
             make_1d_frequency_grid(shape[1], pixel_size, outputs_rfftfreqs=True),
             make_1d_frequency_grid(shape[0], pixel_size, outputs_rfftfreqs=False),
