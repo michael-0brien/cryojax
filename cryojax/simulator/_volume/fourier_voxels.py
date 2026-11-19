@@ -26,7 +26,6 @@ from .base_volume import (
     EwaldSphereArray,
     ProjectionArray,
 )
-from .internal import check_anisotropy_supported
 
 
 def _check_voxel_array_shape(shape: tuple[int, ...], cls_name: str) -> None:
@@ -222,14 +221,9 @@ class FourierSliceExtraction(
         frequency_slice = volume_representation.frequency_slice
         N = frequency_slice.shape[1]
         if image_config.is_anisotropic:
-            # The rotated slice is linear in the in-plane frequencies `k`: read its
-            # steps along x and y at zero frequency and evaluate it at `q = Dᵀk`,
-            # elementwise so that XLA fuses it into the sampling
-            steps = N * jnp.fft.ifftshift(frequency_slice, axes=(1,))[0]
-            k = make_frequency_slice((N, N), fftshifted=True)
-            D = image_config.anisotropy_matrix
-            q = k[..., 0:1] * D[0] + k[..., 1:2] * D[1]
-            frequency_slice = q[..., 0:1] * steps[0, 1] + q[..., 1:2] * steps[1, 0]
+            frequency_slice = _anisotropic_frequency_slice(
+                frequency_slice, image_config.anisotropy_matrix
+            )
         # Compute the fourier projection
         fourier_projection = sample_fft_slice(
             volume_representation.values,
@@ -276,6 +270,7 @@ class EwaldSphereExtraction(
     `q` are the half sum and half difference over `2i` of the volume's spectrum on the
     sphere, `q - c ẑ`, and on its mirror image, `q + c ẑ`, with
     `c = wavelength |q|² / 2`: both are sampled on the volume's own half slice.
+    With an anisotropic magnification `D`, `q = Dᵀk` for the image frequencies `k`.
 
     The interpolation method is read from `FourierVoxelGridVolume.interp`.
     """
@@ -284,7 +279,7 @@ class EwaldSphereExtraction(
     unroll: bool | Literal["auto"]
 
     outputs_ewald_sphere: ClassVar[bool] = True
-    supports_anisotropy: ClassVar[bool] = False
+    supports_anisotropy: ClassVar[bool] = True
 
     def __init__(
         self,
@@ -328,7 +323,6 @@ class EwaldSphereExtraction(
         The field at the `image_config.padded_shape`, `image_config.pixel_size`,
         and `image_config.voltage_in_kilovolts`.
         """
-        check_anisotropy_supported(self, image_config)
         if not isinstance(volume_representation, FourierVoxelGridVolume):
             raise ValueError(
                 "Got unsupported type for `volume_representation` in "
@@ -341,6 +335,10 @@ class EwaldSphereExtraction(
         if volume_representation.shape != (N, N, N):
             raise AttributeError(
                 "Only cubic boxes are supported for fourier slice extraction."
+            )
+        if image_config.is_anisotropic:
+            frequency_slice = _anisotropic_frequency_slice(
+                frequency_slice, image_config.anisotropy_matrix
             )
         surface = ewald_sphere_from_slice(
             frequency_slice,
@@ -373,10 +371,30 @@ class EwaldSphereExtraction(
             )
         # Scale by voxel size to convert from projection to integral
         spectra *= image_config.pixel_size
+        if image_config.is_anisotropic:
+            # The spectrum of `ψ(D⁻¹x)` is `|det D| Ψ(Dᵀk)`
+            spectra *= jnp.abs(jnp.linalg.det(image_config.anisotropy_matrix))
         if outputs_real_space:
             real, imaginary = jnp.fft.irfftn(spectra, s=image_config.padded_shape)
             return real + 1j * imaginary
         return spectra
+
+
+def _anisotropic_frequency_slice(
+    frequency_slice: Float[Array, "1 dim dim//2+1 3"],
+    anisotropy_matrix: Float[Array, "2 2"],
+) -> Float[Array, "1 dim dim//2+1 3"]:
+    """The rotated `frequency_slice` at the frequencies `Dᵀk`, for the
+    `anisotropy_matrix` `D`.
+    """
+    # The rotated slice is linear in the in-plane frequencies `k`: read its steps
+    # along x and y at zero frequency and evaluate it at `q = Dᵀk`, elementwise so
+    # that XLA fuses it into the sampling
+    N = frequency_slice.shape[1]
+    steps = N * jnp.fft.ifftshift(frequency_slice, axes=(1,))[0]
+    k = make_frequency_slice((N, N), fftshifted=True)
+    q = k[..., 0:1] * anisotropy_matrix[0] + k[..., 1:2] * anisotropy_matrix[1]
+    return q[..., 0:1] * steps[0, 1] + q[..., 1:2] * steps[1, 0]
 
 
 def _resolve_unroll(unroll: bool | Literal["auto"], interp: str) -> bool:

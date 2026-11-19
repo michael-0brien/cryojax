@@ -612,13 +612,14 @@ class AnisotropicImageConfig(AbstractImageConfig, strict=True):
 
     !!! info "Applying the anisotropic magnification"
 
-        The volume integrator returns the projection with the magnification applied,
-        `p(D⁻¹x)` for the `anisotropy_matrix` `D`, and the CTF is evaluated at
-        frequencies `Dᵀk`. `FourierSliceExtraction` samples its slice at `Dᵀk`, with
-        the accuracy of an isotropic slice. `GaussianMixtureProjection` resamples its
-        projection by cubic interpolation, whose error is aliasing that grows towards
-        Nyquist. `GaussianFourierProjection`, `EwaldSphereExtraction` and
-        `MultisliceScatteringTheory` raise a `NotImplementedError`.
+        The volume integrator returns the projection (for `EwaldSphereExtraction`, the
+        field) with the magnification applied, `p(D⁻¹x)` for the `anisotropy_matrix`
+        `D`, and the CTF is evaluated at
+        frequencies `Dᵀk`. `FourierSliceExtraction` and `EwaldSphereExtraction` sample
+        their slice and sphere at `Dᵀk`, with the accuracy of an isotropic one.
+        `GaussianMixtureProjection` resamples its projection by cubic interpolation,
+        whose error is aliasing that grows towards Nyquist. `GaussianFourierProjection`
+        and `MultisliceScatteringTheory` raise a `NotImplementedError`.
     """
 
     shape: tuple[int, int]

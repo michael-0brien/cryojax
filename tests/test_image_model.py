@@ -489,6 +489,34 @@ def _ewald_test_volume():
     )
 
 
+def test_anisotropic_ewald_sphere_matches_fourier_slice_at_high_voltage():
+    config = cxs.AnisotropicImageConfig(
+        (32, 32), 1.0, voltage_in_kilovolts=1e6, anisotropy_xy=_ANISOTROPY_XY
+    )
+
+    def simulate(integrator):
+        return cxs.IntensityImageModel(
+            _ewald_test_volume(),
+            cxs.EulerAnglePose(),
+            config,
+            cxs.WeakPhaseScatteringTheory(
+                integrator,
+                cxs.ContrastTransferTheory(
+                    cxs.AstigmaticCTF(defocus_in_angstroms=2500.0),
+                    amplitude_contrast_ratio=0.1,
+                ),
+            ),
+        ).simulate()
+
+    # Measured 1.2e-8 (1.6e-5 of the contrast), as isotropically: the field's
+    # imaginary part, first order in the wavelength
+    np.testing.assert_allclose(
+        simulate(cxs.EwaldSphereExtraction()),
+        simulate(cxs.FourierSliceExtraction()),
+        atol=3e-8,
+    )
+
+
 def test_projection_image_model_refuses_ewald_sphere_integrators():
     with pytest.raises(ValueError, match="ProjectionImageModel.*EwaldSphereExtraction"):
         cxs.ProjectionImageModel(

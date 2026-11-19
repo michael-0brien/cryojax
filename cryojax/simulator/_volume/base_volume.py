@@ -221,8 +221,9 @@ class AbstractVolumeIntegrator(eqx.Module, Generic[VolRep], strict=True):
         outputs_real_space: bool = False,
     ) -> ProjectionOrEwaldSphereArray:
         """Integrate the volume onto the exit plane. If `supports_anisotropy` and
-        `image_config.is_anisotropic`, return the projection with the anisotropic
-        magnification applied, `p(D⁻¹x)` for `D = image_config.anisotropy_matrix`.
+        `image_config.is_anisotropic`, return the projection (for `outputs_ewald_sphere`,
+        the field) with the anisotropic magnification applied, `p(D⁻¹x)` for
+        `D = image_config.anisotropy_matrix`.
         """
         raise NotImplementedError
 
