@@ -618,7 +618,9 @@ class AnisotropicImageConfig(AbstractImageConfig, strict=True):
         frequencies `Dᵀk`. `FourierSliceExtraction` and `EwaldSphereExtraction` sample
         their slice and sphere at `Dᵀk`, with the accuracy of an isotropic one.
         `GaussianMixtureProjection` resamples its projection by cubic interpolation,
-        whose error is aliasing that grows towards Nyquist. `GaussianFourierProjection`
+        whose error is aliasing that grows towards the Nyquist of the grid resampled:
+        the image's, or with `sampling_mode = 'point'` the grid `upsample_factor` times
+        finer, before its crop to the image's band. `GaussianFourierProjection`
         and `MultisliceScatteringTheory` raise a `NotImplementedError`.
     """
 
