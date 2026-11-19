@@ -16,6 +16,8 @@ from ...ndimage import (
     FourierGaussian,
     fourier_crop_to_shape,
     make_1d_coordinate_grid,
+    make_coordinate_grid,
+    make_frequency_grid,
     map_coordinates,
     resize_with_crop_or_pad,
     spread_gaussians_2d,
@@ -272,6 +274,8 @@ class GaussianMixtureProjection(
             The shape of the plane on which projections are computed before padding or
             cropping to the `AbstractImageConfig.padded_shape`. This argument is particularly
             useful if the `AbstractImageConfig.padded_shape` is much larger than the protein.
+            Under an anisotropic magnification with `sampling_mode = 'point'`, the
+            projection is resampled periodically within this box.
         - `sampling_mode`:
             If `'average'`, the average of the projected volume over each pixel,
             computed exactly with error functions. If `'point'`, the band-limited
@@ -312,7 +316,11 @@ class GaussianMixtureProjection(
             the full picture. `None` (default) defers to `CRYOJAX_ENABLE_PALLAS`.
         - `upsample_factor`:
             Gaussians are spread on a grid this many times finer, then Fourier
-            cropped to the image grid. Ignored if `sampling_mode = 'average'`.
+            cropped to the image grid. Under an anisotropic magnification, the
+            projection is resampled on the finer grid, before the crop, where cubic
+            interpolation is more accurate (see
+            [`cryojax.simulator.AnisotropicImageConfig`][]). Ignored if
+            `sampling_mode = 'average'`.
         - `blur_variance`:
             The variance, in angstroms squared, of a gaussian blur added to every
             gaussian before spreading and divided out after the crop. Ignored if
@@ -490,30 +498,44 @@ class GaussianMixtureProjection(
                 self.enable_pallas,
             )
         if not use_erf:
-            # Crop to the image's band and divide out the blur
-            projection_fft = fourier_crop_to_shape(
-                projection_integral, shape, outputs_real_space=False, preserve_mean=True
-            )
+            # Crop to the image's band and divide out the blur. Under an anisotropic
+            # magnification, the finer grid is resampled before the crop, and the blur,
+            # applied before the resampling, is divided out at `Dᵀk`
+            if image_config.is_anisotropic:
+                projection_fft = _resample_with_anisotropy_matrix(
+                    projection_integral, image_config.anisotropy_matrix, shape
+                )
+            else:
+                projection_fft = fourier_crop_to_shape(
+                    projection_integral,
+                    shape,
+                    outputs_real_space=False,
+                    preserve_mean=True,
+                )
             if self.blur_variance > 0:
                 blur_fn = FourierGaussian(b_factor=8 * jnp.pi**2 * self.blur_variance)
-                frequencies_1d = make_frequencies_1d(
-                    shape, pixel_size, modeord=1, outputs_rfft=True
-                )
-                projection_fft /= eval_separable_impl(blur_fn, frequencies_1d)
-            if (
-                self.shape is None
-                and not outputs_real_space
-                and not image_config.is_anisotropic
-            ):
+                if image_config.is_anisotropic:
+                    frequency_grid = jnp.matmul(
+                        make_frequency_grid(shape, pixel_size),
+                        image_config.anisotropy_matrix,
+                        precision=jax.lax.Precision.HIGHEST,
+                    )
+                    projection_fft /= blur_fn(frequency_grid)
+                else:
+                    frequencies_1d = make_frequencies_1d(
+                        shape, pixel_size, modeord=1, outputs_rfft=True
+                    )
+                    projection_fft /= eval_separable_impl(blur_fn, frequencies_1d)
+            if self.shape is None and not outputs_real_space:
                 return projection_fft
             projection_integral = jnp.fft.irfftn(projection_fft, s=shape)
         if self.shape is not None:
             projection_integral = resize_with_crop_or_pad(
                 projection_integral, image_config.padded_shape
             )
-        if image_config.is_anisotropic:
+        if use_erf and image_config.is_anisotropic:
             fourier_projection = _resample_with_anisotropy_matrix(
-                projection_integral, image_config
+                projection_integral, image_config.anisotropy_matrix
             )
             return (
                 jnp.fft.irfftn(fourier_projection, s=image_config.padded_shape)
@@ -1027,39 +1049,43 @@ def _spread_and_sum_gaussian_components(
 
 def _resample_with_anisotropy_matrix(
     image: Float[Array, "y_dim x_dim"],
-    image_config: AbstractImageConfig,
-) -> Complex[Array, "y_dim x_dim//2+1"]:
+    anisotropy_matrix: Float[Array, "2 2"],
+    shape: tuple[int, int] | None = None,
+) -> Complex[Array, "_ _"]:
     """Given a real-space image `p(x)`, return the `rfftn` of `p(D⁻¹x)` on the same
-    pixel grid, for the `image_config.anisotropy_matrix` `D`. Coordinates `x` are in
-    pixels, about the center `N//2`.
+    pixel grid, for the `anisotropy_matrix` `D`, Fourier cropped to `shape` if given.
+    Coordinates `x` are in pixels, about the center `N//2`.
 
     1. `p` is interpolated at `D⁻¹x` with a cubic B-spline, without a prefilter
        (`cryojax.ndimage.map_coordinates(..., order=3)`). The image is treated as
        periodic, as it is by the FFT: coordinates wrap modulo the shape.
-    2. The result is transformed with `rfftn`.
+    2. The result is transformed and cropped to `shape` with
+       `cryojax.ndimage.fourier_crop_to_shape(..., preserve_mean=True)`, its `rfftn`
+       at `image.shape`.
     3. The spectrum is divided by the response of the cubic B-spline sampled at the
        integers, `(2/3 + cos(2πq_x)/3)(2/3 + cos(2πq_y)/3)`, at `q = Dᵀk` for each
-       FFT frequency `k` in cycles per pixel.
+       kept frequency `k` in cycles per pixel of `image`.
 
     Step 3 undoes the blur of step 1, a circular convolution, so for `D = I` the output
     is the `rfftn` of `p` exactly. Otherwise, the error is aliasing that grows towards
-    Nyquist.
+    the Nyquist of `image`, so a `shape` well below it keeps it small.
 
     **Arguments:**
 
     - `image`:
-        The image in real space, at `image_config.padded_shape`.
-    - `image_config`:
-        The image configuration.
+        The image in real space.
+    - `anisotropy_matrix`:
+        The matrix `D`.
+    - `shape`:
+        The real-space shape to Fourier crop to. By default, `image.shape`.
     """
     y_dim, x_dim = image.shape
-    matrix = image_config.anisotropy_matrix
     # Interpolate at `D⁻¹x`, in index units wrapped into `[0, N)`. The cubic taps at
     # `floor(c) + [-1, 0, 1, 2]` then read from the image wrapped by one pixel below
     # and two above. Products with `D` are elementwise so that XLA fuses them
-    coordinate_grid = image_config.get_coordinate_grid(padding=True, physical=False)
+    coordinate_grid = make_coordinate_grid(image.shape)
     x, y = coordinate_grid[..., 0], coordinate_grid[..., 1]
-    inverse = inverse_2x2(matrix)
+    inverse = inverse_2x2(anisotropy_matrix)
     y_index = jnp.mod(inverse[1, 0] * x + inverse[1, 1] * y + y_dim // 2, y_dim)
     x_index = jnp.mod(inverse[0, 0] * x + inverse[0, 1] * y + x_dim // 2, x_dim)
     resampled = map_coordinates(
@@ -1068,13 +1094,18 @@ def _resample_with_anisotropy_matrix(
         order=3,
         mode="promise_in_bounds",
     )
-    # Divide out the B-spline's response at `Dᵀk`
-    frequency_grid = image_config.get_frequency_grid(padding=True, physical=False)
-    k_x, k_y = frequency_grid[..., 0], frequency_grid[..., 1]
-    q_x = matrix[0, 0] * k_x + matrix[1, 0] * k_y
-    q_y = matrix[0, 1] * k_x + matrix[1, 1] * k_y
+    n_y, n_x = image.shape if shape is None else shape
+    spectrum = fourier_crop_to_shape(
+        resampled, (n_y, n_x), outputs_real_space=False, preserve_mean=True
+    )
+    # Divide out the B-spline's response at `Dᵀk`, for `k` in cycles per pixel of `image`
+    frequency_grid = make_frequency_grid((n_y, n_x))
+    k_x = frequency_grid[..., 0] * (n_x / x_dim)
+    k_y = frequency_grid[..., 1] * (n_y / y_dim)
+    q_x = anisotropy_matrix[0, 0] * k_x + anisotropy_matrix[1, 0] * k_y
+    q_y = anisotropy_matrix[0, 1] * k_x + anisotropy_matrix[1, 1] * k_y
     response = _bspline_response(q_x) * _bspline_response(q_y)
-    return jnp.fft.rfftn(resampled) / response
+    return spectrum / response
 
 
 def _bspline_response(frequency: Float[Array, "..."]) -> Float[Array, "..."]:
