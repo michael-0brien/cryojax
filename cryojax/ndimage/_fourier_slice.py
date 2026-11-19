@@ -294,13 +294,15 @@ def ewald_sphere_from_slice(
     """
     voxel_size = jnp.asarray(voxel_size, dtype=float)
     wavelength = jnp.asarray(wavelength, dtype=float)
-    # The slice normal, from the slice's steps along x and y at zero frequency
+    # The slice's unit normal, from its steps along x and y at zero frequency. They
+    # need not be orthogonal (e.g. at frequencies `Dᵀk`): divide by their angle's sine
     frequency_slice_with_zero_in_corner = jnp.fft.ifftshift(frequency_slice, axes=(1,))
     xhat, yhat = (
         frequency_slice_with_zero_in_corner[0, 0, 1, :],
         frequency_slice_with_zero_in_corner[0, 1, 0, :],
     )
-    zhat = jnp.cross(xhat / jnp.linalg.norm(xhat), yhat / jnp.linalg.norm(yhat))
+    xhat, yhat = xhat / jnp.linalg.norm(xhat), yhat / jnp.linalg.norm(yhat)
+    zhat = jnp.cross(xhat, yhat) / jnp.sqrt(1 - jnp.sum(xhat * yhat) ** 2)
     q_squared = jnp.sum(frequency_slice**2, axis=-1, keepdims=True)
     return frequency_slice - (wavelength / voxel_size) * q_squared * zhat / 2
 
