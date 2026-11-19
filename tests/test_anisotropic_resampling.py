@@ -424,6 +424,117 @@ def test_anisotropic_ewald_sphere_at_high_voltage_is_the_fourier_slice(
     np.testing.assert_allclose(field.imag, 0.0, atol=2e-6 * peak)
 
 
+_ONE_POSITION = np.array([[5.0, -3.0, 4.0]])
+_ONE_POSE = cxs.EulerAnglePose(4.0, -6.0, 30.0, 50.0, -20.0)
+_ONE_SIGMA = 4.0
+
+
+@pytest.fixture(scope="module")
+def one_gaussian():
+    """One wide gaussian off the volume's center, point-sampled in every
+    representation."""
+    z, y, x = np.indices((64, 64, 64)) - 32
+    r = np.stack([x, y, z], axis=-1) - _ONE_POSITION[0]
+    density = np.exp(-np.sum(r**2, axis=-1) / (2 * _ONE_SIGMA**2))
+    return {
+        "gaussians": cxs.GaussianMixtureVolume(
+            _ONE_POSITION, amplitudes=1.0, variances=_ONE_SIGMA**2
+        ),
+        "voxels": cxs.FourierVoxelGridVolume.from_real_voxel_grid(
+            density / (2 * np.pi * _ONE_SIGMA**2) ** 1.5, interp="cubic", pad_scale=2.0
+        ),
+        "fourier gaussians": cxs.GaussianFourierVolume(
+            _ONE_POSITION, im.FourierGaussian(b_factor=8 * np.pi**2 * _ONE_SIGMA**2)
+        ),
+    }
+
+
+@pytest.mark.parametrize("anisotropy_xy", [(0.12, 0.08), (-0.05, 0.03)])
+@pytest.mark.parametrize(
+    "integrator, volume, outcome",
+    [
+        # 3.4e-6 to 3.6e-6
+        (
+            cxs.GaussianMixtureProjection(sampling_mode="point", upsample_factor=2),
+            "gaussians",
+            1e-5,
+        ),
+        # 1.1e-5, as isotropically
+        (cxs.FourierSliceExtraction(), "voxels", 3e-5),
+        # 1.5e-8 to 2.1e-8
+        (cxs.GaussianFourierProjection(), "fourier gaussians", 1e-7),
+    ],
+)
+def test_integrators_match_one_distorted_gaussian(
+    one_gaussian, integrator, volume, outcome, anisotropy_xy
+):
+    """The gaussian in a pose with an offset, under a large and a typical anisotropy,
+    against the point-sampled `p(D⁻¹x)` written out here from
+    `D = I + [[-e0, e1], [e1, e0]]`, periodic like the simulations."""
+    e0, e1 = anisotropy_xy
+    D = np.eye(2) + np.array([[-e0, e1], [e1, e0]])
+    config = cxs.AnisotropicImageConfig((64, 64), 1.0, anisotropy_xy=anisotropy_xy)
+    center = np.asarray(one_gaussian["gaussians"].rotate_to_pose(_ONE_POSE).positions)[
+        :, :2
+    ] + np.asarray(_ONE_POSE.offset_in_angstroms)
+    shifts = 64 * np.array([[i, j] for i in (-1, 0, 1) for j in (-1, 0, 1)])
+    expected = _gaussians(
+        (64, 64), center + shifts @ np.linalg.inv(D).T, _ONE_SIGMA, D
+    ) / (2 * np.pi * _ONE_SIGMA**2)
+    image = cxs.ProjectionImageModel(
+        one_gaussian[volume], _ONE_POSE, config, integrator
+    ).simulate()
+    np.testing.assert_allclose(image, expected, atol=outcome * expected.max())
+
+
+@pytest.mark.parametrize("anisotropy_xy", [(0.12, 0.08), (-0.05, 0.03)])
+def test_integrators_agree_through_a_ctf(one_gaussian, anisotropy_xy):
+    """Through a CTF, each integrator matches `GaussianFourierProjection`, and
+    `EwaldSphereExtraction` at zero curvature matches `FourierSliceExtraction`."""
+    transfer_theory = cxs.ContrastTransferTheory(
+        cxs.AstigmaticCTF(
+            defocus_in_angstroms=8000.0,
+            astigmatism_in_angstroms=600.0,
+            astigmatism_angle=20.0,
+        ),
+        amplitude_contrast_ratio=0.1,
+    )
+
+    def simulate(integrator, volume, voltage_in_kilovolts=300.0):
+        config = cxs.AnisotropicImageConfig(
+            (64, 64),
+            1.0,
+            voltage_in_kilovolts=voltage_in_kilovolts,
+            anisotropy_xy=anisotropy_xy,
+        )
+        return cxs.LinearImageModel(
+            one_gaussian[volume], _ONE_POSE, config, transfer_theory, integrator
+        ).simulate()
+
+    expected = simulate(cxs.GaussianFourierProjection(), "fourier gaussians")
+    # 6.9e-7 to 9.4e-7, and 9.4e-6 to 9.5e-6
+    for integrator, volume, outcome in [
+        (
+            cxs.GaussianMixtureProjection(sampling_mode="point", upsample_factor=2),
+            "gaussians",
+            3e-6,
+        ),
+        (cxs.FourierSliceExtraction(), "voxels", 3e-5),
+    ]:
+        np.testing.assert_allclose(
+            simulate(integrator, volume),
+            expected,
+            atol=outcome * np.abs(expected).max(),
+        )
+    # At 1e9 kV the curvature `λ|q|²/2` is below 2e-9: 2.3e-9
+    expected = simulate(cxs.FourierSliceExtraction(), "voxels", 1e9)
+    np.testing.assert_allclose(
+        simulate(cxs.EwaldSphereExtraction(), "voxels", 1e9),
+        expected,
+        atol=1e-8 * np.abs(expected).max(),
+    )
+
+
 class _NoAnisotropyIntegrator(cxs.AbstractVolumeIntegrator, strict=True):
     outputs_ewald_sphere: ClassVar[bool] = False
     supports_anisotropy: ClassVar[bool] = False
