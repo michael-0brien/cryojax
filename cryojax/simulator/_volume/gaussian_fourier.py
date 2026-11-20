@@ -81,7 +81,7 @@ class GaussianFourierVolume(AbstractAtomVolume, strict=True):
 
     positions: PyTree[Float[NDArrayLike, "_ 3"]]
     kernel_fns: PyTree[FourierGaussian]
-    amplitudes: PyTree[Float[NDArrayLike, " _"]]
+    amplitudes: PyTree[Float[NDArrayLike, " _"] | Float[NDArrayLike, "_ _"]]
 
     is_frame_rotation: ClassVar[bool] = False
 
@@ -89,7 +89,8 @@ class GaussianFourierVolume(AbstractAtomVolume, strict=True):
         self,
         positions: PyTree[Float[NDArrayLike, "_ 3"], "T"],
         kernel_fns: PyTree[FourierGaussian, "T"],
-        amplitudes: PyTree[Float[NDArrayLike, " _"], "T"] | None = None,
+        amplitudes: PyTree[Float[NDArrayLike, " _"] | Float[NDArrayLike, "_ _"], "T"]
+        | None = None,
     ):
         """**Arguments:**
 
@@ -103,8 +104,9 @@ class GaussianFourierVolume(AbstractAtomVolume, strict=True):
             b-factors with a batch dimension to simulate form factors.
         - `amplitudes`:
             A pytree with the same tree structure as `positions`, each leaf
-            of shape `(M,)`: one amplitude per atom, scaling its type's
-            scattering factor. Ones if not given.
+            of shape `(M,)`, one amplitude per atom scaling its type's
+            scattering factor, or `(K, M)`, one per atom for each of the `K`
+            terms of its type's `FourierGaussian`. Ones if not given.
         """  # noqa: E501
         if jax.tree.structure(positions) != jax.tree.structure(
             kernel_fns,
@@ -130,15 +132,26 @@ class GaussianFourierVolume(AbstractAtomVolume, strict=True):
         if amplitudes is None:
             amplitudes = jax.tree.map(lambda x: np.ones(x.shape[0]), self.positions)
         self.amplitudes = jax.tree.map(lambda x: leaf_asarray(x, dtype=float), amplitudes)
-        for pos, amp in zip(
-            jax.tree.leaves(self.positions), jax.tree.leaves(self.amplitudes)
+        for pos, kernel_fn, amp in zip(
+            jax.tree.leaves(self.positions),
+            jax.tree.leaves(
+                kernel_fns, is_leaf=lambda x: isinstance(x, AbstractFourierOperator)
+            ),
+            jax.tree.leaves(self.amplitudes),
         ):
-            if amp.shape != (pos.shape[0],):
+            n_terms = math.prod(
+                np.broadcast_shapes(
+                    np.shape(kernel_fn.amplitude), np.shape(kernel_fn.b_factor)
+                )
+            )
+            if amp.shape not in ((pos.shape[0],), (n_terms, pos.shape[0])):
                 raise ValueError(
                     "When instantiating a `GaussianFourierVolume`, found an "
                     f"`amplitudes` leaf of shape {amp.shape} for {pos.shape[0]} "
-                    "positions. Each leaf must have shape `(M,)`, where `M` is "
-                    "the number of positions in the matching leaf of `positions`."
+                    f"positions and a kernel of {n_terms} terms. Each leaf must "
+                    "have shape `(M,)` or `(K, M)`, where `M` is the number of "
+                    "positions in the matching leaf of `positions` and `K` the "
+                    "number of terms of its kernel."
                 )
 
     @override
@@ -511,7 +524,7 @@ def _standardize_kernel_fns(
 def _project_impl(
     positions: PyTree[Float[Array, "_ 3"]],
     kernel_fns: PyTree[FourierGaussian],
-    amplitudes: PyTree[Float[Array, " _"]],
+    amplitudes: PyTree[Float[Array, " _"] | Float[Array, "_ _"]],
     *,
     shape: tuple[int, int],
     pixel_size: Float[Array, ""],
@@ -547,7 +560,7 @@ def _project_impl(
     def fourier_impl(
         _positions: Float[Array, "_ 3"],
         _kernel_fn: FourierGaussian,
-        _amplitudes: Float[Array, " _"],
+        _amplitudes: Float[Array, " _"] | Float[Array, "_ _"],
     ) -> Array:
         _positions = _positions[:, :2]
         if anisotropy_matrix is not None:
@@ -570,11 +583,13 @@ def _project_impl(
             options=options,
         )
         if anisotropy_matrix is None:
-            return (
-                _eval_kernel_impl(_kernel_fn, frequencies_1d) * spectrum / pixel_size**2
-            )
-        kernel = jnp.sum(jax.vmap(lambda fn: fn(frequencies))(_kernel_fn), axis=0)
-        return det * kernel * spectrum / pixel_size**2
+            terms = _eval_kernel_impl(_kernel_fn, frequencies_1d)
+        else:
+            terms = jax.vmap(lambda fn: fn(frequencies))(_kernel_fn)
+        spectrum = _apply_kernel_terms(terms, spectrum, _amplitudes)
+        if anisotropy_matrix is None:
+            return spectrum / pixel_size**2
+        return det * spectrum / pixel_size**2
 
     # Project and sum over kernels
     return jax.tree.reduce(
@@ -586,7 +601,7 @@ def _project_impl(
 def _render_impl(
     positions: PyTree[Float[Array, "_ 3"]],
     kernel_fns: PyTree[FourierGaussian],
-    amplitudes: PyTree[Float[Array, " _"]],
+    amplitudes: PyTree[Float[Array, " _"] | Float[Array, "_ _"]],
     *,
     shape: tuple[int, int, int],
     voxel_size: Float[Array, ""],
@@ -604,7 +619,7 @@ def _render_impl(
     def fourier_impl(
         _positions: Float[Array, "_ 3"],
         _kernel_fn: FourierGaussian,
-        _amplitudes: Float[Array, " _"],
+        _amplitudes: Float[Array, " _"] | Float[Array, "_ _"],
     ) -> Array:
         spectrum = dispatch_nufft1(
             _positions,
@@ -616,7 +631,8 @@ def _render_impl(
             enable_pallas=enable_pallas,
             options=options,
         )
-        return _eval_kernel_impl(_kernel_fn, frequencies_1d) * spectrum / voxel_size**3
+        terms = _eval_kernel_impl(_kernel_fn, frequencies_1d)
+        return _apply_kernel_terms(terms, spectrum, _amplitudes) / voxel_size**3
 
     return jax.tree.reduce(
         lambda x, y: x + y,
@@ -701,12 +717,20 @@ def _check_upsample_factor(
 
 
 def _eval_kernel_impl(kernel_fn: FourierGaussian, frequencies_1d: tuple[Array, ...]):
-    # Each term at unit amplitude per axis, its amplitude applied once: a root per
-    # axis is NaN for a negative term
+    # Each term, `(K, ...)`, at unit amplitude per axis and its amplitude applied once:
+    # a root per axis is NaN for a negative term
     eval_term = lambda b: eval_separable_impl(FourierGaussian(b_factor=b), frequencies_1d)
     terms = jax.vmap(eval_term)(kernel_fn.b_factor)
     a = jnp.expand_dims(kernel_fn.amplitude, tuple(range(1, terms.ndim)))
-    return jnp.sum(a * terms, axis=0)
+    return a * terms
+
+
+def _apply_kernel_terms(terms: Array, spectrum: Array, amplitudes: Array) -> Array:
+    # `(M,)` amplitudes give one spectrum for the summed kernel; `(K, M)` give one per
+    # term
+    if amplitudes.ndim == 1:
+        return jnp.sum(terms, axis=0) * spectrum
+    return jnp.sum(terms * spectrum, axis=0)
 
 
 def _prepare_fft_to_fft(

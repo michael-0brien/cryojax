@@ -729,6 +729,13 @@ def test_fft_atom_amplitudes_bad_instantiation(amplitudes):
         )
 
 
+@pytest.mark.parametrize("shape", ((3, 4), (2, 5), (1, 4)))
+def test_fft_atom_per_term_amplitudes_bad_instantiation(shape):
+    kernel = im.FourierGaussian(amplitude=np.ones(2), b_factor=np.array([10.0, 20.0]))
+    with pytest.raises(ValueError, match="amplitudes"):
+        cxs.GaussianFourierVolume(np.zeros((4, 3)), kernel, np.ones(shape))
+
+
 # ── GaussianFourierProjection: each backend vs GaussianMixtureProjection ─────
 
 
@@ -951,6 +958,108 @@ def test_fft_atom_projection_amplitudes_grad_and_hvp(monkeypatch, pdb_info, back
             rtol=1e-6,
             atol=1e-8 * np.abs(expected).max(),
         )
+
+
+# A kernel with a negative term, and (K, M) amplitudes for it
+_term_amplitudes, _term_b_factors = np.array([1.0, -0.3]), np.array([60.0, 150.0])
+
+
+def _per_term_amplitudes_for(n_atoms):
+    return np.random.default_rng(2).uniform(0.5, 1.5, (2, n_atoms))
+
+
+def _volumes_by_term(positions, per_term):
+    return [
+        cxs.GaussianFourierVolume(
+            positions, im.FourierGaussian(amplitude=a, b_factor=b), s
+        )
+        for a, b, s in zip(_term_amplitudes, _term_b_factors, per_term)
+    ]
+
+
+def _per_term_volume(positions, per_term):
+    kernel = im.FourierGaussian(amplitude=_term_amplitudes, b_factor=_term_b_factors)
+    return cxs.GaussianFourierVolume(positions, kernel, per_term)
+
+
+@pytest.mark.parametrize("anisotropy_xy", (None, (-0.05, 0.03)))
+@_backends
+def test_fft_atom_projection_per_term_amplitudes(
+    monkeypatch, pdb_info, anisotropy_xy, backend
+):
+    monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", backend)
+    positions = pdb_info[0]
+    per_term = _per_term_amplitudes_for(positions.shape[0])
+    image_config = (
+        cxs.BasicImageConfig(**_amplitudes_image_config)
+        if anisotropy_xy is None
+        else cxs.AnisotropicImageConfig(
+            (64, 64), 0.5, padded_shape=(128, 128), anisotropy_xy=anisotropy_xy
+        )
+    )
+    integrator = cxs.GaussianFourierProjection(eps=1e-9)
+    expected = sum(
+        compute_projection(v, integrator, image_config)
+        for v in _volumes_by_term(positions, per_term)
+    )
+    actual = compute_projection(
+        _per_term_volume(positions, per_term), integrator, image_config
+    )
+    np.testing.assert_allclose(actual, expected, atol=1e-10 * np.abs(expected).max())
+
+
+@_backends
+def test_fft_atom_render_per_term_amplitudes(monkeypatch, pdb_info, backend):
+    monkeypatch.setattr(_nufft, "CRYOJAX_FINUFFT_BACKEND", backend)
+    positions = pdb_info[0]
+    per_term = _per_term_amplitudes_for(positions.shape[0])
+    render_fn = cxs.GaussianFourierRenderFn((64, 64, 64), 0.5, eps=1e-9)
+    expected = sum(render_fn(v) for v in _volumes_by_term(positions, per_term))
+    actual = render_fn(_per_term_volume(positions, per_term))
+    np.testing.assert_allclose(actual, expected, atol=1e-10 * np.abs(expected).max())
+
+
+def test_fft_atom_per_term_amplitudes_equal_shared_ones(pdb_info):
+    positions = pdb_info[0]
+    amplitudes = _amplitudes_for(positions.shape[0])
+    kernel = im.FourierGaussian(amplitude=_term_amplitudes, b_factor=_term_b_factors)
+    image_config = cxs.BasicImageConfig(**_amplitudes_image_config)
+    integrator = cxs.GaussianFourierProjection(eps=1e-9)
+    shared = compute_projection(
+        cxs.GaussianFourierVolume(positions, kernel, amplitudes), integrator, image_config
+    )
+    per_term = compute_projection(
+        _per_term_volume(positions, np.stack([amplitudes, amplitudes])),
+        integrator,
+        image_config,
+    )
+    np.testing.assert_allclose(per_term, shared, atol=1e-10 * np.abs(shared).max())
+
+
+def test_fft_atom_projection_per_term_amplitudes_grad(pdb_info):
+    positions = pdb_info[0]
+    per_term = jnp.asarray(_per_term_amplitudes_for(positions.shape[0]))
+    image_config = cxs.BasicImageConfig(**_amplitudes_image_config)
+    integrator = cxs.GaussianFourierProjection(eps=1e-9)
+
+    def loss(project):
+        return lambda a: 0.5 * jnp.sum(project(a) ** 2)
+
+    per_term_loss = loss(
+        lambda a: compute_projection(
+            _per_term_volume(positions, a), integrator, image_config
+        )
+    )
+    by_term_loss = loss(
+        lambda a: sum(
+            compute_projection(v, integrator, image_config)
+            for v in _volumes_by_term(positions, a)
+        )
+    )
+    expected = jax.grad(by_term_loss)(per_term)
+    np.testing.assert_allclose(
+        jax.grad(per_term_loss)(per_term), expected, atol=1e-10 * np.abs(expected).max()
+    )
 
 
 def _make_peng_volumes(pdb_info):
