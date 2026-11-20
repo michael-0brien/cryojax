@@ -515,10 +515,13 @@ class GaussianMixtureProjection(
             if self.blur_variance > 0:
                 blur_fn = FourierGaussian(b_factor=8 * jnp.pi**2 * self.blur_variance)
                 if image_config.is_anisotropic:
-                    frequency_grid = jnp.matmul(
-                        make_frequency_grid(shape, pixel_size),
-                        image_config.anisotropy_matrix,
-                        precision=jax.lax.Precision.HIGHEST,
+                    # `Dᵀk`, elementwise so that XLA fuses it
+                    k = make_frequency_grid(shape, pixel_size)
+                    k_x, k_y = k[..., 0], k[..., 1]
+                    D = image_config.anisotropy_matrix
+                    frequency_grid = jnp.stack(
+                        [k_x * D[0, 0] + k_y * D[1, 0], k_x * D[0, 1] + k_y * D[1, 1]],
+                        axis=-1,
                     )
                     projection_fft /= blur_fn(frequency_grid)
                 else:
