@@ -736,11 +736,13 @@ def _safe_matrix_multiply(
         is_origin = (row_idx == 0)[:, None] & (col_idx == 0)[None, :]
     else:
         is_origin = (row_idx == y_dim // 2)[:, None] & (col_idx == x_dim // 2)[None, :]
-    return jnp.where(
-        is_origin[..., None],
-        grid,
-        jnp.matmul(grid, matrix, precision=jax.lax.Precision.HIGHEST),
+    # Elementwise so that XLA fuses it
+    x, y = grid[..., 0], grid[..., 1]
+    product = jnp.stack(
+        [x * matrix[0, 0] + y * matrix[1, 0], x * matrix[0, 1] + y * matrix[1, 1]],
+        axis=-1,
     )
+    return jnp.where(is_origin[..., None], grid, product)
 
 
 def _make_precomputed_grids(
