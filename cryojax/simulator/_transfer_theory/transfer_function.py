@@ -8,7 +8,7 @@ from jaxtyping import Array, Complex, Float
 
 from ..._internal import error_if_negative, leaf_asarray, leaf_asarray_vector
 from ...jax_util import FloatLike, NDArrayLike
-from .phase_shifts import (
+from .internal import (
     compute_amplitude_contrast_phase_shift,
     compute_even_aberration_phase_shifts,
     compute_odd_aberration_phase_shifts,
