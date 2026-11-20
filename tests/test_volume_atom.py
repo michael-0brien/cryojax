@@ -1019,6 +1019,35 @@ def test_fft_atom_render_per_term_amplitudes(monkeypatch, pdb_info, backend):
     np.testing.assert_allclose(actual, expected, atol=1e-10 * np.abs(expected).max())
 
 
+@pytest.mark.parametrize("per_term", (False, True))
+def test_fft_atom_projection_anisotropic_scalar_kernel_amplitude(pdb_info, per_term):
+    positions = pdb_info[0]
+    amplitudes = _per_term_amplitudes_for(positions.shape[0])
+    if not per_term:
+        amplitudes = amplitudes[0]
+    image_config = cxs.AnisotropicImageConfig(
+        (64, 64), 0.5, padded_shape=(128, 128), anisotropy_xy=(-0.05, 0.03)
+    )
+    integrator = cxs.GaussianFourierProjection(eps=1e-9)
+    expected = compute_projection(
+        cxs.GaussianFourierVolume(
+            positions,
+            im.FourierGaussian(amplitude=np.ones(2), b_factor=_term_b_factors),
+            amplitudes,
+        ),
+        integrator,
+        image_config,
+    )
+    actual = compute_projection(
+        cxs.GaussianFourierVolume(
+            positions, im.FourierGaussian(b_factor=_term_b_factors), amplitudes
+        ),
+        integrator,
+        image_config,
+    )
+    np.testing.assert_allclose(actual, expected, atol=1e-10 * np.abs(expected).max())
+
+
 def test_fft_atom_per_term_amplitudes_equal_shared_ones(pdb_info):
     positions = pdb_info[0]
     amplitudes = _amplitudes_for(positions.shape[0])
