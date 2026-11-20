@@ -27,6 +27,7 @@ from .gaussian_mixture import (
     GaussianMixtureRenderFn,
     GaussianMixtureVolume,
 )
+from .internal import check_anisotropy_supported
 
 
 class AutoVolumeProjection(
@@ -53,6 +54,7 @@ class AutoVolumeProjection(
     """  # noqa: E501
 
     outputs_ewald_sphere: ClassVar[bool] = False
+    supports_anisotropy: ClassVar[bool] = True
 
     def _select_projection_method(
         self, volume: AbstractVolumeRepresentation
@@ -98,6 +100,7 @@ class AutoVolumeProjection(
         `AbstractImageConfig.padded_shape` and the `image_config.pixel_size`.
         """
         volume_integrator = self._select_projection_method(volume_representation)
+        check_anisotropy_supported(volume_integrator, image_config)
         return volume_integrator.integrate(
             volume_representation, image_config, outputs_real_space=outputs_real_space
         )

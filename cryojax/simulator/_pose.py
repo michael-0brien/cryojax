@@ -4,7 +4,6 @@ Representations of rigid body rotations and translations of 3D coordinate system
 
 from abc import abstractmethod
 from collections.abc import Sequence
-from functools import cached_property
 from typing import Self
 from typing_extensions import override
 
@@ -57,40 +56,45 @@ class AbstractPose(Module, strict=True):
         # `(N1, N2, N3, 3)` directly, without explicit `jax.vmap`.
         return rotation.apply(target)
 
-    def translate_image(
+    def translate_fft(
         self,
         fourier_image: Complex[Array, "{shape[0]} {shape[1]}//2+1"],
-        translation_operator: Complex[Array, "{shape[0]} {shape[1]}//2+1"],
         shape: tuple[int, int],
+        pixel_size: FloatLike,
+        anisotropy_matrix: Float[Array, "2 2"] | None = None,
     ) -> Complex[Array, "{shape[0]} {shape[1]}//2+1"]:
-        """Apply translational phase shifts to a fourier-space image.
+        """Translate an image in Fourier space by the in-plane offset, with phase
+        shifts $\\exp{(- 2 \\pi i (t_x q_x + t_y q_y))}$.
 
         **Arguments:**
 
         - `fourier_image`:
-            The image in fourier-space, which is the output of a call
-            to `cryojax.image.rfftn`.
-        - `phase_shifts`:
-            The phase shifts for translation, which are computed from
-            `AbstractPose.compute_translation_operator`.
+            The image in Fourier space, as the output of `jax.numpy.fft.rfftn`.
         - `shape`:
-            The shape of `fourier_image` in real-space.
+            The shape of `fourier_image` in real space.
+        - `pixel_size`:
+            The pixel size in angstroms.
+        - `anisotropy_matrix`:
+            An optional linear map `D` of the offset, which translates the image by
+            `D t` for the offset `t`.
 
-        **Return:**
+        **Returns:**
 
-        The translated `fourier_image`, taking care to avoid image
-        artifacts when applying the phase shifts.
+        The translated `fourier_image`.
         """
         fourier_image = enforce_rfftn_self_conjugates(
             fourier_image, shape, includes_dc=False, mode="zero"
         )
-        return fourier_image * translation_operator
+        return fourier_image * self.compute_translation_operator(
+            shape, pixel_size, anisotropy_matrix
+        )
 
     def compute_translation_operator(
         self,
         shape: tuple[int, int],
-        pixel_size: Float[NDArrayLike, ""],
-    ) -> Complex[Array, "y_dim x_dim//2+1"]:
+        pixel_size: FloatLike,
+        anisotropy_matrix: Float[Array, "2 2"] | None = None,
+    ) -> Complex[Array, "{shape[0]} {shape[1]}//2+1"]:
         """Compute the phase shifts from the in-plane translation.
 
         **Arguments:**
@@ -98,7 +102,10 @@ class AbstractPose(Module, strict=True):
         - `shape`:
             The real-space image shape $(N_y, N_x)$.
         - `pixel_size`:
-            The pixel size in Angstroms.
+            The pixel size in angstroms.
+        - `anisotropy_matrix`:
+            An optional linear map `D` of the offset, which translates by `D t` for
+            the offset `t`.
 
         **Returns:**
 
@@ -107,6 +114,9 @@ class AbstractPose(Module, strict=True):
         """
         offset_in_angstroms = jnp.asarray(self.offset_xy_in_angstroms)
         tx, ty = offset_in_angstroms[0], offset_in_angstroms[1]
+        if anisotropy_matrix is not None:
+            D = anisotropy_matrix
+            tx, ty = D[0, 0] * tx + D[0, 1] * ty, D[1, 0] * tx + D[1, 1] * ty
         q_x, q_y = (
             make_1d_frequency_grid(shape[1], pixel_size, outputs_rfftfreqs=True),
             make_1d_frequency_grid(shape[0], pixel_size, outputs_rfftfreqs=False),
@@ -114,7 +124,7 @@ class AbstractPose(Module, strict=True):
         phase_x, phase_y = (FourierPhaseShifts(tx)(q_x), FourierPhaseShifts(ty)(q_y))
         return phase_y[:, None] * phase_x[None, :]
 
-    @cached_property
+    @property
     def offset_in_angstroms(
         self,
     ) -> Float[NDArrayLike, "... 2"] | Float[NDArrayLike, "... 3"]:
@@ -122,7 +132,7 @@ class AbstractPose(Module, strict=True):
         xy, z = self.offset_xy_in_angstroms, self.offset_z_in_angstroms
         return xy if z is None else leaf_stack((xy[..., 0], xy[..., 1], z), dtype=None)
 
-    @cached_property
+    @property
     def offset_x_in_angstroms(self) -> Float[Array, "..."]:
         """The in-plane translation in the x direction."""
         # a[..., i] indexing is for convenience outside of `jax.vmap`
@@ -130,7 +140,7 @@ class AbstractPose(Module, strict=True):
         # if batch dimensions are not the leading dimensions.
         return jnp.asarray(self.offset_xy_in_angstroms)[..., 0]
 
-    @cached_property
+    @property
     def offset_y_in_angstroms(self) -> Float[Array, "..."]:
         """The in-plane translation in the y direction."""
         # a[..., i] indexing is for convenience outside of `jax.vmap`
@@ -138,7 +148,7 @@ class AbstractPose(Module, strict=True):
         # if batch dimensions are not the leading dimensions.
         return jnp.asarray(self.offset_xy_in_angstroms)[..., 1]
 
-    @cached_property
+    @property
     @abstractmethod
     def rotation(self) -> SO3:
         """Generate an `SO3` object from a particular angular
@@ -254,7 +264,7 @@ class EulerAnglePose(AbstractPose, strict=True):
         self.theta_angle = leaf_asarray(theta_angle, dtype=float)
         self.psi_angle = leaf_asarray(psi_angle, dtype=float)
 
-    @cached_property
+    @property
     @override
     def rotation(self) -> SO3:
         """Generate a `SO3` object from a set of Euler angles."""
@@ -336,7 +346,7 @@ class QuaternionPose(AbstractPose, strict=True):
             )
         self.wxyz = wxyz
 
-    @cached_property
+    @property
     @override
     def rotation(self) -> SO3:
         """Generate rotation from the unit quaternion
@@ -407,7 +417,7 @@ class AxisAnglePose(AbstractPose, strict=True):
             )
         self.euler_vector = euler_vector
 
-    @cached_property
+    @property
     @override
     def rotation(self) -> SO3:
         """Generate rotation from an euler vector using the exponential map."""

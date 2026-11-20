@@ -48,6 +48,18 @@ This documentation describes the elements of transfer theory in `cryojax`. More 
                 - __init__
                 - compute_aberration_phase_shifts
                 - __call__
+                - defocus_in_um
+                - astigmatism_xy_in_um
+
+---
+
+::: cryojax.simulator.AberratedCTF
+        options:
+            members:
+                - __init__
+                - from_polar_coordinates
+                - compute_aberration_phase_shifts
+                - __call__
 
 ## Transfer Theories
 

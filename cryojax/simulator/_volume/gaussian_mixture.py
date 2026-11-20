@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import ClassVar, Literal, Self
 from typing_extensions import override
 
@@ -7,18 +7,20 @@ import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
 import numpy as np
-from jaxtyping import Array, Float, PyTree
+from jaxtyping import Array, Complex, Float, PyTree
 
 from ..._internal import error_if_not_positive, leaf_asarray
 from ...constants import PengScatteringFactorParameters, b_factor_to_variance
 from ...jax_util import FloatLike, NDArrayLike, filter_bscan
 from ...ndimage import (
     make_1d_coordinate_grid,
+    map_coordinates,
     resize_with_crop_or_pad,
     spread_gaussians_2d,
     spread_gaussians_3d,
 )
 from .._image_config import AbstractImageConfig
+from .._internal import inverse_2x2
 from .._pose import AbstractPose
 from .base_volume import (
     AbstractAtomVolume,
@@ -27,7 +29,6 @@ from .base_volume import (
     ProjectionArray,
     VoxelArray,
 )
-from .common import spread_and_sum_gaussian_components
 
 
 def _leaf_broadcast_to(x, shape):
@@ -241,6 +242,7 @@ class GaussianMixtureProjection(
     enable_pallas: bool | Mapping[str, bool] | None
 
     outputs_ewald_sphere: ClassVar[bool] = False
+    supports_anisotropy: ClassVar[bool] = True
 
     def __init__(
         self,
@@ -365,21 +367,24 @@ class GaussianMixtureProjection(
                 context,
                 self.enable_pallas,
             )
-        if self.shape is None:
-            return (
-                projection_integral
-                if outputs_real_space
-                else jnp.fft.rfftn(projection_integral)
-            )
-        else:
+        if self.shape is not None:
             projection_integral = resize_with_crop_or_pad(
                 projection_integral, image_config.padded_shape
             )
-            return (
-                projection_integral
-                if outputs_real_space
-                else jnp.fft.rfftn(projection_integral)
+        if image_config.is_anisotropic:
+            fourier_projection = _resample_with_anisotropy_matrix(
+                projection_integral, image_config
             )
+            return (
+                jnp.fft.irfftn(fourier_projection, s=image_config.padded_shape)
+                if outputs_real_space
+                else fourier_projection
+            )
+        return (
+            projection_integral
+            if outputs_real_space
+            else jnp.fft.rfftn(projection_integral)
+        )
 
 
 class GaussianMixtureRenderFn(AbstractVolumeRenderFn[GaussianMixtureVolume], strict=True):
@@ -624,9 +629,8 @@ def _dense_axis_values(
     *,
     use_erf: bool,
 ) -> Float[Array, "dim M K"]:
-    """Evaluate the normalized 1D marginal kernel (see `cryojax.simulator
-    ._volume.common`) at every grid point, for every position and gaussian
-    component."""
+    """Evaluate the normalized 1D marginal kernel at every grid point, for every
+    position and gaussian component."""
     r = grid[:, None, None] - positions_1d[None, :, None]
     variance = variance[None, :, :]
     return _erf_weight(r, variance, width) if use_erf else _gaussian_weight(r, variance)
@@ -693,7 +697,7 @@ def _gaussians_to_projection_spread(
     enable_pallas: bool | Mapping[str, bool] | None,
 ) -> Float[Array, "dim_y dim_x"]:
     """Spread each gaussian component directly onto the `n_spread` nearest
-    grid points (see `cryojax.simulator._volume.common`), rather than
+    grid points, rather than
     evaluating dense gaussian integrals over the whole grid.
     """
 
@@ -713,7 +717,7 @@ def _gaussians_to_projection_spread(
                 enable_pallas=enable_pallas,
             )
 
-        return spread_and_sum_gaussian_components(
+        return _spread_and_sum_gaussian_components(
             spread_one_gaussian, _amplitudes, _variances, n_spread
         )
 
@@ -791,7 +795,7 @@ def _gaussians_to_real_voxels_spread(
     enable_pallas: bool | Mapping[str, bool] | None,
 ) -> Float[Array, "{shape[0]} {shape[1]} {shape[2]}"]:
     """Spread each gaussian component directly onto the `n_spread` nearest
-    grid points (see `cryojax.simulator._volume.common`), rather than
+    grid points, rather than
     evaluating dense gaussian integrals over the whole grid.
     """
 
@@ -812,10 +816,128 @@ def _gaussians_to_real_voxels_spread(
                 enable_pallas=enable_pallas,
             )
 
-        return spread_and_sum_gaussian_components(
+        return _spread_and_sum_gaussian_components(
             spread_one_gaussian, _amplitudes, _variances, n_spread
         )
 
     return _sum_over_atom_batches(
         kernel_fn, (positions, amplitudes, variances), n_batches, shape, context=context
     )
+
+
+def _spread_and_sum_gaussian_components(
+    spread_one: Callable[[Array, Array, int], Array],
+    amplitudes: Float[Array, "... n_gaussians"],
+    variances: Float[Array, "... n_gaussians"],
+    n_spread: int | tuple[int, ...],
+) -> Array:
+    """Spread each gaussian component -- indexed by the trailing axis of
+    `amplitudes`/`variances` -- via `spread_one(amplitude, variance,
+    n_spread)`, and sum the results. Used by `GaussianMixtureVolume` (where
+    the leading axes are `(n_positions,)`).
+
+    If `n_spread` is a single `int`, `spread_one` is `vmap`'d over the
+    `n_gaussians` axis, sharing one compiled/traced call across every
+    component -- fast, but every component, however narrow or wide, is
+    spread with the same width.
+
+    If `n_spread` is a `tuple` of length `n_gaussians` (one value per
+    component, e.g. from [`cryojax.simulator.suggest_n_spread`][]), components
+    are grouped by their shared `n_spread` value, and `spread_one` is
+    `vmap`'d once per distinct value across that group -- not once per
+    component. This is necessary to have per-component spread widths at all
+    -- not just an optimization choice -- because `n_spread` fixes array
+    shapes inside `spread_one` (see `cryojax.ndimage.spread_gaussians_2d`/
+    `spread_gaussians_3d`), so components with different `n_spread` cannot
+    share one `vmap`'d/traced call. But components that happen to share the
+    same `n_spread` (common -- e.g. X-ray/electron scattering factors written
+    as a sum of 5 Gaussians often have several components of similar width)
+    still get to share a single `vmap`'d call, rather than each getting its
+    own fully unrolled `spread_one` call.
+    """
+    n_gaussians = amplitudes.shape[-1]
+    if isinstance(n_spread, int):
+        contributions = jax.vmap(
+            lambda a, v: spread_one(a, v, n_spread), in_axes=(-1, -1)
+        )(amplitudes, variances)
+        return jnp.sum(contributions, axis=0)
+    if len(n_spread) != n_gaussians:
+        raise ValueError(
+            f"`n_spread` was a tuple of length {len(n_spread)}, but the "
+            f"number of gaussian components was {n_gaussians}. These must "
+            "be equal (one `n_spread` value per gaussian component)."
+        )
+    groups: dict[int, list[int]] = {}
+    for i, n in enumerate(n_spread):
+        groups.setdefault(n, []).append(i)
+
+    def _spread_group(n: int, indices: list[int]) -> Array:
+        idx = jnp.asarray(indices)
+        contributions = jax.vmap(lambda a, v: spread_one(a, v, n), in_axes=(-1, -1))(
+            amplitudes[..., idx], variances[..., idx]
+        )
+        return jnp.sum(contributions, axis=0)
+
+    group_totals = [_spread_group(n, indices) for n, indices in groups.items()]
+    total = group_totals[0]
+    for group_total in group_totals[1:]:
+        total = total + group_total
+    return total
+
+
+def _resample_with_anisotropy_matrix(
+    image: Float[Array, "y_dim x_dim"],
+    image_config: AbstractImageConfig,
+) -> Complex[Array, "y_dim x_dim//2+1"]:
+    """Given a real-space image `p(x)`, return the `rfftn` of `p(D⁻¹x)` on the same
+    pixel grid, for the `image_config.anisotropy_matrix` `D`. Coordinates `x` are in
+    pixels, about the center `N//2`.
+
+    1. `p` is interpolated at `D⁻¹x` with a cubic B-spline, without a prefilter
+       (`cryojax.ndimage.map_coordinates(..., order=3)`). The image is treated as
+       periodic, as it is by the FFT: coordinates wrap modulo the shape.
+    2. The result is transformed with `rfftn`.
+    3. The spectrum is divided by the response of the cubic B-spline sampled at the
+       integers, `(2/3 + cos(2πq_x)/3)(2/3 + cos(2πq_y)/3)`, at `q = Dᵀk` for each
+       FFT frequency `k` in cycles per pixel.
+
+    Step 3 undoes the blur of step 1, a circular convolution, so for `D = I` the output
+    is the `rfftn` of `p` exactly. Otherwise, the error is aliasing that grows towards
+    Nyquist.
+
+    **Arguments:**
+
+    - `image`:
+        The image in real space, at `image_config.padded_shape`.
+    - `image_config`:
+        The image configuration.
+    """
+    y_dim, x_dim = image.shape
+    matrix = image_config.anisotropy_matrix
+    # Interpolate at `D⁻¹x`, in index units wrapped into `[0, N)`. The cubic taps at
+    # `floor(c) + [-1, 0, 1, 2]` then read from the image wrapped by one pixel below
+    # and two above. Products with `D` are elementwise so that XLA fuses them
+    coordinate_grid = image_config.get_coordinate_grid(padding=True, physical=False)
+    x, y = coordinate_grid[..., 0], coordinate_grid[..., 1]
+    inverse = inverse_2x2(matrix)
+    y_index = jnp.mod(inverse[1, 0] * x + inverse[1, 1] * y + y_dim // 2, y_dim)
+    x_index = jnp.mod(inverse[0, 0] * x + inverse[0, 1] * y + x_dim // 2, x_dim)
+    resampled = map_coordinates(
+        jnp.pad(image, ((1, 2), (1, 2)), mode="wrap"),
+        (y_index + 1, x_index + 1),
+        order=3,
+        mode="promise_in_bounds",
+    )
+    # Divide out the B-spline's response at `Dᵀk`
+    frequency_grid = image_config.get_frequency_grid(padding=True, physical=False)
+    k_x, k_y = frequency_grid[..., 0], frequency_grid[..., 1]
+    q_x = matrix[0, 0] * k_x + matrix[1, 0] * k_y
+    q_y = matrix[0, 1] * k_x + matrix[1, 1] * k_y
+    response = _bspline_response(q_x) * _bspline_response(q_y)
+    return jnp.fft.rfftn(resampled) / response
+
+
+def _bspline_response(frequency: Float[Array, "..."]) -> Float[Array, "..."]:
+    """The fourier response of the cubic B-spline sampled at the integers, at
+    `frequency` in cycles per pixel."""
+    return 2 / 3 + jnp.cos(2 * jnp.pi * frequency) / 3
