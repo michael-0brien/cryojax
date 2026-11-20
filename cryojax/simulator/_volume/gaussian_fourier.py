@@ -525,16 +525,22 @@ def _project_impl(
         "GaussianFourierProjection", positions, pixel_size, shape, eps, upsample_factor
     )
     is_leaf = lambda x: isinstance(x, AbstractFourierOperator)  # noqa: E731
-    highest = jax.lax.Precision.HIGHEST
     if anisotropy_matrix is None:
         frequencies_1d = make_frequencies_1d(
             shape, pixel_size, modeord=1, outputs_rfft=True
         )
     else:
         # The spectrum of `p(D⁻¹x)` is `|det D|` times that of the positions `D r`,
-        # with each gaussian at `Dᵀk` and its full amplitude
-        frequencies = jnp.matmul(
-            make_frequency_grid(shape, pixel_size), anisotropy_matrix, precision=highest
+        # with each gaussian at `Dᵀk` and its full amplitude. Products with `D` are
+        # elementwise so that XLA fuses them
+        k = make_frequency_grid(shape, pixel_size)
+        k_x, k_y = k[..., 0], k[..., 1]
+        frequencies = jnp.stack(
+            [
+                k_x * anisotropy_matrix[0, 0] + k_y * anisotropy_matrix[1, 0],
+                k_x * anisotropy_matrix[0, 1] + k_y * anisotropy_matrix[1, 1],
+            ],
+            axis=-1,
         )
         det = jnp.abs(jnp.linalg.det(anisotropy_matrix))
 
@@ -545,7 +551,14 @@ def _project_impl(
     ) -> Array:
         _positions = _positions[:, :2]
         if anisotropy_matrix is not None:
-            _positions = jnp.matmul(_positions, anisotropy_matrix.T, precision=highest)
+            x, y = _positions[:, 0], _positions[:, 1]
+            _positions = jnp.stack(
+                [
+                    anisotropy_matrix[0, 0] * x + anisotropy_matrix[0, 1] * y,
+                    anisotropy_matrix[1, 0] * x + anisotropy_matrix[1, 1] * y,
+                ],
+                axis=-1,
+            )
         spectrum = dispatch_nufft1(
             _positions,
             jnp.asarray(_amplitudes, dtype=float),
