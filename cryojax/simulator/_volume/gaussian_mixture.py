@@ -357,7 +357,7 @@ class GaussianMixtureProjection(
         volume: GaussianMixtureVolume,
         image_config: AbstractImageConfig,
         *,
-        tolerance: float = 1e-2,
+        aliasing_tolerance: float = 1e-2,
         cutoff_sigma: float = 4.0,
         sampling_mode: Literal["average", "point"] = "average",
         upsample_factor: int = 2,
@@ -365,28 +365,28 @@ class GaussianMixtureProjection(
         n_batches: int = 1,
         enable_pallas: bool | Mapping[str, bool] | None = None,
     ) -> Self:
-        """Build an integrator with `blur_variance` and `n_spread` chosen for
-        `volume` at `image_config.pixel_size`. Not JIT-compatible: call on
-        concrete values. Sizes for the given pixel size.
+        """A `GaussianMixtureProjection` with `n_spread` and, for
+        `sampling_mode = 'point'`, `blur_variance` chosen for `volume` at
+        `image_config.pixel_size`. Call outside JIT.
 
         **Arguments:**
 
-        - `volume`: The volume to size `n_spread` for, with any B-factor
-            already added to its variances.
-        - `image_config`: The image configuration, for its pixel size.
-        - `tolerance`: With `sampling_mode = 'point'`, the relative error allowed
-            from content folded into the image's band.
-        - `cutoff_sigma`: Truncation width in standard deviations, for
-            [`cryojax.simulator.suggest_n_spread`][].
-        - `upsample_factor`: As for `GaussianMixtureProjection`, but at least 2
-            with `sampling_mode = 'point'`.
+        - `volume`: Its variances, B-factor included, set `n_spread` and the blur.
+        - `image_config`: For its pixel size.
+        - `aliasing_tolerance`: For `'point'`, the largest error the finer grid's
+            folded content may add in the image's band, relative to the signal.
+            Two folds meet at the band's corners, so it is below 2.
+        - `cutoff_sigma`: `n_spread` covers each gaussian, blur included, to this
+            many standard deviations (as in [`cryojax.simulator.suggest_n_spread`][]).
+        - `upsample_factor`: Defaults to 2, the least `'point'` allows here.
 
         The other arguments are those of `GaussianMixtureProjection`.
         """
-        if not 0 < tolerance < 2:
+        if not 0 < aliasing_tolerance < 2:
             raise ValueError(
-                "`tolerance` in `GaussianMixtureProjection.with_calibration` must "
-                f"be between 0 and 2. Got `tolerance = {tolerance}`."
+                "`aliasing_tolerance` in `GaussianMixtureProjection.with_calibration` "
+                "must be between 0 and 2. Got `aliasing_tolerance = "
+                f"{aliasing_tolerance}`."
             )
         # Raises the constructor's errors before any arithmetic on the factor
         cls(
@@ -412,7 +412,9 @@ class GaussianMixtureProjection(
             spread_pixel_size = pixel_size / r
             # The variance the finer grid needs, topped up from the narrowest gaussian
             required = (
-                pixel_size**2 * np.log(2 / tolerance) / (2 * np.pi**2 * r * (r - 1))
+                pixel_size**2
+                * np.log(2 / aliasing_tolerance)
+                / (2 * np.pi**2 * r * (r - 1))
             )
             blur_variance = max(0.0, required - float(np.min(volume.variances)))
         blurred_volume = eqx.tree_at(

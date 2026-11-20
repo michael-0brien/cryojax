@@ -1709,15 +1709,17 @@ class TestGMMWithCalibration:
                 upsample_factor=1,
             )
 
-    @pytest.mark.parametrize("tolerance", (0.0, -1e-2, 2.0, 5.0))
-    def test_with_calibration_invalid_tolerance(self, pdb_info, tolerance):
+    @pytest.mark.parametrize("aliasing_tolerance", (0.0, -1e-2, 2.0, 5.0))
+    def test_with_calibration_invalid_aliasing_tolerance(
+        self, pdb_info, aliasing_tolerance
+    ):
         volume, _ = _make_two_component_volumes(pdb_info[0])
         image_config = cxs.BasicImageConfig((32, 32), 1.0, voltage_in_kilovolts=300.0)
-        with pytest.raises(ValueError, match="tolerance"):
+        with pytest.raises(ValueError, match="aliasing_tolerance"):
             cxs.GaussianMixtureProjection.with_calibration(
                 volume,
                 image_config,
-                tolerance=tolerance,
+                aliasing_tolerance=aliasing_tolerance,
                 sampling_mode="point",
                 upsample_factor=2,
             )
