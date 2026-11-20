@@ -111,8 +111,7 @@ def _models(
     volume = _gaussian_volume() if volume is None else volume
     ctf = cxs.AstigmaticCTF(defocus_in_angstroms=5000.0, astigmatism_in_angstroms=300.0)
     transfer_theory = cxs.ContrastTransferTheory(ctf, amplitude_contrast_ratio=0.1)
-    return {
-        "projection": cxs.ProjectionImageModel(volume, _POSE, config, integrator),
+    models = {
         "weak phase": cxs.LinearImageModel(
             volume, _POSE, config, transfer_theory, integrator
         ),
@@ -129,13 +128,20 @@ def _models(
             cxs.RytovScatteringTheory(integrator, cxs.WaveTransferTheory(ctf)),
         ),
     }
+    # `ProjectionImageModel` refuses Ewald integrators
+    if not integrator.outputs_ewald_sphere:
+        models["projection"] = cxs.ProjectionImageModel(volume, _POSE, config, integrator)
+    return models
 
 
-def _analytic_projection(config):
+def _analytic_projection(config, is_translated=True):
     """The pixel-averaged projection of the gaussians `_POSITIONS` (unit amplitude,
-    standard deviation `_SIGMA`) in `_POSE`, at the points `D⁻¹x`."""
+    standard deviation `_SIGMA`) in `_POSE`, translated if `is_translated`, at the
+    points `D⁻¹x`."""
     volume = _gaussian_volume(variance=_SIGMA**2).rotate_to_pose(_POSE)
-    centers = np.asarray(volume.positions)[:, :2] + np.asarray(_POSE.offset_in_angstroms)
+    centers = np.asarray(volume.positions)[:, :2]
+    if is_translated:
+        centers = centers + np.asarray(_POSE.offset_in_angstroms)
     x = np.asarray(config.get_coordinate_grid(padding=True))[..., None, :] - centers
     d, s = float(config.pixel_size), np.sqrt(2) * _SIGMA
     box = np.asarray(erf((x + d / 2) / s) - erf((x - d / 2) / s))
@@ -162,8 +168,8 @@ def _analytic_projection(config):
             "GaussianFourierProjection",
             True,
         ),
-        (cxs.EwaldSphereExtraction(), "voxels", "EwaldSphereExtraction", False),
-        (cxs.EwaldSphereExtraction(), "voxels", "EwaldSphereExtraction", True),
+        # The real part of its field; 7e-6 to 1.3e-5, as `FourierSliceExtraction`
+        (cxs.EwaldSphereExtraction(), "voxels", 1e-4, True),
         (cxs.AutoVolumeProjection(), "gaussians", 3e-4, False),
         (cxs.AutoVolumeProjection(), "voxels", 1e-4, False),
         (
@@ -177,14 +183,16 @@ def _analytic_projection(config):
 def test_integrators_apply_the_anisotropic_magnification(
     volumes, integrator, volume, outcome, is_direct, anisotropy_xy
 ):
-    """Each integrator matches the analytic `p(D⁻¹x)` to `outcome` of its peak, with
-    its real-space output the `irfftn` of its fourier-space output, or raises for the
-    integrator named by `outcome`, through an image model or when `integrate` is
-    called directly."""
+    """Each integrator matches the analytic `p(D⁻¹x)` (Ewald by the real part of its
+    field) to `outcome` of its peak, with its real-space output the `irfftn` of its
+    fourier-space output, or raises for the integrator named by `outcome`, through an
+    image model or when `integrate`, which does not translate, is called directly."""
     config = cxs.AnisotropicImageConfig((64, 64), 1.0, anisotropy_xy=anisotropy_xy)
     volume_representation = volumes[volume].rotate_to_pose(_POSE)
     if is_direct:
-        simulate = lambda: integrator.integrate(volume_representation, config)
+        simulate = lambda: integrator.integrate(
+            volume_representation, config, outputs_real_space=True
+        )
     else:
         model = cxs.ProjectionImageModel(volumes[volume], _POSE, config, integrator)
         simulate = model.simulate
@@ -192,25 +200,38 @@ def test_integrators_apply_the_anisotropic_magnification(
         with pytest.raises(NotImplementedError, match=f"`{outcome}` does not support"):
             simulate()
     else:
-        expected = _analytic_projection(config)
-        np.testing.assert_allclose(simulate(), expected, atol=outcome * expected.max())
-        fourier_projection = integrator.integrate(volume_representation, config)
+        expected = _analytic_projection(config, is_translated=not is_direct)
+        np.testing.assert_allclose(
+            np.real(simulate()), expected, atol=outcome * expected.max()
+        )
+        parts = np.fft.irfftn(
+            integrator.integrate(volume_representation, config),
+            s=config.padded_shape,
+            axes=(-2, -1),
+        )
+        if integrator.outputs_ewald_sphere:
+            parts = parts[0] + 1j * parts[1]
         np.testing.assert_allclose(
             integrator.integrate(volume_representation, config, outputs_real_space=True),
-            np.fft.irfftn(fourier_projection, s=config.padded_shape, axes=(0, 1)),
+            parts,
             atol=1e-12 * expected.max(),
         )
 
 
 @pytest.mark.parametrize(
-    "integrator, volume",
+    "integrator, volume, name",
     [
-        (cxs.GaussianMixtureProjection(sampling_mode="point"), None),
-        (cxs.FourierSliceExtraction(), "voxels"),
+        (integrator, volume, name)
+        for integrator, volume in [
+            (cxs.GaussianMixtureProjection(sampling_mode="point"), None),
+            (cxs.FourierSliceExtraction(), "voxels"),
+        ]
+        for name in ["projection", "weak phase", "weak phase theory", "rytov"]
+    ]
+    + [
+        (cxs.EwaldSphereExtraction(), "voxels", name)
+        for name in ["weak phase", "weak phase theory", "rytov"]
     ],
-)
-@pytest.mark.parametrize(
-    "name", ["projection", "weak phase", "weak phase theory", "rytov"]
 )
 def test_zero_anisotropy_reproduces_the_isotropic_simulation(
     volumes, integrator, volume, name
@@ -225,12 +246,64 @@ def test_zero_anisotropy_reproduces_the_isotropic_simulation(
     )
 
 
+@pytest.mark.parametrize("anisotropy_xy", [_ANISOTROPY_XY, (-0.05, 0.03)])
+def test_ewald_sphere_is_sampled_at_the_distorted_frequencies(volumes, anisotropy_xy):
+    """The sphere `q - λ|q|²/2 ẑ` and its mirror at `q = Dᵀk`, times `|det D|`, here
+    curved before the pose rotates it, at a voltage where the curvature matters."""
+    volume = volumes["voxels"]
+    config = cxs.AnisotropicImageConfig(
+        (128, 128), 1.0, voltage_in_kilovolts=60.0, anisotropy_xy=anisotropy_xy
+    )
+    D = config.anisotropy_matrix
+    k = im.make_frequency_slice((128, 128), fftshifted=True)
+    q = k.at[..., :2].set(k[..., :2] @ D)
+    curvature = config.wavelength_in_angstroms * jnp.sum(q**2, axis=-1) / 2
+    on_sphere, on_mirror = (
+        im.sample_fft_slice(
+            volume.values,
+            _POSE.rotate_coordinates(q.at[..., 2].add(sign * curvature), inverse=True),
+            interp="cubic",
+        )
+        for sign in (-1.0, 1.0)
+    )
+    expected = jnp.stack([on_sphere + on_mirror, (on_sphere - on_mirror) / 1j]) / 2
+    expected *= jnp.abs(jnp.linalg.det(D))
+    np.testing.assert_allclose(
+        cxs.EwaldSphereExtraction().integrate(volume.rotate_to_pose(_POSE), config),
+        expected,
+        atol=1e-12 * np.abs(expected).max(),
+    )
+
+
+@pytest.mark.parametrize("anisotropy_xy", [_ANISOTROPY_XY, (-0.05, 0.03)])
+def test_anisotropic_ewald_sphere_at_high_voltage_is_the_fourier_slice(
+    volumes, anisotropy_xy
+):
+    """The field's real part is `FourierSliceExtraction`'s projection and its imaginary
+    part vanishes, up to second and first order in the wavelength (the imaginary part
+    is 1.4e-3 of the peak at 300 kV)."""
+    config = cxs.AnisotropicImageConfig(
+        (64, 64), 1.0, voltage_in_kilovolts=1e6, anisotropy_xy=anisotropy_xy
+    )
+    volume = volumes["voxels"].rotate_to_pose(_POSE)
+    field = cxs.EwaldSphereExtraction().integrate(volume, config, outputs_real_space=True)
+    projection = cxs.FourierSliceExtraction().integrate(
+        volume, config, outputs_real_space=True
+    )
+    peak = np.abs(projection).max()
+    # Measured 1.2e-12 and 8.9e-7
+    np.testing.assert_allclose(field.real, projection, atol=1e-11 * peak)
+    np.testing.assert_allclose(field.imag, 0.0, atol=2e-6 * peak)
+
+
 class _NoAnisotropyIntegrator(cxs.AbstractVolumeIntegrator, strict=True):
     outputs_ewald_sphere: ClassVar[bool] = False
     supports_anisotropy: ClassVar[bool] = False
 
     def integrate(self, volume_representation, image_config, outputs_real_space=False):
         y_dim, x_dim = image_config.padded_shape
+        if outputs_real_space:
+            return jnp.zeros((y_dim, x_dim))
         return jnp.zeros((y_dim, x_dim // 2 + 1), dtype=complex)
 
 
@@ -307,6 +380,7 @@ def _loss(
     [
         (cxs.GaussianMixtureProjection(sampling_mode="point"), None),
         (cxs.FourierSliceExtraction(), "voxels"),
+        (cxs.EwaldSphereExtraction(), "voxels"),
     ],
 )
 def test_anisotropy_gradients_match_finite_differences(
@@ -349,13 +423,18 @@ def _count_ffts(fn):
     return count(jax.make_jaxpr(fn)().jaxpr)
 
 
-@pytest.mark.parametrize("name", ["projection", "weak phase", "rytov"])
-def test_resampling_adds_no_ffts_to_a_real_space_projection(name):
+@pytest.mark.parametrize(
+    "name, extra_ffts", [("projection", 0), ("weak phase", 0), ("rytov", 2)]
+)
+def test_resampling_adds_no_ffts_to_a_real_space_projection(name, extra_ffts):
     """With `GaussianMixtureProjection`, which projects in real space, the resampling
-    reuses the FFT that the isotropic simulation computes."""
+    reuses the FFT that the isotropic simulation computes. Rytov takes the projection
+    in real space, so there the resampling adds a pair."""
     shape = (32, 32)
     isotropic = _models(cxs.BasicImageConfig(shape, 1.0))[name]
     anisotropic = _models(
         cxs.AnisotropicImageConfig(shape, 1.0, anisotropy_xy=(0.02, 0.01))
     )[name]
-    assert _count_ffts(anisotropic.simulate) == _count_ffts(isotropic.simulate)
+    assert (
+        _count_ffts(anisotropic.simulate) == _count_ffts(isotropic.simulate) + extra_ffts
+    )

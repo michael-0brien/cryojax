@@ -44,7 +44,6 @@ import numpy as np
 import pytest
 from cryojax.constants import PengScatteringFactorParameters
 from cryojax.io import read_atoms_from_pdb
-from cryojax.ndimage._fourier_slice import _full_slice_from_half_slice
 from cryojax.simulator._volume.fourier_voxels import _resolve_unroll
 from jaxtyping import Array, Float
 
@@ -427,12 +426,62 @@ def test_ewald_sphere_high_voltage_limit_cubic(fourier_cubic_volume, image_confi
     assert err < 5e-5
 
 
+# ── EwaldSphereExtraction: the field's real and imaginary parts ───────────────
+
+
+def _rotated_ewald_volume():
+    # Narrow gaussians, so the spectrum reaches Nyquist, and a rotated slice, so its
+    # frequencies fall between the voxel grid's
+    positions = np.random.default_rng(0).uniform(-6.0, 6.0, size=(12, 3))
+    gmm = cxs.GaussianMixtureVolume(positions, amplitudes=1.0, variances=0.4)
+    real_voxel_grid = cxs.GaussianMixtureRenderFn((32, 32, 32), voxel_size=1.0)(gmm)
+    pose = cxs.EulerAnglePose(phi_angle=20.0, theta_angle=35.0, psi_angle=-50.0)
+    volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(real_voxel_grid)
+    return volume.rotate_to_pose(pose)
+
+
+def test_ewald_sphere_contrast_matches_fourier_slice_at_high_voltage_at_nyquist():
+    volume = _rotated_ewald_volume()
+    config = cxs.BasicImageConfig((32, 32), pixel_size=1.0, voltage_in_kilovolts=1e6)
+    ctf = cxs.AstigmaticCTF(
+        defocus_in_angstroms=10000.0,
+        astigmatism_in_angstroms=2000.0,
+        astigmatism_angle=30.0,
+    )
+    transfer_theory = cxs.ContrastTransferTheory(ctf, amplitude_contrast_ratio=0.1)
+    ewald = transfer_theory.propagate_object(
+        _ESE.integrate(volume, config), config, is_ewald_sphere=True
+    )
+    projection = transfer_theory.propagate_object(_FSE.integrate(volume, config), config)
+    # Except the self-conjugate bins, which `FourierSliceExtraction` zeroes. The
+    # sphere's remaining curvature leaves ~3e-5; pairing -N/2 with itself, ~2e-1
+    keep = np.ones((32, 17), dtype=bool)
+    keep[16, 0] = keep[0, 16] = keep[16, 16] = False
+    difference = np.abs(np.asarray(ewald - projection))[keep]
+    assert difference.max() < 1e-3 * np.abs(np.asarray(projection)).max()
+
+
+@pytest.mark.parametrize("padded_shape", ((32, 32), (40, 36)))
+def test_ewald_sphere_extraction_returns_the_field_parts(padded_shape):
+    volume = _rotated_ewald_volume()
+    config = cxs.BasicImageConfig(
+        (32, 32), pixel_size=1.0, voltage_in_kilovolts=300.0, padded_shape=padded_shape
+    )
+    parts = _ESE.integrate(volume, config)
+    field = _ESE.integrate(volume, config, outputs_real_space=True)
+    assert parts.shape == (2, padded_shape[0], padded_shape[1] // 2 + 1)
+    real, imaginary = jnp.fft.irfftn(parts, s=padded_shape)
+    np.testing.assert_allclose(real, field.real, atol=1e-12)
+    np.testing.assert_allclose(imaginary, field.imag, atol=1e-12)
+
+
 # ── EwaldSphereExtraction vs analytic ground truth ────────────────────────────
 #
 # A gaussian mixture has a closed-form 3D fourier transform,
 #     hat_V(q) = sum_i a_i * exp(-2 pi^2 sigma_i^2 |q|^2) * exp(-2 pi i q . r_i),
-# evaluated here directly on the curved Ewald sphere surface (paraxial
-# approximation q_z = wavelength / 2 * |q_parallel|^2, valid at identity pose
+# evaluated here directly on the curved Ewald sphere surface and its mirror image
+# through the slice, giving the field's real and imaginary parts (paraxial
+# approximation q_z = -wavelength / 2 * |q_parallel|^2, valid at identity pose
 # where the beam axis is exactly z), independent of the voxel grid entirely.
 #
 # A variance of 4 A^2 (sigma=2 px) is used, rather than sigma=1 px used
@@ -472,27 +521,25 @@ def _ewald_sphere_analytic_ground_truth(volume, voltage_in_kilovolts: float) -> 
         voltage_in_kilovolts=voltage_in_kilovolts,
     )
     wavelength = config.wavelength_in_angstroms
-    # Curved Ewald sphere frequency coordinates (paraxial approximation, at
-    # identity pose the beam/projection axis is exactly z). `volume` only
-    # stores the half (rfft) in-plane slice; reconstruct the full grid this
-    # ground truth needs (an exact, non-interpolating coordinate operation,
-    # independent of the interpolation logic under test).
-    q_at_slice = _full_slice_from_half_slice(volume.frequency_slice)[0]
-    q_parallel_squared = jnp.sum(q_at_slice[..., :2] ** 2, axis=-1)
-    q_z_curvature = 0.5 * wavelength * q_parallel_squared
-    q_at_surface = q_at_slice.at[..., 2].add(q_z_curvature)
-
-    transform = _gaussian_mixture_fourier_transform(
-        jnp.asarray(_TWO_ATOM_POSITIONS),
-        jnp.asarray(_TWO_ATOM_AMPLITUDES),
-        jnp.asarray(_TWO_ATOM_VARIANCES),
-        q_at_surface,
+    # The sphere (paraxial approximation, at identity pose the beam/projection axis is
+    # exactly z) and its mirror image, on the half (rfft) in-plane slice
+    q_at_slice = volume.frequency_slice[0]
+    q_z_curvature = -0.5 * wavelength * jnp.sum(q_at_slice[..., :2] ** 2, axis=-1)
+    on_sphere, on_mirror = (
+        _gaussian_mixture_fourier_transform(
+            jnp.asarray(_TWO_ATOM_POSITIONS),
+            jnp.asarray(_TWO_ATOM_AMPLITUDES),
+            jnp.asarray(_TWO_ATOM_VARIANCES),
+            q_at_slice.at[..., 2].add(sign * q_z_curvature),
+        )
+        for sign in (1.0, -1.0)
     )
+    parts = jnp.stack([on_sphere + on_mirror, (on_sphere - on_mirror) / 1j]) / 2
     # cryojax's real-space convention puts the origin at array index N // 2,
     # so any analytic transform evaluated at raw (corner-indexed) frequency
     # coordinates must pick up the corresponding (-1)^k checkerboard phase.
-    checkerboard_phase = im.make_fftshift_phase(transform.shape)
-    return jnp.fft.ifftshift(checkerboard_phase * transform)
+    checkerboard_phase = im.make_fftshift_phase((N, N), outputs_rfft=True)
+    return checkerboard_phase * jnp.fft.ifftshift(parts, axes=(1,))
 
 
 @pytest.fixture(scope="module")
@@ -540,9 +587,8 @@ def test_ewald_sphere_matches_analytic_ground_truth(two_atom_cubic_volume):
 # `q_x < 0` through the origin and conjugates the result, and recovers taps that
 # fall outside the stored half by Hermitian symmetry -- see
 # `_sample_half_space_grid` in `cryojax/ndimage/_fourier_slice.py`.
-# `EwaldSphereExtraction` reconstructs the full in-plane grid on demand
-# (`_full_slice_from_half_slice`), since its curved output isn't
-# Hermitian-symmetric as a whole.
+# `EwaldSphereExtraction` samples the same half slice, curved onto the Ewald sphere
+# and onto its mirror image.
 
 
 def test_storage_shape_grid():

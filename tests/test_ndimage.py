@@ -823,25 +823,28 @@ def test_sample_fft_slice_shape_check():
         im.sample_fft_slice(grid, frequency_slice)
 
 
-def test_ewald_sphere_from_slice_curvature():
+@pytest.mark.parametrize("matrix", [np.eye(2), np.array([[0.97, 0.04], [0.04, 1.03]])])
+def test_ewald_sphere_from_slice_curvature(matrix):
     # For an unrotated slice, the Ewald surface keeps the in-plane
-    # coordinates and displaces out of plane by `(wavelength / voxel_size) *
-    # |q|**2 / 2` along the slice normal. The `wavelength=0` call gives the
-    # flat, fully-reconstructed slice used as the in-plane reference.
+    # coordinates and displaces out of plane by `-(wavelength / voxel_size) *
+    # |q|**2 / 2` along the slice normal, also when `matrix` shears the slice so that
+    # its steps are not orthogonal. The `wavelength=0` call gives the flat slice used
+    # as the in-plane reference.
     N, voxel_size, wavelength = 16, 1.3, 0.02
     frequency_slice = im.make_frequency_slice((N, N), fftshifted=True)
+    frequency_slice = frequency_slice.at[..., :2].set(frequency_slice[..., :2] @ matrix)
     flat = im.ewald_sphere_from_slice(frequency_slice, voxel_size, 0.0)
     surface = im.ewald_sphere_from_slice(frequency_slice, voxel_size, wavelength)
 
-    assert surface.shape == (1, N, N, 3)
-    # The `wavelength=0` surface is flat (no out-of-plane displacement).
-    np.testing.assert_allclose(flat[..., 2], 0.0, atol=1e-6)
+    assert surface.shape == (1, N, N // 2 + 1, 3)
+    # The `wavelength=0` surface is the slice itself.
+    np.testing.assert_allclose(flat, frequency_slice, atol=1e-12)
     # In-plane coordinates are unchanged by the curving.
-    np.testing.assert_allclose(surface[..., 0:2], flat[..., 0:2], atol=1e-6)
+    np.testing.assert_allclose(surface[..., 0:2], flat[..., 0:2], atol=1e-12)
     # Out-of-plane displacement matches the analytic Ewald curvature.
     q_squared = flat[..., 0] ** 2 + flat[..., 1] ** 2
-    predicted_z = (wavelength / voxel_size) * q_squared / 2
-    np.testing.assert_allclose(surface[..., 2], predicted_z, atol=1e-6)
+    predicted_z = -(wavelength / voxel_size) * q_squared / 2
+    np.testing.assert_allclose(surface[..., 2], predicted_z, atol=1e-12)
 
 
 #

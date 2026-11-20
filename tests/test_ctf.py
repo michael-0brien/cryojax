@@ -369,7 +369,16 @@ def test_wave_path_test_is_sensitive_to_the_odd_sign():
 
 def _ewald_spectrum(shape):
     key_re, key_im = jax.random.split(jax.random.key(2))
-    return jax.random.normal(key_re, shape) + 1.0j * jax.random.normal(key_im, shape)
+    parts_shape = (2, shape[0], shape[1] // 2 + 1)
+    return jax.random.normal(key_re, parts_shape) + 1.0j * jax.random.normal(
+        key_im, parts_shape
+    )
+
+
+def _field_parts(field):
+    """The `rfftn` of a field's real and imaginary parts, stacked, as Ewald sphere
+    integrators return them."""
+    return jnp.stack([jnp.fft.rfftn(field.real), jnp.fft.rfftn(field.imag)])
 
 
 def test_ewald_sphere_without_odd_aberrations_matches_astigmatic_ctf():
@@ -387,14 +396,117 @@ def test_ewald_sphere_without_odd_aberrations_matches_astigmatic_ctf():
     )
 
 
-def test_ewald_sphere_with_odd_aberrations_raises():
-    shape = (16, 16)
-    config = cxs.BasicImageConfig(shape, pixel_size=1.0, voltage_in_kilovolts=300.0)
-    transfer_theory = cxs.ContrastTransferTheory(_aberrated_ctf(coma=_COMA))
-    with pytest.raises(NotImplementedError):
-        transfer_theory.propagate_object(
-            _ewald_spectrum(shape), config, is_ewald_sphere=True
+_EWALD_SHAPES = pytest.mark.parametrize("shape", [(32, 32), (31, 31), (32, 31)])
+_EWALD_CTFS = pytest.mark.parametrize(
+    "ctf",
+    [
+        _aberrated_ctf(),
+        _aberrated_ctf(coma=_COMA),
+        _aberrated_ctf(coma=_COMA, trefoil=_TREFOIL),
+    ],
+    ids=["none", "coma", "coma+trefoil"],
+)
+
+
+def _off_nyquist(shape):
+    """The half-plane bins off the Nyquist row and column, where the half-plane and
+    full-grid paths take opposite signs of the Nyquist frequency."""
+    y_dim, x_dim = shape
+    mask = np.ones((y_dim, x_dim // 2 + 1), dtype=bool)
+    if y_dim % 2 == 0:
+        mask[y_dim // 2, :] = False
+    if x_dim % 2 == 0:
+        mask[:, -1] = False
+    return mask
+
+
+def _relative_error(actual, expected, mask=Ellipsis):
+    actual, expected = np.asarray(actual)[mask], np.asarray(expected)[mask]
+    return np.abs(actual - expected).max() / np.abs(expected).max()
+
+
+def _complex_field(shape):
+    key_re, key_im = jax.random.split(jax.random.key(0))
+    field = jax.random.normal(key_re, shape) + 1.0j * jax.random.normal(key_im, shape)
+    spectrum = jnp.fft.fftn(field)
+    y_dim, x_dim = shape
+    if y_dim % 2 == 0:
+        spectrum = spectrum.at[y_dim // 2, :].set(0.0)
+    if x_dim % 2 == 0:
+        spectrum = spectrum.at[:, x_dim // 2].set(0.0)
+    return jnp.fft.ifftn(spectrum)
+
+
+def _linear_term_of_the_propagated_wave(
+    field, config, ctf, amplitude_contrast_ratio, offset_z_in_angstroms=None
+):
+    """The contrast spectrum of the exit wave `exp(i w field)`, to first order in the
+    field."""
+    ac = amplitude_contrast_ratio
+    w = jnp.sqrt(1.0 - ac**2) + 1.0j * ac
+
+    def intensity(scale):
+        wave = jnp.fft.fftn(jnp.exp(1.0j * scale * w * field))
+        wave = cxs.WaveTransferTheory(ctf).propagate_exit_wave(
+            wave, config, offset_z_in_angstroms=offset_z_in_angstroms
         )
+        return jnp.abs(jnp.fft.ifftn(wave)) ** 2
+
+    _, linear_term = jax.jvp(intensity, (0.0,), (1.0,))
+    return jnp.fft.rfftn(linear_term / 2)
+
+
+def _ewald_contrast_error(shape, ctf, amplitude_contrast_ratio, offset_z_in_angstroms):
+    config = cxs.BasicImageConfig(shape, pixel_size=1.0, voltage_in_kilovolts=300.0)
+    field = _complex_field(shape)
+    ewald = cxs.ContrastTransferTheory(
+        ctf, amplitude_contrast_ratio=amplitude_contrast_ratio
+    ).propagate_object(
+        _field_parts(field),
+        config,
+        is_ewald_sphere=True,
+        offset_z_in_angstroms=offset_z_in_angstroms,
+    )
+    expected = _linear_term_of_the_propagated_wave(
+        field, config, ctf, amplitude_contrast_ratio, offset_z_in_angstroms
+    )
+    return _relative_error(ewald, expected, _off_nyquist(shape))
+
+
+@_EWALD_SHAPES
+@_EWALD_CTFS
+@pytest.mark.parametrize("amplitude_contrast_ratio", [0.0, 0.1])
+@pytest.mark.parametrize("offset_z_in_angstroms", [None, 600.0])
+def test_ewald_contrast_is_the_linear_term_of_the_propagated_wave(
+    shape, ctf, amplitude_contrast_ratio, offset_z_in_angstroms
+):
+    error = _ewald_contrast_error(
+        shape, ctf, amplitude_contrast_ratio, offset_z_in_angstroms
+    )
+    assert error <= 1e-12
+
+
+@pytest.mark.parametrize("offset_z_in_angstroms", [None, 600.0])
+def test_ewald_contrast_is_the_linear_term_of_the_propagated_wave_in_float32(
+    offset_z_in_angstroms,
+):
+    with jax.enable_x64(False):
+        ctf = _aberrated_ctf(coma=_COMA, trefoil=_TREFOIL)
+        error = _ewald_contrast_error((32, 31), ctf, 0.1, offset_z_in_angstroms)
+    assert error <= 5e-5
+
+
+@_EWALD_SHAPES
+@_EWALD_CTFS
+def test_ewald_real_field_equals_projection(shape, ctf):
+    config = cxs.BasicImageConfig(shape, pixel_size=1.0, voltage_in_kilovolts=300.0)
+    field = jax.random.normal(jax.random.key(1), shape)
+    transfer_theory = cxs.ContrastTransferTheory(ctf, amplitude_contrast_ratio=0.1)
+    ewald = transfer_theory.propagate_object(
+        _field_parts(field), config, is_ewald_sphere=True
+    )
+    projection = transfer_theory.propagate_object(jnp.fft.rfftn(field), config)
+    assert _relative_error(ewald, projection) <= 1e-14
 
 
 def test_coma_matches_cistem_beam_tilt():
