@@ -29,7 +29,7 @@ from .base_volume import (
     ProjectionArray,
     VoxelArray,
 )
-from .common import spread_and_sum_gaussian_components
+from .internal import spread_and_sum_gaussian_components
 
 
 def _leaf_broadcast_to(x, shape):
@@ -630,9 +630,8 @@ def _dense_axis_values(
     *,
     use_erf: bool,
 ) -> Float[Array, "dim M K"]:
-    """Evaluate the normalized 1D marginal kernel (see `cryojax.simulator
-    ._volume.common`) at every grid point, for every position and gaussian
-    component."""
+    """Evaluate the normalized 1D marginal kernel at every grid point, for every
+    position and gaussian component."""
     r = grid[:, None, None] - positions_1d[None, :, None]
     variance = variance[None, :, :]
     return _erf_weight(r, variance, width) if use_erf else _gaussian_weight(r, variance)
@@ -699,7 +698,7 @@ def _gaussians_to_projection_spread(
     enable_pallas: bool | Mapping[str, bool] | None,
 ) -> Float[Array, "dim_y dim_x"]:
     """Spread each gaussian component directly onto the `n_spread` nearest
-    grid points (see `cryojax.simulator._volume.common`), rather than
+    grid points, rather than
     evaluating dense gaussian integrals over the whole grid.
     """
 
@@ -797,7 +796,7 @@ def _gaussians_to_real_voxels_spread(
     enable_pallas: bool | Mapping[str, bool] | None,
 ) -> Float[Array, "{shape[0]} {shape[1]} {shape[2]}"]:
     """Spread each gaussian component directly onto the `n_spread` nearest
-    grid points (see `cryojax.simulator._volume.common`), rather than
+    grid points, rather than
     evaluating dense gaussian integrals over the whole grid.
     """
 

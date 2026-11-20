@@ -13,7 +13,6 @@ from .base_volume import (
     ProjectionArray,
     VoxelArray,
 )
-from .common import check_anisotropy_supported
 from .fourier_voxels import (
     FourierSliceExtraction,
     FourierVoxelGridVolume,
@@ -28,6 +27,7 @@ from .gaussian_mixture import (
     GaussianMixtureRenderFn,
     GaussianMixtureVolume,
 )
+from .internal import check_anisotropy_supported
 
 
 class AutoVolumeProjection(

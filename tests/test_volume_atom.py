@@ -384,7 +384,7 @@ class TestIntegrateGMMToPixelsWithSpreadingBackend:
     def test_gradients_are_finite(self, toy_gaussian_cloud, sampling_mode):
         """Gradients through the spreading backend w.r.t. positions,
         amplitudes, and variances must be finite (regression check for the
-        custom VJP rule in `common.py`)."""
+        custom VJP rule)."""
         atom_positions, ff_a, ff_b, n_voxels_per_side, voxel_size = toy_gaussian_cloud
         n_pixels_per_side = n_voxels_per_side[:2]
         image_config = cxs.BasicImageConfig(
@@ -533,7 +533,7 @@ class TestRenderGMMToVoxelsWithSpreadingBackend:
     def test_gradients_are_finite(self, toy_gaussian_cloud):
         """Gradients through the spreading backend w.r.t. positions,
         amplitudes, and variances must be finite (regression check for the
-        custom VJP rule in `common.py`)."""
+        custom VJP rule)."""
         atom_positions, ff_a, ff_b, n_voxels_per_side, voxel_size = toy_gaussian_cloud
         render_fn = cxs.GaussianMixtureRenderFn(
             n_voxels_per_side, voxel_size, n_spread=11

@@ -33,7 +33,7 @@ from ._volume import (
     AbstractVolumeRepresentation,
     AutoVolumeProjection,
 )
-from ._volume.common import check_anisotropy_supported
+from ._volume.internal import check_anisotropy_supported
 
 
 RealImageArray = Float[Array, "{self.image_config.y_dim} {self.image_config.x_dim}"]

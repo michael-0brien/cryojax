@@ -26,7 +26,7 @@ from .base_volume import (
     EwaldSphereArray,
     ProjectionArray,
 )
-from .common import check_anisotropy_supported
+from .internal import check_anisotropy_supported
 
 
 def _check_voxel_array_shape(shape: tuple[int, ...], cls_name: str) -> None:

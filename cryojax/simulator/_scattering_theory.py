@@ -10,7 +10,7 @@ from ..jax_util import FloatLike, NDArrayLike
 from ._image_config import AbstractImageConfig
 from ._transfer_theory import ContrastTransferTheory, WaveTransferTheory
 from ._volume import AbstractVolumeIntegrator, AbstractVolumeRepresentation
-from ._volume.common import check_anisotropy_supported
+from ._volume.internal import check_anisotropy_supported
 
 
 class AbstractScatteringTheory(eqx.Module, strict=True):

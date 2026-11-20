@@ -32,7 +32,7 @@ from .base_volume import (
     ProjectionArray,
     VoxelArray,
 )
-from .common import check_anisotropy_supported, make_frequencies_1d
+from .internal import check_anisotropy_supported, make_frequencies_1d
 
 
 T = TypeVar("T")
