@@ -62,7 +62,7 @@ def test_resampling_matches_a_direct_anisotropic_gaussian_render(shape, anisotro
         _gaussians(shape, centers, sigma, D),
     )
     fourier_image = np.asarray(
-        _resample_with_anisotropy_matrix(jnp.asarray(image), config)
+        _resample_with_anisotropy_matrix(jnp.asarray(image), config.anisotropy_matrix)
     )
     fourier_expected = np.fft.rfftn(expected)
     shells = [(0.0, 0.1), (0.1, 0.2), (0.2, 0.3), (0.3, 0.4)]
@@ -71,13 +71,23 @@ def test_resampling_matches_a_direct_anisotropic_gaussian_render(shape, anisotro
     assert all(e < b for e, b in zip(errors, bounds)), errors
 
 
-@pytest.mark.parametrize("shape", [(32, 32), (31, 28)])
-def test_resampling_with_zero_anisotropy_is_the_fft(shape):
+@pytest.mark.parametrize(
+    "shape, cropped_shape",
+    [((32, 32), None), ((31, 28), None), ((64, 56), (32, 28)), ((63, 57), (21, 19))],
+)
+def test_resampling_with_zero_anisotropy_is_the_fft(shape, cropped_shape):
     config = cxs.AnisotropicImageConfig(shape, 1.3, anisotropy_xy=(0.0, 0.0))
-    image = np.random.default_rng(0).normal(size=shape)
+    image = jnp.asarray(np.random.default_rng(0).normal(size=shape))
+    expected = (
+        jnp.fft.rfftn(image)
+        if cropped_shape is None
+        else im.fourier_crop_to_shape(
+            image, cropped_shape, outputs_real_space=False, preserve_mean=True
+        )
+    )
     np.testing.assert_allclose(
-        _resample_with_anisotropy_matrix(jnp.asarray(image), config),
-        np.fft.rfftn(image),
+        _resample_with_anisotropy_matrix(image, config.anisotropy_matrix, cropped_shape),
+        expected,
         atol=1e-10,
     )
 
@@ -106,7 +116,10 @@ def volumes():
 
 
 def _models(
-    config, volume=None, integrator=cxs.GaussianMixtureProjection(sampling_mode="point")
+    config,
+    volume=None,
+    # A projection made in real space, so that resampling adds no FFTs
+    integrator=cxs.GaussianMixtureProjection(sampling_mode="average"),
 ):
     volume = _gaussian_volume() if volume is None else volume
     ctf = cxs.AstigmaticCTF(defocus_in_angstroms=5000.0, astigmatism_in_angstroms=300.0)
@@ -134,15 +147,18 @@ def _models(
     return models
 
 
-def _analytic_projection(config, is_translated=True):
-    """The pixel-averaged projection of the gaussians `_POSITIONS` (unit amplitude,
-    standard deviation `_SIGMA`) in `_POSE`, translated if `is_translated`, at the
-    points `D⁻¹x`."""
+def _analytic_projection(config, is_translated=True, sampling_mode="average"):
+    """The projection of the gaussians `_POSITIONS` (unit amplitude, standard deviation
+    `_SIGMA`) in `_POSE`, translated if `is_translated`, at the points `D⁻¹x`, averaged
+    over each pixel or, for `sampling_mode = 'point'`, sampled."""
     volume = _gaussian_volume(variance=_SIGMA**2).rotate_to_pose(_POSE)
     centers = np.asarray(volume.positions)[:, :2]
     if is_translated:
         centers = centers + np.asarray(_POSE.offset_in_angstroms)
     x = np.asarray(config.get_coordinate_grid(padding=True))[..., None, :] - centers
+    if sampling_mode == "point":
+        density = np.exp(-np.sum(x**2, axis=-1) / (2 * _SIGMA**2))
+        return np.sum(density, axis=-1) / (2 * np.pi * _SIGMA**2)
     d, s = float(config.pixel_size), np.sqrt(2) * _SIGMA
     box = np.asarray(erf((x + d / 2) / s) - erf((x - d / 2) / s))
     return np.sum(np.prod(box, axis=-1), axis=-1) / (2 * d) ** 2
@@ -152,8 +168,31 @@ def _analytic_projection(config, is_translated=True):
 @pytest.mark.parametrize(
     "integrator, volume, outcome, is_direct",
     [
-        # Cubic resampling; exact isotropically
+        # Cubic resampling at the image's pixels, 6.8e-5 to 2.1e-4; exact isotropically
         (cxs.GaussianMixtureProjection(), "gaussians", 3e-4, False),
+        (cxs.GaussianMixtureProjection(sampling_mode="point"), "gaussians", 3e-4, False),
+        # On the grid twice as fine, before the crop: 8.7e-6 to 1.1e-5
+        (
+            cxs.GaussianMixtureProjection(sampling_mode="point", upsample_factor=2),
+            "gaussians",
+            2e-5,
+            False,
+        ),
+        (
+            cxs.GaussianMixtureProjection(sampling_mode="point", upsample_factor=2),
+            "gaussians",
+            2e-5,
+            True,
+        ),
+        # The blur divided out at `Dᵀk`: 8.9e-6 to 1.6e-5
+        (
+            cxs.GaussianMixtureProjection(
+                sampling_mode="point", upsample_factor=2, blur_variance=1.0
+            ),
+            "gaussians",
+            3e-5,
+            False,
+        ),
         # Isotropically 5e-6 to 1e-4 over poses, 7e-6 at `_POSE`
         (cxs.FourierSliceExtraction(), "voxels", 1e-4, False),
         (
@@ -200,7 +239,11 @@ def test_integrators_apply_the_anisotropic_magnification(
         with pytest.raises(NotImplementedError, match=f"`{outcome}` does not support"):
             simulate()
     else:
-        expected = _analytic_projection(config, is_translated=not is_direct)
+        expected = _analytic_projection(
+            config,
+            is_translated=not is_direct,
+            sampling_mode=getattr(integrator, "sampling_mode", "average"),
+        )
         np.testing.assert_allclose(
             np.real(simulate()), expected, atol=outcome * expected.max()
         )
@@ -218,12 +261,54 @@ def test_integrators_apply_the_anisotropic_magnification(
         )
 
 
+@pytest.mark.parametrize("anisotropy_xy", [_ANISOTROPY_XY, (-0.05, 0.03)])
+@pytest.mark.parametrize(
+    "integrator, outcome",
+    [
+        # 2.1e-6 to 2.2e-6
+        (cxs.GaussianMixtureProjection(sampling_mode="point", upsample_factor=3), 5e-6),
+        # Cropped from a larger render: 8.7e-6 to 1.1e-5
+        (
+            cxs.GaussianMixtureProjection(
+                sampling_mode="point", upsample_factor=2, shape=(70, 66)
+            ),
+            2e-5,
+        ),
+        # Padded from a smaller render, periodic at its edges, which hold 3e-5 of the
+        # peak: 4.6e-5 to 1.6e-4
+        (
+            cxs.GaussianMixtureProjection(
+                sampling_mode="point", upsample_factor=2, shape=(48, 45)
+            ),
+            3e-4,
+        ),
+    ],
+)
+def test_point_sampling_resamples_odd_grids_about_their_center(
+    volumes, integrator, outcome, anisotropy_xy
+):
+    """With `sampling_mode = 'point'`, the finer grid is resampled about its center
+    pixel, which the crop keeps on the image's, here at odd sizes."""
+    config = cxs.AnisotropicImageConfig((63, 57), 1.0, anisotropy_xy=anisotropy_xy)
+    image = integrator.integrate(
+        volumes["gaussians"].rotate_to_pose(_POSE), config, outputs_real_space=True
+    )
+    expected = _analytic_projection(config, is_translated=False, sampling_mode="point")
+    np.testing.assert_allclose(image, expected, atol=outcome * expected.max())
+
+
 @pytest.mark.parametrize(
     "integrator, volume, name",
     [
         (integrator, volume, name)
         for integrator, volume in [
             (cxs.GaussianMixtureProjection(sampling_mode="point"), None),
+            (
+                cxs.GaussianMixtureProjection(
+                    sampling_mode="point", upsample_factor=2, blur_variance=1.0
+                ),
+                None,
+            ),
             (cxs.FourierSliceExtraction(), "voxels"),
         ]
         for name in ["projection", "weak phase", "weak phase theory", "rytov"]
@@ -379,6 +464,12 @@ def _loss(
     "integrator, volume",
     [
         (cxs.GaussianMixtureProjection(sampling_mode="point"), None),
+        (
+            cxs.GaussianMixtureProjection(
+                sampling_mode="point", upsample_factor=2, blur_variance=0.5
+            ),
+            None,
+        ),
         (cxs.FourierSliceExtraction(), "voxels"),
         (cxs.EwaldSphereExtraction(), "voxels"),
     ],
@@ -424,16 +515,31 @@ def _count_ffts(fn):
 
 
 @pytest.mark.parametrize(
-    "name, extra_ffts", [("projection", 0), ("weak phase", 0), ("rytov", 2)]
+    "sampling_mode, name, extra_ffts",
+    [
+        ("average", "projection", 0),
+        ("average", "weak phase", 0),
+        ("average", "rytov", 2),
+        ("point", "projection", 0),
+        ("point", "weak phase", 0),
+        ("point", "rytov", 0),
+    ],
 )
-def test_resampling_adds_no_ffts_to_a_real_space_projection(name, extra_ffts):
+def test_resampling_adds_no_ffts_to_a_real_space_projection(
+    sampling_mode, name, extra_ffts
+):
     """With `GaussianMixtureProjection`, which projects in real space, the resampling
-    reuses the FFT that the isotropic simulation computes. Rytov takes the projection
-    in real space, so there the resampling adds a pair."""
+    reuses the FFT that the isotropic simulation computes: of the image with
+    `sampling_mode = 'average'`, of the finer grid before the crop with `'point'`.
+    Rytov takes the projection in real space, so there `'average'` adds a pair."""
     shape = (32, 32)
-    isotropic = _models(cxs.BasicImageConfig(shape, 1.0))[name]
+    integrator = cxs.GaussianMixtureProjection(
+        sampling_mode=sampling_mode, upsample_factor=2
+    )
+    isotropic = _models(cxs.BasicImageConfig(shape, 1.0), integrator=integrator)[name]
     anisotropic = _models(
-        cxs.AnisotropicImageConfig(shape, 1.0, anisotropy_xy=(0.02, 0.01))
+        cxs.AnisotropicImageConfig(shape, 1.0, anisotropy_xy=(0.02, 0.01)),
+        integrator=integrator,
     )[name]
     assert (
         _count_ffts(anisotropic.simulate) == _count_ffts(isotropic.simulate) + extra_ffts

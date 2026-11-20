@@ -38,6 +38,7 @@
             members:
                 - __init__
                 - integrate
+                - with_calibration
 
 ---
 

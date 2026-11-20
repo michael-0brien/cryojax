@@ -1,5 +1,3 @@
-import functools as ft
-import math
 from collections.abc import Sequence
 from typing import Any, ClassVar, Literal, Self, TypeVar, cast
 from typing_extensions import override
@@ -7,6 +5,7 @@ from typing_extensions import override
 import equinox as eqx
 import jax
 import jax.numpy as jnp
+import numpy as np
 from jaxtyping import Array, Float, PyTree
 
 from ..._internal import leaf_asarray
@@ -17,10 +16,8 @@ from ...jax_util import FloatLike, NDArrayLike
 from ...ndimage import (
     AbstractFourierOperator,
     FourierGaussian,
-    FourierSinc,
     convert_fftn_to_rfftn,
     dispatch_nufft1,
-    query_efficient_grid_size,
     resize_with_crop_or_pad,
 )
 from .._image_config import AbstractImageConfig
@@ -32,7 +29,7 @@ from .base_volume import (
     ProjectionArray,
     VoxelArray,
 )
-from .internal import check_anisotropy_supported, make_frequencies_1d
+from .internal import check_anisotropy_supported, eval_separable_impl, make_frequencies_1d
 
 
 T = TypeVar("T")
@@ -57,7 +54,7 @@ class GaussianFourierVolume(AbstractAtomVolume, strict=True):
         )
         ```
 
-    The arguments `positions` and `kernel_fns` may also be
+    The arguments `positions`, `kernel_fns` and `amplitudes` may also be
     pytrees of arrays and scattering factors, where each tree leaf represents
     a different atom type.
 
@@ -80,6 +77,7 @@ class GaussianFourierVolume(AbstractAtomVolume, strict=True):
 
     positions: PyTree[Float[NDArrayLike, "_ 3"]]
     kernel_fns: PyTree[FourierGaussian]
+    amplitudes: PyTree[Float[NDArrayLike, " _"]]
 
     is_frame_rotation: ClassVar[bool] = False
 
@@ -87,6 +85,7 @@ class GaussianFourierVolume(AbstractAtomVolume, strict=True):
         self,
         positions: PyTree[Float[NDArrayLike, "_ 3"], "T"],
         kernel_fns: PyTree[FourierGaussian, "T"],
+        amplitudes: PyTree[Float[NDArrayLike, " _"], "T"] | None = None,
     ):
         """**Arguments:**
 
@@ -97,9 +96,11 @@ class GaussianFourierVolume(AbstractAtomVolume, strict=True):
             as `positions`, where each leaf is a
             [`cryojax.ndimage.FourierGaussian`][] representing the atom
             type's scattering factor. These may have amplitudes and
-            b-factors with a batch dimension to simulate form factors. To
-            use a different amplitude for each atom position, use
-            [`cryojax.simulator.GaussianMixtureVolume`][] instead.
+            b-factors with a batch dimension to simulate form factors.
+        - `amplitudes`:
+            A pytree with the same tree structure as `positions`, each leaf
+            of shape `(M,)`: one amplitude per atom, scaling its type's
+            scattering factor. Ones if not given.
         """  # noqa: E501
         if jax.tree.structure(positions) != jax.tree.structure(
             kernel_fns,
@@ -110,10 +111,31 @@ class GaussianFourierVolume(AbstractAtomVolume, strict=True):
                 "that the pytree structures of `positions` and "
                 "`kernel_fns` were not equal."
             )
+        if amplitudes is not None and (
+            jax.tree.structure(positions) != jax.tree.structure(amplitudes)
+        ):
+            raise ValueError(
+                "When instantiating a `GaussianFourierVolume`, found "
+                "that the pytree structures of `positions` and "
+                "`amplitudes` were not equal."
+            )
         # Convert positions to array leaves, preserving their backend (JAX
         # arrays stay on-device, NumPy arrays stay on the host).
         self.positions = jax.tree.map(lambda x: leaf_asarray(x, dtype=float), positions)
         self.kernel_fns = kernel_fns
+        if amplitudes is None:
+            amplitudes = jax.tree.map(lambda x: np.ones(x.shape[0]), self.positions)
+        self.amplitudes = jax.tree.map(lambda x: leaf_asarray(x, dtype=float), amplitudes)
+        for pos, amp in zip(
+            jax.tree.leaves(self.positions), jax.tree.leaves(self.amplitudes)
+        ):
+            if amp.shape != (pos.shape[0],):
+                raise ValueError(
+                    "When instantiating a `GaussianFourierVolume`, found an "
+                    f"`amplitudes` leaf of shape {amp.shape} for {pos.shape[0]} "
+                    "positions. Each leaf must have shape `(M,)`, where `M` is "
+                    "the number of positions in the matching leaf of `positions`."
+                )
 
     @override
     def rotate_to_pose(self, pose: AbstractPose) -> Self:
@@ -206,9 +228,11 @@ class GaussianFourierVolume(AbstractAtomVolume, strict=True):
 
 class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], strict=True):
     """Render a voxel grid from a `GaussianFourierVolume` using non-uniform FFTs
-    and Fourier-domain convolution. Good when kernels span at least a
-    couple pixels; see `cryojax.simulator.GaussianMixtureRenderFn` for an
-    alternative that directly spreads narrow kernels onto the grid.
+    and Fourier-domain convolution. Computes the band-limited voxel grid, whose
+    spectrum is the volume's at every frequency of the grid. Good when kernels span
+    at least a couple pixels; see `cryojax.simulator.GaussianMixtureRenderFn` for an
+    alternative that directly spreads narrow kernels onto the grid, and for the
+    voxel average.
 
     !!! info
         By default, the non-uniform FFT runs on a pure-JAX backend using
@@ -223,8 +247,7 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
     shape: tuple[int, int, int]
     voxel_size: Float[NDArrayLike, "..."]
 
-    sampling_mode: Literal["average", "point"]
-    upsample_factor: float
+    sampling_mode: Literal["point"] = eqx.field(static=True)
     eps: float
     options: dict[str, Any]
 
@@ -233,8 +256,6 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
         shape: tuple[int, int, int],
         voxel_size: FloatLike,
         *,
-        sampling_mode: Literal["average", "point"] = "average",
-        upsample_factor: int | float = 1.0,
         eps: float = 1e-6,
         options: dict[str, Any] = {},
     ):
@@ -244,13 +265,6 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
             The shape of the resulting voxel grid.
         - `voxel_size`:
             The voxel size of the resulting voxel grid.
-        - `sampling_mode`:
-            If `'average'`, convolve with a box function to sample the
-            projected volume at a pixel to be the average value of the
-            underlying continuous function. If `'point'`, the volume at
-            a pixel will be point sampled.
-        - `upsample_factor`:
-            How much to upsample the grid on which atoms are spread onto.
         - `eps`:
             The precision of the underlying non-uniform FFT implementation.
             See [`finufft`](https://finufft.readthedocs.io/en/latest/opts.html#options-parameters-cpu)
@@ -259,17 +273,9 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
             A dictionary of options for advanced usage, passed directly to
             the underlying non-uniform FFT implementation.
         """  # noqa: E501
-        if sampling_mode not in ["average", "point"]:
-            raise ValueError(
-                "`sampling_mode` in `GaussianFourierRenderFn` "
-                "must be either 'average' for averaging within a "
-                "pixel or 'point' for point sampling. Got "
-                f"`sampling_mode = {sampling_mode}`."
-            )
         self.shape = shape
         self.voxel_size = leaf_asarray(voxel_size, dtype=float)
-        self.sampling_mode = sampling_mode
-        self.upsample_factor = float(upsample_factor)
+        self.sampling_mode = "point"
         self.eps = eps
         self.options = options
 
@@ -299,39 +305,24 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
             component is in the corner. Does nothing if
             `outputs_real_space = True`.
         """
-        # Prepare arguments, casting positions and the voxel size to JAX arrays
+        # Prepare arguments, casting positions, amplitudes and voxel size to JAX arrays
         voxel_size = jnp.asarray(self.voxel_size)
-        positions, kernel_fns = (
+        positions, kernel_fns, amplitudes = (
             jax.tree.map(lambda x: jnp.asarray(x), volume_representation.positions),
             volume_representation.kernel_fns,
+            jax.tree.map(lambda x: jnp.asarray(x), volume_representation.amplitudes),
         )
         kernel_fns = _standardize_kernel_fns(kernel_fns, spatial_dim=3)
-        (shape_u, voxel_size_u), upsampfac = _prepare_upsample(
-            shape=self.shape,
-            pixel_size=voxel_size,
-            upsampfac=self.upsample_factor,
-        )
         # Compute
         rendering_fft = _render_impl(
             positions,
             kernel_fns,
-            shape_u=cast(tuple[int, int, int], shape_u),
-            shape_out=cast(tuple[int, int, int], self.shape),
-            voxel_size_u=voxel_size_u,
+            amplitudes,
+            shape=self.shape,
+            voxel_size=voxel_size,
             eps=self.eps,
             options=self.options,
         )
-        # Average within a pixel size
-        if self.sampling_mode == "average":
-            box_fn = FourierSinc(box_width=voxel_size)
-            frequencies_1d = make_frequencies_1d(shape_u, voxel_size_u, modeord=1)
-            rendering_fft *= _eval_separable_impl(box_fn, frequencies_1d)
-        # Downsample by extracting fourier modes
-        if self.shape != shape_u:
-            (indices_z, indices_y, indices_x), fac = _build_extraction_mesh(
-                shape_u, self.shape, modeord=1
-            )
-            rendering_fft = fac * rendering_fft[indices_z, indices_y, indices_x]
         return (
             jnp.fft.ifftn(rendering_fft).real
             if outputs_real_space
@@ -349,9 +340,11 @@ class GaussianFourierProjection(
 ):
     """Integrate atomic parametrization of a volume onto the exit plane from
     a `GaussianFourierVolume` using non-uniform FFTs and Fourier-domain
-    convolution. Good when kernels span at least a couple pixels; see
-    `cryojax.simulator.GaussianMixtureProjection` for an alternative that
-    directly spreads narrow kernels onto the grid.
+    convolution. Computes the band-limited image, whose spectrum is the projected
+    volume's at every frequency of the grid. Good when kernels span at least a
+    couple pixels; see `cryojax.simulator.GaussianMixtureProjection` for an
+    alternative that directly spreads narrow kernels onto the grid, and for the
+    pixel average.
 
     !!! info
         By default, the non-uniform FFT runs on a pure-JAX backend using
@@ -363,8 +356,7 @@ class GaussianFourierProjection(
         with multi-GPU JAX.
     """  # noqa: E501
 
-    sampling_mode: Literal["average", "point"]
-    upsample_factor: float
+    sampling_mode: Literal["point"] = eqx.field(static=True)
     eps: float
     shape: tuple[int, int] | None
     options: dict[str, Any]
@@ -375,21 +367,12 @@ class GaussianFourierProjection(
     def __init__(
         self,
         *,
-        sampling_mode: Literal["average", "point"] = "average",
-        upsample_factor: int | float = 1.0,
         eps: float = 1e-6,
         shape: tuple[int, int] | None = None,
         options: dict[str, Any] = {},
     ):
         """**Arguments:**
 
-        - `sampling_mode`:
-            If `'average'`, convolve with a box function to sample the
-            projected volume at a pixel to be the average value of the
-            underlying continuous function. If `'point'`, the volume at
-            a pixel will be point sampled.
-        - `upsample_factor`:
-            How much to upsample the grid on which atoms are spread onto.
         - `eps`:
             The precision of the underlying non-uniform FFT implementation.
             See [`finufft`](https://finufft.readthedocs.io/en/latest/opts.html#options-parameters-cpu)
@@ -401,16 +384,8 @@ class GaussianFourierProjection(
             A dictionary of options for advanced usage, passed directly to
             the underlying non-uniform FFT implementation.
         """  # noqa: E501
-        if sampling_mode not in ["average", "point"]:
-            raise ValueError(
-                "`sampling_mode` in `GaussianFourierProjection` "
-                "must be either 'average' for averaging within a "
-                "pixel or 'point' for point sampling. Got "
-                f"`sampling_mode = {sampling_mode}`."
-            )
-        self.sampling_mode = sampling_mode
+        self.sampling_mode = "point"
         self.shape = shape
-        self.upsample_factor = float(upsample_factor)
         self.eps = eps
         self.options = options
 
@@ -444,38 +419,23 @@ class GaussianFourierProjection(
         pixel_size = jnp.asarray(image_config.pixel_size)
         shape = image_config.padded_shape if self.shape is None else self.shape
         output_shape = image_config.padded_shape
-        positions, kernel_fns = (
+        positions, kernel_fns, amplitudes = (
             volume_representation.positions,
             volume_representation.kernel_fns,
+            volume_representation.amplitudes,
         )
         kernel_fns = _standardize_kernel_fns(kernel_fns, spatial_dim=2)
-        (shape_u, pixel_size_u), upsampfac = _prepare_upsample(
-            shape=shape,
-            pixel_size=pixel_size,
-            upsampfac=self.upsample_factor,
-        )
         # Compute projection
         projection_fft = _project_impl(
             positions,
             kernel_fns,
-            shape_u=cast(tuple[int, int], shape_u),
-            pixel_size_u=pixel_size_u,
-            shape_out=cast(tuple[int, int], shape),
+            amplitudes,
+            shape=cast(tuple[int, int], shape),
+            pixel_size=pixel_size,
             eps=self.eps,
             options=self.options,
         )
-        # Average within a pixel size
-        if self.sampling_mode == "average":
-            box_fn = FourierSinc(box_width=pixel_size)
-            frequencies_1d = make_frequencies_1d(shape_u, pixel_size_u, modeord=1)
-            projection_fft *= _eval_separable_impl(box_fn, frequencies_1d)
-        # Downsample by extracting fourier modes
-        if shape != shape_u:
-            (indices_y, indices_x), fac = _build_extraction_mesh(
-                shape_u, shape, modeord=1
-            )
-            projection_fft = fac * projection_fft[indices_y, indices_x]
-        projection_fft = convert_fftn_to_rfftn(projection_fft, mode="real")
+        projection_fft = convert_fftn_to_rfftn(projection_fft, mode=None)
         if output_shape == shape:
             return (
                 jnp.fft.irfftn(projection_fft, s=output_shape)
@@ -520,40 +480,39 @@ def _standardize_kernel_fns(
 def _project_impl(
     positions: PyTree[Float[Array, "_ 3"]],
     kernel_fns: PyTree[FourierGaussian],
+    amplitudes: PyTree[Float[Array, " _"]],
     *,
-    shape_u: tuple[int, int],
-    pixel_size_u: Float[Array, ""],
-    shape_out: tuple[int, int],
+    shape: tuple[int, int],
+    pixel_size: Float[Array, ""],
     eps: float,
     options: dict[str, Any],
 ) -> Array:
     is_leaf = lambda x: isinstance(x, AbstractFourierOperator)  # noqa: E731
-    frequencies_1d = make_frequencies_1d(shape_u, pixel_size_u, modeord=0)
-
-    center_shift = _center_shift(shape_u, shape_out, pixel_size_u)
+    frequencies_1d = make_frequencies_1d(shape, pixel_size, modeord=0)
 
     def fourier_impl(
         _positions: Float[Array, "_ 3"],
         _kernel_fn: FourierGaussian,
+        _amplitudes: Float[Array, " _"],
     ) -> Array:
         return (
             _eval_kernel_impl(_kernel_fn, frequencies_1d)
             * dispatch_nufft1(
-                _positions[:, :2] + center_shift,
-                jnp.ones(_positions.shape[0], dtype=complex),
-                shape_u,
-                pixel_size=pixel_size_u,
+                _positions[:, :2],
+                jnp.asarray(_amplitudes, dtype=complex),
+                shape,
+                pixel_size=pixel_size,
                 fftshifted=True,
                 eps=eps,
                 options=options,
             )
-            / pixel_size_u**2
+            / pixel_size**2
         )
 
     # Project and sum over kernels
     projection_out = jax.tree.reduce(
         lambda x, y: x + y,
-        jax.tree.map(fourier_impl, positions, kernel_fns, is_leaf=is_leaf),
+        jax.tree.map(fourier_impl, positions, kernel_fns, amplitudes, is_leaf=is_leaf),
     )
     return jnp.fft.ifftshift(projection_out)
 
@@ -561,38 +520,37 @@ def _project_impl(
 def _render_impl(
     positions: PyTree[Float[Array, "_ 3"]],
     kernel_fns: PyTree[FourierGaussian],
+    amplitudes: PyTree[Float[Array, " _"]],
     *,
-    shape_u: tuple[int, int, int],
-    voxel_size_u: Float[Array, ""],
-    shape_out: tuple[int, int, int],
+    shape: tuple[int, int, int],
+    voxel_size: Float[Array, ""],
     eps: float,
     options: dict[str, Any],
 ) -> Array:
     is_leaf = lambda x: isinstance(x, AbstractFourierOperator)  # noqa: E731
-    frequencies_1d = make_frequencies_1d(shape_u, voxel_size_u, modeord=0)
-
-    center_shift = _center_shift(shape_u, shape_out, voxel_size_u)
+    frequencies_1d = make_frequencies_1d(shape, voxel_size, modeord=0)
 
     def fourier_impl(
         _positions: Float[Array, "_ 3"],
         _kernel_fn: FourierGaussian,
+        _amplitudes: Float[Array, " _"],
     ) -> Array:
         return _eval_kernel_impl(_kernel_fn, frequencies_1d) * (
             dispatch_nufft1(
-                _positions + center_shift,
-                jnp.ones(_positions.shape[0], dtype=complex),
-                shape_u,
-                pixel_size=voxel_size_u,
+                _positions,
+                jnp.asarray(_amplitudes, dtype=complex),
+                shape,
+                pixel_size=voxel_size,
                 fftshifted=True,
                 eps=eps,
                 options=options,
             )
-            / voxel_size_u**3
+            / voxel_size**3
         )
 
     rendering_out = jax.tree.reduce(
         lambda x, y: x + y,
-        jax.tree.map(fourier_impl, positions, kernel_fns, is_leaf=is_leaf),
+        jax.tree.map(fourier_impl, positions, kernel_fns, amplitudes, is_leaf=is_leaf),
     )
     return jnp.fft.ifftshift(rendering_out)
 
@@ -600,104 +558,13 @@ def _render_impl(
 def _eval_kernel_impl(kernel_fn: FourierGaussian, frequencies_1d: tuple[Array, ...]):
     a, b = kernel_fn.amplitude, kernel_fn.b_factor
     make_gaussians = jax.vmap(lambda _a, _b: FourierGaussian(amplitude=_a, b_factor=_b))
-    eval_gaussians = jax.vmap(_eval_separable_impl, in_axes=(0, None))
+    eval_gaussians = jax.vmap(eval_separable_impl, in_axes=(0, None))
     return jnp.sum(eval_gaussians(make_gaussians(a, b), frequencies_1d), axis=0)
-
-
-def _eval_separable_impl(
-    kernel_fn: FourierGaussian | FourierSinc, frequencies_1d: tuple[Array, ...]
-):
-    ndim = len(frequencies_1d)
-    assert 1 in kernel_fn.spatial_dims and ndim in [2, 3]
-    if len(frequencies_1d) == 2:
-        q_x, q_y = frequencies_1d
-        return kernel_fn(q_x)[None, :] * kernel_fn(q_y)[:, None]
-    else:
-        q_x, q_y, q_z = frequencies_1d
-        return (
-            kernel_fn(q_x)[None, None, :]
-            * kernel_fn(q_y)[None, :, None]
-            * kernel_fn(q_z)[:, None, None]
-        )
-
-
-def _center_shift(
-    shape_u: tuple[int, ...], shape_out: tuple[int, ...], pixel_size_u: Float[Array, ""]
-) -> Float[Array, " d"]:
-    """The shift, in `(x, y[, z])` order, that places the physical origin at the output
-    grid's center `N//2` on the upsampled grid, whose own center is `N_u//2`."""
-    return jnp.asarray(
-        [
-            pixel_size_u * (n_u * (n // 2) / n - n_u // 2)
-            for n_u, n in zip(shape_u[::-1], shape_out[::-1])
-        ]
-    )
-
-
-def _build_extraction_mesh(
-    shape: tuple[int, ...], shape_ds: tuple[int, ...], *, modeord: int
-):
-    """Build indices to extract modes from FFT output."""
-    assert len(shape) == len(shape_ds)
-    assert len(shape) in [2, 3]
-    mean_factor = math.prod(shape_ds) / math.prod(shape)
-    indices_1d = tuple(
-        _build_extraction_indices_1d(dim, dim_ds, modeord=modeord)
-        for dim, dim_ds in zip(shape, shape_ds)
-    )
-    return jnp.meshgrid(*indices_1d, indexing="ij"), mean_factor
-
-
-def _build_extraction_indices_1d(dim: int, dim_ds: int, *, modeord: int):
-    """Build indices to extract modes from FFT output. Adapted from `nufftax`"""
-    q_min = -(dim_ds // 2)
-    q_max = (dim_ds - 1) // 2
-
-    idx_pos = jnp.arange(q_max + 1)
-    idx_neg = jnp.arange(dim + q_min, dim)
-
-    if modeord == 0:
-        indices = jnp.concatenate([idx_neg, idx_pos])
-    else:
-        indices = jnp.concatenate([idx_pos, idx_neg])
-
-    return indices
-
-
-def _prepare_upsample(
-    shape: tuple[int, ...],
-    pixel_size: Float[Array, ""],
-    upsampfac: float,
-) -> tuple[tuple[tuple[int, ...], Array], float]:
-    """Find the upsampfac that perfectly divides the upsampled
-    image shape.
-    """
-    if upsampfac == 1.0:
-        return (shape, pixel_size), upsampfac
-    else:
-        dim = shape[0]
-        if not all(s == dim for s in shape):
-            # If rectangular image focus on accuracy. Make sure
-            # `upsampfac` is mapped directly onto a pixel size
-            # dilation
-            gcd = ft.reduce(math.gcd, shape)
-            upsampfac = round(gcd * upsampfac) / gcd
-            shape_u = tuple(s * upsampfac for s in shape)
-        else:
-            # Otherwise, find an efficient grid for FFTs close to
-            # the requested upsampfac and return the corrected upsampfac
-            shape_u = query_efficient_grid_size(shape, upsampfac)
-            dim_u = shape_u[0]
-            upsampfac = dim_u / dim
-        return (
-            (tuple(int(upsampfac * s) for s in shape), pixel_size / upsampfac),
-            upsampfac,
-        )
 
 
 def _prepare_fft_to_fft(f: Array, *, outputs_rfft: bool, fftshifted: bool) -> Array:
     if outputs_rfft:
-        f = convert_fftn_to_rfftn(f, mode="real")
+        f = convert_fftn_to_rfftn(f, mode=None)
         return jnp.fft.fftshift(f, axes=(0, 1)) if fftshifted else f
     else:
         return jnp.fft.fftshift(f) if fftshifted else f

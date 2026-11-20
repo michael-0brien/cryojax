@@ -453,11 +453,8 @@ def test_ewald_sphere_contrast_matches_fourier_slice_at_high_voltage_at_nyquist(
         _ESE.integrate(volume, config), config, is_ewald_sphere=True
     )
     projection = transfer_theory.propagate_object(_FSE.integrate(volume, config), config)
-    # Except the self-conjugate bins, which `FourierSliceExtraction` zeroes. The
-    # sphere's remaining curvature leaves ~3e-5; pairing -N/2 with itself, ~2e-1
-    keep = np.ones((32, 17), dtype=bool)
-    keep[16, 0] = keep[0, 16] = keep[16, 16] = False
-    difference = np.abs(np.asarray(ewald - projection))[keep]
+    # The sphere's remaining curvature leaves ~3e-5; pairing -N/2 with itself, ~2e-1
+    difference = np.abs(np.asarray(ewald - projection))
     assert difference.max() < 1e-3 * np.abs(np.asarray(projection)).max()
 
 
