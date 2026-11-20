@@ -19,7 +19,8 @@ from ...ndimage import (
     spread_gaussians_2d,
     spread_gaussians_3d,
 )
-from .._image_config import AbstractImageConfig, _inverse_2x2
+from .._image_config import AbstractImageConfig
+from .._internal import inverse_2x2
 from .._pose import AbstractPose
 from .base_volume import (
     AbstractAtomVolume,
@@ -860,7 +861,7 @@ def _resample_with_anisotropy_matrix(
     # and two above
     coordinate_grid = image_config.get_coordinate_grid(padding=True, physical=False)
     coordinate_grid = jnp.matmul(
-        coordinate_grid, _inverse_2x2(matrix).T, precision=jax.lax.Precision.HIGHEST
+        coordinate_grid, inverse_2x2(matrix).T, precision=jax.lax.Precision.HIGHEST
     )
     y_index = jnp.mod(coordinate_grid[..., 1] + y_dim // 2, y_dim)
     x_index = jnp.mod(coordinate_grid[..., 0] + x_dim // 2, x_dim)
