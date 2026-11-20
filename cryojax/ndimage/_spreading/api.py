@@ -12,7 +12,7 @@ import numpy as np
 from jaxtyping import Array, Float
 
 from ...jax_util import FloatLike, NDArrayLike
-from .._pallas_helpers import resolve_enable_pallas
+from .._internal import resolve_enable_pallas
 from .pallas_spread import (
     pallas_spread_2d,
     pallas_spread_3d,

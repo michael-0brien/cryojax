@@ -31,7 +31,7 @@ import jax
 import jax.numpy as jnp
 import pytest
 from cryojax.ndimage import spread_gaussians_2d, spread_gaussians_3d
-from cryojax.ndimage._pallas_helpers import resolve_enable_pallas
+from cryojax.ndimage._internal import resolve_enable_pallas
 from cryojax.ndimage._spreading.pallas_spread import pallas_spread_vjp_2d
 
 
@@ -145,17 +145,17 @@ def force_gpu_backend(monkeypatch):
     # logic in isolation, so they mock `jax.default_backend()` -> "gpu"
     # (this repo's own `.venv` is CPU-only) rather than actually requiring
     # one; GPU-availability *rejection* is covered separately below.
-    import cryojax.ndimage._pallas_helpers as pallas_helpers
+    import cryojax.ndimage._internal as ndimage_internal
 
-    monkeypatch.setattr(pallas_helpers.jax, "default_backend", lambda: "gpu")
+    monkeypatch.setattr(ndimage_internal.jax, "default_backend", lambda: "gpu")
 
 
 def test_resolve_enable_pallas_none_defers_to_env(monkeypatch, force_gpu_backend):
-    import cryojax.ndimage._pallas_helpers as pallas_helpers
+    import cryojax.ndimage._internal as ndimage_internal
 
-    monkeypatch.setattr(pallas_helpers, "CRYOJAX_ENABLE_PALLAS", True)
+    monkeypatch.setattr(ndimage_internal, "CRYOJAX_ENABLE_PALLAS", True)
     assert resolve_enable_pallas(None) == (True, True)
-    monkeypatch.setattr(pallas_helpers, "CRYOJAX_ENABLE_PALLAS", False)
+    monkeypatch.setattr(ndimage_internal, "CRYOJAX_ENABLE_PALLAS", False)
     assert resolve_enable_pallas(None) == (False, False)
 
 
@@ -167,31 +167,31 @@ def test_resolve_enable_pallas_bool(force_gpu_backend):
 def test_resolve_enable_pallas_bool_overrides_env(monkeypatch, force_gpu_backend):
     # `enable_pallas=<bool>` must win outright over `CRYOJAX_ENABLE_PALLAS`,
     # in both directions -- not just take effect when the env var agrees.
-    import cryojax.ndimage._pallas_helpers as pallas_helpers
+    import cryojax.ndimage._internal as ndimage_internal
 
-    monkeypatch.setattr(pallas_helpers, "CRYOJAX_ENABLE_PALLAS", True)
+    monkeypatch.setattr(ndimage_internal, "CRYOJAX_ENABLE_PALLAS", True)
     assert resolve_enable_pallas(False) == (False, False)
-    monkeypatch.setattr(pallas_helpers, "CRYOJAX_ENABLE_PALLAS", False)
+    monkeypatch.setattr(ndimage_internal, "CRYOJAX_ENABLE_PALLAS", False)
     assert resolve_enable_pallas(True) == (True, True)
 
 
 def test_resolve_enable_pallas_dict_partial(monkeypatch, force_gpu_backend):
-    import cryojax.ndimage._pallas_helpers as pallas_helpers
+    import cryojax.ndimage._internal as ndimage_internal
 
-    monkeypatch.setattr(pallas_helpers, "CRYOJAX_ENABLE_PALLAS", False)
+    monkeypatch.setattr(ndimage_internal, "CRYOJAX_ENABLE_PALLAS", False)
     assert resolve_enable_pallas({"fwd": True}) == (True, False)
     assert resolve_enable_pallas({"bwd": True}) == (False, True)
     assert resolve_enable_pallas({"fwd": True, "bwd": True}) == (True, True)
     # A dict overrides per-key; a key it doesn't mention still falls back
     # to the env var, not to some other default.
-    monkeypatch.setattr(pallas_helpers, "CRYOJAX_ENABLE_PALLAS", True)
+    monkeypatch.setattr(ndimage_internal, "CRYOJAX_ENABLE_PALLAS", True)
     assert resolve_enable_pallas({"fwd": False}) == (False, True)
 
 
 def test_resolve_enable_pallas_requires_gpu_when_no_gpu_backend(monkeypatch):
-    import cryojax.ndimage._pallas_helpers as pallas_helpers
+    import cryojax.ndimage._internal as ndimage_internal
 
-    monkeypatch.setattr(pallas_helpers.jax, "default_backend", lambda: "cpu")
+    monkeypatch.setattr(ndimage_internal.jax, "default_backend", lambda: "cpu")
     with pytest.raises(RuntimeError, match="requires a CUDA GPU"):
         resolve_enable_pallas(True)
 
@@ -962,15 +962,15 @@ def test_tangent_map_launches_one_multi_direction_kernel_per_kind(
     """`jax.linearize` records the tangent map; applying it in `n_directions` runs the
     tangent scatter and tangent gather once each per chunk, on one grid axis, and no
     primal kernel at all -- the property an optimizer holding the gradient relies on."""
-    from cryojax.ndimage._pallas_helpers import _MAX_JVP_DIRECTIONS
+    from cryojax.ndimage._internal import MAX_JVP_DIRECTIONS
 
-    assert _MAX_JVP_DIRECTIONS == 12  # the (13, 4) row above assumes two chunks
+    assert MAX_JVP_DIRECTIONS == 12  # the (13, 4) row above assumes two chunks
     loss, p = _hvp_loss_2d(use_erf=True, enable_pallas=True)
     dirs = _direction_tangents(jax.random.PRNGKey(34), p, n_directions)
     _, tangent_map = jax.linearize(jax.value_and_grad(loss), p)
     calls = _pallas_calls(lambda d: jax.vmap(tangent_map)(d), dirs)
     assert len(calls) == n_launches
-    cap = _MAX_JVP_DIRECTIONS
+    cap = MAX_JVP_DIRECTIONS
     n_pixels, chunk_sizes = 48 * 40, {min(n_directions, cap), n_directions % cap or cap}
     for n_outputs, out_shape, n_grid_axes in calls:
         assert n_grid_axes == 1  # generic batching would add a second grid axis

@@ -16,7 +16,7 @@ import jax.experimental.pallas as pl
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from cryojax.ndimage import _pallas_helpers
+from cryojax.ndimage import _internal
 from cryojax.ndimage._nufft import api as nufft_api, pallas_spread as nufft_pallas
 from cryojax.ndimage._nufft.kernel import make_pswf_kernel
 from cryojax.ndimage._nufft.spread import interp, interp_bwd, spread, spread_bwd
@@ -107,7 +107,7 @@ def _kernel(fine_shape):
 #
 @pytest.mark.parametrize("fine_shape", FINE_SHAPES)
 def test_spread_matches_pure_jax_interpret(interpret, monkeypatch, fine_shape):
-    monkeypatch.setattr(_pallas_helpers, "CRYOJAX_PALLAS_BLOCK_SIZE", 1)
+    monkeypatch.setattr(_internal, "CRYOJAX_PALLAS_BLOCK_SIZE", 1)
     kernel = _kernel(fine_shape)
     u, c, _ = _fine_problem(fine_shape, 40, 2, seed=0)
     actual = nufft_pallas.pallas_nufft_spread(
@@ -210,7 +210,7 @@ def test_vmap_over_grids_matches_unbatched_interpret(interpret, monkeypatch):
             assert _relative_error(values[b], expected_values) <= 1e-12
             assert _relative_error(u_bar[b], expected_u_bar) <= 1e-12
 
-    monkeypatch.setattr(_pallas_helpers, "CRYOJAX_PALLAS_BLOCK_SIZE", 1)
+    monkeypatch.setattr(_internal, "CRYOJAX_PALLAS_BLOCK_SIZE", 1)
     u, batched_c, _ = _fine_problem(fine_shape, 30, 2, seed=6, batch=(3,))
     grids = jax.vmap(
         lambda c: nufft_pallas.pallas_nufft_spread(u[0], c, fine_shape, key)
@@ -280,7 +280,7 @@ def _assert_trees_close(actual, expected, tolerance):
 def test_spread_jvp_matches_pure_jax_interpret(
     interpret, monkeypatch, fine_shape, moving
 ):
-    monkeypatch.setattr(_pallas_helpers, "CRYOJAX_PALLAS_BLOCK_SIZE", 1)
+    monkeypatch.setattr(_internal, "CRYOJAX_PALLAS_BLOCK_SIZE", 1)
     kernel = _kernel(fine_shape)
     key = nufft_pallas.make_kernel_key(kernel)
     u, c, _ = _fine_problem(fine_shape, 30, 2, seed=12)
@@ -371,7 +371,7 @@ def test_jvp_and_vmap_over_strengths_compose_interpret(interpret, monkeypatch):
     """With the positions shared, a `jax.vmap` over strengths and grids still folds the
     primal into one launch inside `jax.jvp`, and a `jax.jvp` inside `jax.vmap` matches
     pure JAX."""
-    monkeypatch.setattr(_pallas_helpers, "CRYOJAX_PALLAS_BLOCK_SIZE", 1)
+    monkeypatch.setattr(_internal, "CRYOJAX_PALLAS_BLOCK_SIZE", 1)
     fine_shape = FINE_SHAPES[0]
     kernel = _kernel(fine_shape)
     key = nufft_pallas.make_kernel_key(kernel)
@@ -823,8 +823,8 @@ def test_pallas_vmap_hvp_one_launch(transform):
 @pytest.mark.parametrize("n_directions, n_chunks", [(None, 1), (12, 1), (13, 2)])
 def test_pallas_hvp_launch_count(transform, n_directions, n_chunks):
     """One HVP launches each primal kernel and its tangent kernel once; a batch of
-    directions beyond `_MAX_JVP_DIRECTIONS` splits into chunks. Values as pure JAX."""
-    assert _pallas_helpers._MAX_JVP_DIRECTIONS == 12
+    directions beyond `MAX_JVP_DIRECTIONS` splits into chunks. Values as pure JAX."""
+    assert _internal.MAX_JVP_DIRECTIONS == 12
     shape, dtype, eps, sigma = HVP_CASES[0]
     primals, target = _hvp_problem(transform, shape, dtype, seed=38)
     directions = _hvp_directions(primals, seed=39, n_directions=n_directions)

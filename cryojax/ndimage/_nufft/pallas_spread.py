@@ -21,14 +21,14 @@ import numpy as np
 from jax.custom_batching import custom_vmap
 from jaxtyping import Array, Float
 
-from .._pallas_helpers import (
-    _add,
-    _batchable,
-    _choose_block_size,
-    _CompilerParams,
-    _is_zero,
-    _mul,
-    _valid_lane_mask,
+from .._internal import (
+    CompilerParams,
+    add,
+    batchable,
+    choose_block_size,
+    is_zero,
+    mul,
+    valid_lane_mask,
 )
 from .kernel import PSWFKernel, derivative_coefficients
 
@@ -115,7 +115,7 @@ def pallas_nufft_interp(
 #
 def _spread_jvp(fine_shape, kernel_key, primals, tangents):
     out = pallas_nufft_spread(*primals, fine_shape, kernel_key)
-    if all(_is_zero(t) for t in tangents):
+    if all(is_zero(t) for t in tangents):
         return out, jnp.zeros_like(out)
     return out, pallas_nufft_spread_tangent(*primals, tangents, fine_shape, kernel_key)
 
@@ -126,7 +126,7 @@ pallas_nufft_spread.defjvp(_spread_jvp, symbolic_zeros=True)
 def _interp_jvp(fine_shape, kernel_key, values, positions, primals, tangents):
     out = pallas_nufft_interp(*primals, fine_shape, kernel_key, values, positions)
     tangents = tangents[: 2 + positions]
-    if all(_is_zero(t) for t in tangents):
+    if all(is_zero(t) for t in tangents):
         return out, jax.tree.map(jnp.zeros_like, out)
     return out, pallas_nufft_interp_tangent(
         *primals, tangents, fine_shape, kernel_key, values, positions
@@ -139,9 +139,9 @@ pallas_nufft_interp.defjvp(_interp_jvp, symbolic_zeros=True)
 def pallas_nufft_spread_tangent(u, c, tangents, fine_shape, kernel_key):
     """The tangent of `pallas_nufft_spread` for `tangents = (tu, tc)`, symbolic zeros
     dropped at trace time. Under `jax.vmap` over the tangents, one launch."""
-    nonzero = tuple(not _is_zero(t) for t in tangents)
+    nonzero = tuple(not is_zero(t) for t in tangents)
     fn = _spread_tangent_batchable(fine_shape, kernel_key, nonzero)
-    return fn(u, c, *(t for t in tangents if not _is_zero(t)))
+    return fn(u, c, *(t for t in tangents if not is_zero(t)))
 
 
 def pallas_nufft_interp_tangent(
@@ -150,10 +150,10 @@ def pallas_nufft_interp_tangent(
     """The tangent of `pallas_nufft_interp` for `tangents = (tu, tg[, tweights])`,
     symbolic zeros dropped at trace time. Under `jax.vmap` over the tangents, one
     launch."""
-    nonzero = tuple(not _is_zero(t) for t in tangents)
+    nonzero = tuple(not is_zero(t) for t in tangents)
     fn = _interp_tangent_batchable(fine_shape, kernel_key, values, positions, nonzero)
     primals = (u, g, weights) if positions else (u, g)
-    out = list(fn(*primals, *(t for t in tangents if not _is_zero(t))))
+    out = list(fn(*primals, *(t for t in tangents if not is_zero(t))))
     return (out.pop(0) if values else None), (out.pop(0) if positions else None)
 
 
@@ -165,7 +165,7 @@ def _spread_tangent_batchable(fine_shape, kernel_key, nonzero):
     def single(u, c, *tangents):
         return impl((u, c), tuple(t[None] for t in tangents))[0]
 
-    return _batchable(single, 2, impl)
+    return batchable(single, 2, impl)
 
 
 @cache
@@ -190,7 +190,7 @@ def _interp_tangent_batchable(fine_shape, kernel_key, values, positions, nonzero
         primals, tangents = args[:num_primals], args[num_primals:]
         return tuple(x[0] for x in impl(primals, tuple(t[None] for t in tangents)))
 
-    return _batchable(single, num_primals, impl)
+    return batchable(single, num_primals, impl)
 
 
 #
@@ -201,7 +201,7 @@ def _spread(u, c, fine_shape, kernel_key):
     size = math.prod(fine_shape)
     if num_grids == 0 or num_points == 0:
         return jnp.zeros((num_grids, *fine_shape), dtype)
-    block_size = _choose_block_size(kernel_key[0], len(fine_shape))
+    block_size = choose_block_size(kernel_key[0], len(fine_shape))
     kernel = _make_spread_kernel(
         fine_shape, kernel_key, num_grids, block_size, num_points
     )
@@ -216,7 +216,7 @@ def _spread(u, c, fine_shape, kernel_key):
         out_specs=pl.BlockSpec((num_grids, size), lambda p: (0, 0)),
         out_shape=jax.ShapeDtypeStruct((num_grids, size), dtype),
         input_output_aliases={len(fine_shape) + 1: 0},
-        compiler_params=_CompilerParams(),
+        compiler_params=CompilerParams(),
         name="nufft_spread",
     )(*u.T, c.astype(dtype), jnp.zeros((num_grids, size), dtype))
     return grids.reshape(num_grids, *fine_shape)
@@ -232,7 +232,7 @@ def _interp(u, g, weights, fine_shape, kernel_key, values, positions, num_groups
     if num_grids == 0 or num_points == 0:
         out = [jnp.zeros(shape, dtype) for shape in out_shapes]
     else:
-        block_size = _choose_block_size(kernel_key[0], ndim)
+        block_size = choose_block_size(kernel_key[0], ndim)
         kernel = _make_interp_kernel(
             fine_shape,
             kernel_key,
@@ -254,7 +254,7 @@ def _interp(u, g, weights, fine_shape, kernel_key, values, positions, num_groups
             ],
             out_specs=[_per_point_spec(shape, block_size) for shape in out_shapes],
             out_shape=[jax.ShapeDtypeStruct(shape, dtype) for shape in out_shapes],
-            compiler_params=_CompilerParams(),
+            compiler_params=CompilerParams(),
             name="nufft_interp",
         )(
             *u.T,
@@ -275,7 +275,7 @@ def _spread_tangent(u, c, tangents, nonzero, fine_shape, kernel_key):
     num_directions = (tc if tu is None else tu).shape[0]
     if num_grids == 0 or num_points == 0:
         return jnp.zeros((num_directions, num_grids, *fine_shape), dtype)
-    block_size = _choose_block_size(kernel_key[0], ndim)
+    block_size = choose_block_size(kernel_key[0], ndim)
     per_point = partial(_per_point_spec, block_size=block_size)
     operands, in_specs = [*u.T], [per_point((num_points,))] * ndim
     if tu is not None:
@@ -298,7 +298,7 @@ def _spread_tangent(u, c, tangents, nonzero, fine_shape, kernel_key):
         out_specs=out_spec,
         out_shape=jax.ShapeDtypeStruct(out_shape, dtype),
         input_output_aliases={len(operands): 0},
-        compiler_params=_CompilerParams(),
+        compiler_params=CompilerParams(),
         name="nufft_spread_tangent",
     )(*operands, jnp.zeros(out_shape, dtype))
     return grids.reshape(num_directions, num_grids, *fine_shape)
@@ -322,7 +322,7 @@ def _interp_tangent(
     if num_grids == 0 or num_points == 0:
         out = [jnp.zeros(shape, dtype) for shape in out_shapes]
     else:
-        block_size = _choose_block_size(kernel_key[0], ndim)
+        block_size = choose_block_size(kernel_key[0], ndim)
         per_point = partial(_per_point_spec, block_size=block_size)
         size = math.prod(fine_shape)
         operands, in_specs = [*u.T], [per_point((num_points,))] * ndim
@@ -359,7 +359,7 @@ def _interp_tangent(
             in_specs=in_specs,
             out_specs=[per_point(shape) for shape in out_shapes],
             out_shape=[jax.ShapeDtypeStruct(shape, dtype) for shape in out_shapes],
-            compiler_params=_CompilerParams(),
+            compiler_params=CompilerParams(),
             name="nufft_interp_tangent",
         )(*operands)
     result = []
@@ -489,7 +489,7 @@ def _make_spread_kernel(fine_shape, kernel_key, num_grids, block_size, num_point
         u_refs, (c_ref, _, out_ref) = refs[:ndim], refs[ndim:]
         # The zeros input is aliased into `out_ref`
         mask = (
-            _valid_lane_mask(block_size, num_points) if num_points % block_size else None
+            valid_lane_mask(block_size, num_points) if num_points % block_size else None
         )
         starts, per_axis = _axis_taps(u_refs, mask, width, polynomials)
         weights = [w for (w,) in per_axis]
@@ -541,7 +541,7 @@ def _make_interp_kernel(
         values_ref = refs.pop(0) if values else None
         u_bar_refs = refs[::-1]  # (z, y, x), as the grid axes
         mask = (
-            _valid_lane_mask(block_size, num_points) if num_points % block_size else None
+            valid_lane_mask(block_size, num_points) if num_points % block_size else None
         )
         starts, per_axis = _axis_taps(u_refs, mask, width, polynomials)
         inner = [(starts[-1] + j) % fine_shape[-1] for j in range(width)]
@@ -598,7 +598,7 @@ def _make_spread_tangent_kernel(
         # The zeros input is aliased into `out_ref`
         _, out_ref = refs
         mask = (
-            _valid_lane_mask(block_size, num_points) if num_points % block_size else None
+            valid_lane_mask(block_size, num_points) if num_points % block_size else None
         )
         starts, per_axis = _axis_taps(u_refs, mask, width, polynomials)
         tu = _by_grid_axis(
@@ -609,15 +609,13 @@ def _make_spread_tangent_kernel(
         def scatter(r, axis, base, value, tangents):
             if axis == ndim - 1:
                 moved = [
-                    _mul(value, tu[axis][d]) if nonzero_u else None for d in directions
+                    mul(value, tu[axis][d]) if nonzero_u else None for d in directions
                 ]
                 for j in range(width):
                     weight = per_axis[axis][0][j]
                     derivative = per_axis[axis][1][j] if nonzero_u else None
                     for d in directions:
-                        tangent = _add(
-                            _mul(tangents[d], weight), _mul(moved[d], derivative)
-                        )
+                        tangent = add(mul(tangents[d], weight), mul(moved[d], derivative))
                         pltriton.atomic_add(
                             out_ref,
                             (d * num_grids + r, base + inner[j]),
@@ -629,16 +627,16 @@ def _make_spread_tangent_kernel(
             def body(t, carry):
                 index = (starts[axis] + t) % fine_shape[axis]
                 weight = _select(per_axis[axis][0], t)
-                moved = _mul(value, _select(per_axis[axis][1], t)) if nonzero_u else None
+                moved = mul(value, _select(per_axis[axis][1], t)) if nonzero_u else None
                 scatter(
                     r,
                     axis + 1,
                     base + index * strides[axis],
-                    _mul(value, weight),
+                    mul(value, weight),
                     [
-                        _add(
-                            _mul(tangents[d], weight),
-                            _mul(moved, tu[axis][d]) if nonzero_u else None,
+                        add(
+                            mul(tangents[d], weight),
+                            mul(moved, tu[axis][d]) if nonzero_u else None,
                         )
                         for d in directions
                     ],
@@ -706,7 +704,7 @@ def _make_interp_tangent_kernel(
 
     def contract(tu, d, jet, key):
         """`sum_b tu_b jet[key + (b,)]` in direction `d`."""
-        return _add(*(tu[b][d] * jet[tuple(sorted(key + (b,)))] for b in range(ndim)))
+        return add(*(tu[b][d] * jet[tuple(sorted(key + (b,)))] for b in range(ndim)))
 
     def kernel(*refs):
         u_refs, refs = refs[:ndim], list(refs[ndim:])
@@ -718,7 +716,7 @@ def _make_interp_tangent_kernel(
         tvalues_ref = refs.pop(0) if out_values else None
         tu_bar_refs = _by_grid_axis(refs, num_directions)
         mask = (
-            _valid_lane_mask(block_size, num_points) if num_points % block_size else None
+            valid_lane_mask(block_size, num_points) if num_points % block_size else None
         )
         starts, per_axis = _axis_taps(u_refs, mask, width, polynomials)
         tu = _by_grid_axis(
@@ -745,7 +743,7 @@ def _make_interp_tangent_kernel(
                 tg_jet = jets[d] if nonzero_g else {}
                 row = d * num_grids + r
                 if out_values:
-                    tvalue = _add(
+                    tvalue = add(
                         tg_jet.get(()), contract(tu, d, g_jet, ()) if nonzero_u else None
                     )
                     pltriton.store(tvalues_ref.at[row], tvalue, mask=mask)
@@ -753,11 +751,11 @@ def _make_interp_tangent_kernel(
                     continue
                 tw = pltriton.load(tw_ref.at[row], mask=mask) if nonzero_w else None
                 for a in range(ndim):
-                    tu_bar[d][a] = tu_bar[d][a] + _add(
-                        _mul(tw, g_jet[(a,)]) if nonzero_w else None,
-                        _mul(
+                    tu_bar[d][a] = tu_bar[d][a] + add(
+                        mul(tw, g_jet[(a,)]) if nonzero_w else None,
+                        mul(
                             weight,
-                            _add(
+                            add(
                                 tg_jet.get((a,)),
                                 contract(tu, d, g_jet, (a,)) if nonzero_u else None,
                             ),
