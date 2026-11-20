@@ -1994,3 +1994,35 @@ def test_fourier_projection_advised_numbers_pass():
         cxs.GaussianFourierProjection(eps=1e-10, upsample_factor=1.27).integrate(
             volume, config
         )
+
+
+# ── GaussianFourier*: kernels with a negative term ─────────────────────────────
+
+_SIGNED_POSITIONS = np.array([[1.5, -2.0, 0.5], [-3.0, 1.0, -1.0], [0.0, 4.0, 2.0]])
+
+
+def _kernel_volume(amplitude, b_factor):
+    kernel = im.FourierGaussian(
+        amplitude=np.asarray(amplitude), b_factor=np.asarray(b_factor)
+    )
+    return cxs.GaussianFourierVolume(_SIGNED_POSITIONS, kernel)
+
+
+def test_a_negative_kernel_term_projects_as_on_the_unseparated_path():
+    volume = _kernel_volume([1.0, -0.4], [20.0, 60.0])
+    project = lambda config: cxs.GaussianFourierProjection().integrate(volume, config)
+    separated = project(cxs.BasicImageConfig((32, 30), 1.0))
+    unseparated = project(cxs.AnisotropicImageConfig((32, 30), 1.0))
+    assert np.all(np.isfinite(separated))
+    np.testing.assert_allclose(
+        separated, unseparated, atol=1e-10 * np.abs(unseparated).max()
+    )
+
+
+def test_a_negative_kernel_term_renders_as_the_difference_of_its_terms():
+    render = cxs.GaussianFourierRenderFn((16, 16, 16), 1.0)
+    both = render(_kernel_volume([1.0, -0.4], [20.0, 60.0]))
+    first = render(_kernel_volume([1.0], [20.0]))
+    second = render(_kernel_volume([0.4], [60.0]))
+    assert np.all(np.isfinite(both))
+    np.testing.assert_allclose(both, first - second, atol=1e-10 * np.abs(first).max())

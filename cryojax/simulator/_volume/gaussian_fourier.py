@@ -333,7 +333,7 @@ class GaussianFourierRenderFn(AbstractVolumeRenderFn[GaussianFourierVolume], str
             volume_representation.kernel_fns,
             jax.tree.map(lambda x: jnp.asarray(x), volume_representation.amplitudes),
         )
-        kernel_fns = _standardize_kernel_fns(kernel_fns, spatial_dim=3)
+        kernel_fns = _standardize_kernel_fns(kernel_fns)
         # Compute
         rendering_rfft = _render_impl(
             positions,
@@ -463,9 +463,7 @@ class GaussianFourierProjection(
             volume_representation.kernel_fns,
             volume_representation.amplitudes,
         )
-        kernel_fns = _standardize_kernel_fns(
-            kernel_fns, spatial_dim=2, is_separable=not image_config.is_anisotropic
-        )
+        kernel_fns = _standardize_kernel_fns(kernel_fns)
         # Compute projection
         projection_rfft = _project_impl(
             positions,
@@ -494,7 +492,7 @@ class GaussianFourierProjection(
 
 
 def _standardize_kernel_fns(
-    kernel_pytree: PyTree[FourierGaussian], *, spatial_dim: int, is_separable: bool = True
+    kernel_pytree: PyTree[FourierGaussian],
 ) -> PyTree[FourierGaussian]:
     kernel_list = jax.tree.leaves(
         kernel_pytree,
@@ -507,21 +505,7 @@ def _standardize_kernel_fns(
         )
     # Standardize gaussian kernels for computation
     # ... pytree leaves have a batch dim
-    kernel_pytree = jax.tree.map(lambda x: jnp.atleast_1d(x), kernel_pytree)
-    if not is_separable:
-        return kernel_pytree
-    # ... `eval_separable_impl` embeds the kernel's amplitude once per axis
-    # (outer product), so it must be pre-split by the `spatial_dim`-th root
-    # to recover the correct total amplitude.
-    replace_fn = lambda fn: eqx.tree_at(
-        lambda _fn: _fn.amplitude, fn, (fn.amplitude ** (1 / spatial_dim))
-    )
-    kernel_pytree = jax.tree.map(
-        replace_fn,
-        kernel_pytree,
-        is_leaf=lambda x: isinstance(x, FourierGaussian),
-    )
-    return kernel_pytree
+    return jax.tree.map(lambda x: jnp.atleast_1d(x), kernel_pytree)
 
 
 def _project_impl(
@@ -704,10 +688,12 @@ def _check_upsample_factor(
 
 
 def _eval_kernel_impl(kernel_fn: FourierGaussian, frequencies_1d: tuple[Array, ...]):
-    a, b = kernel_fn.amplitude, kernel_fn.b_factor
-    make_gaussians = jax.vmap(lambda _a, _b: FourierGaussian(amplitude=_a, b_factor=_b))
-    eval_gaussians = jax.vmap(eval_separable_impl, in_axes=(0, None))
-    return jnp.sum(eval_gaussians(make_gaussians(a, b), frequencies_1d), axis=0)
+    # Each term at unit amplitude per axis, its amplitude applied once: a root per
+    # axis is NaN for a negative term
+    eval_term = lambda b: eval_separable_impl(FourierGaussian(b_factor=b), frequencies_1d)
+    terms = jax.vmap(eval_term)(kernel_fn.b_factor)
+    a = jnp.expand_dims(kernel_fn.amplitude, tuple(range(1, terms.ndim)))
+    return jnp.sum(a * terms, axis=0)
 
 
 def _prepare_fft_to_fft(
