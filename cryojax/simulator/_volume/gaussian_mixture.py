@@ -7,20 +7,20 @@ import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
 import numpy as np
-from jaxtyping import Array, Float, PyTree
+from jaxtyping import Array, Complex, Float, PyTree
 
 from ..._internal import error_if_not_positive, leaf_asarray
 from ...constants import PengScatteringFactorParameters, b_factor_to_variance
 from ...jax_util import FloatLike, NDArrayLike, filter_bscan
 from ...ndimage import (
     make_1d_coordinate_grid,
+    map_coordinates,
     resize_with_crop_or_pad,
     spread_gaussians_2d,
     spread_gaussians_3d,
 )
-from .._image_config import AbstractImageConfig
+from .._image_config import AbstractImageConfig, _inverse_2x2
 from .._pose import AbstractPose
-from .._resample import resample_with_anisotropy_matrix
 from .base_volume import (
     AbstractAtomVolume,
     AbstractVolumeIntegrator,
@@ -372,7 +372,7 @@ class GaussianMixtureProjection(
                 projection_integral, image_config.padded_shape
             )
         if image_config.is_anisotropic:
-            fourier_projection = resample_with_anisotropy_matrix(
+            fourier_projection = _resample_with_anisotropy_matrix(
                 projection_integral, image_config
             )
             return (
@@ -824,3 +824,64 @@ def _gaussians_to_real_voxels_spread(
     return _sum_over_atom_batches(
         kernel_fn, (positions, amplitudes, variances), n_batches, shape, context=context
     )
+
+
+def _resample_with_anisotropy_matrix(
+    image: Float[Array, "y_dim x_dim"],
+    image_config: AbstractImageConfig,
+) -> Complex[Array, "y_dim x_dim//2+1"]:
+    """Given a real-space image `p(x)`, return the `rfftn` of `p(D⁻¹x)` on the same
+    pixel grid, for the `image_config.anisotropy_matrix` `D`. Coordinates `x` are in
+    pixels, about the center `N//2`.
+
+    1. `p` is interpolated at `D⁻¹x` with a cubic B-spline, without a prefilter
+       (`cryojax.ndimage.map_coordinates(..., order=3)`). The image is treated as
+       periodic, as it is by the FFT: coordinates wrap modulo the shape.
+    2. The result is transformed with `rfftn`.
+    3. The spectrum is divided by the response of the cubic B-spline sampled at the
+       integers, `(2/3 + cos(2πq_x)/3)(2/3 + cos(2πq_y)/3)`, at `q = Dᵀk` for each
+       FFT frequency `k` in cycles per pixel.
+
+    Step 3 undoes the blur of step 1, a circular convolution, so for `D = I` the output
+    is the `rfftn` of `p` exactly. Otherwise, the error is aliasing that grows towards
+    Nyquist.
+
+    **Arguments:**
+
+    - `image`:
+        The image in real space, at `image_config.padded_shape`.
+    - `image_config`:
+        The image configuration.
+    """
+    y_dim, x_dim = image.shape
+    matrix = image_config.anisotropy_matrix
+    # Interpolate at `D⁻¹x`, in index units wrapped into `[0, N)`. The cubic taps at
+    # `floor(c) + [-1, 0, 1, 2]` then read from the image wrapped by one pixel below
+    # and two above
+    coordinate_grid = image_config.get_coordinate_grid(padding=True, physical=False)
+    coordinate_grid = jnp.matmul(
+        coordinate_grid, _inverse_2x2(matrix).T, precision=jax.lax.Precision.HIGHEST
+    )
+    y_index = jnp.mod(coordinate_grid[..., 1] + y_dim // 2, y_dim)
+    x_index = jnp.mod(coordinate_grid[..., 0] + x_dim // 2, x_dim)
+    resampled = map_coordinates(
+        jnp.pad(image, ((1, 2), (1, 2)), mode="wrap"),
+        (y_index + 1, x_index + 1),
+        order=3,
+        mode="promise_in_bounds",
+    )
+    # Divide out the B-spline's response at `Dᵀk`
+    frequency_grid = image_config.get_frequency_grid(padding=True, physical=False)
+    frequency_grid = jnp.matmul(
+        frequency_grid, matrix, precision=jax.lax.Precision.HIGHEST
+    )
+    response = _bspline_response(frequency_grid[..., 0]) * _bspline_response(
+        frequency_grid[..., 1]
+    )
+    return jnp.fft.rfftn(resampled) / response
+
+
+def _bspline_response(frequency: Float[Array, "..."]) -> Float[Array, "..."]:
+    """The fourier response of the cubic B-spline sampled at the integers, at
+    `frequency` in cycles per pixel."""
+    return 2 / 3 + jnp.cos(2 * jnp.pi * frequency) / 3

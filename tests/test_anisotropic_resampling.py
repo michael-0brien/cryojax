@@ -13,7 +13,7 @@ from cryojax.simulator._multislice import (
     FFTMultisliceIntegrator,
     MultisliceScatteringTheory,
 )
-from cryojax.simulator._resample import resample_with_anisotropy_matrix
+from cryojax.simulator._volume.gaussian_mixture import _resample_with_anisotropy_matrix
 from jax.scipy.special import erf
 
 
@@ -62,7 +62,7 @@ def test_resampling_matches_a_direct_anisotropic_gaussian_render(shape, anisotro
         _gaussians(shape, centers, sigma, D),
     )
     fourier_image = np.asarray(
-        resample_with_anisotropy_matrix(jnp.asarray(image), config)
+        _resample_with_anisotropy_matrix(jnp.asarray(image), config)
     )
     fourier_expected = np.fft.rfftn(expected)
     shells = [(0.0, 0.1), (0.1, 0.2), (0.2, 0.3), (0.3, 0.4)]
@@ -76,7 +76,7 @@ def test_resampling_with_zero_anisotropy_is_the_fft(shape):
     config = cxs.AnisotropicImageConfig(shape, 1.3, anisotropy_xy=(0.0, 0.0))
     image = np.random.default_rng(0).normal(size=shape)
     np.testing.assert_allclose(
-        resample_with_anisotropy_matrix(jnp.asarray(image), config),
+        _resample_with_anisotropy_matrix(jnp.asarray(image), config),
         np.fft.rfftn(image),
         atol=1e-10,
     )
