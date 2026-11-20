@@ -858,13 +858,12 @@ def _resample_with_anisotropy_matrix(
     matrix = image_config.anisotropy_matrix
     # Interpolate at `D⁻¹x`, in index units wrapped into `[0, N)`. The cubic taps at
     # `floor(c) + [-1, 0, 1, 2]` then read from the image wrapped by one pixel below
-    # and two above
+    # and two above. Products with `D` are elementwise so that XLA fuses them
     coordinate_grid = image_config.get_coordinate_grid(padding=True, physical=False)
-    coordinate_grid = jnp.matmul(
-        coordinate_grid, inverse_2x2(matrix).T, precision=jax.lax.Precision.HIGHEST
-    )
-    y_index = jnp.mod(coordinate_grid[..., 1] + y_dim // 2, y_dim)
-    x_index = jnp.mod(coordinate_grid[..., 0] + x_dim // 2, x_dim)
+    x, y = coordinate_grid[..., 0], coordinate_grid[..., 1]
+    inverse = inverse_2x2(matrix)
+    y_index = jnp.mod(inverse[1, 0] * x + inverse[1, 1] * y + y_dim // 2, y_dim)
+    x_index = jnp.mod(inverse[0, 0] * x + inverse[0, 1] * y + x_dim // 2, x_dim)
     resampled = map_coordinates(
         jnp.pad(image, ((1, 2), (1, 2)), mode="wrap"),
         (y_index + 1, x_index + 1),
@@ -873,12 +872,10 @@ def _resample_with_anisotropy_matrix(
     )
     # Divide out the B-spline's response at `Dᵀk`
     frequency_grid = image_config.get_frequency_grid(padding=True, physical=False)
-    frequency_grid = jnp.matmul(
-        frequency_grid, matrix, precision=jax.lax.Precision.HIGHEST
-    )
-    response = _bspline_response(frequency_grid[..., 0]) * _bspline_response(
-        frequency_grid[..., 1]
-    )
+    k_x, k_y = frequency_grid[..., 0], frequency_grid[..., 1]
+    q_x = matrix[0, 0] * k_x + matrix[1, 0] * k_y
+    q_y = matrix[0, 1] * k_x + matrix[1, 1] * k_y
+    response = _bspline_response(q_x) * _bspline_response(q_y)
     return jnp.fft.rfftn(resampled) / response
 
 
