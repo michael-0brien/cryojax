@@ -585,7 +585,9 @@ def _project_impl(
         if anisotropy_matrix is None:
             terms = _eval_kernel_impl(_kernel_fn, frequencies_1d)
         else:
-            terms = jax.vmap(lambda fn: fn(frequencies))(_kernel_fn)
+            terms = jax.vmap(lambda a, b: FourierGaussian(a, b)(frequencies))(
+                *jnp.broadcast_arrays(_kernel_fn.amplitude, _kernel_fn.b_factor)
+            )
         spectrum = _apply_kernel_terms(terms, spectrum, _amplitudes)
         if anisotropy_matrix is None:
             return spectrum / pixel_size**2
