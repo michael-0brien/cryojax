@@ -13,7 +13,7 @@ from jaxtyping import Array, Complex, Float
 
 from ..._config import CRYOJAX_FINUFFT_BACKEND
 from ...jax_util import FloatLike
-from .._pallas_helpers import resolve_enable_pallas
+from .._internal import resolve_enable_pallas
 from .kernel import (
     PSWFKernel,
     fine_grid_size,
