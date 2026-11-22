@@ -320,9 +320,10 @@ def compute_spread_order(
     onto, x fastest, as finufft sorts its points.
 
     Point order changes no result of spreading or a type-1 NUFFT, only its speed: the
-    GPU kernels add each point into the grid atomically, and points spread together
-    then write nearby memory. Compute it once and reuse it while points move a fraction
-    of a bin.
+    Pallas kernels (`enable_pallas`) add each block of points into the grid atomically,
+    and a sorted block writes nearby memory. The pure-JAX backend can be slower on
+    sorted points, its adds contending for the same cells. Compute it once and reuse it
+    while points move a fraction of a bin.
 
     ```python
     order = compute_spread_order(positions, shape, upsample_factor=2.0)
