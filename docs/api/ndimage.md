@@ -284,6 +284,8 @@ This documentation is a collection of functions used to work with coordinate sys
 
 ::: cryojax.ndimage.variance_to_nspread
 
+::: cryojax.ndimage.compute_spread_order
+
 ### Non-uniform FFTs
 
 ::: cryojax.ndimage.dispatch_nufft1

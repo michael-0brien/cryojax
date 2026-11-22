@@ -8,8 +8,9 @@ from collections.abc import Mapping
 from functools import partial
 
 import jax
+import jax.numpy as jnp
 import numpy as np
-from jaxtyping import Array, Float
+from jaxtyping import Array, Float, Int
 
 from ...jax_util import FloatLike, NDArrayLike
 from .._internal import resolve_enable_pallas
@@ -305,6 +306,92 @@ def variance_to_nspread(
     # The window moves a whole pixel at a time, so its nearer edge can sit half a
     # pixel closer to the point than `n_spread / 2`.
     return math.ceil(n_spread) + 1
+
+
+def compute_spread_order(
+    positions: Float[Array, "M d"],
+    shape: tuple[int, ...],
+    *,
+    pixel_size: FloatLike = 1.0,
+    upsample_factor: float = 1.0,
+    bin_shape: tuple[int, ...] | None = None,
+) -> Int[Array, " M"]:
+    """A permutation of points that groups them by bins of the grid they are spread
+    onto, x fastest, as finufft sorts its points.
+
+    Point order changes no result of spreading or a type-1 NUFFT, only its speed: the
+    GPU kernels add each point into the grid atomically, and points spread together
+    then write nearby memory. Compute it once and reuse it while points move a fraction
+    of a bin.
+
+    ```python
+    order = compute_spread_order(positions, shape, upsample_factor=2.0)
+    spectrum = dispatch_nufft1(
+        positions[order], strengths[..., order], shape, upsample_factor=2.0
+    )
+    # Per-point outputs (e.g. `dispatch_nufft2`) come back sorted: undo with
+    inverse = jnp.argsort(order)
+    values = dispatch_nufft2(positions[order], spectrum, shape)[inverse]
+    ```
+
+    Gradients through `positions[order]` return in the original order.
+
+    **Arguments:**
+
+    - `positions`:
+        `(x, y)` or `(x, y, z)`, in the units of `pixel_size`, measured from grid index
+        `n // 2`, as in [`cryojax.ndimage.dispatch_nufft1`][] and
+        [`cryojax.ndimage.spread_gaussians_2d`][].
+    - `shape`:
+        The grid shape, `(y, x)` or `(z, y, x)`.
+    - `pixel_size`:
+        The grid spacing.
+    - `upsample_factor`:
+        The ratio of the grid the kernel writes to `shape`: 1 for
+        `spread_gaussians_2d`/`spread_gaussians_3d`, the NUFFT's `upsample_factor` for
+        `dispatch_nufft1`.
+    - `bin_shape`:
+        The bin, in cells of that grid, in the order of `shape`. `None` is finufft's:
+        `(4, 16)` in 2D, `(4, 4, 16)` in 3D.
+
+    **Returns:**
+
+    The indices that sort the points.
+    """
+    name = "compute_spread_order(positions, shape, ...)"
+    ndim = len(shape)
+    if ndim not in (2, 3):
+        raise ValueError(
+            f"Found invalid value for `{name}`. The `shape` must be `(y, x)` or "
+            f"`(z, y, x)`, got `shape = {shape}`."
+        )
+    if positions.ndim != 2 or positions.shape[1] != ndim:
+        raise ValueError(
+            f"Found invalid value for `{name}`. The `positions` must have shape "
+            f"`(M, {ndim})` for `shape = {shape}`, got `positions.shape = "
+            f"{positions.shape}`."
+        )
+    bin_shape = ((4, 16) if ndim == 2 else (4, 4, 16)) if bin_shape is None else bin_shape
+    if len(bin_shape) != ndim or any(int(b) < 1 for b in bin_shape):
+        raise ValueError(
+            f"Found invalid value for `{name}`. The `bin_shape` must be {ndim} positive "
+            f"integers, got `bin_shape = {bin_shape}`."
+        )
+    if not upsample_factor >= 1:
+        raise ValueError(
+            f"Found invalid value for `{name}`. The `upsample_factor` must be at least "
+            f"1, got `upsample_factor = {upsample_factor}`."
+        )
+    n = np.asarray(shape[::-1])  # x, y(, z), as `positions`
+    bins = np.asarray(bin_shape[::-1])
+    # Periodic grid indices, then cells of the upsampled grid
+    cells = jnp.mod(positions / pixel_size + n // 2, n) * upsample_factor
+    index = jnp.floor(cells / bins).astype(jnp.int32)
+    n_bins = np.ceil(n * upsample_factor / bins).astype(np.int64) + 1
+    key = index[:, -1]
+    for axis in range(ndim - 2, -1, -1):
+        key = key * int(n_bins[axis]) + index[:, axis]
+    return jnp.argsort(key, stable=True)
 
 
 # ============================================================================
