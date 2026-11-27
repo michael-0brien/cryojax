@@ -580,3 +580,60 @@ def test_nominal_ctf_batches_over_the_pixel_size():
     assert batched.shape == (3, 14, 9)
     for i, p in enumerate(pixel_sizes):
         np.testing.assert_allclose(batched[i], evaluate(p), rtol=1e-12)
+
+
+@pytest.mark.parametrize("padding, full", [(False, False), (True, False), (True, True)])
+@pytest.mark.parametrize("offset_z", [None, 300.0])
+def test_astigmatic_ctf_of_an_image_config_is_the_phase_on_its_grid(
+    padding, full, offset_z
+):
+    ctf = _astigmatic_ctf()
+    config = cxs.AnisotropicImageConfig(
+        (14, 16), 1.1, anisotropy_xy=(0.01, -0.02), padded_shape=(18, 20)
+    )
+    defocus = jnp.asarray(ctf.defocus_in_angstroms)
+    if offset_z is not None:
+        defocus = defocus + jnp.asarray(offset_z, dtype=float)
+    theta = 2 * jnp.deg2rad(jnp.asarray(ctf.astigmatism_angle))
+    astigmatism = jnp.stack(
+        [
+            ctf.astigmatism_in_angstroms * jnp.cos(theta),
+            ctf.astigmatism_in_angstroms * jnp.sin(theta),
+        ]
+    )
+    even = compute_even_aberration_phase_shifts(
+        config.get_frequency_grid(padding=padding, full=full),
+        config.wavelength_in_angstroms,
+        defocus,
+        astigmatism,
+        jnp.asarray(ctf.spherical_aberration_in_mm) * 1e7,
+    )
+    np.testing.assert_array_equal(
+        ctf.compute_aberration_phase_shifts(
+            config, padding=padding, full=full, offset_z_in_angstroms=offset_z
+        ),
+        even,
+    )
+
+
+@pytest.mark.parametrize("path", ["projection", "ewald", "wave"])
+@pytest.mark.parametrize("offset_z", [None, 300.0])
+def test_apparent_astigmatic_ctf_on_the_nominal_grid_is_the_physical_ctf(path, offset_z):
+    physical, nominal = _configs()
+    truth = _astigmatic_ctf()
+    defocus, (a0, a1) = _apparent_parameters(
+        12000.0,
+        _polar_to_xy(400.0, 35.0, 2),
+        1.1,
+        1.06,
+        np.asarray(physical.anisotropy_matrix),
+    )
+    apparent = cxs.AstigmaticCTF(
+        defocus, np.hypot(a0, a1), np.rad2deg(np.arctan2(a1, a0)) / 2, 2.7
+    )
+    np.testing.assert_allclose(
+        _propagate(path, apparent, nominal, offset_z),
+        _propagate(path, truth, physical, offset_z),
+        rtol=1e-9,
+        atol=1e-12,
+    )
