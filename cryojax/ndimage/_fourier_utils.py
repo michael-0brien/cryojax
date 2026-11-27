@@ -22,6 +22,11 @@ def convert_fftn_to_rfftn(
     an `fftn_array`. Also, optionally take care to make sure that
     self-conjugate components are purely real-valued.
 
+    An `fftn` stores the last axis's Nyquist column at $-N/2$ and an `rfftn` at
+    $+N/2$, so that column is read off $F(k, N/2) = F^*(-k, -N/2)$: the same column
+    for the `fftn` of a real function, and the right one for a spectrum sampled at
+    the `fftfreq` frequencies.
+
     **Arguments:**
 
     - `fftn_array`:
@@ -38,17 +43,19 @@ def convert_fftn_to_rfftn(
     to `cryojax.image.rfftn` function.
     """
     shape = fftn_array.shape
-    # Take upper half plane
-    if fftn_array.ndim == 2:
-        rfftn_array = fftn_array[:, : shape[-1] // 2 + 1]
-    elif fftn_array.ndim == 3:
-        rfftn_array = fftn_array[:, :, : shape[-1] // 2 + 1]
-    else:
+    if fftn_array.ndim not in (2, 3):
         raise NotImplementedError(
             "Only 2D and 3D arrays are supported "
             "in function `convert_fftn_to_rfftn`. "
             f"Passed an array with `ndim = {fftn_array.ndim}`."
         )
+    # Take upper half plane
+    n = shape[-1]
+    rfftn_array = fftn_array[..., : n // 2 + 1]
+    if n % 2 == 0:
+        leading = tuple(range(fftn_array.ndim - 1))
+        nyquist = jnp.conj(_negate_frequencies(rfftn_array[..., -1:], leading))
+        rfftn_array = jnp.concatenate([rfftn_array[..., :-1], nyquist], axis=-1)
     if mode is not None:
         rfftn_array = enforce_rfftn_self_conjugates(
             rfftn_array,
@@ -57,6 +64,47 @@ def convert_fftn_to_rfftn(
             mode=mode,
         )
     return rfftn_array
+
+
+def convert_rfftn_to_fftn(
+    rfftn_array: Complex[Array, "{shape[0]} {shape[1]}//2+1"]
+    | Complex[Array, "{shape[0]} {shape[1]} {shape[2]}//2+1"],
+    shape: tuple[int, int] | tuple[int, int, int],
+) -> (
+    Complex[Array, "{shape[0]} {shape[1]}"]
+    | Complex[Array, "{shape[0]} {shape[1]} {shape[2]}"]
+):
+    """Converts the output of a call to `jax.numpy.fft.rfftn` to that of
+    `jax.numpy.fft.fftn`, completing the spectrum by hermitian symmetry,
+    $F(k, -m) = F^*(-k, m)$. The inverse of `convert_fftn_to_rfftn`.
+
+    **Arguments:**
+
+    - `rfftn_array`: The output of a call to `jax.numpy.fft.rfftn`.
+    - `shape`: The shape of the array in real space.
+
+    **Returns:**
+
+    The `rfftn_array`, as if it were the output of a call to `jax.numpy.fft.fftn`.
+    """
+    if rfftn_array.ndim not in (2, 3):
+        raise NotImplementedError(
+            "Only 2D and 3D arrays are supported "
+            "in function `convert_rfftn_to_fftn`. "
+            f"Passed an array with `ndim = {rfftn_array.ndim}`."
+        )
+    n = shape[-1]
+    leading = tuple(range(rfftn_array.ndim - 1))
+    # Modes -1 ... -n//2 of the last axis, from +1 ... +n//2
+    negative = jnp.conj(_negate_frequencies(rfftn_array[..., 1 : n // 2 + 1], leading))
+    return jnp.concatenate(
+        [rfftn_array[..., : (n + 1) // 2], jnp.flip(negative, axis=-1)], axis=-1
+    )
+
+
+def _negate_frequencies(array: Array, axes: tuple[int, ...]) -> Array:
+    # The value at -k on an fft-ordered grid, k -> -k mod N along `axes`
+    return jnp.roll(jnp.flip(array, axes), 1, axes)
 
 
 def enforce_rfftn_self_conjugates(

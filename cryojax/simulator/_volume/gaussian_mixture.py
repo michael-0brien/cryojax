@@ -13,7 +13,11 @@ from ..._internal import error_if_not_positive, leaf_asarray
 from ...constants import PengScatteringFactorParameters, b_factor_to_variance
 from ...jax_util import FloatLike, NDArrayLike, filter_bscan
 from ...ndimage import (
+    FourierGaussian,
+    fourier_crop_to_shape,
     make_1d_coordinate_grid,
+    make_coordinate_grid,
+    make_frequency_grid,
     map_coordinates,
     resize_with_crop_or_pad,
     spread_gaussians_2d,
@@ -29,6 +33,7 @@ from .base_volume import (
     ProjectionArray,
     VoxelArray,
 )
+from .internal import eval_separable_impl, make_frequencies_1d
 
 
 def _leaf_broadcast_to(x, shape):
@@ -233,6 +238,12 @@ class GaussianMixtureProjection(
             n_spread=7, enable_pallas={"bwd": True}
         )
         ```
+
+    **References:**
+
+    - For `sampling_mode = 'average'`, see Section 3.1 from *Himes, Benjamin, and
+      Nikolaus Grigorieff. "Cryo-TEM simulations of amorphous radiation-sensitive
+      samples using multislice wave propagation." IUCrJ 8.6 (2021): 943-953.*
     """
 
     sampling_mode: Literal["average", "point"]
@@ -240,6 +251,8 @@ class GaussianMixtureProjection(
     n_batches: int
     n_spread: int | tuple[int, ...] | None
     enable_pallas: bool | Mapping[str, bool] | None
+    upsample_factor: int
+    blur_variance: float
 
     outputs_ewald_sphere: ClassVar[bool] = False
     supports_anisotropy: ClassVar[bool] = True
@@ -252,6 +265,8 @@ class GaussianMixtureProjection(
         n_batches: int = 1,
         n_spread: int | tuple[int, ...] | None = None,
         enable_pallas: bool | Mapping[str, bool] | None = None,
+        upsample_factor: int = 1,
+        blur_variance: float = 0.0,
     ):
         """**Arguments:**
 
@@ -259,11 +274,16 @@ class GaussianMixtureProjection(
             The shape of the plane on which projections are computed before padding or
             cropping to the `AbstractImageConfig.padded_shape`. This argument is particularly
             useful if the `AbstractImageConfig.padded_shape` is much larger than the protein.
+            Under an anisotropic magnification with `sampling_mode = 'point'`, the
+            projection is resampled periodically within this box.
         - `sampling_mode`:
-            If `'average'`, use error functions to sample the projected volume at
-            a pixel to be the average value using gaussian
-            integrals. If `'point'`, the volume at a pixel will
-            be evaluated by evaluating the gaussian at a point.
+            If `'average'`, the average of the projected volume over each pixel,
+            computed exactly with error functions. If `'point'`, the band-limited
+            image, whose spectrum is the projected volume's at every frequency of
+            the grid, up to content past the Nyquist of the grid gaussians are
+            spread on, which folds in unless `upsample_factor` is at least 2 and
+            the narrowest gaussian plus `blur_variance` is wide enough (see
+            `with_calibration`).
         - `n_batches`:
             The number of batches over groups of positions
             used to evaluate the projection. By default, `n_batches = 1`,
@@ -284,7 +304,8 @@ class GaussianMixtureProjection(
             single `n_spread` would either truncate the widest components or
             waste computation spreading the narrowest ones too widely. See
             [`cryojax.simulator.suggest_n_spread`][] to choose these values
-            from `volume_representation.variances`.
+            from `volume_representation.variances`. With `sampling_mode = 'point'`,
+            these are points of the grid `upsample_factor` times finer.
         - `enable_pallas`:
             Use the Pallas/Triton GPU backend instead of pure-JAX for the
             `n_spread` spreading backend (ignored if `n_spread` is `None`).
@@ -293,19 +314,124 @@ class GaussianMixtureProjection(
             advantageous for the *backward* pass -- `{"bwd": True}`. See
             [`cryojax.ndimage.spread_gaussians_2d`][]'s `enable_pallas` for
             the full picture. `None` (default) defers to `CRYOJAX_ENABLE_PALLAS`.
+        - `upsample_factor`:
+            Gaussians are spread on a grid this many times finer, then Fourier
+            cropped to the image grid. Under an anisotropic magnification, the
+            projection is resampled on the finer grid, before the crop, where cubic
+            interpolation is more accurate (see
+            [`cryojax.simulator.AnisotropicImageConfig`][]). Ignored if
+            `sampling_mode = 'average'`.
+        - `blur_variance`:
+            The variance, in angstroms squared, of a gaussian blur added to every
+            gaussian before spreading and divided out after the crop. Ignored if
+            `sampling_mode = 'average'`.
         """  # noqa: E501
         if sampling_mode not in ["average", "point"]:
             raise ValueError(
-                "`sampling_mode` in `GaussianMixtureProjection` "
-                "must be either 'average' for averaging within a "
-                "pixel or 'point' for point sampling. Got "
+                "`sampling_mode` in `GaussianMixtureProjection` must be either "
+                "'average' for the pixel average or 'point' for the band-limited "
+                "image. Got "
                 f"`sampling_mode = {sampling_mode}`."
+            )
+        if not (isinstance(upsample_factor, int) and upsample_factor >= 1):
+            raise ValueError(
+                "`upsample_factor` in `GaussianMixtureProjection` must be an "
+                f"integer of at least 1. Got `upsample_factor = {upsample_factor}`."
+            )
+        if blur_variance < 0:
+            raise ValueError(
+                "`blur_variance` in `GaussianMixtureProjection` must be "
+                f"non-negative. Got `blur_variance = {blur_variance}`."
             )
         self.shape = shape
         self.sampling_mode = sampling_mode
         self.n_batches = n_batches
         self.n_spread = n_spread
         self.enable_pallas = enable_pallas
+        self.upsample_factor = upsample_factor
+        self.blur_variance = float(blur_variance)
+
+    @classmethod
+    def with_calibration(
+        cls,
+        volume: GaussianMixtureVolume,
+        image_config: AbstractImageConfig,
+        *,
+        aliasing_tolerance: float = 1e-2,
+        cutoff_sigma: float = 4.0,
+        sampling_mode: Literal["average", "point"] = "average",
+        upsample_factor: int = 2,
+        shape: tuple[int, int] | None = None,
+        n_batches: int = 1,
+        enable_pallas: bool | Mapping[str, bool] | None = None,
+    ) -> Self:
+        """A `GaussianMixtureProjection` with `n_spread` and, for
+        `sampling_mode = 'point'`, `blur_variance` chosen for `volume` at
+        `image_config.pixel_size`. Call outside JIT.
+
+        **Arguments:**
+
+        - `volume`: Its variances, B-factor included, set `n_spread` and the blur.
+        - `image_config`: For its pixel size.
+        - `aliasing_tolerance`: For `'point'`, the largest error the finer grid's
+            folded content may add in the image's band, relative to the signal.
+            Two folds meet at the band's corners, so it is below 2.
+        - `cutoff_sigma`: `n_spread` covers each gaussian, blur included, to this
+            many standard deviations (as in [`cryojax.simulator.suggest_n_spread`][]).
+        - `upsample_factor`: Defaults to 2, the least `'point'` allows here.
+
+        The other arguments are those of `GaussianMixtureProjection`.
+        """
+        if not 0 < aliasing_tolerance < 2:
+            raise ValueError(
+                "`aliasing_tolerance` in `GaussianMixtureProjection.with_calibration` "
+                "must be between 0 and 2. Got `aliasing_tolerance = "
+                f"{aliasing_tolerance}`."
+            )
+        # Raises the constructor's errors before any arithmetic on the factor
+        cls(
+            shape=shape,
+            sampling_mode=sampling_mode,
+            n_batches=n_batches,
+            upsample_factor=upsample_factor,
+        )
+        if sampling_mode == "point" and upsample_factor < 2:
+            raise ValueError(
+                "`GaussianMixtureProjection.with_calibration` with "
+                "`sampling_mode = 'point'` requires `upsample_factor` of at least 2. "
+                f"Got `upsample_factor = {upsample_factor}`."
+            )
+        # Function-local, since `_api_utils` imports this module
+        from .._api_utils import suggest_n_spread
+
+        pixel_size = float(image_config.pixel_size)
+        blur_variance = 0.0
+        spread_pixel_size = pixel_size
+        if sampling_mode == "point":
+            r = upsample_factor
+            spread_pixel_size = pixel_size / r
+            # The variance the finer grid needs, topped up from the narrowest gaussian
+            required = (
+                pixel_size**2
+                * np.log(2 / aliasing_tolerance)
+                / (2 * np.pi**2 * r * (r - 1))
+            )
+            blur_variance = max(0.0, required - float(np.min(volume.variances)))
+        blurred_volume = eqx.tree_at(
+            lambda v: v.variances, volume, volume.variances + blur_variance
+        )
+        n_spread = suggest_n_spread(
+            blurred_volume, spread_pixel_size, cutoff_sigma=cutoff_sigma
+        )
+        return cls(
+            shape=shape,
+            sampling_mode=sampling_mode,
+            n_batches=n_batches,
+            n_spread=n_spread,
+            enable_pallas=enable_pallas,
+            upsample_factor=upsample_factor,
+            blur_variance=blur_variance,
+        )
 
     @override
     def integrate(
@@ -342,11 +468,17 @@ class GaussianMixtureProjection(
         context = (
             f"Error during projection using `{type(self).__name__}(..., n_batches=...)`"
         )
+        # The band-limited image is spread, blurred, on a finer grid and cropped
+        shape_u, pixel_size_u = shape, pixel_size
+        if not use_erf:
+            r = self.upsample_factor
+            shape_u, pixel_size_u = (r * shape[0], r * shape[1]), pixel_size / r
+            variances = variances + self.blur_variance
         # Compute the projection
         if self.n_spread is None:
             projection_integral = _gaussians_to_projection_dense(
-                shape,
-                pixel_size,
+                shape_u,
+                pixel_size_u,
                 positions,
                 amplitudes,
                 variances,
@@ -356,8 +488,8 @@ class GaussianMixtureProjection(
             )
         else:
             projection_integral = _gaussians_to_projection_spread(
-                shape,
-                pixel_size,
+                shape_u,
+                pixel_size_u,
                 positions,
                 amplitudes,
                 variances,
@@ -367,13 +499,48 @@ class GaussianMixtureProjection(
                 context,
                 self.enable_pallas,
             )
+        if not use_erf:
+            # Crop to the image's band and divide out the blur. Under an anisotropic
+            # magnification, the finer grid is resampled before the crop, and the blur,
+            # applied before the resampling, is divided out at `Dᵀk`
+            if image_config.is_anisotropic:
+                projection_fft = _resample_with_anisotropy_matrix(
+                    projection_integral, image_config.anisotropy_matrix, shape
+                )
+            else:
+                projection_fft = fourier_crop_to_shape(
+                    projection_integral,
+                    shape,
+                    outputs_real_space=False,
+                    preserve_mean=True,
+                )
+            if self.blur_variance > 0:
+                blur_fn = FourierGaussian(b_factor=8 * jnp.pi**2 * self.blur_variance)
+                if image_config.is_anisotropic:
+                    # `Dᵀk`, elementwise so that XLA fuses it
+                    k = make_frequency_grid(shape, pixel_size)
+                    k_x, k_y = k[..., 0], k[..., 1]
+                    D = image_config.anisotropy_matrix
+                    frequency_grid = jnp.stack(
+                        [k_x * D[0, 0] + k_y * D[1, 0], k_x * D[0, 1] + k_y * D[1, 1]],
+                        axis=-1,
+                    )
+                    projection_fft /= blur_fn(frequency_grid)
+                else:
+                    frequencies_1d = make_frequencies_1d(
+                        shape, pixel_size, modeord=1, outputs_rfft=True
+                    )
+                    projection_fft /= eval_separable_impl(blur_fn, frequencies_1d)
+            if self.shape is None and not outputs_real_space:
+                return projection_fft
+            projection_integral = jnp.fft.irfftn(projection_fft, s=shape)
         if self.shape is not None:
             projection_integral = resize_with_crop_or_pad(
                 projection_integral, image_config.padded_shape
             )
-        if image_config.is_anisotropic:
+        if use_erf and image_config.is_anisotropic:
             fourier_projection = _resample_with_anisotropy_matrix(
-                projection_integral, image_config
+                projection_integral, image_config.anisotropy_matrix
             )
             return (
                 jnp.fft.irfftn(fourier_projection, s=image_config.padded_shape)
@@ -887,39 +1054,43 @@ def _spread_and_sum_gaussian_components(
 
 def _resample_with_anisotropy_matrix(
     image: Float[Array, "y_dim x_dim"],
-    image_config: AbstractImageConfig,
-) -> Complex[Array, "y_dim x_dim//2+1"]:
+    anisotropy_matrix: Float[Array, "2 2"],
+    shape: tuple[int, int] | None = None,
+) -> Complex[Array, "_ _"]:
     """Given a real-space image `p(x)`, return the `rfftn` of `p(D⁻¹x)` on the same
-    pixel grid, for the `image_config.anisotropy_matrix` `D`. Coordinates `x` are in
-    pixels, about the center `N//2`.
+    pixel grid, for the `anisotropy_matrix` `D`, Fourier cropped to `shape` if given.
+    Coordinates `x` are in pixels, about the center `N//2`.
 
     1. `p` is interpolated at `D⁻¹x` with a cubic B-spline, without a prefilter
        (`cryojax.ndimage.map_coordinates(..., order=3)`). The image is treated as
        periodic, as it is by the FFT: coordinates wrap modulo the shape.
-    2. The result is transformed with `rfftn`.
+    2. The result is transformed and cropped to `shape` with
+       `cryojax.ndimage.fourier_crop_to_shape(..., preserve_mean=True)`, its `rfftn`
+       at `image.shape`.
     3. The spectrum is divided by the response of the cubic B-spline sampled at the
        integers, `(2/3 + cos(2πq_x)/3)(2/3 + cos(2πq_y)/3)`, at `q = Dᵀk` for each
-       FFT frequency `k` in cycles per pixel.
+       kept frequency `k` in cycles per pixel of `image`.
 
     Step 3 undoes the blur of step 1, a circular convolution, so for `D = I` the output
     is the `rfftn` of `p` exactly. Otherwise, the error is aliasing that grows towards
-    Nyquist.
+    the Nyquist of `image`, so a `shape` well below it keeps it small.
 
     **Arguments:**
 
     - `image`:
-        The image in real space, at `image_config.padded_shape`.
-    - `image_config`:
-        The image configuration.
+        The image in real space.
+    - `anisotropy_matrix`:
+        The matrix `D`.
+    - `shape`:
+        The real-space shape to Fourier crop to. By default, `image.shape`.
     """
     y_dim, x_dim = image.shape
-    matrix = image_config.anisotropy_matrix
     # Interpolate at `D⁻¹x`, in index units wrapped into `[0, N)`. The cubic taps at
     # `floor(c) + [-1, 0, 1, 2]` then read from the image wrapped by one pixel below
     # and two above. Products with `D` are elementwise so that XLA fuses them
-    coordinate_grid = image_config.get_coordinate_grid(padding=True, physical=False)
+    coordinate_grid = make_coordinate_grid(image.shape)
     x, y = coordinate_grid[..., 0], coordinate_grid[..., 1]
-    inverse = inverse_2x2(matrix)
+    inverse = inverse_2x2(anisotropy_matrix)
     y_index = jnp.mod(inverse[1, 0] * x + inverse[1, 1] * y + y_dim // 2, y_dim)
     x_index = jnp.mod(inverse[0, 0] * x + inverse[0, 1] * y + x_dim // 2, x_dim)
     resampled = map_coordinates(
@@ -928,13 +1099,18 @@ def _resample_with_anisotropy_matrix(
         order=3,
         mode="promise_in_bounds",
     )
-    # Divide out the B-spline's response at `Dᵀk`
-    frequency_grid = image_config.get_frequency_grid(padding=True, physical=False)
-    k_x, k_y = frequency_grid[..., 0], frequency_grid[..., 1]
-    q_x = matrix[0, 0] * k_x + matrix[1, 0] * k_y
-    q_y = matrix[0, 1] * k_x + matrix[1, 1] * k_y
+    n_y, n_x = image.shape if shape is None else shape
+    spectrum = fourier_crop_to_shape(
+        resampled, (n_y, n_x), outputs_real_space=False, preserve_mean=True
+    )
+    # Divide out the B-spline's response at `Dᵀk`, for `k` in cycles per pixel of `image`
+    frequency_grid = make_frequency_grid((n_y, n_x))
+    k_x = frequency_grid[..., 0] * (n_x / x_dim)
+    k_y = frequency_grid[..., 1] * (n_y / y_dim)
+    q_x = anisotropy_matrix[0, 0] * k_x + anisotropy_matrix[1, 0] * k_y
+    q_y = anisotropy_matrix[0, 1] * k_x + anisotropy_matrix[1, 1] * k_y
     response = _bspline_response(q_x) * _bspline_response(q_y)
-    return jnp.fft.rfftn(resampled) / response
+    return spectrum / response
 
 
 def _bspline_response(frequency: Float[Array, "..."]) -> Float[Array, "..."]:
