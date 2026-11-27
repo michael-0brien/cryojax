@@ -461,11 +461,7 @@ def test_anisotropic_linear_image_applies_the_ctf_at_the_distorted_frequencies(
         cxs.ContrastTransferTheory(ctf, amplitude_contrast_ratio=0.1),
         integrator,
     )
-    ctf_array = ctf(
-        config.get_frequency_grid(padding=True),
-        config.wavelength_in_angstroms,
-        amplitude_contrast_ratio=0.1,
-    )
+    ctf_array = ctf(config, padding=True, amplitude_contrast_ratio=0.1)
     projection = _analytic_anisotropic_projection(
         config, position[:2] + offset, is_pixel_averaged=is_voxel_volume
     )

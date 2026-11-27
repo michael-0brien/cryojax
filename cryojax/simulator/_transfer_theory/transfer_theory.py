@@ -108,8 +108,8 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
         if not is_ewald_sphere:
             # Compute the CTF, including additional phase shifts
             ctf_array = self.ctf(
-                frequency_grid,
-                wavelength_in_angstroms=image_config.wavelength_in_angstroms,
+                image_config,
+                padding=True,
                 phase_shift=phase_shift,
                 amplitude_contrast_ratio=amplitude_contrast_ratio,
                 outputs_exp=False,
@@ -123,9 +123,7 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
             # `-q` terms, which is only correct for even aberrations.
             if (
                 self.ctf.compute_aberration_phase_shifts(
-                    frequency_grid,
-                    wavelength_in_angstroms=image_config.wavelength_in_angstroms,
-                    parity="odd",
+                    image_config, padding=True, parity="odd"
                 )
                 is not None
             ):
@@ -143,9 +141,7 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
             # Propagate to the exit plane when the phase spectrum is
             # the surface of the ewald sphere
             aberration_phase_shifts = self.ctf.compute_aberration_phase_shifts(
-                frequency_grid,
-                wavelength_in_angstroms=image_config.wavelength_in_angstroms,
-                offset_z_in_angstroms=offset_z_in_angstroms,
+                image_config, padding=True, offset_z_in_angstroms=offset_z_in_angstroms
             ) - jnp.deg2rad(phase_shift)
             contrast_spectrum = _compute_contrast_from_ewald_sphere(
                 object_spectrum,
@@ -197,11 +193,11 @@ class WaveTransferTheory(AbstractTransferTheory, strict=True):
             An optional offset in Angstroms of the specimen along z, added to the
             defocus at runtime, e.g. the `offset_z_in_angstroms` of an `AbstractPose`.
         """
-        frequency_grid = image_config.get_frequency_grid(padding=True, full=True)
         # Compute the wave transfer function
         ctf_array = self.ctf(
-            frequency_grid,
-            wavelength_in_angstroms=image_config.wavelength_in_angstroms,
+            image_config,
+            padding=True,
+            full=True,
             outputs_exp=True,
             offset_z_in_angstroms=offset_z_in_angstroms,
         )

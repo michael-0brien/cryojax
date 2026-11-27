@@ -7,7 +7,10 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 from cryojax.constants import wavelength_from_kilovolts
-from cryojax.ndimage import make_frequency_grid
+from cryojax.simulator._transfer_theory.internal import (
+    compute_even_aberration_phase_shifts,
+    compute_odd_aberration_phase_shifts,
+)
 
 
 _WAVELENGTH = float(wavelength_from_kilovolts(300.0))
@@ -75,14 +78,10 @@ def test_ctf_pixel_size_derivatives_no_nan(astigmatism_in_angstroms):
 
 def test_ctf_phase_matches_polar_form():
     """The polynomial astigmatic term equals the `cos(2 (azimuth - angle))` form."""
-    grid = make_frequency_grid((16, 12), 1.7)
-    defocus, astigmatism, angle_in_degrees, wavelength, cs_in_mm = (
-        12000.0,
-        400.0,
-        35.0,
-        0.0197,
-        2.7,
-    )
+    config = cxs.BasicImageConfig((16, 12), 1.7)
+    grid = config.get_frequency_grid()
+    wavelength = config.wavelength_in_angstroms
+    defocus, astigmatism, angle_in_degrees, cs_in_mm = 12000.0, 400.0, 35.0, 2.7
     k_sqr = jnp.sum(grid**2, axis=-1)
     azimuth = jnp.arctan2(grid[..., 0], grid[..., 1])
     astigmatic_defocus = defocus + 0.5 * astigmatism * jnp.cos(
@@ -98,9 +97,7 @@ def test_ctf_phase_matches_polar_form():
         astigmatism_angle=angle_in_degrees,
         spherical_aberration_in_mm=cs_in_mm,
     )
-    polynomial_form = ctf.compute_aberration_phase_shifts(
-        grid, wavelength_in_angstroms=wavelength
-    )
+    polynomial_form = ctf.compute_aberration_phase_shifts(config)
     np.testing.assert_allclose(polynomial_form, polar_form, rtol=1e-10, atol=1e-10)
 
 
@@ -111,6 +108,11 @@ def test_astigmatic_ctf_cartesian_properties():
 
 
 # ── Parity ───────────────────────────────────────────────────────────────────
+
+
+def _at_negative_frequency(x):
+    """`x(-k)` from `x(k)` on a full FFT-ordered grid of odd shape."""
+    return jnp.roll(jnp.flip(x, (0, 1)), 1, (0, 1))
 
 
 @pytest.mark.parametrize(
@@ -124,16 +126,16 @@ def test_astigmatic_ctf_cartesian_properties():
     ],
 )
 def test_aberration_phase_shifts_split_by_parity(ctf, has_odd):
-    grid = make_frequency_grid((15, 15), 1.3, outputs_rfftfreqs=False)
+    config = cxs.BasicImageConfig((15, 15), 1.3)
 
-    def chi(k, parity):
-        return ctf.compute_aberration_phase_shifts(k, _WAVELENGTH, parity=parity)
+    def chi(parity):
+        return ctf.compute_aberration_phase_shifts(config, full=True, parity=parity)
 
-    chi_all, chi_even, chi_odd = (chi(grid, p) for p in ("all", "even", "odd"))
+    chi_all, chi_even, chi_odd = (chi(p) for p in ("all", "even", "odd"))
     assert (chi_odd is not None) == has_odd
-    np.testing.assert_allclose(chi(-grid, "even"), chi_even, atol=1e-10)
+    np.testing.assert_allclose(_at_negative_frequency(chi_even), chi_even, atol=1e-10)
     if has_odd:
-        np.testing.assert_allclose(chi(-grid, "odd"), -chi_odd, atol=1e-10)
+        np.testing.assert_allclose(_at_negative_frequency(chi_odd), -chi_odd, atol=1e-10)
         np.testing.assert_allclose(chi_all, chi_even + chi_odd, atol=1e-10)
         assert not np.allclose(chi_odd, 0.0)
     else:
@@ -148,10 +150,10 @@ def test_aberrated_ctf_from_astigmatic_ctf_properties():
     aberrated = cxs.AberratedCTF(
         ctf.defocus_in_um, ctf.astigmatism_xy_in_um, ctf.spherical_aberration_in_mm
     )
-    grid = make_frequency_grid((16, 12), 1.7)
+    config = cxs.BasicImageConfig((16, 12), 1.7)
     np.testing.assert_allclose(
-        aberrated.compute_aberration_phase_shifts(grid, _WAVELENGTH),
-        ctf.compute_aberration_phase_shifts(grid, _WAVELENGTH),
+        aberrated.compute_aberration_phase_shifts(config),
+        ctf.compute_aberration_phase_shifts(config),
         rtol=1e-10,
         atol=1e-10,
     )
@@ -159,12 +161,12 @@ def test_aberrated_ctf_from_astigmatic_ctf_properties():
 
 @pytest.mark.parametrize("outputs_exp", [False, True])
 def test_aberrated_ctf_without_odd_terms_reduces_to_astigmatic_ctf(outputs_exp):
-    grid = make_frequency_grid((16, 12), 1.7)
+    config = cxs.BasicImageConfig((16, 12), 1.7)
     kwargs = dict(
         amplitude_contrast_ratio=0.07, phase_shift=10.0, outputs_exp=outputs_exp
     )
-    expected = _astigmatic_ctf()(grid, _WAVELENGTH, **kwargs)
-    actual = _aberrated_ctf()(grid, _WAVELENGTH, **kwargs)
+    expected = _astigmatic_ctf()(config, **kwargs)
+    actual = _aberrated_ctf()(config, **kwargs)
     assert jnp.iscomplexobj(actual) == outputs_exp
     np.testing.assert_allclose(actual, expected, rtol=1e-10, atol=1e-10)
 
@@ -180,11 +182,11 @@ def test_aberrated_ctf_without_odd_terms_reduces_to_astigmatic_ctf(outputs_exp):
 def test_offset_z_is_in_angstroms_for_every_ctf(make_ctf, outputs_exp):
     """`offset_z_in_angstroms` is in Angstroms, including for `AberratedCTF`, whose
     defocus is in microns."""
-    grid = make_frequency_grid((16, 12), 1.7)
+    config = cxs.BasicImageConfig((16, 12), 1.7)
     kwargs = dict(amplitude_contrast_ratio=0.07, outputs_exp=outputs_exp)
     np.testing.assert_allclose(
-        make_ctf(0.0)(grid, _WAVELENGTH, offset_z_in_angstroms=500.0, **kwargs),
-        make_ctf(500.0)(grid, _WAVELENGTH, **kwargs),
+        make_ctf(0.0)(config, offset_z_in_angstroms=500.0, **kwargs),
+        make_ctf(500.0)(config, **kwargs),
         rtol=1e-10,
         atol=1e-10,
     )
@@ -211,14 +213,12 @@ def test_image_model_adds_the_pose_offset_z_to_the_defocus():
 
 
 def test_odd_aberrations_make_the_ctf_complex_and_hermitian():
-    grid = make_frequency_grid((15, 15), 1.3, outputs_rfftfreqs=False)
+    config = cxs.BasicImageConfig((15, 15), 1.3)
     ctf = _aberrated_ctf(coma=_COMA, trefoil=_TREFOIL)
-    values = ctf(grid, _WAVELENGTH, amplitude_contrast_ratio=0.07)
+    values = ctf(config, full=True, amplitude_contrast_ratio=0.07)
     assert jnp.iscomplexobj(values)
     np.testing.assert_allclose(
-        ctf(-grid, _WAVELENGTH, amplitude_contrast_ratio=0.07),
-        jnp.conj(values),
-        atol=1e-10,
+        _at_negative_frequency(values), jnp.conj(values), atol=1e-10
     )
 
 
@@ -238,10 +238,8 @@ def test_aberrated_ctf_accepts_sequences_and_arrays(to_vector):
         coma_xy_in_um=np.array([0.5, 0.2]),
         trefoil_xy_in_um=np.array([0.1, -0.3]),
     )
-    grid = make_frequency_grid((16, 12), 1.7)
-    np.testing.assert_allclose(
-        ctf(grid, _WAVELENGTH), expected(grid, _WAVELENGTH), rtol=0, atol=0
-    )
+    config = cxs.BasicImageConfig((16, 12), 1.7)
+    np.testing.assert_allclose(ctf(config), expected(config), rtol=0, atol=0)
 
 
 @pytest.mark.parametrize(
@@ -271,10 +269,10 @@ def test_from_polar_coordinates():
         defocus_in_um=1.2, astigmatism_in_um=0.04, astigmatism_angle=35.0
     )
     assert without_odd.coma_xy_in_um is None and without_odd.trefoil_xy_in_um is None
-    grid = make_frequency_grid((16, 12), 1.7)
+    config = cxs.BasicImageConfig((16, 12), 1.7)
     np.testing.assert_allclose(
-        without_odd.compute_aberration_phase_shifts(grid, _WAVELENGTH),
-        _astigmatic_ctf().compute_aberration_phase_shifts(grid, _WAVELENGTH),
+        without_odd.compute_aberration_phase_shifts(config),
+        _astigmatic_ctf().compute_aberration_phase_shifts(config),
         rtol=1e-10,
         atol=1e-10,
     )
@@ -358,9 +356,8 @@ def test_wave_path_test_is_sensitive_to_the_odd_sign():
         return jnp.abs(jnp.fft.ifftn(wave)) ** 2
 
     _, linear_term = jax.jvp(intensity, (0.0,), (1.0,))
-    grid = config.get_frequency_grid(padding=True)
-    chi_even = ctf.compute_aberration_phase_shifts(grid, _WAVELENGTH, parity="even")
-    chi_odd = ctf.compute_aberration_phase_shifts(grid, _WAVELENGTH, parity="odd")
+    chi_even = ctf.compute_aberration_phase_shifts(config, padding=True, parity="even")
+    chi_odd = ctf.compute_aberration_phase_shifts(config, padding=True, parity="odd")
     flipped = jnp.fft.irfftn(
         jnp.fft.rfftn(phase) * jnp.sin(chi_even) * jnp.exp(1.0j * chi_odd), s=shape
     )
@@ -405,7 +402,8 @@ def test_coma_matches_cistem_beam_tilt():
     `arctan2(k_x, k_y)` (see `generate_cistem_references.py`). `AberratedCTF` applies
     `exp(-i chi_odd)`, so cisTEM's tilt is reproduced by a coma of magnitude
     `Cs tau` pointing *against* the tilt."""
-    grid = make_frequency_grid((32, 32), 1.2)
+    config = cxs.BasicImageConfig((32, 32), 1.2)
+    grid = config.get_frequency_grid()
     cs_in_mm, tilt_in_mrad, tilt_angle = 2.7, 0.5, 40.0
     astigmatic_ctf = cxs.AstigmaticCTF(
         defocus_in_angstroms=15000.0,
@@ -424,9 +422,7 @@ def test_coma_matches_cistem_beam_tilt():
         * (tilt_in_mrad * 1e-3)
         * jnp.cos(azimuth - jnp.deg2rad(tilt_angle))
     )
-    expected = astigmatic_ctf(grid, _WAVELENGTH, amplitude_contrast_ratio=0.07) * jnp.exp(
-        1.0j * phi
-    )
+    expected = astigmatic_ctf(config, amplitude_contrast_ratio=0.07) * jnp.exp(1.0j * phi)
     ctf = cxs.AberratedCTF(
         astigmatic_ctf.defocus_in_um,
         astigmatic_ctf.astigmatism_xy_in_um,
@@ -434,5 +430,39 @@ def test_coma_matches_cistem_beam_tilt():
         coma_xy_in_um=-cs_in_mm * tilt_in_mrad * _polar_to_xy(1.0, tilt_angle, 1),
     )
     np.testing.assert_allclose(
-        ctf(grid, _WAVELENGTH, amplitude_contrast_ratio=0.07), expected, atol=1e-10
+        ctf(config, amplitude_contrast_ratio=0.07), expected, atol=1e-10
+    )
+
+
+# ── The image config ─────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("padding, full", [(False, False), (True, False), (True, True)])
+@pytest.mark.parametrize("offset_z", [None, 300.0])
+def test_ctf_of_an_image_config_is_the_phase_on_its_grid(padding, full, offset_z):
+    ctf = _aberrated_ctf(coma=_COMA, trefoil=_TREFOIL)
+    config = cxs.AnisotropicImageConfig(
+        (14, 16), 1.1, anisotropy_xy=(0.01, -0.02), padded_shape=(18, 20)
+    )
+    q = config.get_frequency_grid(padding=padding, full=full)
+    wavelength = config.wavelength_in_angstroms
+    defocus = ctf.defocus_in_um * 1e4
+    if offset_z is not None:
+        defocus = defocus + offset_z
+    even = compute_even_aberration_phase_shifts(
+        q,
+        wavelength,
+        defocus,
+        ctf.astigmatism_xy_in_um * 1e4,
+        ctf.spherical_aberration_in_mm * 1e7,
+    )
+    odd = compute_odd_aberration_phase_shifts(
+        q, wavelength, ctf.coma_xy_in_um * 1e4, ctf.trefoil_xy_in_um * 1e4
+    )
+    kwargs = dict(padding=padding, full=full, offset_z_in_angstroms=offset_z)
+    np.testing.assert_array_equal(
+        ctf.compute_aberration_phase_shifts(config, parity="even", **kwargs), even
+    )
+    np.testing.assert_array_equal(
+        ctf.compute_aberration_phase_shifts(config, parity="odd", **kwargs), odd
     )

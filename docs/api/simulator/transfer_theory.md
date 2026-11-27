@@ -1,22 +1,18 @@
 # Contrast transfer functions
 
-Applying a contrast transfer function (CTF) to an image in `cryojax` is layered into two classes. The most important class is the `AstigmaticCTF`, which is a function that takes in a grid of in-plane frequency vectors and returns a JAX array of the CTF.
+Applying a contrast transfer function (CTF) to an image in `cryojax` is layered into two classes. The most important class is the `AstigmaticCTF`, which is a function that takes in an image configuration and returns a JAX array of the CTF on its frequency grid.
 
 ```python
 import cryojax.simulator as cxs
-from cryojax.ndimage import make_frequency_grid
 
-shape, pixel_size = (100, 100), 1.1
-frequency_grid_in_angstroms = make_frequency_grid(shape, pixel_size)
+image_config = cxs.BasicImageConfig((100, 100), 1.1, voltage_in_kilovolts=300.0)
 ctf = cxs.AstigmaticCTF(
     defocus_in_angstroms=10000.0,
     astigmatism_in_angstroms=100.0,
     astigmatism_angle=30.0,
     spherical_aberration_in_mm=2.7,
-    amplitude_contrast_ratio=0.07,
-    phase_shift=0.0,
 )
-ctf_array = ctf(frequency_grid_in_angstroms, voltage_in_kilovolts=300.0)
+ctf_array = ctf(image_config, amplitude_contrast_ratio=0.07)
 ```
 
 Further, the `ContrastTransferTheory` is a class that takes in a projection image in a plane below the object and returns the contrast in the plane of the detector.

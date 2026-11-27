@@ -8,6 +8,7 @@ from jaxtyping import Array, Complex, Float
 
 from ..._internal import error_if_negative, leaf_asarray, leaf_asarray_vector
 from ...jax_util import FloatLike, NDArrayLike
+from .._image_config import AbstractImageConfig
 from .internal import (
     compute_amplitude_contrast_phase_shift,
     compute_even_aberration_phase_shifts,
@@ -21,8 +22,10 @@ class AbstractCTF(eqx.Module, strict=True):
     @abstractmethod
     def compute_aberration_phase_shifts(
         self,
-        frequency_grid_in_angstroms: Float[Array, "y_dim x_dim 2"],
-        wavelength_in_angstroms: FloatLike,
+        image_config: AbstractImageConfig,
+        *,
+        padding: bool = False,
+        full: bool = False,
         offset_z_in_angstroms: FloatLike | None = None,
         parity: Literal["all", "even", "odd"] = "all",
     ) -> Float[Array, "y_dim x_dim"] | None:
@@ -31,10 +34,13 @@ class AbstractCTF(eqx.Module, strict=True):
 
         **Arguments:**
 
-        - `frequency_grid_in_angstroms`:
-            The grid of frequencies in units of inverse angstroms.
-        - `wavelength_in_angstroms`:
-            The wavelength of the incident electrons in Angstroms.
+        - `image_config`:
+            The image configuration, which gives the frequencies and the wavelength.
+        - `padding`:
+            If `True`, evaluate at the frequencies of `image_config.padded_shape`.
+        - `full`:
+            If `True`, evaluate on the full plane of frequencies (for
+            `jax.numpy.fft.fftn`). Otherwise, on the half plane.
         - `offset_z_in_angstroms`:
             An optional offset in Angstroms of the specimen along z, added to the
             defocus at runtime, e.g. the `offset_z_in_angstroms` of an `AbstractPose`.
@@ -47,8 +53,10 @@ class AbstractCTF(eqx.Module, strict=True):
 
     def __call__(
         self,
-        frequency_grid_in_angstroms: Float[Array, "y_dim x_dim 2"],
-        wavelength_in_angstroms: FloatLike,
+        image_config: AbstractImageConfig,
+        *,
+        padding: bool = False,
+        full: bool = False,
         amplitude_contrast_ratio: FloatLike = 0.1,
         phase_shift: FloatLike = 0.0,
         outputs_exp: bool = False,
@@ -58,13 +66,13 @@ class AbstractCTF(eqx.Module, strict=True):
 
         **Arguments:**
 
-        - `frequency_grid_in_angstroms`:
-            The grid of frequencies in units of inverse angstroms. This can
-            be computed with [`cryojax.ndimage.make_frequency_grid`][]
-        - `wavelength_in_angstroms`:
-            The wavelength of the incident electrons in Angstroms. This
-            can be retrieved from the accelerating voltage using the function
-            the function [`cryojax.constants.wavelength_from_kilovolts`][].
+        - `image_config`:
+            The image configuration, which gives the frequencies and the wavelength.
+        - `padding`:
+            If `True`, evaluate at the frequencies of `image_config.padded_shape`.
+        - `full`:
+            If `True`, evaluate on the full plane of frequencies (for
+            `jax.numpy.fft.fftn`). Otherwise, on the half plane.
         - `amplitude_contrast_ratio`:
             The amplitude contrast ratio. This argument is not used if `outputs_exp = True`, as
             the amplitude contrast ratio cannot simply be absorbed into a phase shift.
@@ -79,24 +87,19 @@ class AbstractCTF(eqx.Module, strict=True):
 
         With odd aberrations and `outputs_exp = False`, the CTF is complex.
         """  # noqa: E501
-        # Get the wavelength
-        wavelength_in_angstroms = jnp.asarray(wavelength_in_angstroms, dtype=float)
+        grid_kwargs = dict(
+            padding=padding, full=full, offset_z_in_angstroms=offset_z_in_angstroms
+        )
         # Constant phase shift, convert degrees to radians
         phase_shift = jnp.deg2rad(phase_shift)
         if not outputs_exp:
             # Compute the CTF from the even part of the phase shifts; the odd part,
             # if any, is a pure phase factor
             aberration_phase_shifts = self.compute_aberration_phase_shifts(
-                frequency_grid_in_angstroms,
-                wavelength_in_angstroms=wavelength_in_angstroms,
-                offset_z_in_angstroms=offset_z_in_angstroms,
-                parity="even",
+                image_config, parity="even", **grid_kwargs
             )
             odd_phase_shifts = self.compute_aberration_phase_shifts(
-                frequency_grid_in_angstroms,
-                wavelength_in_angstroms=wavelength_in_angstroms,
-                offset_z_in_angstroms=offset_z_in_angstroms,
-                parity="odd",
+                image_config, parity="odd", **grid_kwargs
             )
             amplitude_contrast_phase_shift = compute_amplitude_contrast_phase_shift(
                 jnp.asarray(amplitude_contrast_ratio, dtype=float)
@@ -111,9 +114,7 @@ class AbstractCTF(eqx.Module, strict=True):
             # Compute the "complex CTF", correcting for the amplitude contrast
             # and additional phase shift in the zero mode
             aberration_phase_shifts = self.compute_aberration_phase_shifts(
-                frequency_grid_in_angstroms,
-                wavelength_in_angstroms=wavelength_in_angstroms,
-                offset_z_in_angstroms=offset_z_in_angstroms,
+                image_config, **grid_kwargs
             )
             return jnp.exp(-1.0j * (aberration_phase_shifts - phase_shift))
 
@@ -181,8 +182,10 @@ class AstigmaticCTF(AbstractCTF, strict=True):
 
     def compute_aberration_phase_shifts(
         self,
-        frequency_grid_in_angstroms: Float[Array, "y_dim x_dim 2"],
-        wavelength_in_angstroms: FloatLike,
+        image_config: AbstractImageConfig,
+        *,
+        padding: bool = False,
+        full: bool = False,
         offset_z_in_angstroms: FloatLike | None = None,
         parity: Literal["all", "even", "odd"] = "all",
     ) -> Float[Array, "y_dim x_dim"] | None:
@@ -193,13 +196,13 @@ class AstigmaticCTF(AbstractCTF, strict=True):
 
         **Arguments:**
 
-        - `frequency_grid_in_angstroms`:
-            The grid of frequencies in units of inverse angstroms. This can
-            be computed with [`cryojax.ndimage.make_frequency_grid`][]
-        - `wavelength_in_angstroms`:
-            The wavelength of the incident electrons in Angstroms. This
-            can be retrieved from the accelerating voltage using the function
-            the function [`cryojax.constants.wavelength_from_kilovolts`][].
+        - `image_config`:
+            The image configuration, which gives the frequencies and the wavelength.
+        - `padding`:
+            If `True`, evaluate at the frequencies of `image_config.padded_shape`.
+        - `full`:
+            If `True`, evaluate on the full plane of frequencies (for
+            `jax.numpy.fft.fftn`). Otherwise, on the half plane.
         - `offset_z_in_angstroms`:
             An optional offset in Angstroms of the specimen along z, added to the
             defocus at runtime, e.g. the `offset_z_in_angstroms` of an `AbstractPose`.
@@ -216,8 +219,8 @@ class AstigmaticCTF(AbstractCTF, strict=True):
         )
         # Compute phase shifts for CTF
         phase_shifts = compute_even_aberration_phase_shifts(
-            frequency_grid_in_angstroms,
-            jnp.asarray(wavelength_in_angstroms, dtype=float),
+            image_config.get_frequency_grid(padding=padding, full=full),
+            image_config.wavelength_in_angstroms,
             (
                 defocus_in_angstroms
                 if offset_z_in_angstroms is None
@@ -347,8 +350,10 @@ class AberratedCTF(AbstractCTF, strict=True):
 
     def compute_aberration_phase_shifts(
         self,
-        frequency_grid_in_angstroms: Float[Array, "y_dim x_dim 2"],
-        wavelength_in_angstroms: FloatLike,
+        image_config: AbstractImageConfig,
+        *,
+        padding: bool = False,
+        full: bool = False,
         offset_z_in_angstroms: FloatLike | None = None,
         parity: Literal["all", "even", "odd"] = "all",
     ) -> Float[Array, "y_dim x_dim"] | None:
@@ -356,12 +361,13 @@ class AberratedCTF(AbstractCTF, strict=True):
 
         **Arguments:**
 
-        - `frequency_grid_in_angstroms`:
-            The grid of frequencies in units of inverse angstroms. This can
-            be computed with [`cryojax.ndimage.make_frequency_grid`][].
-        - `wavelength_in_angstroms`:
-            The wavelength of the incident electrons in Angstroms. This can be
-            computed with [`cryojax.constants.wavelength_from_kilovolts`][].
+        - `image_config`:
+            The image configuration, which gives the frequencies and the wavelength.
+        - `padding`:
+            If `True`, evaluate at the frequencies of `image_config.padded_shape`.
+        - `full`:
+            If `True`, evaluate on the full plane of frequencies (for
+            `jax.numpy.fft.fftn`). Otherwise, on the half plane.
         - `offset_z_in_angstroms`:
             An optional offset in Angstroms of the specimen along z, added to the
             defocus at runtime, e.g. the `offset_z_in_angstroms` of an `AbstractPose`.
@@ -371,7 +377,10 @@ class AberratedCTF(AbstractCTF, strict=True):
             neither coma nor trefoil.
         """
         _check_parity(self, parity)
-        wavelength_in_angstroms = jnp.asarray(wavelength_in_angstroms, dtype=float)
+        frequency_grid_in_angstroms = image_config.get_frequency_grid(
+            padding=padding, full=full
+        )
+        wavelength_in_angstroms = image_config.wavelength_in_angstroms
         even_phase_shifts, odd_phase_shifts = None, None
         if parity in ("all", "even"):
             defocus_in_angstroms = jnp.asarray(self.defocus_in_um) * 1e4

@@ -15,12 +15,7 @@ import cryojax.simulator as cxs
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from cryojax.constants import wavelength_from_kilovolts
-from cryojax.ndimage import (
-    compute_binned_powerspectrum,
-    make_frequency_grid,
-    make_radial_frequency_grid,
-)
+from cryojax.ndimage import compute_binned_powerspectrum, make_radial_frequency_grid
 from cryojax.simulator import AstigmaticCTF, EulerAnglePose
 
 
@@ -39,7 +34,9 @@ def test_ctf_with_cistem(index):
     ][index]
     cistem_ctf = _CTF_REFERENCE["ctf"][index]
     grid_size = int(_CTF_REFERENCE["grid_size"])
-    frequency_grid = make_frequency_grid((grid_size, grid_size), pixel_size)
+    config = cxs.BasicImageConfig(
+        (grid_size, grid_size), pixel_size, voltage_in_kilovolts=kV
+    )
     # Compute cryojax CTF
     optics = AstigmaticCTF(
         defocus_in_angstroms=(defocus1 + defocus2) / 2,
@@ -47,13 +44,7 @@ def test_ctf_with_cistem(index):
         astigmatism_angle=astig_angle,
         spherical_aberration_in_mm=cs,
     )
-    ctf = jnp.asarray(
-        optics(
-            frequency_grid,
-            wavelength_in_angstroms=wavelength_from_kilovolts(kV),
-            amplitude_contrast_ratio=ac,
-        )
-    )
+    ctf = jnp.asarray(optics(config, amplitude_contrast_ratio=ac))
     # Compare the radially averaged power spectrum too, which is more sensitive
     # to a systematic bias than the pointwise comparison. The CTF needs a
     # frequency grid in inverse angstroms, but the power spectrum needs one in
