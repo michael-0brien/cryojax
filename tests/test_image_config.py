@@ -260,3 +260,63 @@ def test_anisotropic_grid_norm_gradients_are_finite(anisotropy_xy):
 def test_anisotropic_config_rejects_non_2_vectors(anisotropy_xy):
     with pytest.raises(ValueError, match="anisotropy_xy"):
         _anisotropic_config(anisotropy_xy)
+
+
+@pytest.mark.parametrize(
+    "cls_name", ["BasicImageConfig", "DoseImageConfig", "AnisotropicImageConfig"]
+)
+@pytest.mark.parametrize("full", [False, True])
+def test_nominal_grid_is_the_unitless_grid_over_the_nominal_pixel_size(cls_name, full):
+    kwargs = (
+        dict(anisotropy_xy=(0.01, -0.02)) if cls_name == "AnisotropicImageConfig" else {}
+    )
+    config = getattr(cxs, cls_name)((12, 16), 1.1, nominal_pixel_size=1.05, **kwargs)
+    unitless = config.get_frequency_grid(physical=False, full=full)
+    np.testing.assert_allclose(
+        config.get_frequency_grid(full=full, nominal=True), unitless / 1.05, rtol=1e-14
+    )
+
+
+def test_unset_nominal_grid_is_the_physical_grid():
+    config = cxs.AnisotropicImageConfig((12, 16), 1.1, anisotropy_xy=(0.01, -0.02))
+    for anisotropy in (True, False):
+        np.testing.assert_array_equal(
+            config.get_frequency_grid(nominal=True, anisotropy=anisotropy),
+            config.get_frequency_grid(anisotropy=anisotropy),
+        )
+
+
+@pytest.mark.parametrize(
+    "precompute_mode", ["none", "rfft", "fft", "all", "compile_time_eval"]
+)
+def test_nominal_grid_agrees_across_precompute_modes(precompute_mode):
+    config = cxs.BasicImageConfig(
+        (12, 16),
+        1.1,
+        nominal_pixel_size=1.05,
+        padded_shape=(16, 20),
+        precompute_mode=precompute_mode,
+    )
+    expected = cxs.BasicImageConfig(
+        (12, 16), 1.1, nominal_pixel_size=1.05, padded_shape=(16, 20)
+    )
+    for padding in (False, True):
+        np.testing.assert_allclose(
+            config.get_frequency_grid(padding=padding, nominal=True),
+            expected.get_frequency_grid(padding=padding, nominal=True),
+            rtol=1e-14,
+        )
+
+
+def test_nominal_pixel_size_is_static():
+    config = cxs.BasicImageConfig((8, 8), 1.1, nominal_pixel_size=np.float64(1.05))
+    assert type(config.nominal_pixel_size) is float
+    assert not any(np.ndim(x) == 0 and float(x) == 1.05 for x in jax.tree.leaves(config))
+    grid = eqx.filter_jit(lambda c: c.get_frequency_grid(nominal=True))(config)
+    np.testing.assert_allclose(grid, config.get_frequency_grid(nominal=True))
+
+
+@pytest.mark.parametrize("value", [0.0, -1.0])
+def test_nominal_pixel_size_must_be_positive(value):
+    with pytest.raises(ValueError, match="nominal_pixel_size"):
+        cxs.BasicImageConfig((8, 8), 1.0, nominal_pixel_size=value)

@@ -132,6 +132,8 @@ class AbstractImageConfig(eqx.Module, strict=True):
     pixel_size: eqx.AbstractVar[Float[NDArrayLike, "..."]]
     voltage_in_kilovolts: eqx.AbstractVar[Float[NDArrayLike, "..."]]
 
+    nominal_pixel_size: eqx.AbstractVar[float | None]
+
     padded_shape: eqx.AbstractVar[tuple[int, int]]
     precompute_mode: eqx.AbstractVar[
         Literal["none", "rfft", "fft", "all", "compile_time_eval"]
@@ -162,6 +164,11 @@ class AbstractImageConfig(eqx.Module, strict=True):
             raise AttributeError(
                 f"Found that `{cls}.padded_shape` is less than `{cls}.shape` in one or "
                 " more dimensions."
+            )
+        if self.nominal_pixel_size is not None and not self.nominal_pixel_size > 0:
+            raise ValueError(
+                f"`{cls}.nominal_pixel_size` must be positive; got "
+                f"{self.nominal_pixel_size}."
             )
 
     @property
@@ -237,6 +244,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
         physical: bool = True,
         full: bool = False,
         anisotropy: bool = True,
+        nominal: bool = False,
     ) -> Float[Array, "y_dim x_dim 2"]:
         """Return a grid of FFT frequencies. See
         [`cryojax.ndimage.make_frequency_grid`] for more
@@ -259,6 +267,9 @@ class AbstractImageConfig(eqx.Module, strict=True):
             `jax.numpy.fft.rfftn`.
         - `anisotropy`:
             If `True` and `physical = True`, apply the anisotropic magnification.
+        - `nominal`:
+            If `True` and `nominal_pixel_size` is set, frequencies at the nominal
+            pixel size, without the anisotropic magnification.
 
         **Returns:**
 
@@ -283,6 +294,8 @@ class AbstractImageConfig(eqx.Module, strict=True):
         else:
             frequency_grid = _get_grid_impl(self)
 
+        if physical and nominal and self.nominal_pixel_size is not None:
+            return frequency_grid / self.nominal_pixel_size
         if physical:
             frequency_grid = self.apply_magnification(
                 frequency_grid, anisotropy=anisotropy
@@ -427,6 +440,8 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
     pixel_size: Float[NDArrayLike, "..."]
     voltage_in_kilovolts: Float[NDArrayLike, "..."]
 
+    nominal_pixel_size: float | None = eqx.field(static=True)
+
     padded_shape: tuple[int, int]
     precompute_mode: Literal["none", "rfft", "fft", "all", "compile_time_eval"] = (
         eqx.field(static=True)
@@ -441,6 +456,7 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
         pixel_size: FloatLike,
         voltage_in_kilovolts: FloatLike = 300.0,
         *,
+        nominal_pixel_size: float | None = None,
         padded_shape: tuple[int, int] | None = None,
         pad_scale: float = 1.0,
         precompute_mode: Literal[
@@ -455,6 +471,9 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
             The pixel size of the image in angstroms.
         - `voltage_in_kilovolts`:
             The incident energy of the electron beam.
+        - `nominal_pixel_size`:
+            The pixel size at which the CTF's defocus and astigmatism are stated,
+            in angstroms. If `None`, they are stated at `pixel_size`.
         - `padded_shape`:
             The shape of the image after padding. By default, equal
             to `shape`.
@@ -488,6 +507,9 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
         # Set parameters
         self.pixel_size = leaf_asarray(pixel_size, dtype=float)
         self.voltage_in_kilovolts = leaf_asarray(voltage_in_kilovolts, dtype=float)
+        self.nominal_pixel_size = (
+            None if nominal_pixel_size is None else float(nominal_pixel_size)
+        )
         # Set shape and padded shape
         self.shape = shape
         self.padded_shape = _set_padded_shape(type(self), shape, padded_shape, pad_scale)
@@ -512,6 +534,8 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
     voltage_in_kilovolts: Float[NDArrayLike, "..."]
     electron_dose: Float[NDArrayLike, "..."]
 
+    nominal_pixel_size: float | None = eqx.field(static=True)
+
     padded_shape: tuple[int, int]
     precompute_mode: Literal["none", "rfft", "fft", "all", "compile_time_eval"] = (
         eqx.field(static=True)
@@ -527,6 +551,7 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
         voltage_in_kilovolts: FloatLike = 300.0,
         electron_dose: FloatLike = 50.0,
         *,
+        nominal_pixel_size: float | None = None,
         padded_shape: tuple[int, int] | None = None,
         pad_scale: float = 1.0,
         precompute_mode: Literal[
@@ -544,6 +569,8 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
         - `electron_dose`:
             The integrated dose rate of the electron beam in
             $e^-/A^2$
+        - `nominal_pixel_size`:
+            As for `BasicImageConfig`.
         - `padded_shape`:
             The shape of the image after padding. By default, equal
             to `shape`.
@@ -577,6 +604,9 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
         # Set parameters
         self.pixel_size = leaf_asarray(pixel_size, dtype=float)
         self.voltage_in_kilovolts = leaf_asarray(voltage_in_kilovolts, dtype=float)
+        self.nominal_pixel_size = (
+            None if nominal_pixel_size is None else float(nominal_pixel_size)
+        )
         self.electron_dose = leaf_asarray(electron_dose, dtype=float)
         # Set shape and padded shape
         self.shape = shape
@@ -626,6 +656,8 @@ class AnisotropicImageConfig(AbstractImageConfig, strict=True):
     voltage_in_kilovolts: Float[NDArrayLike, "..."]
     anisotropy_xy: Float[NDArrayLike, "... 2"]
 
+    nominal_pixel_size: float | None = eqx.field(static=True)
+
     padded_shape: tuple[int, int]
     precompute_mode: Literal["none", "rfft", "fft", "all", "compile_time_eval"] = (
         eqx.field(static=True)
@@ -641,6 +673,7 @@ class AnisotropicImageConfig(AbstractImageConfig, strict=True):
         voltage_in_kilovolts: FloatLike = 300.0,
         anisotropy_xy: Float[NDArrayLike, "... 2"] | Sequence[float] = (0.0, 0.0),
         *,
+        nominal_pixel_size: float | None = None,
         padded_shape: tuple[int, int] | None = None,
         pad_scale: float = 1.0,
         precompute_mode: Literal[
@@ -657,6 +690,8 @@ class AnisotropicImageConfig(AbstractImageConfig, strict=True):
             The incident energy of the electron beam.
         - `anisotropy_xy`:
             The magnification anisotropy, `a * (cos(2 * angle), sin(2 * angle))`.
+        - `nominal_pixel_size`:
+            As for `BasicImageConfig`.
         - `padded_shape`:
             The shape of the image after padding. By default, equal
             to `shape`.
@@ -670,6 +705,9 @@ class AnisotropicImageConfig(AbstractImageConfig, strict=True):
         # Set parameters
         self.pixel_size = leaf_asarray(pixel_size, dtype=float)
         self.voltage_in_kilovolts = leaf_asarray(voltage_in_kilovolts, dtype=float)
+        self.nominal_pixel_size = (
+            None if nominal_pixel_size is None else float(nominal_pixel_size)
+        )
         self.anisotropy_xy = leaf_asarray_vector(
             anisotropy_xy, 2, name="AnisotropicImageConfig(..., anisotropy_xy=...)"
         )
