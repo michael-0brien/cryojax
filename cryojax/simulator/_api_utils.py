@@ -355,8 +355,9 @@ def load_tabulated_volume(  # pyright: ignore[reportOverlappingOverload]
     *,
     output_type: type[GaussianFourierVolume] = GaussianFourierVolume,
     tabulation: Literal["peng"] = "peng",
-    include_b_factors: bool = True,
+    include_b_factors: bool = False,
     b_factor_fn: Callable[[NDArrayLike, NDArrayLike], NDArrayLike] = identity_fn,
+    include_occupancies: bool = False,
     selection_string: str = "all",
     pdb_options: dict[str, Any] = {},
 ) -> GaussianFourierVolume: ...
@@ -368,8 +369,9 @@ def load_tabulated_volume(
     *,
     output_type: type[GaussianMixtureVolume] = GaussianMixtureVolume,
     tabulation: Literal["peng"] = "peng",
-    include_b_factors: bool = True,
+    include_b_factors: bool = False,
     b_factor_fn: Callable[[NDArrayLike, NDArrayLike], NDArrayLike] = identity_fn,
+    include_occupancies: bool = False,
     selection_string: str = "all",
     pdb_options: dict[str, Any] = {},
 ) -> GaussianMixtureVolume: ...
@@ -384,6 +386,7 @@ def load_tabulated_volume(
     tabulation: Literal["peng"] = "peng",
     include_b_factors: bool = False,
     b_factor_fn: Callable[[NDArrayLike, NDArrayLike], NDArrayLike] = identity_fn,
+    include_occupancies: bool = False,
     selection_string: str = "all",
     pdb_options: dict[str, Any] = {},
 ) -> GaussianFourierVolume | GaussianMixtureVolume:
@@ -431,6 +434,9 @@ def load_tabulated_volume(
         `new_b_factor = b_factor_fn(b_factor, atomic_number)`.
         If `output_type = GaussianFourierVolume`, `b_factor` is
         the mean B-factor for a given atom type.
+    - `include_occupancies`:
+        If `True`, weight each atom by its PDB occupancy. Only for
+        `output_type = GaussianMixtureVolume`.
     - `selection_string`:
         A string for [`mdtraj` atom selection](https://mdtraj.org/1.9.4/examples/atom-selection.html#atom-selection).
         See [`cryojax.io.read_atoms_from_pdb`][] for documentation.
@@ -478,10 +484,24 @@ def load_tabulated_volume(
             if include_b_factors
             else None
         )
+        occupancies = atom_properties["occupancies"] if include_occupancies else None
+        if occupancies is not None and not occupancies.any():
+            raise ValueError(
+                "Passed `include_occupancies = True` to `load_tabulated_volume`, "
+                "but every atom has occupancy 0, which would render an empty "
+                "volume. The file probably does not set occupancies; pass "
+                "`include_occupancies = False`."
+            )
         atom_volume = GaussianMixtureVolume.from_tabulated_parameters(
-            atom_positions, peng_parameters, extra_b_factors=b_factors
+            atom_positions, peng_parameters, b_factors=b_factors, occupancies=occupancies
         )
     elif output_type is GaussianFourierVolume:
+        if include_occupancies:
+            raise ValueError(
+                "Passed `include_occupancies = True` to `load_tabulated_volume` "
+                "with `output_type = GaussianFourierVolume`, which cannot weight "
+                "atoms by occupancy. Use `output_type = GaussianMixtureVolume`."
+            )
         (positions_by_id, b_factor_by_id), atom_ids = split_atoms_by_element(
             atomic_numbers, (atom_positions, atom_properties["b_factors"])
         )

@@ -13,6 +13,13 @@ Modeling the electron scattering amplitudes of individual atoms is an important 
             - a
             - b
 
+::: cryojax.constants.EmpiricalScatteringFactorParameters
+    options:
+        members:
+            - __init__
+            - a
+            - b
+
 ---
 
 !!! warning
