@@ -473,7 +473,7 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
             The incident energy of the electron beam.
         - `nominal_pixel_size`:
             The pixel size at which the CTF's defocus and astigmatism are stated,
-            in angstroms. If `None`, they are stated at `pixel_size`.
+            without the anisotropic magnification. If `None`, at `pixel_size`.
         - `padded_shape`:
             The shape of the image after padding. By default, equal
             to `shape`.

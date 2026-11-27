@@ -17,19 +17,31 @@ def compute_even_aberration_phase_shifts(
     defocus_in_angstroms: Float[Array, ""],
     astigmatism_xy_in_angstroms: Float[Array, "2"],
     spherical_aberration_in_angstroms: Float[Array, ""],
+    offset_z_in_angstroms: FloatLike | None = None,
+    nominal_frequency_grid_in_angstroms: Float[Array, "y_dim x_dim 2"] | None = None,
 ) -> Float[Array, "y_dim x_dim"]:
     """The defocus, astigmatism, and spherical aberration phase shifts. As in
-    CTFFIND4, the defocus is `defocus + astigmatism cos(2 (azimuth - angle)) / 2`."""
+    CTFFIND4, the defocus is `defocus + astigmatism cos(2 (azimuth - angle)) / 2`.
+    Given the nominal grid, the defocus and astigmatism are read on it."""
+    if nominal_frequency_grid_in_angstroms is None:
+        if offset_z_in_angstroms is not None:
+            defocus_in_angstroms = defocus_in_angstroms + jnp.asarray(
+                offset_z_in_angstroms, dtype=float
+            )
+        nominal_frequency_grid_in_angstroms = frequency_grid_in_angstroms
+        offset_z_in_angstroms = None
     q_x, q_y = frequency_grid_in_angstroms[..., 0], frequency_grid_in_angstroms[..., 1]
     q_sqr = q_x**2 + q_y**2
-    astigmatic_q_sqr = (q_y**2 - q_x**2) * astigmatism_xy_in_angstroms[0] + (
-        2.0 * q_x * q_y
+    n_x = nominal_frequency_grid_in_angstroms[..., 0]
+    n_y = nominal_frequency_grid_in_angstroms[..., 1]
+    n_sqr = n_x**2 + n_y**2
+    astigmatic_q_sqr = (n_y**2 - n_x**2) * astigmatism_xy_in_angstroms[0] + (
+        2.0 * n_x * n_y
     ) * astigmatism_xy_in_angstroms[1]
-    defocus_phase_shifts = (
-        -0.5
-        * wavelength_in_angstroms
-        * (defocus_in_angstroms * q_sqr + 0.5 * astigmatic_q_sqr)
-    )
+    defocused_q_sqr = defocus_in_angstroms * n_sqr + 0.5 * astigmatic_q_sqr
+    if offset_z_in_angstroms is not None:
+        defocused_q_sqr += jnp.asarray(offset_z_in_angstroms, dtype=float) * q_sqr
+    defocus_phase_shifts = -0.5 * wavelength_in_angstroms * defocused_q_sqr
     spherical_phase_shifts = (
         0.25
         * spherical_aberration_in_angstroms

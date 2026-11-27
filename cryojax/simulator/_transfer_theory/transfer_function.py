@@ -221,14 +221,13 @@ class AstigmaticCTF(AbstractCTF, strict=True):
         phase_shifts = compute_even_aberration_phase_shifts(
             image_config.get_frequency_grid(padding=padding, full=full),
             image_config.wavelength_in_angstroms,
-            (
-                defocus_in_angstroms
-                if offset_z_in_angstroms is None
-                else defocus_in_angstroms
-                + jnp.asarray(offset_z_in_angstroms, dtype=float)
-            ),
+            defocus_in_angstroms,
             _polar_to_xy(self.astigmatism_in_angstroms, self.astigmatism_angle, 2),
             spherical_aberration_in_angstroms,
+            offset_z_in_angstroms=offset_z_in_angstroms,
+            nominal_frequency_grid_in_angstroms=_get_nominal_grid(
+                image_config, padding, full
+            ),
         )
         return phase_shifts
 
@@ -384,8 +383,6 @@ class AberratedCTF(AbstractCTF, strict=True):
         even_phase_shifts, odd_phase_shifts = None, None
         if parity in ("all", "even"):
             defocus_in_angstroms = jnp.asarray(self.defocus_in_um) * 1e4
-            if offset_z_in_angstroms is not None:
-                defocus_in_angstroms += jnp.asarray(offset_z_in_angstroms, dtype=float)
             spherical_aberration_in_angstroms = (
                 error_if_negative(jnp.asarray(self.spherical_aberration_in_mm)) * 1e7
             )
@@ -395,6 +392,10 @@ class AberratedCTF(AbstractCTF, strict=True):
                 defocus_in_angstroms,
                 jnp.asarray(self.astigmatism_xy_in_um) * 1e4,
                 spherical_aberration_in_angstroms,
+                offset_z_in_angstroms=offset_z_in_angstroms,
+                nominal_frequency_grid_in_angstroms=_get_nominal_grid(
+                    image_config, padding, full
+                ),
             )
         if parity in ("all", "odd"):
             odd_phase_shifts = compute_odd_aberration_phase_shifts(
@@ -420,6 +421,12 @@ def _check_parity(ctf: AbstractCTF, parity: str):
             "parity=...)`. Values 'all', 'even', and 'odd' are supported, but got "
             f"{parity!r}."
         )
+
+
+def _get_nominal_grid(image_config, padding, full) -> Array | None:
+    if image_config.nominal_pixel_size is None:
+        return None
+    return image_config.get_frequency_grid(padding=padding, full=full, nominal=True)
 
 
 def _polar_to_xy(magnitude, angle_in_degrees, fold: int) -> Float[Array, "... 2"]:

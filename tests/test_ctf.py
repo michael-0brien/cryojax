@@ -466,3 +466,117 @@ def test_ctf_of_an_image_config_is_the_phase_on_its_grid(padding, full, offset_z
     np.testing.assert_array_equal(
         ctf.compute_aberration_phase_shifts(config, parity="odd", **kwargs), odd
     )
+
+
+# ── The nominal pixel size ───────────────────────────────────────────────────
+
+
+def _apparent_parameters(defocus, astigmatism_xy, pixel_size, nominal_pixel_size, d):
+    """`M' = (p_nom / p)^2 D M D^T` for `M = df I + (1/2) [[-a0, a1], [a1, a0]]`."""
+    a0, a1 = astigmatism_xy
+    m = defocus * np.eye(2) + 0.5 * np.array([[-a0, a1], [a1, a0]])
+    mp = (nominal_pixel_size / pixel_size) ** 2 * d @ m @ d.T
+    return 0.5 * np.trace(mp), np.array([mp[1, 1] - mp[0, 0], 2 * mp[0, 1]])
+
+
+def _configs(pixel_size=1.1, nominal=1.06, anisotropy_xy=(0.02, -0.015)):
+    kwargs = dict(anisotropy_xy=anisotropy_xy, padded_shape=(18, 20))
+    return (
+        cxs.AnisotropicImageConfig((14, 16), pixel_size, **kwargs),
+        cxs.AnisotropicImageConfig(
+            (14, 16), pixel_size, nominal_pixel_size=nominal, **kwargs
+        ),
+    )
+
+
+def _propagate(path, ctf, config, offset_z):
+    key_re, key_im = jax.random.split(jax.random.key(3))
+    full_shape = config.padded_shape
+    full = jax.random.normal(key_re, full_shape) + 1.0j * jax.random.normal(
+        key_im, full_shape
+    )
+    if path == "projection":
+        spectrum = full[:, : full_shape[1] // 2 + 1]
+        return cxs.ContrastTransferTheory(ctf).propagate_object(
+            spectrum, config, offset_z_in_angstroms=offset_z
+        )
+    if path == "ewald":
+        return cxs.ContrastTransferTheory(ctf).propagate_object(
+            full, config, is_ewald_sphere=True, offset_z_in_angstroms=offset_z
+        )
+    return cxs.WaveTransferTheory(ctf).propagate_exit_wave(
+        full, config, offset_z_in_angstroms=offset_z
+    )
+
+
+@pytest.mark.parametrize("path", ["projection", "ewald", "wave"])
+@pytest.mark.parametrize("offset_z", [None, 300.0])
+def test_apparent_ctf_on_the_nominal_grid_is_the_physical_ctf(path, offset_z):
+    physical, nominal = _configs()
+    odd = dict(coma_xy_in_um=_COMA, trefoil_xy_in_um=_TREFOIL) if path != "ewald" else {}
+    truth = cxs.AberratedCTF(1.2, _polar_to_xy(0.04, 35.0, 2), 2.7, **odd)
+    defocus, astigmatism = _apparent_parameters(
+        1.2,
+        np.asarray(truth.astigmatism_xy_in_um),
+        1.1,
+        1.06,
+        np.asarray(physical.anisotropy_matrix),
+    )
+    apparent = cxs.AberratedCTF(defocus, astigmatism, 2.7, **odd)
+    np.testing.assert_allclose(
+        _propagate(path, apparent, nominal, offset_z),
+        _propagate(path, truth, physical, offset_z),
+        rtol=1e-9,
+        atol=1e-12,
+    )
+
+
+def test_quadratic_terms_do_not_see_the_pixel_size_or_anisotropy():
+    def loss(pixel_size, anisotropy_xy):
+        config = cxs.AnisotropicImageConfig(
+            (14, 16), pixel_size, anisotropy_xy=anisotropy_xy, nominal_pixel_size=1.06
+        )
+        return jnp.sum(cxs.AberratedCTF(1.2, (0.03, -0.01), 0.0)(config) ** 2)
+
+    grads = jax.grad(loss, argnums=(0, 1))(1.1, jnp.array([0.02, -0.015]))
+    assert all(np.all(np.asarray(g) == 0.0) for g in grads)
+
+
+def test_nominal_ctf_derivatives_are_finite():
+    shape = (16, 16)
+    spectrum = jax.random.normal(
+        jax.random.key(0), (shape[0], shape[1] // 2 + 1), dtype=complex
+    )
+
+    def image_sum_sq(params):
+        defocus, astigmatism, cs, coma, trefoil, pixel_size = (
+            params[0],
+            params[1:3],
+            params[3],
+            params[4:6],
+            params[6:8],
+            params[8],
+        )
+        ctf = cxs.AberratedCTF(defocus, astigmatism, cs, coma, trefoil)
+        cfg = cxs.BasicImageConfig(shape, pixel_size=pixel_size, nominal_pixel_size=1.5)
+        contrast = cxs.ContrastTransferTheory(ctf).propagate_object(
+            spectrum, cfg, offset_z_in_angstroms=100.0
+        )
+        return jnp.sum(jnp.fft.irfftn(contrast, s=shape) ** 2)
+
+    params = jnp.array([1.0, 0.0, 0.0, 2.7, 0.0, 0.0, 0.0, 0.0, 1.5])
+    assert jnp.all(jnp.isfinite(jax.grad(image_sum_sq)(params)))
+    assert jnp.all(jnp.isfinite(jax.hessian(image_sum_sq)(params)))
+
+
+def test_nominal_ctf_batches_over_the_pixel_size():
+    ctf = _aberrated_ctf(coma=_COMA)
+
+    def evaluate(pixel_size):
+        return ctf(cxs.BasicImageConfig((14, 16), pixel_size, nominal_pixel_size=1.06))
+
+    pixel_sizes = jnp.array([1.05, 1.06, 1.08])
+    batched = jax.vmap(evaluate)(pixel_sizes)
+    assert batched.shape == (3, 14, 9)
+    for i, p in enumerate(pixel_sizes):
+        np.testing.assert_allclose(batched[i], evaluate(p), rtol=1e-12)
