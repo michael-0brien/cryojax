@@ -191,7 +191,7 @@ class GaussianWhiteNoiseModel(AbstractGaussianNoiseModel, strict=True):
         """
         n_pixels = self.image_model.image_config.padded_n_pixels
         frequency_grid = self.image_model.image_config.get_frequency_grid(
-            padding=True, physical=True
+            padding=True, physical=True, anisotropy=False
         )
         # Compute the zero mean variance and scale up to be independent of the number of
         # pixels
@@ -318,7 +318,7 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
         """
         n_pixels = self.image_model.image_config.padded_n_pixels
         frequency_grid = self.image_model.image_config.get_frequency_grid(
-            padding=True, physical=True
+            padding=True, physical=True, anisotropy=False
         )
         # Compute the zero mean variance and scale up to be independent of the number of
         # pixels
@@ -371,7 +371,7 @@ class GaussianColoredNoiseModel(AbstractGaussianNoiseModel, strict=True):
         """
         n_pixels = self.image_model.image_config.n_pixels
         frequency_grid = self.image_model.image_config.get_frequency_grid(
-            padding=False, physical=True
+            padding=False, physical=True, anisotropy=False
         )
         # Compute the variance and scale up to be independent of the number of pixels
         variance = n_pixels * self.variance_fn(frequency_grid)

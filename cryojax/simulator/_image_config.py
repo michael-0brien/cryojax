@@ -1,15 +1,16 @@
 """The image configuration and utility manager."""
 
 import math
-from functools import cached_property
-from typing import Literal, cast
+from abc import abstractmethod
+from collections.abc import Sequence
+from typing import ClassVar, Literal, cast
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
-from .._internal import error_if_not_positive, leaf_asarray
+from .._internal import error_if_not_positive, leaf_asarray, leaf_asarray_vector
 from ..constants import (
     interaction_constant_from_kilovolts,
     lorentz_factor_from_kilovolts,
@@ -21,6 +22,7 @@ from ..ndimage import (
     make_frequency_grid,
     query_efficient_grid_size,
 )
+from ._internal import inverse_2x2
 
 
 # Not currently public API
@@ -130,11 +132,23 @@ class AbstractImageConfig(eqx.Module, strict=True):
     pixel_size: eqx.AbstractVar[Float[NDArrayLike, "..."]]
     voltage_in_kilovolts: eqx.AbstractVar[Float[NDArrayLike, "..."]]
 
+    nominal_pixel_size: eqx.AbstractVar[float | None]
+
     padded_shape: eqx.AbstractVar[tuple[int, int]]
     precompute_mode: eqx.AbstractVar[
         Literal["none", "rfft", "fft", "all", "compile_time_eval"]
     ]
     precomputed_grids: eqx.AbstractVar[PrecomputedGrids | None]
+
+    is_anisotropic: eqx.AbstractClassVar[bool]
+
+    @property
+    @abstractmethod
+    def anisotropy_matrix(self) -> Float[Array, "2 2"]:
+        """The 2x2 matrix `D` of the anisotropic magnification, which takes a
+        projection `p(x)` to `p(D⁻¹x)`, for coordinates `x` about the image center.
+        The identity if the magnification is isotropic."""
+        raise NotImplementedError
 
     def __check_init__(self):
         cls = self.__class__.__name__
@@ -150,6 +164,11 @@ class AbstractImageConfig(eqx.Module, strict=True):
             raise AttributeError(
                 f"Found that `{cls}.padded_shape` is less than `{cls}.shape` in one or "
                 " more dimensions."
+            )
+        if self.nominal_pixel_size is not None and not self.nominal_pixel_size > 0:
+            raise ValueError(
+                f"`{cls}.nominal_pixel_size` must be positive; got "
+                f"{self.nominal_pixel_size}."
             )
 
     @property
@@ -175,7 +194,9 @@ class AbstractImageConfig(eqx.Module, strict=True):
             error_if_not_positive(jnp.asarray(self.voltage_in_kilovolts))
         )
 
-    def get_coordinate_grid(self, *, padding: bool = False, physical: bool = True):
+    def get_coordinate_grid(
+        self, *, padding: bool = False, physical: bool = True, anisotropy: bool = True
+    ) -> Float[Array, "y_dim x_dim 2"]:
         """Return the image coordinate system. See
         [`cryojax.ndimage.make_coordinate_grid`][] for more
         information.
@@ -189,6 +210,8 @@ class AbstractImageConfig(eqx.Module, strict=True):
         - `physical`:
             If `True`, return coordinates in units of angstroms.
             Otherwise, return on the unit box.
+        - `anisotropy`:
+            If `True` and `physical = True`, apply the anisotropic magnification.
 
         **Returns:**
 
@@ -208,16 +231,21 @@ class AbstractImageConfig(eqx.Module, strict=True):
             coordinate_grid = _get_grid_impl(self)
 
         if physical:
-            pixel_size = error_if_not_positive(jnp.asarray(self.pixel_size))
-            coordinate_grid = _safe_multiply_by_constant(
-                coordinate_grid, pixel_size, is_fft_grid=False
+            coordinate_grid = self.apply_magnification(
+                coordinate_grid, is_real_space=True, anisotropy=anisotropy
             )
 
         return coordinate_grid
 
     def get_frequency_grid(
-        self, *, padding: bool = False, physical: bool = True, full: bool = False
-    ):
+        self,
+        *,
+        padding: bool = False,
+        physical: bool = True,
+        full: bool = False,
+        anisotropy: bool = True,
+        nominal: bool = False,
+    ) -> Float[Array, "y_dim x_dim 2"]:
         """Return a grid of FFT frequencies. See
         [`cryojax.ndimage.make_frequency_grid`] for more
         information.
@@ -237,6 +265,11 @@ class AbstractImageConfig(eqx.Module, strict=True):
             for usage with `jax.numpy.fft.fftn`.
             Otherwise, return the half plane for usage with
             `jax.numpy.fft.rfftn`.
+        - `anisotropy`:
+            If `True` and `physical = True`, apply the anisotropic magnification.
+        - `nominal`:
+            If `True` and `nominal_pixel_size` is set, frequencies at the nominal
+            pixel size, without the anisotropic magnification.
 
         **Returns:**
 
@@ -261,13 +294,43 @@ class AbstractImageConfig(eqx.Module, strict=True):
         else:
             frequency_grid = _get_grid_impl(self)
 
+        if physical and nominal and self.nominal_pixel_size is not None:
+            return frequency_grid / self.nominal_pixel_size
         if physical:
-            pixel_size = error_if_not_positive(jnp.asarray(self.pixel_size))
-            frequency_grid = _safe_multiply_by_constant(
-                frequency_grid, 1 / pixel_size, is_fft_grid=True
+            frequency_grid = self.apply_magnification(
+                frequency_grid, anisotropy=anisotropy
             )
 
         return frequency_grid
+
+    def apply_magnification(
+        self,
+        grid: Float[Array, "y_dim x_dim 2"],
+        *,
+        is_real_space: bool = False,
+        anisotropy: bool = True,
+    ) -> Float[Array, "y_dim x_dim 2"]:
+        """Convert a unitless grid to physical units in the specimen frame. Frequencies
+        (in FFT order) map to `Dᵀk / pixel_size` and coordinates (centered) to
+        `D⁻¹x * pixel_size`, for the `anisotropy_matrix` `D`.
+
+        **Arguments:**
+
+        - `grid`:
+            A grid of frequencies in cycles per pixel, or of coordinates in pixels.
+        - `is_real_space`:
+            If `True`, `grid` is a coordinate grid. Otherwise, it is a frequency grid.
+        - `anisotropy`:
+            If `True`, apply the anisotropic magnification.
+        """
+        pixel_size = error_if_not_positive(jnp.asarray(self.pixel_size))
+        constant = pixel_size if is_real_space else 1 / pixel_size
+        grid = _safe_constant_multiply(grid, constant, is_fft_grid=not is_real_space)
+        if not (self.is_anisotropic and anisotropy):
+            return grid
+        matrix = self.anisotropy_matrix
+        matrix = inverse_2x2(matrix).T if is_real_space else matrix
+        return _safe_matrix_multiply(grid, matrix, is_fft_grid=not is_real_space)
 
     @property
     def n_pixels(self) -> int:
@@ -299,7 +362,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
         """Convenience property for `math.prod(padded_shape)`"""
         return math.prod(self.padded_shape)
 
-    @cached_property
+    @property
     def _coordinate_grid(
         self,
     ) -> Float[Array, "{self.y_dim} {self.x_dim} 2"]:
@@ -309,7 +372,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
         else:
             return self.precomputed_grids.get(real_space=True)
 
-    @cached_property
+    @property
     def _frequency_grid(
         self,
     ) -> Float[Array, "{self.y_dim} {self.x_dim//2+1} 2"]:
@@ -321,7 +384,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
         else:
             return self.precomputed_grids.get(real_space=False)
 
-    @cached_property
+    @property
     def _full_frequency_grid(
         self,
     ) -> Float[Array, "{self.y_dim} {self.x_dim} 2"]:
@@ -333,7 +396,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
         else:
             return self.precomputed_grids.get(real_space=False, full=True)
 
-    @cached_property
+    @property
     def _padded_coordinate_grid(
         self,
     ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim} 2"]:
@@ -343,7 +406,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
         else:
             return self.precomputed_grids.get(real_space=True, padding=True)
 
-    @cached_property
+    @property
     def _padded_frequency_grid(
         self,
     ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim//2+1} 2"]:
@@ -355,7 +418,7 @@ class AbstractImageConfig(eqx.Module, strict=True):
         else:
             return self.precomputed_grids.get(real_space=False, padding=True)
 
-    @cached_property
+    @property
     def _padded_full_frequency_grid(
         self,
     ) -> Float[Array, "{self.padded_y_dim} {self.padded_x_dim} 2"]:
@@ -377,11 +440,15 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
     pixel_size: Float[NDArrayLike, "..."]
     voltage_in_kilovolts: Float[NDArrayLike, "..."]
 
+    nominal_pixel_size: float | None = eqx.field(static=True)
+
     padded_shape: tuple[int, int]
     precompute_mode: Literal["none", "rfft", "fft", "all", "compile_time_eval"] = (
         eqx.field(static=True)
     )
     precomputed_grids: PrecomputedGrids | None
+
+    is_anisotropic: ClassVar[bool] = False
 
     def __init__(
         self,
@@ -389,6 +456,7 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
         pixel_size: FloatLike,
         voltage_in_kilovolts: FloatLike = 300.0,
         *,
+        nominal_pixel_size: float | None = None,
         padded_shape: tuple[int, int] | None = None,
         pad_scale: float = 1.0,
         precompute_mode: Literal[
@@ -403,6 +471,9 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
             The pixel size of the image in angstroms.
         - `voltage_in_kilovolts`:
             The incident energy of the electron beam.
+        - `nominal_pixel_size`:
+            The pixel size at which the CTF's defocus and astigmatism are stated,
+            without the anisotropic magnification. If `None`, at `pixel_size`.
         - `padded_shape`:
             The shape of the image after padding. By default, equal
             to `shape`.
@@ -436,25 +507,22 @@ class BasicImageConfig(AbstractImageConfig, strict=True):
         # Set parameters
         self.pixel_size = leaf_asarray(pixel_size, dtype=float)
         self.voltage_in_kilovolts = leaf_asarray(voltage_in_kilovolts, dtype=float)
+        self.nominal_pixel_size = (
+            None if nominal_pixel_size is None else float(nominal_pixel_size)
+        )
         # Set shape and padded shape
         self.shape = shape
         self.padded_shape = _set_padded_shape(type(self), shape, padded_shape, pad_scale)
         # Finally, grid precompute
-        if precompute_mode == "rfft":
-            self.precomputed_grids = PrecomputedGrids(
-                self.shape, self.padded_shape, only_rfft=True
-            )
-        elif precompute_mode == "fft":
-            self.precomputed_grids = PrecomputedGrids(
-                self.shape, self.padded_shape, only_rfft=False
-            )
-        elif precompute_mode == "all":
-            self.precomputed_grids = PrecomputedGrids(
-                self.shape, self.padded_shape, only_fourier=False, only_rfft=False
-            )
-        else:
-            self.precomputed_grids = None
+        self.precomputed_grids = _make_precomputed_grids(
+            self.shape, self.padded_shape, precompute_mode
+        )
         self.precompute_mode = precompute_mode
+
+    @property
+    def anisotropy_matrix(self) -> Float[Array, "2 2"]:
+        """The identity: the magnification is isotropic."""
+        return jnp.eye(2)
 
 
 class DoseImageConfig(AbstractImageConfig, strict=True):
@@ -466,11 +534,15 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
     voltage_in_kilovolts: Float[NDArrayLike, "..."]
     electron_dose: Float[NDArrayLike, "..."]
 
+    nominal_pixel_size: float | None = eqx.field(static=True)
+
     padded_shape: tuple[int, int]
     precompute_mode: Literal["none", "rfft", "fft", "all", "compile_time_eval"] = (
         eqx.field(static=True)
     )
     precomputed_grids: PrecomputedGrids | None
+
+    is_anisotropic: ClassVar[bool] = False
 
     def __init__(
         self,
@@ -479,6 +551,7 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
         voltage_in_kilovolts: FloatLike = 300.0,
         electron_dose: FloatLike = 50.0,
         *,
+        nominal_pixel_size: float | None = None,
         padded_shape: tuple[int, int] | None = None,
         pad_scale: float = 1.0,
         precompute_mode: Literal[
@@ -496,6 +569,8 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
         - `electron_dose`:
             The integrated dose rate of the electron beam in
             $e^-/A^2$
+        - `nominal_pixel_size`:
+            As for `BasicImageConfig`.
         - `padded_shape`:
             The shape of the image after padding. By default, equal
             to `shape`.
@@ -529,26 +604,23 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
         # Set parameters
         self.pixel_size = leaf_asarray(pixel_size, dtype=float)
         self.voltage_in_kilovolts = leaf_asarray(voltage_in_kilovolts, dtype=float)
+        self.nominal_pixel_size = (
+            None if nominal_pixel_size is None else float(nominal_pixel_size)
+        )
         self.electron_dose = leaf_asarray(electron_dose, dtype=float)
         # Set shape and padded shape
         self.shape = shape
         self.padded_shape = _set_padded_shape(type(self), shape, padded_shape, pad_scale)
         # Finally, grid precompute
-        if precompute_mode == "rfft":
-            self.precomputed_grids = PrecomputedGrids(
-                self.shape, self.padded_shape, only_rfft=True
-            )
-        elif precompute_mode == "fft":
-            self.precomputed_grids = PrecomputedGrids(
-                self.shape, self.padded_shape, only_rfft=False
-            )
-        elif precompute_mode == "all":
-            self.precomputed_grids = PrecomputedGrids(
-                self.shape, self.padded_shape, only_fourier=False, only_rfft=False
-            )
-        else:
-            self.precomputed_grids = None
+        self.precomputed_grids = _make_precomputed_grids(
+            self.shape, self.padded_shape, precompute_mode
+        )
         self.precompute_mode = precompute_mode
+
+    @property
+    def anisotropy_matrix(self) -> Float[Array, "2 2"]:
+        """The identity: the magnification is isotropic."""
+        return jnp.eye(2)
 
     @property
     def electrons_per_pixel(self) -> Float[Array, ""]:
@@ -559,7 +631,107 @@ class DoseImageConfig(AbstractImageConfig, strict=True):
         )
 
 
-def _safe_multiply_by_constant(
+class AnisotropicImageConfig(AbstractImageConfig, strict=True):
+    """Configuration and utilities for an electron microscopy image with an
+    anisotropic magnification.
+
+    The magnification stretches the image by `1 + a` along `angle` and compresses it
+    by `1 - a` perpendicular to it, with `angle` measured as for
+    `AstigmaticCTF.astigmatism_angle`. It is parametrized by the vector
+    `anisotropy_xy = a * (cos(2 * angle), sin(2 * angle))`.
+
+    !!! info "Applying the anisotropic magnification"
+
+        The volume integrator returns the projection with the magnification applied,
+        `p(D⁻¹x)` for the `anisotropy_matrix` `D`, and the CTF is evaluated at
+        frequencies `Dᵀk`. `FourierSliceExtraction` samples its slice at `Dᵀk`, with
+        the accuracy of an isotropic slice. `GaussianMixtureProjection` resamples its
+        projection by cubic interpolation, whose error is aliasing that grows towards
+        Nyquist. `GaussianFourierProjection`, `EwaldSphereExtraction` and
+        `MultisliceScatteringTheory` raise a `NotImplementedError`.
+    """
+
+    shape: tuple[int, int]
+    pixel_size: Float[NDArrayLike, "..."]
+    voltage_in_kilovolts: Float[NDArrayLike, "..."]
+    anisotropy_xy: Float[NDArrayLike, "... 2"]
+
+    nominal_pixel_size: float | None = eqx.field(static=True)
+
+    padded_shape: tuple[int, int]
+    precompute_mode: Literal["none", "rfft", "fft", "all", "compile_time_eval"] = (
+        eqx.field(static=True)
+    )
+    precomputed_grids: PrecomputedGrids | None
+
+    is_anisotropic: ClassVar[bool] = True
+
+    def __init__(
+        self,
+        shape: tuple[int, int],
+        pixel_size: FloatLike,
+        voltage_in_kilovolts: FloatLike = 300.0,
+        anisotropy_xy: Float[NDArrayLike, "... 2"] | Sequence[float] = (0.0, 0.0),
+        *,
+        nominal_pixel_size: float | None = None,
+        padded_shape: tuple[int, int] | None = None,
+        pad_scale: float = 1.0,
+        precompute_mode: Literal[
+            "none", "rfft", "fft", "all", "compile_time_eval"
+        ] = "none",
+    ):
+        """**Arguments:**
+
+        - `shape`:
+            Shape of the imaging plane in pixels.
+        - `pixel_size`:
+            The pixel size of the image in angstroms.
+        - `voltage_in_kilovolts`:
+            The incident energy of the electron beam.
+        - `anisotropy_xy`:
+            The magnification anisotropy, `a * (cos(2 * angle), sin(2 * angle))`.
+        - `nominal_pixel_size`:
+            As for `BasicImageConfig`.
+        - `padded_shape`:
+            The shape of the image after padding. By default, equal
+            to `shape`.
+        - `pad_scale`:
+            A scale factor used to determine the `padded_shape`, as for
+            `BasicImageConfig`.
+        - `precompute_mode`:
+            How to pre-compute coordinate and frequency grids, as for
+            `BasicImageConfig`.
+        """
+        # Set parameters
+        self.pixel_size = leaf_asarray(pixel_size, dtype=float)
+        self.voltage_in_kilovolts = leaf_asarray(voltage_in_kilovolts, dtype=float)
+        self.nominal_pixel_size = (
+            None if nominal_pixel_size is None else float(nominal_pixel_size)
+        )
+        self.anisotropy_xy = leaf_asarray_vector(
+            anisotropy_xy, 2, name="AnisotropicImageConfig(..., anisotropy_xy=...)"
+        )
+        # Set shape and padded shape
+        self.shape = shape
+        self.padded_shape = _set_padded_shape(type(self), shape, padded_shape, pad_scale)
+        # Finally, grid precompute
+        self.precomputed_grids = _make_precomputed_grids(
+            self.shape, self.padded_shape, precompute_mode
+        )
+        self.precompute_mode = precompute_mode
+
+    @property
+    def anisotropy_matrix(self) -> Float[Array, "... 2 2"]:
+        """`D = I + [[-e0, e1], [e1, e0]]`, for `anisotropy_xy = (e0, e1)`."""
+        anisotropy_xy = jnp.asarray(self.anisotropy_xy)
+        e0, e1 = anisotropy_xy[..., 0], anisotropy_xy[..., 1]
+        anisotropy = jnp.stack(
+            [jnp.stack([-e0, e1], axis=-1), jnp.stack([e1, e0], axis=-1)], axis=-2
+        )
+        return jnp.eye(2) + anisotropy
+
+
+def _safe_constant_multiply(
     grid: Float[Array, "y_dim x_dim 2"], constant: Float[Array, ""], is_fft_grid: bool
 ) -> Float[Array, "y_dim x_dim 2"]:
     """Multiply a coordinate grid by a constant, keeping zero-valued
@@ -585,6 +757,45 @@ def _safe_multiply_by_constant(
         [grid[..., 0] * scale_x[None, :], grid[..., 1] * scale_y[:, None]],
         axis=-1,
     )
+
+
+def _safe_matrix_multiply(
+    grid: Float[Array, "y_dim x_dim 2"], matrix: Float[Array, "2 2"], is_fft_grid: bool
+) -> Float[Array, "y_dim x_dim 2"]:
+    """Multiply the vectors of a grid by a matrix, `grid @ matrix`, keeping the origin
+    independent of `matrix` so that gradients through `jnp.linalg.norm(grid, axis=-1)`
+    remain finite there. The origin is at the corner for an FFT grid and at the
+    center (N//2) for a real-space grid.
+    """
+    y_dim, x_dim = grid.shape[0], grid.shape[1]
+    row_idx = jnp.arange(y_dim)
+    col_idx = jnp.arange(x_dim)
+    if is_fft_grid:
+        is_origin = (row_idx == 0)[:, None] & (col_idx == 0)[None, :]
+    else:
+        is_origin = (row_idx == y_dim // 2)[:, None] & (col_idx == x_dim // 2)[None, :]
+    # Elementwise so that XLA fuses it
+    x, y = grid[..., 0], grid[..., 1]
+    product = jnp.stack(
+        [x * matrix[0, 0] + y * matrix[1, 0], x * matrix[0, 1] + y * matrix[1, 1]],
+        axis=-1,
+    )
+    return jnp.where(is_origin[..., None], grid, product)
+
+
+def _make_precomputed_grids(
+    shape: tuple[int, int],
+    padded_shape: tuple[int, int],
+    precompute_mode: Literal["none", "rfft", "fft", "all", "compile_time_eval"],
+) -> PrecomputedGrids | None:
+    if precompute_mode == "rfft":
+        return PrecomputedGrids(shape, padded_shape, only_rfft=True)
+    elif precompute_mode == "fft":
+        return PrecomputedGrids(shape, padded_shape, only_rfft=False)
+    elif precompute_mode == "all":
+        return PrecomputedGrids(shape, padded_shape, only_fourier=False, only_rfft=False)
+    else:
+        return None
 
 
 def _set_padded_shape(

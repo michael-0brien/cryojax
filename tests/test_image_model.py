@@ -11,6 +11,7 @@ from cryojax.ndimage import (
     crop_to_shape,
     pad_to_shape,
 )
+from jax.scipy.special import erf
 
 
 jax.config.update("jax_enable_x64", True)
@@ -382,3 +383,115 @@ def test_bg_normalization_scales_about_the_background(voxel_volume, voxel_size):
     assert abs(contrast[signal_region].mean()) > 0.1 * contrast[signal_region].std()
     expected = contrast / np.sqrt(np.mean(contrast[signal_region] ** 2))
     np.testing.assert_allclose(make(True).simulate(), expected, rtol=1e-4, atol=1e-5)
+
+
+# ── Anisotropic magnification ────────────────────────────────────────────────
+
+_SHAPE, _PIXEL_SIZE, _SIGMA = (64, 64), 1.0, 3.0
+# Cubic resampling is accurate to ~1e-3 of the spectrum at 0.1-0.2 cycles/pixel,
+# where a `_SIGMA = 3` pixel gaussian has the last of its power
+_RESAMPLING_RTOL = 3e-4
+_ANISOTROPY_XY = (0.05 * np.cos(np.deg2rad(60.0)), 0.05 * np.sin(np.deg2rad(60.0)))
+
+
+def _gaussian_volume(position):
+    return cxs.GaussianMixtureVolume(
+        np.asarray([position]), amplitudes=1.0, variances=_SIGMA**2
+    )
+
+
+def _analytic_anisotropic_projection(config, center, is_pixel_averaged=False):
+    """The projection of an isotropic gaussian at `center` (in the specimen frame),
+    with the magnification applied: `p(D⁻¹x)` on the image pixels, with `p` averaged
+    over a pixel if `is_pixel_averaged`."""
+    D = np.asarray(config.anisotropy_matrix)
+    x = np.asarray(config.get_coordinate_grid(anisotropy=False))
+    r = x @ np.linalg.inv(D).T - np.asarray(center)[:2]
+    if is_pixel_averaged:
+        d, s = _PIXEL_SIZE, np.sqrt(2) * _SIGMA
+        box = np.asarray(erf((r + d / 2) / s) - erf((r - d / 2) / s))
+        return np.prod(box, axis=-1) / (2 * d) ** 2
+    return np.exp(-0.5 * np.sum(r**2, axis=-1) / _SIGMA**2) / (2 * np.pi * _SIGMA**2)
+
+
+@pytest.mark.parametrize("translate_mode", ["fft", "atom"])
+def test_anisotropic_projection_is_the_analytic_projection(translate_mode):
+    """A specimen-frame offset `t` means the same in both translation modes."""
+    config = cxs.AnisotropicImageConfig(_SHAPE, _PIXEL_SIZE, anisotropy_xy=_ANISOTROPY_XY)
+    position, offset = np.array([3.5, -2.2, 0.0]), np.array([4.0, 1.5])
+    model = cxs.ProjectionImageModel(
+        _gaussian_volume(position),
+        cxs.EulerAnglePose(*offset),
+        config,
+        cxs.GaussianMixtureProjection(sampling_mode="point"),
+        translate_mode=translate_mode,
+    )
+    expected = _analytic_anisotropic_projection(config, position[:2] + offset)
+    np.testing.assert_allclose(
+        model.simulate(), expected, atol=_RESAMPLING_RTOL * expected.max()
+    )
+
+
+@pytest.mark.parametrize(
+    "integrator, is_voxel_volume, rtol",
+    [
+        # Measured 3.9e-5
+        (cxs.GaussianMixtureProjection(sampling_mode="point"), False, _RESAMPLING_RTOL),
+        # Measured 6.9e-6, and 1.2e-5 isotropically
+        (cxs.FourierSliceExtraction(), True, 3e-5),
+    ],
+)
+def test_anisotropic_linear_image_applies_the_ctf_at_the_distorted_frequencies(
+    integrator, is_voxel_volume, rtol
+):
+    config = cxs.AnisotropicImageConfig(_SHAPE, _PIXEL_SIZE, anisotropy_xy=_ANISOTROPY_XY)
+    position, offset = np.array([3.5, -2.2, 0.0]), np.array([4.0, 1.5])
+    volume = _gaussian_volume(position)
+    if is_voxel_volume:
+        volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(
+            cxs.GaussianMixtureRenderFn((64, 64, 64), _PIXEL_SIZE)(volume),
+            interp="cubic",
+            pad_scale=2.0,
+        )
+    ctf = cxs.AberratedCTF(defocus_in_um=0.5, coma_xy_in_um=(0.5, 0.2))
+    model = cxs.LinearImageModel(
+        volume,
+        cxs.EulerAnglePose(*offset),
+        config,
+        cxs.ContrastTransferTheory(ctf, amplitude_contrast_ratio=0.1),
+        integrator,
+    )
+    ctf_array = ctf(config, padding=True, amplitude_contrast_ratio=0.1)
+    projection = _analytic_anisotropic_projection(
+        config, position[:2] + offset, is_pixel_averaged=is_voxel_volume
+    )
+    expected = np.fft.irfftn(
+        np.asarray(ctf_array) * np.fft.rfftn(projection), s=_SHAPE, axes=(0, 1)
+    )
+    np.testing.assert_allclose(
+        model.simulate(), expected, atol=rtol * np.abs(expected).max()
+    )
+
+
+def test_anisotropic_rytov_matches_weak_phase():
+    config = cxs.AnisotropicImageConfig(_SHAPE, _PIXEL_SIZE, anisotropy_xy=_ANISOTROPY_XY)
+    ctf = cxs.AstigmaticCTF(defocus_in_angstroms=2500.0)
+    volume, pose = _gaussian_volume(np.array([3.5, -2.2, 0.0])), cxs.EulerAnglePose()
+    integrator = cxs.GaussianMixtureProjection(sampling_mode="point")
+    rytov = cxs.IntensityImageModel(
+        volume,
+        pose,
+        config,
+        cxs.RytovScatteringTheory(
+            integrator, cxs.WaveTransferTheory(ctf), amplitude_contrast_ratio=0.1
+        ),
+    )
+    weak_phase = cxs.IntensityImageModel(
+        volume,
+        pose,
+        config,
+        cxs.WeakPhaseScatteringTheory(
+            integrator, cxs.ContrastTransferTheory(ctf, amplitude_contrast_ratio=0.1)
+        ),
+    )
+    np.testing.assert_allclose(rytov.simulate(), weak_phase.simulate(), atol=1e-4)

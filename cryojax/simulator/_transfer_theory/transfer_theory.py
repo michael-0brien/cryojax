@@ -78,7 +78,7 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
         ),
         image_config: AbstractImageConfig,
         *,
-        defocus_offset: FloatLike | None = None,
+        offset_z_in_angstroms: FloatLike | None = None,
         is_ewald_sphere: bool = False,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         """Apply the CTF directly to the phase shifts in the exit plane.
@@ -96,9 +96,9 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
             array. If `True`, `object_spectrum` is extracted from
             the ewald sphere and is therefore the fourier transform of a complex-valued
             array.
-        - `defocus_offset`:
-            An optional defocus offset to apply to the CTF defocus at
-            runtime.
+        - `offset_z_in_angstroms`:
+            An optional offset in Angstroms of the specimen along z, added to the
+            defocus at runtime, e.g. the `offset_z_in_angstroms` of an `AbstractPose`.
         """
         amplitude_contrast_ratio = error_if_not_fractional(
             jnp.asarray(self.amplitude_contrast_ratio)
@@ -108,23 +108,40 @@ class ContrastTransferTheory(AbstractTransferTheory, strict=True):
         if not is_ewald_sphere:
             # Compute the CTF, including additional phase shifts
             ctf_array = self.ctf(
-                frequency_grid,
-                wavelength_in_angstroms=image_config.wavelength_in_angstroms,
+                image_config,
+                padding=True,
                 phase_shift=phase_shift,
                 amplitude_contrast_ratio=amplitude_contrast_ratio,
                 outputs_exp=False,
-                defocus_offset=defocus_offset,
+                offset_z_in_angstroms=offset_z_in_angstroms,
             )
             # ... compute the contrast as the CTF multiplied by the exit plane
             # phase shifts
             contrast_spectrum = ctf_array * object_spectrum
         else:
+            # The kernel below evaluates the phase shifts at `q` for both the `q` and
+            # `-q` terms, which is only correct for even aberrations.
+            if (
+                self.ctf.compute_aberration_phase_shifts(
+                    image_config, padding=True, parity="odd"
+                )
+                is not None
+            ):
+                ctf_name = self.ctf.__class__.__name__
+                raise NotImplementedError(
+                    f"Found that `ContrastTransferTheory(ctf={ctf_name}(...))` has odd "
+                    "aberrations (e.g. `AberratedCTF(coma_xy_in_um=...)` or "
+                    "`AberratedCTF(trefoil_xy_in_um=...)`), but it was used with a "
+                    "volume integrator that outputs the Ewald sphere (e.g. "
+                    "`EwaldSphereExtraction`). Odd aberrations are not yet supported "
+                    "with the Ewald sphere. Either instantiate the CTF without odd "
+                    "aberrations, or use a volume integrator that outputs a "
+                    "projection (e.g. `FourierSliceExtraction`)."
+                )
             # Propagate to the exit plane when the phase spectrum is
             # the surface of the ewald sphere
             aberration_phase_shifts = self.ctf.compute_aberration_phase_shifts(
-                frequency_grid,
-                wavelength_in_angstroms=image_config.wavelength_in_angstroms,
-                defocus_offset=defocus_offset,
+                image_config, padding=True, offset_z_in_angstroms=offset_z_in_angstroms
             ) - jnp.deg2rad(phase_shift)
             contrast_spectrum = _compute_contrast_from_ewald_sphere(
                 object_spectrum,
@@ -162,16 +179,27 @@ class WaveTransferTheory(AbstractTransferTheory, strict=True):
         ],
         image_config: AbstractImageConfig,
         *,
-        defocus_offset: FloatLike | None = None,
+        offset_z_in_angstroms: FloatLike | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]:
-        """Apply the wave transfer function to the wavefunction in the exit plane."""
-        frequency_grid = image_config.get_frequency_grid(padding=True, full=True)
+        """Apply the wave transfer function to the wavefunction in the exit plane.
+
+        **Arguments:**
+
+        - `wavefunction_spectrum`:
+            The fourier spectrum of the wavefunction in the exit plane.
+        - `image_config`:
+            The configuration of the resulting image.
+        - `offset_z_in_angstroms`:
+            An optional offset in Angstroms of the specimen along z, added to the
+            defocus at runtime, e.g. the `offset_z_in_angstroms` of an `AbstractPose`.
+        """
         # Compute the wave transfer function
         ctf_array = self.ctf(
-            frequency_grid,
-            wavelength_in_angstroms=image_config.wavelength_in_angstroms,
+            image_config,
+            padding=True,
+            full=True,
             outputs_exp=True,
-            defocus_offset=defocus_offset,
+            offset_z_in_angstroms=offset_z_in_angstroms,
         )
         # ... compute the contrast as the CTF multiplied by the exit plane
         # phase shifts

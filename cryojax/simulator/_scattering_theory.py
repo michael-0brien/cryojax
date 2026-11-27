@@ -10,6 +10,7 @@ from ..jax_util import FloatLike, NDArrayLike
 from ._image_config import AbstractImageConfig
 from ._transfer_theory import ContrastTransferTheory, WaveTransferTheory
 from ._volume import AbstractVolumeIntegrator, AbstractVolumeRepresentation
+from ._volume.internal import check_anisotropy_supported
 
 
 class AbstractScatteringTheory(eqx.Module, strict=True):
@@ -21,7 +22,7 @@ class AbstractScatteringTheory(eqx.Module, strict=True):
         volume_representation: AbstractVolumeRepresentation,
         image_config: AbstractImageConfig,
         rng_key: PRNGKeyArray | None = None,
-        defocus_offset: FloatLike | None = None,
+        offset_z_in_angstroms: FloatLike | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         raise NotImplementedError
 
@@ -31,7 +32,7 @@ class AbstractScatteringTheory(eqx.Module, strict=True):
         volume_representation: AbstractVolumeRepresentation,
         image_config: AbstractImageConfig,
         rng_key: PRNGKeyArray | None = None,
-        defocus_offset: FloatLike | None = None,
+        offset_z_in_angstroms: FloatLike | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         raise NotImplementedError
 
@@ -48,6 +49,8 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
         image_config: AbstractImageConfig,
         rng_key: PRNGKeyArray | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]:
+        """With `image_config.is_anisotropic`, return the exit wave with the anisotropic
+        magnification applied, `ψ(D⁻¹x)`."""
         raise NotImplementedError
 
     @override
@@ -56,7 +59,7 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
         volume_representation: AbstractVolumeRepresentation,
         image_config: AbstractImageConfig,
         rng_key: PRNGKeyArray | None = None,
-        defocus_offset: FloatLike | None = None,
+        offset_z_in_angstroms: FloatLike | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         # ... compute the exit wave
         fourier_wavefunction = jnp.fft.fftn(
@@ -66,7 +69,7 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
         fourier_wavefunction = self.transfer_theory.propagate_exit_wave(
             fourier_wavefunction,
             image_config,
-            defocus_offset=defocus_offset,
+            offset_z_in_angstroms=offset_z_in_angstroms,
         )
         wavefunction = jnp.fft.ifftn(fourier_wavefunction)
         # ... get the squared wavefunction and return to fourier space
@@ -80,7 +83,7 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
         volume_representation: AbstractVolumeRepresentation,
         image_config: AbstractImageConfig,
         rng_key: PRNGKeyArray | None = None,
-        defocus_offset: FloatLike | None = None,
+        offset_z_in_angstroms: FloatLike | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         """Compute the contrast at the detector plane, given the squared wavefunction."""
         # ... compute the exit wave
@@ -91,7 +94,7 @@ class AbstractWaveScatteringTheory(AbstractScatteringTheory, strict=True):
         fourier_wavefunction = self.transfer_theory.propagate_exit_wave(
             fourier_wavefunction,
             image_config,
-            defocus_offset=defocus_offset,
+            offset_z_in_angstroms=offset_z_in_angstroms,
         )
         wavefunction = jnp.fft.ifftn(fourier_wavefunction)
         # ... get the squared wavefunction
@@ -132,6 +135,7 @@ class WeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         del rng_key
         # Compute the integrated potential
+        check_anisotropy_supported(self.volume_integrator, image_config)
         fourier_in_plane_potential = self.volume_integrator.integrate(
             volume_representation, image_config, outputs_real_space=False
         )
@@ -146,7 +150,7 @@ class WeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
         volume_representation: AbstractVolumeRepresentation,
         image_config: AbstractImageConfig,
         rng_key: PRNGKeyArray | None = None,
-        defocus_offset: FloatLike | None = None,
+        offset_z_in_angstroms: FloatLike | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         object_spectrum = self.compute_object_spectrum(
             volume_representation, image_config, rng_key
@@ -155,7 +159,7 @@ class WeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
             object_spectrum,
             image_config,
             is_ewald_sphere=self.volume_integrator.outputs_ewald_sphere,
-            defocus_offset=defocus_offset,
+            offset_z_in_angstroms=offset_z_in_angstroms,
         )
 
         return contrast_spectrum
@@ -166,7 +170,7 @@ class WeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
         volume_representation: AbstractVolumeRepresentation,
         image_config: AbstractImageConfig,
         rng_key: PRNGKeyArray | None = None,
-        defocus_offset: FloatLike | None = None,
+        offset_z_in_angstroms: FloatLike | None = None,
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim//2+1}"]:
         """Compute the squared wavefunction at the detector plane, given the
         contrast.
@@ -175,7 +179,10 @@ class WeakPhaseScatteringTheory(AbstractScatteringTheory, strict=True):
         # ... compute the squared wavefunction directly from the image contrast
         # as |psi|^2 = 1 + 2C.
         contrast_spectrum = self.compute_contrast_spectrum(
-            volume_representation, image_config, rng_key, defocus_offset=defocus_offset
+            volume_representation,
+            image_config,
+            rng_key,
+            offset_z_in_angstroms=offset_z_in_angstroms,
         )
         intensity_spectrum = (2 * contrast_spectrum).at[0, 0].add(1.0 * N1 * N2)
         return intensity_spectrum
@@ -239,6 +246,7 @@ class RytovScatteringTheory(AbstractWaveScatteringTheory, strict=True):
     ) -> Complex[Array, "{image_config.padded_y_dim} {image_config.padded_x_dim}"]:
         del rng_key
         # Compute the integrated potential in the exit plane
+        check_anisotropy_supported(self.volume_integrator, image_config)
         fourier_in_plane_potential = self.volume_integrator.integrate(
             volume_representation, image_config, outputs_real_space=False
         )
