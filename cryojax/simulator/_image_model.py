@@ -460,6 +460,12 @@ class ProjectionImageModel(AbstractImageModel, strict=True):
             - 'none':
                 Do not apply the translation.
         """
+        if volume_integrator.outputs_ewald_sphere:
+            raise ValueError(
+                "`ProjectionImageModel` does not support volume integrators with "
+                "`outputs_ewald_sphere = True`, whose output is a complex field. Got "
+                f"`volume_integrator = {type(volume_integrator).__name__}(...)`."
+            )
         # Simulator components
         self.volume = volume
         self.pose = pose

@@ -1,5 +1,6 @@
 import cryojax.simulator as cxs
 import equinox as eqx
+import jax
 import numpy as np
 import pytest
 
@@ -254,3 +255,87 @@ def test_rytov_scattering_theory_with_ewald_sphere_extraction():
     fse_image = simulate_fn(make_model(cxs.FourierSliceExtraction()))
     ese_image = simulate_fn(make_model(cxs.EwaldSphereExtraction()))
     np.testing.assert_allclose(fse_image, ese_image, atol=1e-6)
+
+
+# ── EwaldSphereExtraction: weak phase and Rytov ──────────────────────────────
+
+
+@pytest.mark.parametrize("coma_xy_in_um", [None, (3.0, 1.0)], ids=["no-coma", "coma"])
+def test_ewald_height_equals_defocus(coma_xy_in_um):
+    """An atom at height `d` images as the same atom at 0 with
+    `offset_z_in_angstroms = d`, up to interpolation error."""
+    d, dim = 6.0, 64
+    config = cxs.BasicImageConfig((dim, dim), pixel_size=1.0, voltage_in_kilovolts=20.0)
+    transfer_theory = cxs.ContrastTransferTheory(
+        cxs.AberratedCTF(defocus_in_um=0.3, coma_xy_in_um=coma_xy_in_um),
+        amplitude_contrast_ratio=0.1,
+    )
+
+    def image(integrator, z, offset_z_in_angstroms=None):
+        volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(
+            cxs.GaussianMixtureRenderFn((dim, dim, dim), voxel_size=1.0)(
+                cxs.GaussianMixtureVolume(
+                    np.array([[0.0, 0.0, z]]), amplitudes=1.0, variances=0.5
+                )
+            ),
+            interp="cubic",
+        )
+        return simulate_fn(
+            cxs.IntensityImageModel(
+                volume,
+                cxs.EulerAnglePose(offset_z_in_angstroms=offset_z_in_angstroms),
+                config,
+                cxs.WeakPhaseScatteringTheory(integrator, transfer_theory),
+            )
+        )
+
+    ewald = cxs.EwaldSphereExtraction()
+    ewald_change = image(ewald, d) - image(ewald, 0.0)
+    projection = cxs.FourierSliceExtraction()
+    projection_at_0 = image(projection, 0.0)
+
+    def relative_l2(offset):
+        expected = image(projection, 0.0, offset) - projection_at_0
+        return np.linalg.norm(ewald_change - expected) / np.linalg.norm(expected)
+
+    assert relative_l2(+d) < 0.01
+    assert relative_l2(-d) > 1.9
+
+
+def test_ewald_rytov_agree_on_extraction():
+    volume = cxs.FourierVoxelGridVolume.from_real_voxel_grid(
+        cxs.GaussianMixtureRenderFn((32, 32, 32), voxel_size=1.0)(
+            cxs.GaussianMixtureVolume(
+                np.array([[0.0, 0.0, 0.0], [3.0, -2.0, 6.0]]),
+                amplitudes=1.0,
+                variances=1.0,
+            )
+        ),
+        interp="cubic",
+    )
+    config = cxs.BasicImageConfig((32, 32), pixel_size=1.0, voltage_in_kilovolts=20.0)
+    weak_phase = cxs.WeakPhaseScatteringTheory(
+        cxs.EwaldSphereExtraction(),
+        cxs.ContrastTransferTheory(_ASTIGMATIC_CTF, amplitude_contrast_ratio=0.1),
+    )
+    rytov = cxs.RytovScatteringTheory(
+        cxs.EwaldSphereExtraction(),
+        cxs.WaveTransferTheory(_ASTIGMATIC_CTF),
+        amplitude_contrast_ratio=0.1,
+    )
+
+    def weak_limit(theory):
+        def contrast(scale):
+            scaled = eqx.tree_at(lambda v: v.values, volume, scale * volume.values)
+            return theory.compute_contrast_spectrum(scaled, config)
+
+        return jax.jvp(contrast, (0.0,), (1.0,))[1]
+
+    # Off the Nyquist row and column, where the half-plane and full-grid paths take
+    # opposite signs of the Nyquist frequency
+    off_nyquist = np.ones((32, 17), dtype=bool)
+    off_nyquist[16, :] = off_nyquist[:, 16] = False
+    rytov_limit = np.asarray(weak_limit(rytov))[off_nyquist]
+    weak_phase_limit = np.asarray(weak_limit(weak_phase))[off_nyquist]
+    error = np.abs(rytov_limit - weak_phase_limit).max() / np.abs(weak_phase_limit).max()
+    assert error <= 1e-12
